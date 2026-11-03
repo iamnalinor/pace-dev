@@ -13,6 +13,7 @@ import { cx } from "./cx.ts";
 import { IconButton } from "./icon-button.tsx";
 import { useIsWide } from "./layout.ts";
 import { BACKDROP_ENTER, DIALOG_ENTER, SHEET_ENTER } from "./motion.ts";
+import { useScrim } from "./scrim.ts";
 import { useSheetFocusRef } from "./sheet-focus.ts";
 import { useTheme } from "./theme-provider.tsx";
 import { HotkeyLayer } from "./use-hotkey.tsx";
@@ -52,7 +53,7 @@ const Backdrop = ({
       accessibilityLabel={closeLabel}
       accessibilityRole="button"
       aria-hidden={hasCross}
-      className="flex-1 bg-black/55"
+      className="flex-1 bg-scrim"
       // A focus trap that focuses it anyway (react-native-web's walks every descendant) is refused.
       {...(refuseFocus !== undefined && { onFocus: refuseFocus })}
       onPress={onClose}
@@ -67,8 +68,8 @@ const GrabHandle = () => {
   const { palette } = useTheme();
   return (
     <View
-      className="mb-4 h-1 w-9 self-center rounded-sm"
-      style={{ backgroundColor: palette.faint }}
+      className="mb-4 h-1 w-10 self-center rounded-sm"
+      style={{ backgroundColor: palette["label.quaternary"] }}
     />
   );
 };
@@ -94,18 +95,19 @@ const SheetTitle = ({
     <View className="flex-1">
       <Text
         accessibilityRole="header"
-        className="font-sans text-[20px] font-semibold text-fg"
+        className="font-sans text-title2 text-label-primary"
         nativeID={titleId}
       >
         {title}
       </Text>
       {subtitle === undefined ? null : (
-        <Text className="mt-1 font-sans text-[13px] text-muted">{subtitle}</Text>
+        <Text className="mt-1 font-sans text-footnote text-label-secondary">{subtitle}</Text>
       )}
     </View>
     {isWide ? (
-      // The cross's middle on the title's first line (QA round 16 L10: it sat about 4 px low).
-      <View className="-mr-2 -mt-2.5">
+      // The cross's middle on the title's first line (QA round 16 L10: it sat about 4 px low): a
+      // box as tall as the title's line (`text-title2` is 24 from `lg`, where this shows) centres it.
+      <View className="-mr-2 h-6 justify-center">
         <IconButton icon={X} label={closeLabel} onPress={onClose} variant="plain" />
       </View>
     ) : null}
@@ -129,13 +131,13 @@ const SheetBody = ({
   <>
     {header === undefined ? null : <View className="mt-3 gap-3">{header}</View>}
     <ScrollView
-      className="mt-3 min-h-0 shrink overscroll-contain border-t border-line"
-      contentContainerClassName="gap-[18px] pt-[15px]"
+      className="mt-3 min-h-0 shrink overscroll-contain border-t border-separator"
+      contentContainerClassName="gap-5 pt-4"
       keyboardShouldPersistTaps="handled"
     >
       {children}
     </ScrollView>
-    {footer === undefined ? null : <View className="border-t border-line pt-3">{footer}</View>}
+    {footer === undefined ? null : <View className="border-t border-separator pt-3">{footer}</View>}
   </>
 );
 
@@ -188,6 +190,8 @@ export const Sheet = ({
   const isWide = useIsWide();
   const titleId = useId();
   const surfaceRef = useSheetFocusRef({ closeLabel });
+  // The web page dims its status bar (`theme-color`) with the backdrop.
+  useScrim(visible);
   return (
     // The dialog (react-native-web gives the modal the role) is named by its title (QA round 15 L8).
     <Modal
@@ -217,10 +221,10 @@ export const Sheet = ({
               // The modal is the dialog already (react-native-web gives it the role); this is its surface.
               {...({ dataSet: { paceSheet: name, paceSurface: "sheet" } } as object)}
               className={cx(
-                "shrink overflow-hidden bg-surface px-5",
+                "shrink overflow-hidden bg-elevated px-5",
                 isWide
-                  ? "rounded-2xl border border-line pt-5 shadow-lg"
-                  : "rounded-t-[22px] border-t border-line pt-2.5",
+                  ? "rounded-lg border border-separator pt-5 shadow-lg"
+                  : "rounded-t-sheet border-t border-separator pt-3",
               )}
               style={{ paddingBottom: isWide ? 20 : Math.max(insets.bottom, 12) + 12 }}
             >

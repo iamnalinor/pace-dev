@@ -91,3 +91,19 @@ export const revokeGrant = async (
   await kv.delete(grantKey);
   return true;
 };
+
+/**
+Revokes every grant of the person and every token under them, whatever shape the provider stored
+them in: an account deleted leaves no key of its own behind (re-review N4).
+*/
+export const revokeAllGrants = async (kv: KVNamespace, userId: string): Promise<void> => {
+  const keys = [
+    ...(await keysUnder(kv, `token:${userId}:`)),
+    ...(await keysUnder(kv, grantPrefix(userId))),
+  ];
+  await Promise.all(
+    keys.map(async (name) => {
+      await kv.delete(name);
+    }),
+  );
+};

@@ -8,7 +8,7 @@
   },
   "workspaces": {
     ".": {
-      "entry": ["*.config.ts", "e2e/**/*.ts", "scripts/*.ts"]
+      "entry": ["*.config.ts", "e2e/**/*.ts", "scripts/**/*.ts"]
     },
     "packages/core": {
       "project": ["src/**/*.ts"],

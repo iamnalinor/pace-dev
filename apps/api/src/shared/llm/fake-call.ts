@@ -35,6 +35,12 @@ export const failureOf = (answer: object): APICallError | null => {
   if ("refusedWith" in answer) {
     return apiError(Number(answer.refusedWith), "Invalid API key");
   }
+  if ("badRequestWith" in answer) {
+    // A refusal of this request for good (a content filter, a context too long): no retry hint.
+    return apiError(Number(answer.badRequestWith), "Bad Request", {
+      body: JSON.stringify({ code: "content_filter", message: "the request was refused" }),
+    });
+  }
   if ("unavailableWith" in answer) {
     // As a provider that is down says it: no retry header, a JSON body.
     return apiError(Number(answer.unavailableWith), "Service Unavailable", {

@@ -27,6 +27,23 @@ export type EventStore = {
   */
   readonly getSyncVersion: () => Promise<number>;
   readonly setSyncVersion: (version: number) => Promise<void>;
-  /** Drops the events, the outbox, the cursor, the store id and the sync version. */
-  readonly clear: () => Promise<void>;
+  /**
+  Marks the copy as one session's (a mark of its token, never the token): written at sign-in,
+  before the sync writes anything into it.
+  */
+  readonly setOwner: (mark: string) => Promise<void>;
+  /**
+  Drops the events, the outbox, the cursor, the store id, the sync version and the owner. With
+  `ifOwner`, only while the copy is that session's or nobody's, checked in the clear's own
+  transaction: a browser's tabs share the copy, and one may have signed in since (re-review N3).
+  */
+  readonly clear: (ifOwner?: string) => Promise<void>;
 };
+
+/**
+Whether `clear(ifOwner)` may drop a copy whose stored owner is `owner`: always without `ifOwner`;
+with it, while the copy is that session's or nobody's (one made before owners, or just cleared).
+Every `EventStore` decides with this one rule.
+*/
+export const canClearCopy = (owner: null | string, ifOwner: string | undefined): boolean =>
+  ifOwner === undefined || owner === null || owner === ifOwner;

@@ -2,8 +2,6 @@ import { ChevronLeft, ChevronRight } from "lucide-react-native";
 import { type Ref, useEffect, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
-import type { Language } from "@pace/core";
-
 import {
   type CalendarDay,
   calendarKeyMove,
@@ -12,6 +10,7 @@ import {
   rovingDay,
   shiftMonth,
 } from "@pace/client";
+import { capitalize, type Language } from "@pace/core";
 
 import { claimFocus } from "../platform/claim-focus.ts";
 import { enterAtStop } from "../platform/enter-at-stop.ts";
@@ -27,7 +26,7 @@ const WEEKDAY_SAMPLES = [1, 2, 3, 4, 5, 6, 7].map((day) => new Date(Date.UTC(202
 const monthTitle = (month: string, language: Language): string => {
   const date = new Date(`${month}-01T00:00:00Z`);
   const name = new Intl.DateTimeFormat(language, { month: "long", timeZone: "UTC" }).format(date);
-  return `${name.charAt(0).toLocaleUpperCase(language)}${name.slice(1)} ${month.slice(0, 4)}`;
+  return `${capitalize(name, language)} ${month.slice(0, 4)}`;
 };
 
 const dayLabel = (date: string, language: Language): string =>
@@ -38,12 +37,12 @@ const dayLabel = (date: string, language: Language): string =>
     weekday: "long",
   }).format(new Date(`${date}T00:00:00Z`));
 
-/** The picked day on the quiet accent, the month's days in ink, the neighbours' faint. */
+/** The picked day on the solid accent, the month's days in ink, the neighbours' faint. */
 const ink = (cell: CalendarDay, isSelected: boolean): string => {
   if (isSelected) {
-    return "font-semibold text-accentQuietFg";
+    return "font-semibold text-accent-on";
   }
-  return cell.isInMonth ? "text-fg" : "text-faint";
+  return cell.isInMonth ? "text-label-primary" : "text-label-tertiary";
 };
 
 const NONE: ReadonlySet<string> = new Set();
@@ -82,8 +81,8 @@ const DayCell = ({
     aria-selected={isSelected}
     className={cx(
       "h-10 flex-1 items-center justify-center rounded-lg active:opacity-70",
-      isSelected && "bg-accentQuiet",
-      !isSelected && isToday && "border-2 border-fg",
+      isSelected && "bg-accent",
+      !isSelected && isToday && "border-2 border-label-primary",
       isDisabled && "opacity-30",
     )}
     disabled={isDisabled}
@@ -97,14 +96,14 @@ const DayCell = ({
     ref={ref}
     tabIndex={isStop ? 0 : -1}
   >
-    <Text className={cx("font-sans text-[13px] tabular-nums", ink(cell, isSelected))}>
+    <Text className={cx("font-sans text-footnote tabular-nums", ink(cell, isSelected))}>
       {String(cell.day)}
     </Text>
     {isMarked ? (
       <View
         className={cx(
-          "absolute bottom-1 h-1 w-1 rounded-full",
-          isSelected ? "bg-accentQuietFg" : "bg-accentQuietText",
+          "absolute bottom-1 h-1 w-1 rounded-pill",
+          isSelected ? "bg-accent-on" : "bg-accent",
         )}
       />
     ) : null}
@@ -136,7 +135,7 @@ const MonthHeader = ({
     />
     <Text
       accessibilityLiveRegion="polite"
-      className="flex-1 text-center font-sans text-[15px] font-medium text-fg"
+      className="flex-1 text-center font-sans text-callout font-medium text-label-primary"
     >
       {monthTitle(month, language)}
     </Text>
@@ -159,7 +158,7 @@ const WeekdayRow = ({ language }: { readonly language: Language }) => (
       new Intl.DateTimeFormat(language, { timeZone: "UTC", weekday: "narrow" }).format(date),
     ).map((weekday, index) => (
       <Text
-        className="flex-1 text-center font-sans text-[11px] tabular-nums text-muted"
+        className="flex-1 text-center font-sans text-caption2 font-normal tabular-nums text-label-tertiary"
         // Narrow names repeat (T, S): the column is the key.
         // eslint-disable-next-line @eslint-react/no-array-index-key -- see above
         key={index}
@@ -221,7 +220,7 @@ const useRovingDays = ({
 
 /**
 A themed month view: the month's title with previous / next, Monday-first weeks, today
-outlined, the picked day filled in the quiet accent and days with something on them dotted.
+outlined, the picked day filled in the accent and days with something on them dotted.
 The days are one tab stop (QA round 19 L5): the arrows move a day or a week, Home and End to the
 week's ends, Page Up and Down a month, Enter or Space picks; with a keyboard the picked day (else
 today) takes focus as the view opens.

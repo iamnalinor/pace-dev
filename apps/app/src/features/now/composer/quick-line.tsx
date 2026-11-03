@@ -1,5 +1,5 @@
 import { ArrowUp, Inbox, type LucideIcon, Plus } from "lucide-react-native";
-import { type RefObject, useEffect, useRef, useState } from "react";
+import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -15,6 +15,7 @@ import { type Hotkey, HOTKEYS, labelWithHotkey } from "#app/ui/hotkeys.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { Tooltip } from "#app/ui/tooltip.tsx";
 import { KEYBOARD } from "#app/ui/use-hotkey.tsx";
+import { typeRole } from "@pace/core";
 
 /** What the line needs from the composer's flow. */
 type LineFlow = {
@@ -31,9 +32,17 @@ type LineFlow = {
   readonly toInbox: () => Promise<void>;
 };
 
-const MIN_INPUT_HEIGHT = 44;
-/** Eight lines of 24 px and the padding: a longer message scrolls inside. */
-const MAX_INPUT_HEIGHT = 212;
+/**
+The line's own `py-3` and `text-callout` line (the phone column; a desktop line is a pixel shorter):
+the height sums restate those classes, so they move with them (composer.test.tsx reads both through
+the generated scale; bug-lessons class 11).
+*/
+const PAD_Y_PX = 12;
+const LINE_PX = typeRole("callout", "phone").line;
+/** One line and the padding. */
+const MIN_INPUT_HEIGHT = LINE_PX + 2 * PAD_Y_PX;
+/** Eight lines and the padding: a longer message scrolls inside. */
+const MAX_INPUT_HEIGHT = 8 * LINE_PX + 2 * PAD_Y_PX;
 
 const heightOf = (content: number): number =>
   Math.min(MAX_INPUT_HEIGHT, Math.max(MIN_INPUT_HEIGHT, Math.ceil(content)));
@@ -85,7 +94,7 @@ const LineButton = ({
   hotkey,
   icon: Icon,
   isBusy = false,
-  isLime = false,
+  isAccent = false,
   label,
   onPress,
 }: {
@@ -93,13 +102,13 @@ const LineButton = ({
   readonly hotkey: Hotkey;
   readonly icon: LucideIcon;
   readonly isBusy?: boolean;
-  /** The important action, ready: in the lime accent. */
-  readonly isLime?: boolean;
+  /** The important action, ready: on the accent. */
+  readonly isAccent?: boolean;
   readonly label: string;
   readonly onPress: () => void;
 }) => {
   const { palette } = useTheme();
-  const iconColor = isLime ? palette.accentFg : palette.fg2;
+  const iconColor = isAccent ? palette["accent.on"] : palette["label.secondary"];
   return (
     <Tooltip label={labelWithHotkey(label, hotkey, KEYBOARD)} showsOnTap={false}>
       <Pressable
@@ -107,22 +116,27 @@ const LineButton = ({
         accessibilityRole="button"
         aria-busy={isBusy}
         aria-disabled={disabled}
-        // A 44px target around the 36px circle (hitSlop does nothing on the web, QA round 18 L6);
-        // side by side they touch, and above and below they reach into the card's padding.
-        className="-my-1 h-11 w-11 items-center justify-center active:opacity-70"
+        // A 44px target around the 40px circle (hitSlop does nothing on the web, QA round 18 L6);
+        // side by side they touch. It takes its whole height in the row, which is as tall (one
+        // line and its padding): a reach into the card's padding is clipped by the unfolding
+        // card, so a press there would miss.
+        className="h-hit-web w-hit-web items-center justify-center active:opacity-70"
         disabled={disabled || isBusy}
         onPress={onPress}
       >
         <View
-          className={cx("h-9 w-9 items-center justify-center rounded-full", isLime && "bg-accent")}
+          className={cx(
+            "h-10 w-10 items-center justify-center rounded-pill",
+            isAccent && "bg-accent",
+          )}
         >
           {isBusy ? (
             <ActivityIndicator color={iconColor} size="small" />
           ) : (
             <Icon
-              color={disabled ? palette.faint : iconColor}
+              color={disabled ? palette["label.quaternary"] : iconColor}
               size={18}
-              strokeWidth={isLime ? 2.25 : 1.75}
+              strokeWidth={isAccent ? 2.25 : 1.75}
             />
           )}
         </View>
@@ -172,6 +186,14 @@ const LineInput = ({
   const isEmpty = flow.text.trim() === "";
   // A web textarea does not grow by itself: it takes its content's height, up to eight lines.
   const [inputHeight, setInputHeight] = useState(MIN_INPUT_HEIGHT);
+  // One function for the input's life: react-native-web measures the textarea (a forced layout)
+  // each time this handler changes, which made every re-render of Now pay for a layout.
+  const onContentSizeChange = useCallback(
+    (event: { readonly nativeEvent: { readonly contentSize: { readonly height: number } } }) => {
+      setInputHeight(heightOf(event.nativeEvent.contentSize.height));
+    },
+    [],
+  );
   // Back at the line after adding or closing the form: the cursor goes with it.
   useEffect(() => {
     if (flow.lineFocus > 0) {
@@ -184,8 +206,8 @@ const LineInput = ({
       accessibilityLabel={t("composer.label")}
       autoFocus={isFocused}
       className={cx(
-        "flex-1 px-1.5 py-2.5 font-sans text-[15px] leading-6",
-        isLocked ? "text-muted" : "text-fg",
+        "flex-1 px-1 py-3 font-sans text-callout",
+        isLocked ? "text-label-secondary" : "text-label-primary",
       )}
       editable={!isLocked}
       multiline
@@ -193,9 +215,7 @@ const LineInput = ({
         onFocusChange(false);
       }}
       onChangeText={flow.type}
-      onContentSizeChange={(event) => {
-        setInputHeight(heightOf(event.nativeEvent.contentSize.height));
-      }}
+      onContentSizeChange={onContentSizeChange}
       onFocus={() => {
         onFocusChange(true);
       }}
@@ -214,7 +234,7 @@ const LineInput = ({
           }),
         }))}
       placeholder={t("composer.placeholder")}
-      placeholderTextColor={palette.muted}
+      placeholderTextColor={palette["label.tertiary"]}
       ref={inputRef}
       // An empty line is one line high whatever it measured before (a wrapped placeholder, a
       // long message just added): a textarea's measured height never shrinks by itself.
@@ -227,7 +247,7 @@ const LineInput = ({
 
 /**
 The line: + (the empty form, New task), what to add, then To Inbox and Send at its right edge.
-Send is lime once there is something to send.
+Send is on the accent once there is something to send.
 */
 export const QuickLine = ({
   flow,
@@ -280,8 +300,8 @@ export const QuickLine = ({
           disabled={isIdle}
           hotkey={HOTKEYS.enter}
           icon={ArrowUp}
+          isAccent={!isIdle}
           isBusy={isReading}
-          isLime={!isIdle}
           label={t("composer.send")}
           onPress={flow.enter}
         />

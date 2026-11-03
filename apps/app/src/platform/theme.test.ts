@@ -1,6 +1,6 @@
-import { tokens } from "@pace/core";
+import { color, COLOR_ROLES } from "@pace/core";
 
-import { paletteVariables, resolveScheme } from "./theme.ts";
+import { paletteOf, paletteVariables, resolveScheme } from "./theme.ts";
 
 describe("resolveScheme", () => {
   it("follows the system scheme when the preference is system", () => {
@@ -19,14 +19,15 @@ describe("resolveScheme", () => {
 });
 
 describe("paletteVariables", () => {
-  it("maps every palette token to a --pace-* CSS variable", () => {
+  it("maps every colour role to a --pace-* CSS variable", () => {
     const dark = paletteVariables("dark");
-    expect(dark["--pace-bg"]).toBe(tokens.dark.bg);
-    expect(dark["--pace-accentText"]).toBe(tokens.dark.accentText);
-    expect(Object.keys(dark)).toHaveLength(Object.keys(tokens.dark).length);
+    expect(dark["--pace-app"]).toBe(color("dark", "bg.app"));
+    expect(dark["--pace-accent-text"]).toBe(color("dark", "accent.text"));
+    expect(Object.keys(dark)).toHaveLength(COLOR_ROLES.length);
   });
 
   it("uses the light palette for the light scheme", () => {
-    expect(paletteVariables("light")["--pace-bg"]).toBe(tokens.light.bg);
+    expect(paletteVariables("light")["--pace-app"]).toBe(color("light", "bg.app"));
+    expect(paletteOf("light")["label.primary"]).toBe(color("light", "label.primary"));
   });
 });

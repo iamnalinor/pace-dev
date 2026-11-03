@@ -32,11 +32,26 @@ export const memoryHealth = (initial: Health = {}): HealthMemory => {
 /** How long an isolate trusts what it last read, so a hot path does not ask the object every message. */
 export const HEALTH_CACHE_MS = 15_000;
 
+/**
+How long a read of the object may take: it sits on the parse and the bot's path (a 7 s budget), so
+an object that does not answer is given up on and the read goes ahead in the configured order
+(round 7 review 3).
+*/
+export const HEALTH_READ_TIMEOUT_MS = 1000;
+
+/**
+How long an isolate goes on without the object after a read failed or timed out, so every message
+in the meantime does not wait its second for it again; far shorter than a good read's window.
+*/
+export const HEALTH_FAILURE_CACHE_MS = 5000;
+
 /** The deployment's one health object. */
 const OBJECT_NAME = "global";
 
 /** What an isolate last read or saved, and when (its own clock). */
-export type HealthCache = { value?: { readonly health: Health; readonly at: number } };
+export type HealthCache = {
+  value?: { readonly health: Health; readonly at: number; readonly ttl: number };
+};
 
 /** This isolate's cache: one per isolate, as a deployment has one health object. */
 const ISOLATE_CACHE: HealthCache = {};
@@ -45,6 +60,24 @@ type ObjectHealthOptions = {
   readonly cache?: HealthCache;
   /** The isolate's clock for the cache (not the read's `now`, which a drain holds still). */
   readonly clock?: () => number;
+  readonly readTimeoutMs?: number;
+};
+
+/** The object's answer, or a refusal once `ms` passed without one. */
+const withinMs = async <T>(ms: number, call: () => Promise<T>): Promise<T> => {
+  const timer: { id?: ReturnType<typeof setTimeout> } = {};
+  try {
+    return await Promise.race([
+      call(),
+      new Promise<never>((_resolve, reject) => {
+        timer.id = setTimeout(() => {
+          reject(new Error(`no answer in ${String(ms)} ms`));
+        }, ms);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer.id);
+  }
 };
 
 /**
@@ -52,31 +85,37 @@ The health shared by every user and isolate, kept by its own Durable Object (`Ll
 one writer, so records sent at once all count and nothing an edge cache held comes back.
 Reads are cached for `HEALTH_CACHE_MS`; a read's verdicts go to the object only when they
 change a record as this isolate sees it, and the object writes its storage only when who is
-asked first changes. When the object cannot be reached the read goes ahead in the configured
-order and the failure is logged as an error; a state the object did not save is never cached.
+asked first changes. When the object cannot be reached, or does not answer within
+`HEALTH_READ_TIMEOUT_MS`, the read goes ahead in the configured order, the failure is logged as
+an error and the empty health is kept for `HEALTH_FAILURE_CACHE_MS`; a state the object did not
+save is never cached.
 */
 export const objectHealth = (
   namespace: DurableObjectNamespace<LlmHealth>,
   options: ObjectHealthOptions = {},
 ): HealthMemory => {
-  const { cache = ISOLATE_CACHE, clock = Date.now } = options;
+  const {
+    cache = ISOLATE_CACHE,
+    clock = Date.now,
+    readTimeoutMs = HEALTH_READ_TIMEOUT_MS,
+  } = options;
   const object = () => namespace.get(namespace.idFromName(OBJECT_NAME));
-  const remember = (health: Health): Health => {
-    cache.value = { at: clock(), health };
+  const remember = (health: Health, ttl = HEALTH_CACHE_MS): Health => {
+    cache.value = { at: clock(), health, ttl };
     return health;
   };
   const read = async (): Promise<Health> => {
     const cached = cache.value;
-    if (cached !== undefined && clock() - cached.at < HEALTH_CACHE_MS) {
+    if (cached !== undefined && clock() - cached.at < cached.ttl) {
       return cached.health;
     }
     try {
-      return remember(await object().read());
+      return remember(await withinMs(readTimeoutMs, async () => await object().read()));
     } catch (error) {
       log.error("llm: provider health not read; asking in the configured order", {
         why: String(error),
       });
-      return {};
+      return remember({}, HEALTH_FAILURE_CACHE_MS);
     }
   };
   return {

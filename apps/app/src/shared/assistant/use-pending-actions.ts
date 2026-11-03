@@ -4,16 +4,16 @@ import type {
   Action,
   DecisionResolution,
   Event,
-  MessageKey,
   ParseQuestion,
   ParseRequestBody,
 } from "@pace/core";
 
 import { usePace, useT } from "#app/app-state.tsx";
-import { readingIssue } from "#app/shared/assistant/reading-issue.ts";
+import { type ReadingIssue, readingIssue } from "#app/shared/assistant/reading-issue.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { type Actions, type Assistant, doneLines, type Unread, unreadOf } from "@pace/client";
+import { TOAST_FIT } from "#app/ui/toast.tsx";
+import { type Actions, approvalText, type Assistant, type Unread, unreadOf } from "@pace/client";
 
 /** Earlier turns a request may carry (`ParseRequestSchema.thread`). */
 const MAX_THREAD = 5;
@@ -54,8 +54,8 @@ const approvalFeedback = ({
   written,
 }: {
   readonly actions: Pick<Actions, "revoke">;
-  /** Each approved action in the past tense ("Created task “X”"). */
-  readonly done: readonly string[];
+  /** What was approved, in the past tense ("Created task “X”"), bounded (`approvalText`). */
+  readonly done: string;
   readonly run: ReturnType<typeof useRunAction>;
   readonly t: ReturnType<typeof useT>;
   readonly written: readonly Event[];
@@ -64,7 +64,7 @@ const approvalFeedback = ({
     ? undefined
     : {
         action: { label: t("common.undo"), onPress: undoWritten(written, actions, run) },
-        success: done.length === 0 ? t("assistant.approved") : done.join("; "),
+        success: done,
       };
 
 /** An answer worth showing as a preview; `null` when there is nothing to approve. */
@@ -102,14 +102,14 @@ const revise = (
     setIssue,
   }: {
     readonly read: (text: string, thread: Thread, decisionIds: Ids) => Promise<void>;
-    readonly setIssue: (issue: MessageKey) => void;
+    readonly setIssue: (issue: ReadingIssue) => void;
   },
 ): void => {
   if (pending === null) {
     return;
   }
   if (pending.thread.length >= MAX_THREAD) {
-    setIssue("assistant.tooManyCorrections");
+    setIssue({ canReadLater: false, key: "assistant.tooManyCorrections", retryAt: null });
     return;
   }
   void read(
@@ -153,7 +153,7 @@ const useFirstRead = () => {
     clear: (): void => {
       textRef.current = null;
     },
-    /** Kept only for a reading that found nothing: a preview is approved, a failure retried. */
+    /** Kept only for a final reading that found nothing: a preview is approved, a failure retried. */
     ended: (text: string, thread: Thread, isNothing: boolean): void => {
       textRef.current = isNothing && thread.length === 0 ? text : null;
     },
@@ -163,6 +163,16 @@ const useFirstRead = () => {
     },
   };
 };
+
+/**
+Whether asking again for the same text would get the same answer: a model's own reading, or no
+model for a reason that holds (none on this server, out of shape, out of requests until a time).
+Only "could not be reached" (ours or the providers') may change the next moment (QA round 23
+R23-04: an Enter after a paste sent the same request again).
+*/
+const isFinalAnswer = (answer: Awaited<ReturnType<Assistant["propose"]>>): boolean =>
+  answer?.status === "parsed" ||
+  (answer?.status === "unavailable" && answer.reason !== null && answer.reason !== "unreachable");
 
 /** Approve: the actions written once (a second press waits), then the log told what they made. */
 const useApprove = ({
@@ -192,7 +202,11 @@ const useApprove = ({
     try {
       const result = await actions.applyActions(pending.actions);
       const written = result.ok ? [...result.value] : [];
-      const done = doneLines(pending.actions, { language, now, state: state.store.getState() });
+      const done = approvalText(
+        pending.actions,
+        { language, now, state: state.store.getState() },
+        TOAST_FIT,
+      );
       const applied = await run(
         Promise.resolve(result),
         approvalFeedback({ actions, done, run, t, written }),
@@ -216,7 +230,7 @@ export const usePendingActions = (
 ) => {
   const { assistant } = usePace();
   const [pending, setPending] = useState<null | Pending>(null);
-  const [issue, setIssue] = useState<MessageKey | null>(null);
+  const [issue, setIssue] = useState<null | ReadingIssue>(null);
   const [busy, setBusy] = useState(false);
   const requestRef = useRef(0);
   const firstRead = useFirstRead();
@@ -233,7 +247,7 @@ export const usePendingActions = (
       return;
     }
     const next = pendingOf(answer, { decisionIds, text, thread });
-    firstRead.ended(text, thread, next === null && answer?.status === "parsed");
+    firstRead.ended(text, thread, next === null && isFinalAnswer(answer));
     if (next === null) {
       setIssue(readingIssue(answer, { domain, isRevision: thread.length > 0 }));
     } else {
@@ -242,7 +256,7 @@ export const usePendingActions = (
     setBusy(false);
   };
   /** The preview goes; the log hears the outcome when the person chose one (not on an edit). */
-  const drop = (resolution: "cancelled" | "inbox" | null): void => {
+  const drop = (resolution: "cancelled" | "corrected" | "inbox" | null): void => {
     if (resolution !== null) {
       tellLog(assistant, pending, { resolution });
     }
@@ -267,6 +281,13 @@ export const usePendingActions = (
     /** The line went to the Inbox instead: the preview of it goes, and the log is told. */
     keptInInbox: (): void => {
       drop("inbox");
+    },
+    /**
+    The line was kept for the assistant to read when it is back: that later reading takes the
+    preview's place, so the log hears "corrected", not nothing (round 7 review: it stayed open).
+    */
+    keptForLater: (): void => {
+      drop("corrected");
     },
     /** Dismissed by the person (Cancel, Escape): the log is told once, and that answer stands. */
     cancel: (): void => {

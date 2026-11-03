@@ -15,7 +15,7 @@ import {
 
 import type { DecisionEntry } from "../shared/contract.ts";
 import type { HealthMemory } from "../shared/llm/health-store.ts";
-import type { Cooldowns } from "../shared/llm/llm.ts";
+import type { Cooldowns, LlmError } from "../shared/llm/llm.ts";
 
 import { loadConfig } from "../shared/config.ts";
 import { inboxBody } from "../shared/inbox.ts";
@@ -37,13 +37,21 @@ export type QueuedParse = {
   readonly enqueuedAt: string;
   /** Not before this instant; `null` = at the next chance. */
   readonly retryAt: null | string;
+  /** Reads every provider refused for good (`LlmError.isRefused`; round 7 review 2, review I2). */
+  readonly blindTries?: number | undefined;
 };
 
 const QUEUE_KEY = "llm:queue";
 const COOLDOWNS_KEY = "llm:cooldowns";
 
-/** Without a hint, try again this much later. */
+/** Without a hint, and with no provider under a health penalty, try again this much later. */
 const RETRY_MINUTES = 5;
+/**
+Reads that may fail with no provider saying when to come back before the text goes to the Inbox:
+a refusal of this request for good (400, a content filter, a context too long) says no time, and
+would otherwise be asked again every few minutes for a day (round 7 review 2).
+*/
+export const BLIND_TRIES = 3;
 /** A text not read within a day goes to the Inbox, so nothing waits forever. */
 const GIVE_UP_MINUTES = 24 * 60;
 
@@ -161,6 +169,44 @@ const planAll = (
 };
 
 /**
+When a read with no time from any provider comes back: as the first provider under a health
+penalty is a probe again (round 7 review minor), else `RETRY_MINUTES` later.
+*/
+const blindRetryAt = async (models: Models, now: string): Promise<string> => {
+  const penalties = Object.values(await models.health.read())
+    .map((entry) => entry.until)
+    .filter((until): until is string => until !== null && until > now)
+    .toSorted((a, b) => a.localeCompare(b));
+  return penalties[0] ?? addMinutesIso(now, RETRY_MINUTES);
+};
+
+/**
+A read no model answered: the Inbox for an answer out of shape, a text a day old, or one that
+every provider refused for good `BLIND_TRIES` times; else it waits for the time a provider named,
+or `blindRetryAt` (an outage waits so for up to a day, never counted).
+*/
+const afterFailure = async (
+  item: QueuedParse,
+  {
+    error,
+    models,
+    now,
+  }: { readonly error: LlmError; readonly models: Models; readonly now: string },
+): Promise<Drained> => {
+  const isStale = addMinutesIso(item.enqueuedAt, GIVE_UP_MINUTES) <= now;
+  // Only a refusal of this request for good counts; an outage never does, so "Read it when it's
+  // back" holds for a day (review I2). An outage between refusals keeps the count.
+  const blindTries = (item.blindTries ?? 0) + (error.isRefused ? 1 : 0);
+  if (isStale || error.code === "llm/invalid-output" || blindTries >= BLIND_TRIES) {
+    return toInbox(item, now);
+  }
+  return {
+    item: { ...item, blindTries, retryAt: error.retryAt ?? (await blindRetryAt(models, now)) },
+    kind: "wait",
+  };
+};
+
+/**
 Reads one queued text as the assistant would have at the time: the reading the person asked
 for is written (it can be undone from History); a text it cannot place, one that asks for an
 edit or a delete, or one still unread a day later, goes to the Inbox instead.
@@ -184,15 +230,8 @@ export const drainOne = async (
   });
   const limited = answer.ok ? answer.value.limited : answer.error.limited;
   if (!answer.ok) {
-    const isStale = addMinutesIso(item.enqueuedAt, GIVE_UP_MINUTES) <= now;
     return {
-      drained:
-        isStale || answer.error.code === "llm/invalid-output"
-          ? toInbox(item, now)
-          : {
-              item: { ...item, retryAt: answer.error.retryAt ?? addMinutesIso(now, RETRY_MINUTES) },
-              kind: "wait",
-            },
+      drained: await afterFailure(item, { error: answer.error, models, now }),
       limited,
     };
   }

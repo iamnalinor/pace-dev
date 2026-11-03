@@ -6,7 +6,6 @@ import type { QuickTime } from "@pace/client";
 import { useT } from "#app/app-state.tsx";
 import { RadioChips } from "#app/ui/radio-chips.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
 
 import type { CloseForm } from "./use-close-form.ts";
 
@@ -16,7 +15,7 @@ const TypedTime = ({ deviceTz, form }: { readonly deviceTz: string; readonly for
   return (
     <View className="gap-2">
       <View className="flex-row gap-2">
-        <View className="flex-[3]">
+        <View className="flex-3">
           <TextField
             inputMode="numeric"
             label={t("close.date")}
@@ -27,7 +26,7 @@ const TypedTime = ({ deviceTz, form }: { readonly deviceTz: string; readonly for
             value={form.typed.date}
           />
         </View>
-        <View className="flex-[2]">
+        <View className="flex-2">
           <TextField
             inputMode="numeric"
             label={t("close.time")}
@@ -39,11 +38,14 @@ const TypedTime = ({ deviceTz, form }: { readonly deviceTz: string; readonly for
           />
         </View>
       </View>
-      <Text className="font-sans text-[12px] text-muted">
+      <Text className="font-sans text-caption font-normal text-label-tertiary">
         {t("edit.inZone", { zone: deviceTz })}
       </Text>
       {form.at === null || form.problem !== null ? (
-        <Text accessibilityLiveRegion="polite" className="font-sans text-[12px] text-warn">
+        <Text
+          accessibilityLiveRegion="polite"
+          className="font-sans text-caption font-normal text-danger"
+        >
           {t(form.problem === null ? "close.timeInvalid" : `actionError.${form.problem}`)}
         </Text>
       ) : null}
@@ -64,7 +66,6 @@ export const WhenPicker = ({
   readonly quickTimes: readonly QuickTime[];
 }) => {
   const t = useT();
-  const { palette } = useTheme();
   const isCustom = form.choice === "custom";
   return (
     <View className="gap-2">
@@ -75,7 +76,7 @@ export const WhenPicker = ({
             value: quick.key,
           })),
           {
-            leading: <CalendarDays color={isCustom ? palette.fg : palette.fg2} size={16} />,
+            leading: (color: string) => <CalendarDays color={color} size={16} />,
             // Said as it is shown: the chip that opens the date and time (QA round 20 L5).
             text: t("close.pickExact"),
             value: "custom",

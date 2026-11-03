@@ -1,7 +1,8 @@
 import { openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite";
 
-import type { EventStore } from "@pace/client";
 import type { Event } from "@pace/core";
+
+import { canClearCopy, type EventStore } from "@pace/client";
 
 const DATABASE_NAME = "pace.db";
 
@@ -22,6 +23,7 @@ export const SCHEMA_VERSION = MIGRATIONS.length;
 const CURSOR_KEY = "cursor";
 const STORE_ID_KEY = "storeId";
 const SYNC_VERSION_KEY = "syncVersion";
+const OWNER_KEY = "owner";
 
 const migrate = async (db: SQLiteDatabase): Promise<void> => {
   await db.execAsync("PRAGMA journal_mode = WAL");
@@ -104,7 +106,7 @@ const writeMeta = async (db: SQLiteDatabase, key: string, value: string): Promis
 /**
 `EventStore` on expo-sqlite (`pace.db`, WAL). Events are stored as JSON next to their
 `occurredAt` for ordered reads; the outbox is a separate id table; `meta` holds the cursor,
-the store id and the sync version.
+the store id, the sync version and the owner.
 */
 export const createSqliteEventStore = (): EventStore => {
   let connection: Promise<SQLiteDatabase> | undefined;
@@ -119,9 +121,15 @@ export const createSqliteEventStore = (): EventStore => {
         await insertAll(await db(), events);
       }
     },
-    clear: async () => {
+    clear: async (ifOwner) => {
       const connection = await db();
-      await connection.execAsync("DELETE FROM events; DELETE FROM pending; DELETE FROM meta;");
+      await connection.withExclusiveTransactionAsync(async (txn) => {
+        const owner = await readMeta(txn, OWNER_KEY);
+        if (!canClearCopy(owner, ifOwner)) {
+          return;
+        }
+        await txn.execAsync("DELETE FROM events; DELETE FROM pending; DELETE FROM meta;");
+      });
     },
     getCursor: async () => Number((await readMeta(await db(), CURSOR_KEY)) ?? 0),
     getStoreId: async () => await readMeta(await db(), STORE_ID_KEY),
@@ -144,6 +152,9 @@ export const createSqliteEventStore = (): EventStore => {
       if (ids.length > 0) {
         await deletePending(await db(), ids);
       }
+    },
+    setOwner: async (mark) => {
+      await writeMeta(await db(), OWNER_KEY, mark);
     },
     setCursor: async (seq) => {
       await writeMeta(await db(), CURSOR_KEY, String(seq));

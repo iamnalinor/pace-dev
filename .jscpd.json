@@ -18,6 +18,7 @@
     "**/*.test.tsx",
     "**/tests/**",
     "apps/app/android/**",
+    "apps/app/src/ui/generated/**",
     "e2e/**"
   ]
 }

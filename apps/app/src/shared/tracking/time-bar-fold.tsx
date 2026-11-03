@@ -58,11 +58,11 @@ export const FoldToggle = ({
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ expanded: isOpen }}
-      className="min-h-11 flex-row items-center justify-center gap-1.5 rounded-lg border border-line px-3 active:opacity-70"
+      className="min-h-hit-web flex-row items-center justify-center gap-2 rounded-lg border border-outline px-3 active:opacity-70"
       onPress={onToggle}
     >
-      <Text className="font-sans text-[13px] text-fg2">{t("time.startOther")}</Text>
-      <Chevron color={palette.fg2} size={16} />
+      <Text className="font-sans text-footnote text-label-secondary">{t("time.startOther")}</Text>
+      <Chevron color={palette["label.secondary"]} size={16} />
     </Pressable>
   );
 };

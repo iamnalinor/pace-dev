@@ -21,3 +21,42 @@ export const compareEvents = (a: Placed, b: Placed): number => {
 /** Canonical order: `occurredAt`, then `id`. Stable and pure (returns a new array). */
 export const sortEvents = (events: readonly Event[]): readonly Event[] =>
   events.toSorted(compareEvents);
+
+/** The first index whose item comes after `item` (after every equal one): a binary search. */
+const upperBound = <T>(sorted: readonly T[], item: T, compare: (a: T, b: T) => number): number => {
+  const search = (low: number, high: number): number => {
+    if (low >= high) {
+      return low;
+    }
+    const middle = Math.floor((low + high) / 2);
+    return compare(sorted[middle] as T, item) <= 0 ? search(middle + 1, high) : search(low, middle);
+  };
+  return search(0, sorted.length);
+};
+
+/**
+`sorted` (already in `compare` order) with `fresh` merged in: the same array, item for item, as a
+stable sort of `[...sorted, ...fresh]`, so an item equal to one already there goes after it. Only
+what comes after the first fresh item is sorted again; appending to the end costs a binary search
+and a copy, not a sort of the whole (bug-lessons class 55).
+*/
+export const mergeSorted = <T>(
+  sorted: readonly T[],
+  fresh: readonly T[],
+  compare: (a: T, b: T) => number,
+): readonly T[] => {
+  const incoming = fresh.toSorted(compare);
+  const [first] = incoming;
+  if (first === undefined) {
+    return sorted;
+  }
+  const cut = upperBound(sorted, first, compare);
+  const after = sorted.slice(cut);
+  return after.length === 0
+    ? [...sorted, ...incoming]
+    : [...sorted.slice(0, cut), ...[...after, ...incoming].toSorted(compare)];
+};
+
+/** `mergeSorted` in the canonical order: what `sortEvents([...sorted, ...fresh])` answers. */
+export const mergeEvents = (sorted: readonly Event[], fresh: readonly Event[]): readonly Event[] =>
+  mergeSorted(sorted, fresh, compareEvents);

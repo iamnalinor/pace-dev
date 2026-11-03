@@ -23,6 +23,13 @@ const NowStandIn = () => {
 };
 
 describe("Sidebar", () => {
+  it("sits on the sidebar ground, a step off the page (bg.sidebar, not bg.app)", async () => {
+    await renderScreen(<Sidebar />, await createTestRuntime({ world: "empty" }));
+    const classes = (screen.getByLabelText(en("nav.main")).props["className"] as string).split(" ");
+    expect(classes).toContain("bg-sidebar");
+    expect(classes).not.toContain("bg-app");
+  });
+
   it("asks Now in front for the empty form on New task, rather than reloading it", async () => {
     await renderScreen(
       <>

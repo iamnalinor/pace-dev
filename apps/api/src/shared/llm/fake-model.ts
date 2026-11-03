@@ -27,7 +27,8 @@ import {
 import { DOMAIN_LINES } from "./prompt.ts";
 
 /**
-What a scripted model does with a message: answer it, be rate limited, refuse its key, be down
+What a scripted model does with a message: answer it, be rate limited, refuse its key, refuse
+this request for good (`badRequestWith`), be down
 (a 5xx with no retry hint), or have its endpoint refuse the answer it generated on the
 endpoint's own schema check: in the error's body (`failed_generation`), or after streaming it;
 or send an error object as a stream chunk instead of an answer (`streamsError`: copy a real
@@ -35,6 +36,7 @@ endpoint's object, bug class 97).
 */
 export type FakeReply =
   | ModelOutput
+  | { readonly badRequestWith: 400 | 422 }
   | { readonly rateLimitedFor: number }
   | { readonly refusedWith: 401 | 403 }
   | { readonly schemaRefused: unknown; readonly via: "body" | "stream" }
@@ -345,6 +347,16 @@ export const echoReply = (text: string, system: string): ModelOutput => {
     ? answer("task", 1, [echoTask(text)])
     : answer("activity", 1, [echoActivity(text, system)]);
 };
+
+/** The marker that makes the fake provider refuse a request for good, as a content filter does. */
+export const FAKE_REFUSED_MARK = "#refused";
+
+/**
+The Worker's fake provider (`LLM_PROVIDER=fake`): `echoReply`, except that a message carrying
+`FAKE_REFUSED_MARK` is refused with a 400, so a test can follow a refused text through the queue.
+*/
+export const fakeProviderReply = (text: string, system: string): FakeReply =>
+  text.includes(FAKE_REFUSED_MARK) ? { badRequestWith: 400 } : echoReply(text, system);
 
 /** One new task titled with the message itself. */
 const echoTask = (text: string): ModelAction =>

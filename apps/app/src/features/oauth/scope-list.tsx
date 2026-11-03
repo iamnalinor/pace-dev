@@ -5,6 +5,7 @@ import type { OAuthScope } from "@pace/core";
 
 import { useT } from "#app/app-state.tsx";
 import { cx } from "#app/ui/cx.ts";
+import { spacePress } from "#app/ui/space-press.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { SCOPE_KEYS } from "@pace/client";
 
@@ -22,7 +23,7 @@ export const ScopeList = ({
   const { palette } = useTheme();
   return (
     <View accessibilityLabel={t("oauth.scopesTitle")} className="gap-2" role="group">
-      <Text className="mb-1 font-sans text-[11px] uppercase tabular-nums tracking-[0.06em] text-muted">
+      <Text className="mb-1 font-sans text-caption2 font-normal uppercase tabular-nums text-label-tertiary">
         {t("oauth.scopesTitle")}
       </Text>
       {offered.map((scope) => {
@@ -31,21 +32,28 @@ export const ScopeList = ({
           <Pressable
             accessibilityRole="checkbox"
             aria-checked={isChecked}
-            className="min-h-11 flex-row items-center gap-3 rounded-md border border-line px-3 py-2"
+            className="min-h-hit-web flex-row items-center gap-3 rounded-md border border-outline px-3 py-2"
             key={scope}
             onPress={() => {
               onToggle(scope);
             }}
+            {...spacePress(() => {
+              onToggle(scope);
+            })}
           >
             <View
               className={cx(
-                "h-[18px] w-[18px] items-center justify-center rounded border-[1.5px]",
-                isChecked ? "border-accentQuiet bg-accentQuiet" : "border-muted",
+                "h-5 w-5 items-center justify-center rounded-xs border-stroke",
+                isChecked ? "border-accent bg-accent-quiet" : "border-outline",
               )}
             >
-              {isChecked ? <Check color={palette.accentQuietFg} size={12} strokeWidth={3} /> : null}
+              {isChecked ? (
+                <Check color={palette["accent.text"]} size={12} strokeWidth={3} />
+              ) : null}
             </View>
-            <Text className="flex-1 font-sans text-[14px] text-fg">{t(SCOPE_KEYS[scope])}</Text>
+            <Text className="flex-1 font-sans text-subhead font-normal text-label-primary">
+              {t(SCOPE_KEYS[scope])}
+            </Text>
           </Pressable>
         );
       })}

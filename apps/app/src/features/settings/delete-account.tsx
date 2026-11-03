@@ -1,4 +1,3 @@
-import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Text, View } from "react-native";
 
@@ -49,7 +48,6 @@ while a Confirm tapped in time is still being carried out (bug class 35).
 const useConfirmationPoll = ({ action, onTerminal, request }: PollInput): void => {
   const { auth } = useAuth();
   const { syncNow } = useSync();
-  const router = useRouter();
   const toast = useToast();
   const t = useT();
   useEffect(() => {
@@ -61,8 +59,8 @@ const useConfirmationPoll = ({ action, onTerminal, request }: PollInput): void =
     const finishConfirmed = async (): Promise<void> => {
       onTerminal(null);
       if (action === "delete") {
+        // Signed out: the route gate takes the device to the login card (bug class 75).
         await auth.finishAccountDeletion();
-        router.replace("/login");
       } else {
         await syncNow();
         toast.show({ message: t("settings.wipe.done") });
@@ -93,7 +91,7 @@ const useConfirmationPoll = ({ action, onTerminal, request }: PollInput): void =
       isActive = false;
       clearTimeout(timer);
     };
-  }, [action, auth, onTerminal, request, router, syncNow, t, toast]);
+  }, [action, auth, onTerminal, request, syncNow, t, toast]);
 };
 
 const useDangerFlow = () => {
@@ -195,12 +193,12 @@ const DangerPrompt = ({ flow }: { readonly flow: ReturnType<typeof useDangerFlow
   ) : (
     <View
       aria-label={warning}
-      className="gap-3 rounded-xl border border-warn bg-surface p-4"
+      className="gap-3 rounded-xl border border-danger bg-cell p-4"
       role="group"
     >
       <Text
         accessibilityLiveRegion="polite"
-        className="font-sans text-[14px] leading-5 text-fg"
+        className="font-sans text-subhead font-normal text-label-primary"
         role="status"
       >
         {warning}
@@ -224,7 +222,10 @@ const DangerPrompt = ({ flow }: { readonly flow: ReturnType<typeof useDangerFlow
         />
       ) : (
         <View className="gap-2">
-          <Text accessibilityLiveRegion="polite" className="font-sans text-[13px] text-fg2">
+          <Text
+            accessibilityLiveRegion="polite"
+            className="font-sans text-footnote text-label-secondary"
+          >
             {t("settings.confirmation.waiting")}
           </Text>
           <View className="self-start">
@@ -249,13 +250,13 @@ export const DangerZone = () => {
   const flow = useDangerFlow();
   return (
     // Set apart from the account's actions: a rule and room above it (QA round 15 L6).
-    <View className="mt-3 gap-3 border-t border-line pt-5">
-      <Text accessibilityRole="header" className="font-sans text-[14px] font-semibold text-warn">
+    <View className="mt-3 gap-3 border-t border-separator pt-5">
+      <Text accessibilityRole="header" className="font-sans text-subhead font-semibold text-danger">
         {t("settings.danger")}
       </Text>
       <DangerPrompt flow={flow} />
       {flow.notice === null ? null : (
-        <Text accessibilityRole="alert" className="font-sans text-[13px] text-warn">
+        <Text accessibilityRole="alert" className="font-sans text-footnote text-danger">
           {t(NOTICE_KEY[flow.notice])}
         </Text>
       )}

@@ -10,6 +10,8 @@ import {
 } from "react";
 import { Pressable, Text, View } from "react-native";
 
+import { clipText, clipWords } from "@pace/core";
+
 import { cx } from "./cx.ts";
 import { useIsWide } from "./layout.ts";
 
@@ -112,13 +114,81 @@ of the screen's footer, as the toast does, so it covers no header control (round
 */
 export const useFloatBottom = (): number => use(FloatBottomContext);
 
+/** Where a toast docked in the sidebar sits: inside its column (`w-sidebar-inner`), at its foot. */
+const DOCKED = "bottom-4 left-3 w-sidebar-inner";
+const FLOATING = "inset-x-4 mx-auto w-auto max-w-toast-max";
+
 /**
-Where a toast docked in the sidebar sits: inside its 224 px column, at its foot, its action under
-the text so the text has the column's whole width (QA round 17 L5: beside the action it had a
-hundred pixels and lost its third line).
+How much of a value from data (a task title, an event, an action's summary) a toast quotes: about
+two lines in the sidebar's column, one on a phone.
 */
-const DOCKED = "bottom-4 left-3 w-[200px] flex-col items-stretch gap-0 pr-2";
-const FLOATING = "inset-x-4 mx-auto w-auto max-w-[480px] flex-row items-center gap-3 pr-1";
+export const TOAST_QUOTE_GRAPHEMES = 48;
+
+/**
+A value from data, quoted in a toast's sentence: cut short here, so the sentence itself is never
+cut. The message is shown whole (UI text wraps, spec 4.1.2 rule 3): a clamp on the whole message
+hid the end of the very sentence that explains a refused tap (QA round 22 R22-01).
+*/
+export const toastQuote = (value: string): string => clipText(value, TOAST_QUOTE_GRAPHEMES);
+
+/** How much of a whole stored sentence (an action's summary) a toast shows: about two quotes. */
+export const TOAST_SENTENCE_GRAPHEMES = 2 * TOAST_QUOTE_GRAPHEMES;
+
+/** A whole sentence from data in a toast: cut at a word, never inside one. */
+export const toastSentence = (value: string): string => clipWords(value, TOAST_SENTENCE_GRAPHEMES);
+
+/** How the approval toast fits names and stored sentences (`approvalText`). */
+export const TOAST_FIT = { quote: toastQuote, sentence: toastSentence } as const;
+
+/**
+The toast's card: its words in full and the one action. `ToastBar` places and announces it; the
+gallery shows it. Docked in the sidebar the action goes under the text, so the text has the
+column's whole width (QA round 17 L5: beside the action it had a hundred pixels).
+*/
+export const ToastCard = ({
+  className,
+  isDocked = false,
+  onDone,
+  toast,
+}: {
+  readonly className?: string;
+  readonly isDocked?: boolean;
+  readonly onDone: () => void;
+  readonly toast: ToastInput;
+}) => (
+  <View
+    className={cx(
+      "rounded-xl border border-separator bg-elevated py-1 pl-4 shadow-lg",
+      isDocked ? "flex-col items-stretch pr-2" : "flex-row items-center gap-3 pr-1",
+      className,
+    )}
+  >
+    {/* A tap on the text dismisses it. The words wrap to as many lines as they need. */}
+    <Pressable className={isDocked ? "self-stretch" : "min-w-0 flex-1"} onPress={onDone}>
+      <Text className="py-3 font-sans text-subhead font-normal text-label-primary">
+        {toast.message}
+      </Text>
+    </Pressable>
+    {toast.action === undefined ? null : (
+      <Pressable
+        accessibilityRole="button"
+        className={cx(
+          "h-hit-web shrink-0 justify-center rounded-md px-3 active:opacity-70",
+          isDocked && "self-end",
+        )}
+        onPress={() => {
+          // Closed first, so the action may show a toast of its own.
+          onDone();
+          toast.action?.onPress();
+        }}
+      >
+        <Text className="font-sans text-subhead font-semibold text-accent-text">
+          {toast.action.label}
+        </Text>
+      </Pressable>
+    )}
+  </View>
+);
 
 const ToastBar = ({
   bottom,
@@ -134,37 +204,11 @@ const ToastBar = ({
   <View
     accessibilityLiveRegion="polite"
     accessibilityRole="alert"
-    className={cx(
-      "absolute rounded-xl border border-line bg-surface py-1 pl-4 shadow-lg",
-      isDocked ? DOCKED : FLOATING,
-    )}
+    className={cx("absolute", isDocked ? DOCKED : FLOATING)}
     style={isDocked ? undefined : { bottom }}
     testID="toast"
   >
-    {/* Three lines at most, and a tap on the text dismisses it: a long title never sticks around. */}
-    <Pressable className={isDocked ? "self-stretch" : "flex-1"} onPress={onDone}>
-      <Text className="py-2.5 font-sans text-[14px] text-fg" numberOfLines={isDocked ? 5 : 3}>
-        {toast.message}
-      </Text>
-    </Pressable>
-    {toast.action === undefined ? null : (
-      <Pressable
-        accessibilityRole="button"
-        className={cx(
-          "h-11 justify-center rounded-md px-3 active:opacity-70",
-          isDocked && "self-end",
-        )}
-        onPress={() => {
-          // Closed first, so the action may show a toast of its own.
-          onDone();
-          toast.action?.onPress();
-        }}
-      >
-        <Text className="font-sans text-[14px] font-semibold text-accentText">
-          {toast.action.label}
-        </Text>
-      </Pressable>
-    )}
+    <ToastCard isDocked={isDocked} onDone={onDone} toast={toast} />
   </View>
 );
 

@@ -283,6 +283,71 @@ describe("validatePresetInput", () => {
     });
   });
 
+  it("refuses a name another preset has, whatever its case, a default's in either language too (QA 21 L4)", () => {
+    const taken = { error: "preset/name-taken", ok: false };
+    expect(validatePresetInput(state, input({ name: "HW.ALGEBRA" }), "create")).toEqual(taken);
+    expect(validatePresetInput(state, input({ name: " Work " }), "create")).toEqual(taken);
+    expect(validatePresetInput(state, input({ name: "Работа" }), "create")).toEqual(taken);
+    // Renaming another preset to it too; keeping its own name is no clash.
+    expect(validatePresetInput(state, input({ id: "hw.loop", name: "work" }), "update")).toEqual(
+      taken,
+    );
+    expect(
+      validatePresetInput(state, input({ id: "hw.algebra", name: "hw.algebra" }), "update"),
+    ).toEqual({ ok: true, value: undefined });
+    // An archived preset gives its name back.
+    const archived = stateWith({ ...existing, archived: true });
+    expect(validatePresetInput(archived, input({ name: "hw.algebra" }), "create")).toEqual({
+      ok: true,
+      value: undefined,
+    });
+  });
+
+  it("checks a name only when it changes: presets already sharing one stay editable (review I1)", () => {
+    const ok = { ok: true, value: undefined };
+    // Two "Gym" from an offline merge (or from before names were unique).
+    const merged = stateWith(
+      { ...user("gym-aaaaaa", "hw", {}), name: "Gym" },
+      { ...user("gym-bbbbbb", "hw", {}), name: "gym " },
+    );
+    expect(
+      validatePresetInput(
+        merged,
+        input({ definition: { defaultEstimateMinutes: 30 }, id: "gym-aaaaaa", name: "Gym" }),
+        "update",
+      ),
+    ).toEqual(ok);
+    expect(
+      validatePresetInput(merged, input({ id: "gym-bbbbbb", name: "gym " }), "update"),
+    ).toEqual(ok);
+    // A change of case or spacing of its own name is no new clash either.
+    expect(validatePresetInput(merged, input({ id: "gym-bbbbbb", name: "GYM" }), "update")).toEqual(
+      ok,
+    );
+    // The default `work` beside a custom "Work": the default keeps its shipped name, in either
+    // language, and the custom one its own.
+    const shadowed = stateWith({ ...user("work-cccccc", "work", {}), name: "Work" });
+    for (const name of ["Work", "Работа", "work"]) {
+      expect(
+        validatePresetInput(shadowed, input({ extends: null, id: "work", name }), "update"),
+      ).toEqual(ok);
+    }
+    expect(
+      validatePresetInput(
+        shadowed,
+        input({ extends: "work", id: "work-cccccc", name: "Work" }),
+        "update",
+      ),
+    ).toEqual(ok);
+    // Renaming into a name another preset goes by is still refused.
+    expect(
+      validatePresetInput(merged, input({ id: "gym-aaaaaa", name: "Work" }), "update"),
+    ).toEqual({
+      error: "preset/name-taken",
+      ok: false,
+    });
+  });
+
   it("requires a base: extends null is rejected", () => {
     expect(validatePresetInput(state, input({ extends: null }), "create")).toEqual({
       error: "preset/no-base",

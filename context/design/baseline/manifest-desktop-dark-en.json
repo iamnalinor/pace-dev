@@ -1,0 +1,459 @@
+[
+  {
+    "file": "routes/now--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "scroll/now-1--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/day--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/week--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/inbox--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/more--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "scroll/more-1--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/add--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "scroll/add-1--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/projects--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/project--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/presets--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/preset--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "scroll/preset-1--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "scroll/preset-2--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/task-open--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/task-done--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/task-repeating--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/decisions--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/review--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/history--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "scroll/history-1--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "scroll/history-2--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "scroll/history-3--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/insights--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "scroll/insights-1--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/notifications--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/settings--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "scroll/settings-1--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "scroll/settings-2--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "scroll/settings-3--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/permissions--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/onboarding--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/oauth-authorize--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/app-auth--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/app-login--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/auth--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/auth-telegram--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "scroll/auth-telegram-1--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/not-found--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "empty/now--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "empty/day--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "empty/week--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "empty/inbox--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "empty/projects--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "empty/presets--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "empty/insights--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "empty/history--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "empty/notifications--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "empty/decisions--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "empty/review--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "empty/settings--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "signed-out/login--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "signed-out/app-login--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "signed-out/app-auth--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "signed-out/auth--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "signed-out/oauth-authorize--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "signed-out/not-found--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "signed-out/login-server-picker--desktop-dark-en.png",
+    "note": "Android only: not on the web build",
+    "ok": false
+  },
+  {
+    "file": "states/now-composer-typed--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/now-composer-form--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/now-assistant-preview--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/now-assistant-question--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/now-in-future--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/now-task-pane--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/now-calendar-tooltip--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/notifications-feed--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/sidebar-new-task--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/day-gap-log--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/day-block-edit--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/day-log-past--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/day-pick-date--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/day-previous--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/time-chores-picker--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/time-rest-picker--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/time-task-picker--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/time-typed-preview--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/time-typed-draft--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/week-event--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/task-edit-sheet--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/task-close-as--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/task-project-picker--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/task-original-message--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/task-delete-confirm--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/projects-new--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/settings-add-computer--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/settings-connect-ai--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/settings-wipe--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/settings-sessions-loading--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/settings-sessions-error--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/offline--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/toast-to-inbox--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/now-check-dissolve--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/now-check-toast--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "focus/now-tab1--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "focus/now-tab3--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "focus/now-tab6--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "focus/now-tab10--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "focus/now-tab16--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "focus/day-tab1--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "focus/day-tab3--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "focus/day-tab6--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "focus/day-tab10--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "focus/day-tab16--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "focus/task-tab1--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "focus/task-tab3--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "focus/task-tab6--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "focus/task-tab10--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "focus/task-tab16--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "focus/settings-tab1--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "focus/settings-tab3--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "focus/settings-tab6--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "focus/settings-tab10--desktop-dark-en.png",
+    "ok": true
+  },
+  {
+    "file": "focus/settings-tab16--desktop-dark-en.png",
+    "ok": true
+  }
+]

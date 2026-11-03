@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { endpoints, LIVE_SESSION_ENDED, ParseResponseSchema } from "@pace/core";
 
@@ -6,6 +6,7 @@ import type { SocketLike } from "./live.ts";
 
 import { createMemoryEventStore } from "./adapters/memory-event-store.ts";
 import { createPaceClient, type PaceClient } from "./create-client.ts";
+import { REQUEST_DEADLINE_MS } from "./deadline.ts";
 import {
   createFakeFetch,
   emptySyncRoutes,
@@ -14,6 +15,7 @@ import {
   fakeUser,
   problem,
 } from "./fake-fetch.fake.ts";
+import { createHeldEventStore } from "./held-event-store.fake.ts";
 import { createMemorySessionStore } from "./session.ts";
 
 const setup = async (
@@ -73,6 +75,86 @@ const oneSocket = (): {
 };
 
 describe("createPaceClient", () => {
+  it("counts the changes that have not reached the server, for Log out to ask (QA round 23 R23-02)", async () => {
+    const { client } = await setup({}, "tok");
+    await expect(client.unsyncedCount()).resolves.toBe(0);
+    await client.actions.setNightHours(true);
+    await client.actions.setLanguage("ru");
+    await expect(client.unsyncedCount()).resolves.toBe(2);
+    await client.sync.syncNow();
+    await expect(client.unsyncedCount()).resolves.toBe(0);
+  });
+
+  it("a stale tab's sign-out keeps the shared copy another tab claimed since (re-review N3)", async () => {
+    // Two tabs of one browser profile: one store, each tab its own client.
+    const store = createMemoryEventStore();
+    const tab = async (token: string): Promise<PaceClient> => {
+      const session = createMemorySessionStore();
+      await session.set(token);
+      const api = createFakeFetch({ ...emptySyncRoutes, "GET /api/me": () => fakeMe });
+      const client = createPaceClient({
+        baseUrl: "https://api.test",
+        deviceId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+        fetch: api.fetch,
+        now: () => "2026-10-06T12:00:00.000Z",
+        session,
+        source: "web",
+        store,
+      });
+      await client.auth.ready;
+      await client.state.ready;
+      return client;
+    };
+    const stale = await tab("tok_old");
+    await stale.claimLocalCopy("tok_old");
+    // The other tab logged out and in again before the stale tab heard: its copy, its change.
+    const fresh = await tab("tok_new");
+    await fresh.claimLocalCopy("tok_new");
+    await fresh.actions.setLanguage("ru");
+    await stale.dropLocalCopyOf("tok_old");
+    await expect(store.listPending()).resolves.toHaveLength(1);
+    // The copy's own session leaving drops it.
+    await fresh.dropLocalCopyOf("tok_new");
+    await expect(store.listPending()).resolves.toHaveLength(0);
+    // A copy nobody claimed (made before owners) goes too.
+    await fresh.actions.setNightHours(true);
+    await stale.dropLocalCopyOf("tok_old");
+    await expect(store.listPending()).resolves.toHaveLength(0);
+  });
+
+  it("a claim waits for the sign-out's clear queued before it (fix round 2 review M7)", async () => {
+    const held = createHeldEventStore();
+    const session = createMemorySessionStore();
+    await session.set("tok_old");
+    const api = createFakeFetch({ ...emptySyncRoutes, "GET /api/me": () => fakeMe });
+    const client = createPaceClient({
+      baseUrl: "https://api.test",
+      deviceId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+      fetch: api.fetch,
+      now: () => "2026-10-06T12:00:00.000Z",
+      session,
+      source: "web",
+      store: held.store,
+    });
+    await client.auth.ready;
+    await client.state.ready;
+    await client.claimLocalCopy("tok_old");
+    // A write in flight holds the queue; the old session's clear waits behind it, then the next
+    // sign-in of the same tab claims the copy at once.
+    held.hold();
+    const written = client.actions.setLanguage("ru");
+    const dropped = client.dropLocalCopyOf("tok_old");
+    const claimed = client.claimLocalCopy("tok_new");
+    await vi.waitFor(() => {
+      expect(held.writes).toHaveLength(1);
+    });
+    await held.writes[0]?.resolve();
+    await Promise.all([written, dropped, claimed]);
+    // The clear had its turn first (the copy was still the old session's): nothing stays.
+    await expect(held.store.listAll()).resolves.toEqual([]);
+    await expect(held.store.listPending()).resolves.toEqual([]);
+  });
+
   it("signs out when the server closes the live socket because the session ended", async () => {
     const socket = oneSocket();
     const me = { isRevoked: false };
@@ -89,6 +171,33 @@ describe("createPaceClient", () => {
     socket.emit("close", { code: LIVE_SESSION_ENDED });
     await expect.poll(() => client.auth.store.getState().status).toBe("signed-out");
     expect(socket.opened()).toBe(1);
+    client.live.stop();
+  });
+
+  it('a logout\'s own 4401 close checks nothing: no request after the logout, no "ended elsewhere" (QA round 22 R22-02)', async () => {
+    const socket = oneSocket();
+    const { api, client } = await setup(
+      {
+        "GET /api/me": () => fakeMe,
+        "POST /api/auth/logout": () => {
+          // The Worker closes the session's sockets before it answers (`deleteSession`).
+          socket.emit("close", { code: LIVE_SESSION_ENDED });
+          return { ok: true };
+        },
+      },
+      "tok",
+      socket.create,
+    );
+    await expect.poll(() => client.auth.store.getState().user).not.toBeNull();
+    client.live.start();
+    socket.emit("open", {});
+    const before = api.calls.length;
+    await client.auth.logout();
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+    expect(api.calls.slice(before).map((call) => call.path)).toEqual(["/api/auth/logout"]);
+    expect(client.auth.store.getState()).toEqual({ status: "signed-out", user: null });
     client.live.stop();
   });
 
@@ -128,6 +237,261 @@ describe("createPaceClient", () => {
     await client.sync.syncNow();
     expect(api.pathsCalled("/api/me")).toHaveLength(2);
   });
+
+  it.each(["a call's 401", "the socket's close"] as const)(
+    "sends nothing more with the session while %s has it checked, and nothing once it ended (CI run 41668309388)",
+    async (heardBy) => {
+      // A tab still starting (its first sync refused) or one whose socket heard the end: its next
+      // call (the bell's read) leaves while `me` is on its way and would carry the ended session.
+      const socket = oneSocket();
+      const server = { isRevoked: false };
+      const checked = Promise.withResolvers<null>();
+      const { api, client } = await setup(
+        {
+          "GET /api/me": async () => {
+            if (!server.isRevoked) {
+              return fakeMe;
+            }
+            await checked.promise;
+            return problem(401, "auth/unauthorized");
+          },
+          "GET /api/notifications": () => ({ deliveries: {}, items: [], more: false }),
+          "GET /api/sync/pull": () =>
+            server.isRevoked
+              ? problem(401, "auth/unauthorized")
+              : { events: [], more: false, seq: 0, storeId: "store-test" },
+        },
+        "tok",
+        socket.create,
+      );
+      await expect.poll(() => client.auth.store.getState().user).not.toBeNull();
+      const checks = api.pathsCalled("/api/me").length;
+      server.isRevoked = true;
+      if (heardBy === "a call's 401") {
+        await client.sync.syncNow();
+      } else {
+        client.live.start();
+        socket.emit("open", {});
+        socket.emit("close", { code: LIVE_SESSION_ENDED });
+      }
+      await expect.poll(() => api.pathsCalled("/api/me").length).toBe(checks + 1);
+      const refreshed = client.notifications.refresh();
+      await new Promise((resolve) => {
+        setTimeout(resolve, 20);
+      });
+      expect(api.pathsCalled("/api/notifications")).toEqual([]);
+      checked.resolve(null);
+      await refreshed;
+      await expect.poll(() => client.auth.store.getState().status).toBe("signed-out");
+      expect(client.auth.store.getState().endedElsewhere).toBe(true);
+      // Refused here once the check says the session ended: never sent with it.
+      expect(api.pathsCalled("/api/notifications")).toEqual([]);
+      client.live.stop();
+    },
+  );
+
+  it("a call made while a 401 has the session checked goes out once it proves alive (CI run 41668309388)", async () => {
+    const pulls = { count: 0 };
+    const checked = Promise.withResolvers<null>();
+    const { api, client } = await setup(
+      {
+        "GET /api/me": async () => {
+          if (pulls.count > 0) {
+            await checked.promise;
+          }
+          return fakeMe;
+        },
+        "GET /api/notifications": () => ({ deliveries: {}, items: [], more: false }),
+        // The server misjudges once: a 401 for a session that is still good.
+        "GET /api/sync/pull": () => {
+          pulls.count += 1;
+          return pulls.count === 1
+            ? problem(401, "auth/unauthorized")
+            : { events: [], more: false, seq: 0, storeId: "store-test" };
+        },
+      },
+      "tok",
+    );
+    await expect.poll(() => client.auth.store.getState().user).not.toBeNull();
+    const checks = api.pathsCalled("/api/me").length;
+    await client.sync.syncNow();
+    await expect.poll(() => api.pathsCalled("/api/me").length).toBe(checks + 1);
+    const refreshed = client.notifications.refresh();
+    checked.resolve(null);
+    await refreshed;
+    expect(api.pathsCalled("/api/notifications")).toEqual(["/api/notifications"]);
+    expect(api.calls.at(-1)?.headers["authorization"]).toBe("Bearer tok");
+    expect(client.notifications.store.getState().status).toBe("ready");
+    expect(client.auth.store.getState().status).toBe("signed-in");
+  });
+
+  it("a check whose `me` never answers gives up after the request deadline: nothing signed out, the held call goes once (CI fix review I1)", async () => {
+    const pulls = { count: 0 };
+    const { api, client } = await setup(
+      {
+        "GET /api/me": async () => {
+          if (pulls.count > 0) {
+            await new Promise<never>(() => undefined);
+          }
+          return fakeMe;
+        },
+        "GET /api/notifications": () => ({ deliveries: {}, items: [], more: false }),
+        "GET /api/sync/pull": () => {
+          pulls.count += 1;
+          return problem(401, "auth/unauthorized");
+        },
+      },
+      "tok",
+    );
+    await expect.poll(() => client.auth.store.getState().user).not.toBeNull();
+    vi.useFakeTimers();
+    try {
+      const checks = api.pathsCalled("/api/me").length;
+      const run = client.sync.syncNow();
+      await vi.advanceTimersByTimeAsync(10);
+      await run;
+      expect(api.pathsCalled("/api/me")).toHaveLength(checks + 1);
+      const refreshed = client.notifications.refresh();
+      await vi.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS - 20);
+      expect(api.pathsCalled("/api/notifications")).toEqual([]);
+      await vi.advanceTimersByTimeAsync(20);
+      await refreshed;
+      expect(api.pathsCalled("/api/notifications")).toEqual(["/api/notifications"]);
+      expect(api.calls.at(-1)?.headers["authorization"]).toBe("Bearer tok");
+      expect(client.auth.store.getState().status).toBe("signed-in");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("`me` and a log-out are never held behind the check under way (CI fix review m2)", async () => {
+    const pulls = { count: 0 };
+    const checked = Promise.withResolvers<null>();
+    const { api, client } = await setup(
+      {
+        "GET /api/me": async () => {
+          if (pulls.count > 0) {
+            await checked.promise;
+          }
+          return fakeMe;
+        },
+        "GET /api/sync/pull": () => {
+          pulls.count += 1;
+          return problem(401, "auth/unauthorized");
+        },
+        "POST /api/auth/logout": () => ({ ok: true }),
+      },
+      "tok",
+    );
+    await expect.poll(() => client.auth.store.getState().user).not.toBeNull();
+    const checks = api.pathsCalled("/api/me").length;
+    await client.sync.syncNow();
+    expect(api.pathsCalled("/api/me")).toHaveLength(checks + 1);
+    const asked = client.api.call(endpoints.me, {});
+    const ended = client.api.call(endpoints.auth.logout, {});
+    await new Promise((resolve) => {
+      setTimeout(resolve, 10);
+    });
+    expect(api.pathsCalled("/api/me")).toHaveLength(checks + 2);
+    expect(api.pathsCalled("/api/auth/logout")).toEqual(["/api/auth/logout"]);
+    checked.resolve(null);
+    await Promise.all([asked, ended]);
+  });
+
+  it("the start's `me` is the check: it holds nothing alone, and a 401 meanwhile joins it, asks nothing more and holds what follows (CI fix review m3)", async () => {
+    const started = Promise.withResolvers<null>();
+    const session = createMemorySessionStore();
+    await session.set("tok");
+    const api = createFakeFetch({
+      ...emptySyncRoutes,
+      "GET /api/me": async () => {
+        await started.promise;
+        return fakeMe;
+      },
+      "GET /api/notifications": () => ({ deliveries: {}, items: [], more: false }),
+      "GET /api/sync/pull": () => problem(401, "auth/unauthorized"),
+    });
+    const client = createPaceClient({
+      baseUrl: "https://api.test",
+      deviceId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+      fetch: api.fetch,
+      now: () => "2026-10-06T12:00:00.000Z",
+      session,
+      source: "web",
+      store: createMemoryEventStore(),
+    });
+    await expect.poll(() => api.pathsCalled("/api/me")).toHaveLength(1);
+    // Alone, the start's check holds nothing: the first sync goes at once (and hears a 401).
+    await client.sync.syncNow();
+    expect(api.pathsCalled("/api/sync/pull")).toHaveLength(1);
+    const refreshed = client.notifications.refresh();
+    await new Promise((resolve) => {
+      setTimeout(resolve, 10);
+    });
+    // The 401 joined the start's `me` (no second one) and holds the bell's read behind it.
+    expect(api.pathsCalled("/api/me")).toHaveLength(1);
+    expect(api.pathsCalled("/api/notifications")).toEqual([]);
+    started.resolve(null);
+    await refreshed;
+    expect(api.pathsCalled("/api/notifications")).toEqual(["/api/notifications"]);
+    expect(api.pathsCalled("/api/me")).toHaveLength(1);
+  });
+
+  it.each(["before", "after"] as const)(
+    'a run hung past the hold that lands %s the revoke\'s answer reads as nothing, never "ended elsewhere" (round 7 review 7)',
+    async (when) => {
+      const server = { isRevoked: false };
+      const pull = Promise.withResolvers<null>();
+      const revoked = Promise.withResolvers<null>();
+      const atServer = Promise.withResolvers<null>();
+      const { api, client } = await setup(
+        {
+          "DELETE /api/sessions/s-1": async () => {
+            server.isRevoked = true;
+            atServer.resolve(null);
+            await revoked.promise;
+            return { ok: true };
+          },
+          "GET /api/me": () => (server.isRevoked ? problem(401, "auth/unauthorized") : fakeMe),
+          "GET /api/sync/pull": async () => {
+            await pull.promise;
+            return server.isRevoked
+              ? problem(401, "auth/unauthorized")
+              : { events: [], more: false, seq: 0, storeId: "store-test" };
+          },
+        },
+        "tok",
+      );
+      await expect.poll(() => client.auth.store.getState().user).not.toBeNull();
+      // A run whose request hangs: the hold gives up waiting for it after `HOLD_WAIT_MS`.
+      const hung = client.sync.syncNow();
+      const ended = client.auth.endThisDevice(async () => {
+        await api.fetch("https://api.test/api/sessions/s-1", { method: "DELETE" });
+      });
+      if (when === "before") {
+        // The server ended the session; its answer is still on its way when the run lands.
+        await atServer.promise;
+        pull.resolve(null);
+        await hung;
+        revoked.resolve(null);
+        await ended;
+      } else {
+        revoked.resolve(null);
+        await ended;
+        pull.resolve(null);
+        await hung;
+      }
+      await expect.poll(() => client.auth.store.getState().status).toBe("signed-out");
+      expect(client.auth.store.getState().endedElsewhere).toBeUndefined();
+      // The steady state: nothing asks the server about the ended session.
+      const checks = api.pathsCalled("/api/me").length;
+      await client.sync.syncNow();
+      await new Promise((resolve) => {
+        setTimeout(resolve, 50);
+      });
+      expect(api.pathsCalled("/api/me")).toHaveLength(checks);
+    },
+  );
 
   it("signs out within seconds when its socket is refused at the door, not at the next poll (round 7 CI)", async () => {
     // The session ended while this visible tab's socket was still connecting: the refused upgrade

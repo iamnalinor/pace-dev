@@ -1,4 +1,4 @@
-import type { ProjectColorName } from "../design/tokens.ts";
+import type { ProjectColorName } from "../design/token-types.ts";
 
 /** A project is a tag: a task belongs to at most one, independently of its preset. */
 export type Project = {

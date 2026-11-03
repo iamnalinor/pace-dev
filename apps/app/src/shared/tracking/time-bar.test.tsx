@@ -273,7 +273,7 @@ describe("TimeBar", () => {
       expect(running(runtime)).toEqual(["Commute"]);
     });
     await fireEvent.press(screen.getByRole("button", { name: "Rest" }));
-    await fireEvent(await screen.findByLabelText("Alongside what is running"), "valueChange", true);
+    await fireEvent.press(await screen.findByLabelText("Alongside what is running"));
     await fireEvent.press(screen.getByRole("button", { name: "Workout" }));
     await waitFor(() => {
       expect(running(runtime).toSorted((a, b) => a.localeCompare(b))).toEqual([
@@ -496,6 +496,45 @@ describe("TimeBar", () => {
     await fireEvent(field, "submitEditing");
     expect(await screen.findByText(en("assistant.nothingToStart"))).toBeOnTheScreen();
     expect(screen.queryByText(en("assistant.couldNotRead"))).toBeNull();
+  });
+
+  it.each([
+    ["limited", null, "assistant.unread.limitedSoon"],
+    ["unreachable", null, "assistant.unread.unreachable"],
+    ["unreadable", null, "assistant.unread.unreadable"],
+    ["off", null, "assistant.unread.off"],
+  ] as const)(
+    "says why no model read it when the rules found nothing either: %s (QA 21 M3, class 99)",
+    async (reason, retryAt, key) => {
+      const unread = { ...CSS_READ, actions: [], reason, retryAt, status: "unavailable" };
+      await renderScreen(
+        <TimeBar />,
+        await createTestRuntime({ routes: { "POST /api/parse": () => unread } }),
+      );
+      const field = screen.getByLabelText("What are you doing?");
+      await fireEvent.changeText(field, "Reading a book for an hour");
+      await fireEvent(field, "submitEditing");
+      expect(await screen.findByText(en(key))).toBeOnTheScreen();
+      expect(screen.queryByText(en("assistant.couldNotRead"))).toBeNull();
+    },
+  );
+
+  it("names the time the assistant is back when it is out of requests until then (QA 21 M3)", async () => {
+    const unread = {
+      ...CSS_READ,
+      actions: [],
+      reason: "limited",
+      retryAt: addMinutesIso(NOW, 90),
+      status: "unavailable",
+    };
+    await renderScreen(
+      <TimeBar />,
+      await createTestRuntime({ routes: { "POST /api/parse": () => unread } }),
+    );
+    const field = screen.getByLabelText("What are you doing?");
+    await fireEvent.changeText(field, "Reading a book for an hour");
+    await fireEvent(field, "submitEditing");
+    expect(await screen.findByText(/out of requests until about \d{1,2}:\d{2}/u)).toBeOnTheScreen();
   });
 
   it("says the thread is full on a sixth correction instead of dropping it", async () => {

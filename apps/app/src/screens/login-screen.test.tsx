@@ -247,6 +247,28 @@ describe("LoginScreen", () => {
     );
   });
 
+  it("calls a browser login failed only when its token was refused, not when the device moved on (fix round 2 of QA 22)", async () => {
+    for (const [answer, isFailed] of [
+      [{ error: "auth/unauthorized", ok: false }, true],
+      [{ error: "session/changed", ok: false }, false],
+    ] as const) {
+      jest.mocked(openAuthSessionAsync).mockResolvedValueOnce({
+        type: "success",
+        url: "pace://auth?token=tok_web",
+      });
+      auth.adoptToken.mockResolvedValueOnce(answer);
+      const { unmount } = await renderScreen();
+      await fireEvent.press(screen.getByText("Log in on the web instead"));
+      await waitFor(() => {
+        expect(auth.adoptToken).toHaveBeenCalledWith("tok_web");
+      });
+      await waitFor(() => {
+        expect(screen.queryAllByText(t("en", "login.failed"))).toHaveLength(isFailed ? 1 : 0);
+      });
+      await unmount();
+    }
+  });
+
   it("leaves the screen once signed in", async () => {
     mockStatus.current = "signed-in";
     await renderScreen();

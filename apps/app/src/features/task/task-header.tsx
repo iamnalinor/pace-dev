@@ -11,7 +11,7 @@ import { inkClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { IconButton } from "#app/ui/icon-button.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
-import { useToast } from "#app/ui/toast.tsx";
+import { toastQuote, useToast } from "#app/ui/toast.tsx";
 
 /** Deletes the task at once and goes back; the toast's Undo brings it back. */
 const useDeleteTask = (view: TaskViewModel): (() => void) => {
@@ -29,7 +29,7 @@ const useDeleteTask = (view: TaskViewModel): (() => void) => {
       back();
       const [revocation] = result.value;
       toast.show({
-        message: t("task.deleted", { title: view.title }),
+        message: t("task.deleted", { title: toastQuote(view.title) }),
         ...(revocation !== undefined && {
           action: {
             label: t("common.undo"),
@@ -103,21 +103,21 @@ const ProjectChip = ({
     <Pressable
       accessibilityLabel={t("task.changeProject", { project: name })}
       accessibilityRole="button"
-      className="h-11 flex-row items-center gap-1 active:opacity-70"
+      className="h-hit-web flex-row items-center gap-1 active:opacity-70"
       disabled={onProject === undefined}
       onPress={onProject}
     >
       <Text
         className={cx(
-          "font-sans text-[15px] font-medium",
-          project === null ? "text-fg2" : inkClass(project.color),
+          "font-sans text-callout font-medium",
+          project === null ? "text-label-secondary" : inkClass(project.color),
         )}
         numberOfLines={1}
       >
         {name}
       </Text>
       {onProject === undefined ? null : (
-        <ChevronDown color={palette.muted} size={16} strokeWidth={2} />
+        <ChevronDown color={palette["label.secondary"]} size={16} strokeWidth={2} />
       )}
     </Pressable>
   );

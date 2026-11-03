@@ -1,12 +1,15 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
-import { Linking } from "react-native";
+import { Linking, type ViewStyle } from "react-native";
 
-import { renderScreen } from "#app/test/render.tsx";
+import { classPx } from "#app/test/class-px.ts";
+import { refusingStore } from "#app/test/refusing-store.ts";
+import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { addMinutesIso, type CalendarEvent } from "@pace/core";
-import { NOW } from "@pace/core/testing";
+import { MOSCOW, NOW } from "@pace/core/testing";
 
-import { laneStyle, PHONE_COLUMN_MAX_PX, phoneColumnPx } from "./week-lanes.ts";
+import { BOTTOM_PX, dayLabel, LABELS_PX } from "./week-grid.tsx";
+import { COLUMN_INSET_PX, laneStyle, PHONE_COLUMN_MAX_PX, phoneColumnPx } from "./week-lanes.ts";
 import { WeekScreen } from "./week-screen.tsx";
 
 /** 12:30–14:00 in Moscow today, with everything a phone's calendar can tell about it. */
@@ -150,6 +153,55 @@ describe("WeekScreen", () => {
     expect(screen.getByTestId("week-days")).toHaveProp("tabIndex", 0);
   });
 
+  it("says so and keeps the night hours off when the device refuses to save the header's switch", async () => {
+    const disk = refusingStore();
+    const runtime = await createTestRuntime({ eventStore: disk.eventStore });
+    await renderScreen(<WeekScreen />, runtime);
+    await measure(700);
+    disk.refuse();
+    await fireEvent.press(screen.getByRole("switch", { name: "Night hours" }));
+    expect(await screen.findByText(en("actionError.persist_failed"))).toBeOnTheScreen();
+    expect(screen.getByRole("switch", { name: "Night hours" })).not.toBeChecked();
+    expect(screen.queryByText("00")).toBeNull();
+  });
+
+  it("fits the whole day as drawn (the day names, every hour, the room under it) in the measured height", async () => {
+    const runtime = await world();
+    await act(async () => {
+      await runtime.actions.setNightHours(true);
+    });
+    await renderScreen(<WeekScreen />, runtime);
+    // At 700 the old 28 px label constant drew 4 px past the room once the row was 32 px.
+    await measure(700);
+    await waitFor(() => {
+      expect(screen.getByText("00")).toBeOnTheScreen();
+    });
+    const gutter = screen.getByText("00").parent as { readonly props: object };
+    // The grid: the gutter and the columns in a row, with the room under them.
+    const grid = screen.getByText("00").parent?.parent as {
+      readonly props: { readonly style?: ViewStyle };
+    };
+    const dayName = screen.getByText(dayLabel(NOW, MOSCOW, "en"));
+    const hint = screen.getByText(en("week.scrollHint")).parent as { readonly props: object };
+    // The room the fit subtracts is the room the classes draw: a class change shows here.
+    expect(LABELS_PX).toBe(classPx(dayName, "h"));
+    expect(BOTTOM_PX).toBe(classPx(hint, "h"));
+    // The gutter's numbers start where the day names end.
+    expect(classPx(gutter, "pt")).toBe(classPx(dayName, "h"));
+    const drawn =
+      classPx(dayName, "h") + 24 * Number(hourHeight()) + Number(grid.props.style?.paddingBottom);
+    expect(drawn).toBeLessThanOrEqual(700 - classPx(hint, "h"));
+  });
+
+  it("widens a phone's column by the insets its blocks keep, as the classes draw them (class 11, mirrors)", async () => {
+    await renderScreen(<WeekScreen />, await world());
+    await measure(700);
+    const [blocks] = await screen.findAllByTestId("week-blocks");
+    expect(blocks).toBeDefined();
+    const area = blocks as { readonly props: object };
+    expect(COLUMN_INSET_PX).toBe(classPx(area, "left") + classPx(area, "right"));
+  });
+
   it("shows the night hours when asked, from the header and in the settings", async () => {
     const runtime = await world();
     await renderScreen(<WeekScreen />, runtime);
@@ -163,8 +215,9 @@ describe("WeekScreen", () => {
     });
     expect(screen.getByRole("switch", { name: "Night hours" })).toBeChecked();
     expect(runtime.state.store.getState().settings.nightHours).toBe(true);
-    // 624 shared by the 24 hours.
-    expect(hourHeight()).toBe(26);
+    // 700 less the day names (32), the room under the grid (24) and the hint row (24): 620
+    // shared by the 24 hours.
+    expect(hourHeight()).toBe(25);
     // Turned off elsewhere (the settings, another device): the grid follows while open.
     await act(async () => {
       await runtime.actions.setNightHours(false);
@@ -214,7 +267,7 @@ describe("phoneColumnPx", () => {
     expect(phoneColumnPx(1, 72)).toBe(72);
     for (const lanes of [2, 3, 4]) {
       const width = phoneColumnPx(lanes, 72);
-      expect((width - 8) * (1 / lanes - 0.01)).toBeGreaterThanOrEqual(44);
+      expect((width - COLUMN_INSET_PX) * (1 / lanes - 0.01)).toBeGreaterThanOrEqual(44);
     }
   });
 });

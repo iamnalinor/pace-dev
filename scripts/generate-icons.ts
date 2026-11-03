@@ -2,6 +2,8 @@ import { Resvg } from "@resvg/resvg-js";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
+import { color } from "@pace/core";
+
 /**
 Brand assets (design board "08 · Step"). The mark is two chevrons and a dot; the favicon is
 the dark chevrons on a lime tile (the app's accent for important actions; the quiet indigo
@@ -21,7 +23,8 @@ const DARK: Palette = { accent: "#d4ff3a", fg: "#ececee", track: "#6a6a74" };
 // On a light ground the lime would vanish, so the chevron takes the dark olive of accentText.
 const LIGHT: Palette = { accent: "#4d6b00", fg: "#17181c", track: "#b9bcc6" };
 const WHITE: Palette = { accent: "#ffffff", fg: "#ffffff", track: "#ffffff" };
-const DARK_BG = "#0b0b0c";
+// The tile is the app's dark ground, so the launcher icon, the splash and the page agree (F-WEB-02).
+const DARK_BG = color("dark", "bg.app");
 const LIME = "#d4ff3a";
 
 /**

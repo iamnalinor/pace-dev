@@ -23,11 +23,16 @@ export const InstanceSchema = z.object({
   apiOrigin: z.string(),
   /** A method this client does not know (a newer server's) is dropped. */
   loginMethods: knownValues(z.enum(LOGIN_METHODS)),
-  /** A feature a server does not mention is off, also when it names no features at all. */
+  /**
+  A feature a server does not mention is off, also when it names no features at all; but MCP,
+  which every server served before one could be without it.
+  */
   features: z
     .object({
       push: z.boolean().default(false),
       assistant: z.boolean().default(false),
+      /** False when no origin the OAuth provider accepts fits (plain http on a LAN): no MCP. */
+      mcp: z.boolean().default(true),
     })
     .prefault({}),
 });

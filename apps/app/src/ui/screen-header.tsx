@@ -38,21 +38,21 @@ export const ScreenHeader = ({
           <Pressable
             accessibilityLabel={backLabel}
             accessibilityRole="button"
-            className="h-11 w-11 items-center justify-center active:opacity-70"
+            className="h-hit-web w-hit-web items-center justify-center active:opacity-70"
             onPress={onBack}
           >
-            <ChevronLeft color={palette.fg2} size={20} strokeWidth={1.75} />
+            <ChevronLeft color={palette["label.secondary"]} size={20} strokeWidth={1.75} />
           </Pressable>
         )}
         <View>
           {eyebrow === undefined ? null : (
-            <Text className="font-sans text-[11px] uppercase tabular-nums tracking-[0.06em] text-muted">
+            <Text className="font-sans text-caption2 font-normal uppercase tabular-nums text-label-tertiary">
               {eyebrow}
             </Text>
           )}
           <Text
             accessibilityRole="header"
-            className="mt-1 font-sans text-[30px] font-semibold tracking-tight text-fg"
+            className="mt-1 font-sans text-largeTitle font-semibold text-label-primary"
           >
             {title}
           </Text>

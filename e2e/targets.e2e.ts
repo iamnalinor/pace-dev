@@ -37,8 +37,7 @@ type Measured = {
 /**
 The named controls in sight whose press area is under `TARGET_PX`, by name, and how many were
 measured. The press area is found by pressing: the points 21 px either side of the control's centre
-must land on the control (or inside it), or on a reach drawn over it (a switch's `switch-reach`),
-never on a neighbour that covers it.
+must land on the control (or inside it), never on a neighbour that covers it.
 */
 const measure = async (
   page: Page,
@@ -58,11 +57,7 @@ const measure = async (
         box.right <= globalThis.innerWidth;
       const isLandingOn = (control: Element, x: number, y: number): boolean => {
         const hit = globalThis.document.elementFromPoint(x, y);
-        const reach = hit?.closest('[data-testid="switch-reach"]');
-        return (
-          hit !== null &&
-          (control.contains(hit) || (reach?.parentElement?.contains(control) ?? false))
-        );
+        return hit !== null && control.contains(hit);
       };
       const controls = [...globalThis.document.querySelectorAll(selector)]
         .filter((control) => control.closest('[aria-hidden="true"]') === null)
@@ -155,15 +150,17 @@ test.describe("tap targets at 390 (QA round 18 L6)", () => {
     const toggle = page.getByRole("switch").first();
     await toggle.scrollIntoViewIfNeeded();
     const isBefore = await toggle.isChecked();
-    const { height, width, x, y } = (await toggle.boundingBox()) ?? {
+    // Just outside the drawn switch (its 32 px track), inside its 48 px target (8 px each side).
+    const track = toggle.getByTestId("switch-track");
+    const { height, width, x, y } = (await track.boundingBox()) ?? {
       height: 0,
       width: 0,
       x: 0,
       y: 0,
     };
-    await page.mouse.click(x + width / 2, y - 8);
+    await page.mouse.click(x + width / 2, y - 6);
     await expect(toggle).toBeChecked({ checked: !isBefore });
-    await page.mouse.click(x + width / 2, y + height + 8);
+    await page.mouse.click(x + width / 2, y + height + 6);
     await expect(toggle).toBeChecked({ checked: isBefore });
   });
 });

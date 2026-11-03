@@ -82,6 +82,21 @@ form from every entry path in the table below; the keyboard; empty, loading, err
 offline states; the heuristics walk on every screen; and every owner request still not met. The
 e2e sweep above stands in for the scripted matrix here too.
 
+**The owner's step, once per release: connect a real MCP client end to end.** The Sonnet agent
+cannot connect Claude, and the e2e and the rounds sign in with the dev id, so only this walks the
+real identity step (bug class 119). Before tagging, the owner:
+1. adds the server's MCP URL to a real client (Claude Desktop or claude.ai's connectors, Claude
+   Code's `claude mcp add --transport http`);
+2. signs in through the consent page from a browser signed in to Pace, and again from a private
+   window (the Telegram widget, then "Sign in to Pace first" for a network that blocks it);
+3. calls one read tool and one write tool, then revokes the app in Settings → Devices and sessions
+   and checks that the client is refused;
+4. checks the deployed page cannot be framed: `curl -sI <web origin>/oauth/authorize` shows
+   `X-Frame-Options: DENY` and a `Content-Security-Policy` with `frame-ancestors 'none'` (the
+   single-page fallback serves this path, so the check is on the deploy, not the build).
+
+The result goes into the release notes' checklist.
+
 ## How
 
 1. Launch an agent with `model: "sonnet"` (background), using the prompt below. It must not
@@ -92,6 +107,12 @@ e2e sweep above stands in for the scripted matrix here too.
    never does (races, one-shots, cut connections), and the other way round.
 3. Fix the findings with TDD (a failing unit/app/e2e test first where the bug is testable),
    commit in batches, then launch the next round.
+4. Before a batch PR (and before any QA round of a design batch), run the **full** `bun test:e2e`
+   on a fresh build: every file and every project, latency included (a failure in `chromium`
+   leaves `latency` unrun, which is not a pass). A task may run only the files it touched, but a
+   change to shared classes, tokens or a kit component reaches screens no subset visits
+   (bug-lessons class 11, mirrors, and 112: after Task 2.2 only subsets ran, and three failures
+   waited for the batch's end).
 
 ## The prompt (fill in the round number, its kind, what changed, the fixes and the open lows)
 
@@ -110,7 +131,10 @@ e2e sweep above stands in for the scripted matrix here too.
 > `ALLOWED_TELEGRAM_IDS` list with ids of your own; the web with `EXPO_PUBLIC_API_URL` and
 > `EXPO_PUBLIC_DEV_LOGIN=1`, `build:web` then `serve:web dist 4173`. Sign in and seed as
 > `e2e/support/login.ts` and `e2e/support/seed.ts` (`seedLivedIn`: a Russian lived-in account) do;
-> also use a fresh English account.
+> also use a fresh English account. Put the token in once per tab, as `loginViaApi` does (an init
+> script guarded by a `sessionStorage` mark): an init script runs again on every reload and
+> navigation, so after a Log out it signs the revoked token back in, and the 401s and the "ended
+> on another device" line that follow are the script's, not the app's (QA round 22 R22-02).
 >
 > **This is round <n>, an <intermediate | release> round.** What changed since round <n−1>:
 > <the changed screens, flows and rules, from `git diff --stat` by feature folder>. The fixes of
@@ -168,6 +192,11 @@ e2e sweep above stands in for the scripted matrix here too.
 > - **Visual matrix**: look at each changed screen at 390 px and 1440 px with Russian text;
 >   wrapping, word collisions and layout can fail only in one combination, and the sweep cannot
 >   judge a layout that fits but reads wrong.
+> - **Responsiveness**: run the main taps (a tab, a filter chip, a check-off, opening a row, Back,
+>   a time-bar button) in a mobile context with touch on and the CPU throttled 4× (CDP
+>   `Emulation.setCPUThrottlingRate`); anything that takes over 100 ms from tap to the next frame
+>   (Event Timing API), or a control that shows nothing when pressed, is a finding
+>   (bug-lessons class 108).
 > - **Guest language and sideways content**: check signed-out pages with a Russian browser
 >   locale and verify the document language; on narrow screens, every sideways region needs
 >   a visible scroll cue and a keyboard focus target.
@@ -198,6 +227,19 @@ in gets a row and a test that submits from it.
 | Projects / presets | new; edit; archive and restore; extend a preset | `projects.test.tsx`, `presets.test.tsx` |
 | Settings | each switch and time; the push picker (Auto, Google, Pace checks, Off; offline; another Firebase project) | `settings.test.tsx` |
 | Add a computer, Connect an AI app (Settings → Devices and sessions) | Settings at phone and desktop width; each OS; revoke and disconnect with the inline confirm | `features/sessions/sessions.test.tsx`, `e2e/sessions.e2e.ts` |
+| MCP consent page (`/oauth/authorize`) | a browser signed in to Pace (Allow with the session, no widget); signed out (the Telegram widget; "Sign in to Pace first", back with the request intact); a session revoked while the page is open | `features/oauth/oauth.test.tsx`, `oauth-session.int.test.ts`, `e2e/oauth-consent.e2e.ts` |
+
+## The design review matrix
+
+After a design batch (and before the next one is planned) re-shoot the screenshot matrix and
+compare it with the baseline in [`context/design/baseline/`](../context/design/baseline/):
+`DESIGN_SHOTS=.cache/shots/<batch> bun test:e2e e2e/design-shots.e2e.ts` against the running
+stack (about ten minutes; add `PLAYWRIGHT_CHROMIUM_EXECUTABLE` in a sandbox). Output is
+`<dir>/<group>/<name>--<viewport>-<theme>-<lang>.png` plus `manifest-<combo>.json`; every manifest
+must list only `login-server-picker` as missed (it is Android only), any other miss is a renamed
+control and the script needs the new label. `DESIGN_SHOTS_ONLY=states` and
+`DESIGN_SHOTS_STATES=day-gap-log,day-block-edit` re-shoot part of it. Shoot into `.cache/`
+(git-ignored); only a new baseline is committed under `context/design/baseline/`.
 
 ## Limits
 

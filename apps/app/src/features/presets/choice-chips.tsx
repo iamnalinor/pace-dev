@@ -23,7 +23,7 @@ export const ChoiceChips = <T extends number | string>({
   <View
     accessibilityLabel={label}
     accessibilityRole="radiogroup"
-    className="flex-row flex-wrap gap-1.5"
+    className="flex-row flex-wrap gap-2"
   >
     {values.map((option) => (
       <Chip

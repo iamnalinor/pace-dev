@@ -52,6 +52,7 @@ export {
   type BotLoginError,
   createAuth,
   type LoginDevice,
+  SESSION_CHANGED,
 } from "./auth.ts";
 export {
   type Clock,
@@ -63,7 +64,7 @@ export {
 } from "./clock.ts";
 export { createPaceClient, type PaceClient, type PaceClientOptions } from "./create-client.ts";
 export { REQUEST_DEADLINE_MS, withinDeadline } from "./deadline.ts";
-export type { EventStore } from "./event-store.ts";
+export { canClearCopy, type EventStore } from "./event-store.ts";
 export { checkInstance, type InstanceError } from "./instance.ts";
 export { createLiveChannel, type LiveChannel, type LiveStatus, type SocketLike } from "./live.ts";
 export {
@@ -95,6 +96,7 @@ export {
   type SyncSummary,
 } from "./sync-client.ts";
 export { type AiReading, aiReading } from "./view-models/ai-reading.ts";
+export { approvalText, type ToastFit } from "./view-models/approval.ts";
 export { type EventDetails, eventDetails } from "./view-models/calendar-event.ts";
 export {
   type CalendarDay,
@@ -126,7 +128,7 @@ export {
   type DayTotal,
   trackedDates,
 } from "./view-models/day.ts";
-export { type DecisionView, decisionViews, doneLines } from "./view-models/decisions.ts";
+export { type DecisionView, decisionViews } from "./view-models/decisions.ts";
 export {
   agentCommand,
   agentLogsCommand,
@@ -186,11 +188,11 @@ export { SCOPE_KEYS } from "./view-models/oauth-scopes.ts";
 export {
   definitionIssues,
   editorDraft,
-  freePresetId,
   inheritedOf,
   isOverridden,
   isSubOverridden,
   newDraft,
+  newPresetId,
   type PresetDraft,
   setSub,
   setValue,

@@ -3,7 +3,7 @@ import { AppState, Text } from "react-native";
 
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
-import { FAKE_STORE_ID, fakeUser } from "@pace/client/testing";
+import { FAKE_STORE_ID, fakeUser, problem } from "@pace/client/testing";
 
 import { EmptyState, EmptyText } from "./empty-state.tsx";
 import { backOnline, FIRST_SYNC_COVER_MS, SyncFrame } from "./sync-frame.tsx";
@@ -81,6 +81,49 @@ describe("the first-sync cover (QA round 17 M4)", () => {
     expect(screen.getByText(en("now.empty"))).toBeOnTheScreen();
     expect(screen.queryByRole("progressbar")).toBeNull();
   });
+});
+
+/** A screen's own empty states, as Now, Day and the others draw them. */
+const Screens = () => (
+  <SyncFrame isBare={false}>
+    <EmptyState>{en("now.empty")}</EmptyState>
+    <EmptyText className="">{en("day.empty")}</EmptyText>
+  </SyncFrame>
+);
+
+describe("a first sync that failed on an empty copy (QA round 21 M4)", () => {
+  it.each([
+    ["answered with HTTP 500", () => problem(500, "internal"), "sync.notSyncedYet"],
+    [
+      "that cannot reach the server",
+      () => {
+        throw new TypeError("Failed to fetch");
+      },
+      "errors.offline",
+    ],
+  ] as const)(
+    "%s keeps grey rows, never the final empty copy, under a line with Retry",
+    async (_name, pull, line) => {
+      const network = { pull: pull as () => unknown };
+      const runtime = await createTestRuntime({
+        routes: { ...DEV_LOGIN, "GET /api/sync/pull": () => network.pull() },
+        world: "empty",
+      });
+      await runtime.auth.loginWithDev("1");
+      await renderScreen(<Screens />, runtime);
+      expect(await screen.findByText(en(line))).toBeOnTheScreen();
+      expect(screen.queryByText(en("now.empty"))).toBeNull();
+      expect(screen.queryByText(en("day.empty"))).toBeNull();
+      expect(screen.getAllByRole("progressbar", { name: en("sync.loadingData") })).toHaveLength(2);
+      // Retry asks again at once; once a pull answers, the screen says what it holds.
+      network.pull = () => EMPTY_PAGE;
+      await fireEvent.press(screen.getByRole("button", { name: en("sync.retry") }));
+      expect(await screen.findByText(en("now.empty"))).toBeOnTheScreen();
+      expect(screen.getByText(en("day.empty"))).toBeOnTheScreen();
+      expect(screen.queryByText(en(line))).toBeNull();
+      expect(screen.queryByRole("progressbar")).toBeNull();
+    },
+  );
 });
 
 describe("the first-sync cover's bound (QA round 17 review I2)", () => {

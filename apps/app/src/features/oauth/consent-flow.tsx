@@ -2,11 +2,11 @@ import { Text, View } from "react-native";
 
 import type { TelegramLogin } from "@pace/core";
 
-import { usePace, useT } from "#app/app-state.tsx";
+import { useAuth, usePace, useT } from "#app/app-state.tsx";
 import { IS_DEV_LOGIN_ENABLED } from "#app/platform/api-base.ts";
 import { Button } from "#app/ui/button.tsx";
 import { PaceMark } from "#app/ui/logo.tsx";
-import { type Consent, type Identity, useConsent } from "@pace/client/react";
+import { type Consent, type ConsentSession, type Identity, useConsent } from "@pace/client/react";
 
 import { ClientCard } from "./client-card.tsx";
 import { DevIdentity } from "./dev-identity.tsx";
@@ -15,32 +15,84 @@ import { ScopeList } from "./scope-list.tsx";
 /** The Telegram button, given by the page (the widget exists on the web only). */
 export type RenderWidget = (onAuth: (payload: TelegramLogin) => void) => React.ReactNode;
 
-const identityLabel = (identity: Identity): string =>
-  identity.kind === "dev" ? `dev ${identity.telegramId}` : identity.name;
+type Translate = ReturnType<typeof useT>;
 
-/** Step 1 of consent: prove who is allowing, with the Telegram widget (or a dev id locally). */
+/** "Signed in as …": the session's or the proved name. */
+const identityLine = (t: Translate, identity: Identity): string => {
+  switch (identity.kind) {
+    case "dev": {
+      return t("oauth.signedInAs", { name: `dev ${identity.telegramId}` });
+    }
+    case "session": {
+      return t("oauth.signedInAs", { name: identity.name });
+    }
+    case "telegram": {
+      return t("oauth.signedInAs", { name: identity.name });
+    }
+  }
+};
+
+/** The browser's Pace session, as the consent page reads it from the app's auth. */
+const useConsentSession = (): ConsentSession => {
+  const { status, user } = useAuth();
+  switch (status) {
+    case "loading": {
+      return { kind: "loading" };
+    }
+    // Signed in, but whose session it is comes only when `me` answers (a stored session after a
+    // reload): until then nothing is shown and Allow waits, so the grant never goes to an
+    // account the page did not name (A9 review m1).
+    case "signed-in": {
+      return user === null ? { kind: "loading" } : { kind: "signed-in", name: user.name };
+    }
+    case "signed-out": {
+      return { kind: "signed-out" };
+    }
+  }
+};
+
+/**
+Step 1 of consent: who is allowing. Signed in, the browser's Pace session; signed out, the
+Telegram widget (or a dev id locally), and the app's own sign-in for a browser where the widget
+does not show (a network that blocks Telegram's frame: owner bug 2026-11-03).
+*/
 const IdentityStep = ({
   consent,
+  onSignIn,
   renderWidget,
 }: {
   readonly consent: Consent;
+  readonly onSignIn: () => void;
   readonly renderWidget: RenderWidget;
 }) => {
   const t = useT();
   if (consent.identity !== null) {
     return (
-      <Text className="font-sans text-[14px] text-fg2">
-        {t("oauth.signedInAs", { name: identityLabel(consent.identity) })}
+      <Text className="font-sans text-subhead font-normal text-label-secondary">
+        {identityLine(t, consent.identity)}
       </Text>
     );
   }
+  if (!consent.needsSignIn) {
+    return null;
+  }
   return (
     <View className="gap-3">
-      <Text className="font-sans text-[14px] text-muted">{t("oauth.identify")}</Text>
+      <Text className="font-sans text-subhead font-normal text-label-secondary">
+        {t("oauth.identify")}
+      </Text>
       {renderWidget((payload) => {
         const name = [payload.first_name, payload.last_name].filter(Boolean).join(" ");
         consent.identify({ kind: "telegram", name, payload });
       })}
+      <View className="items-center">
+        <Text className="text-center font-sans text-footnote text-label-secondary">
+          {t("oauth.widgetMissing")}
+        </Text>
+        <Button onPress={onSignIn} variant="ghost" width="fill">
+          {t("oauth.signInFirst")}
+        </Button>
+      </View>
       {IS_DEV_LOGIN_ENABLED ? (
         <DevIdentity
           onIdentify={(telegramId) => {
@@ -55,9 +107,11 @@ const IdentityStep = ({
 /** The client, the scopes it asked for, who is allowing, then Deny / Allow. */
 const ReadyStep = ({
   consent,
+  onSignIn,
   renderWidget,
 }: {
   readonly consent: Consent;
+  readonly onSignIn: () => void;
   readonly renderWidget: RenderWidget;
 }) => {
   const t = useT();
@@ -73,9 +127,9 @@ const ReadyStep = ({
         offered={phase.info.scopes}
         onToggle={consent.toggleScope}
       />
-      <IdentityStep consent={consent} renderWidget={renderWidget} />
+      <IdentityStep consent={consent} onSignIn={onSignIn} renderWidget={renderWidget} />
       {consent.error === null ? null : (
-        <Text accessibilityRole="alert" className="font-sans text-[14px] text-warn">
+        <Text accessibilityRole="alert" className="font-sans text-subhead font-normal text-danger">
           {t(consent.error)}
         </Text>
       )}
@@ -110,43 +164,52 @@ person's identity, then Allow or Deny. Both answers send the browser back to the
 */
 export const ConsentFlow = ({
   authQuery,
+  onSignIn,
   redirect,
   renderWidget,
 }: {
   /** The query string of the client's authorization request, exactly as the API redirected it. */
   readonly authQuery: string;
+  /** Opens the app's own sign-in, which comes back to this page with the request intact. */
+  readonly onSignIn: () => void;
   readonly redirect: (url: string) => void;
   readonly renderWidget: RenderWidget;
 }) => {
   const t = useT();
   const { api } = usePace();
-  const consent = useConsent(api, authQuery, redirect);
+  const consent = useConsent(api, { authQuery, redirect, session: useConsentSession() });
   const { phase } = consent;
   return (
-    <View className="gap-5 rounded-xl border border-line bg-surface px-6 py-8">
+    <View
+      className="gap-5 rounded-xl border border-separator bg-cell px-6 py-8"
+      testID="consent-card"
+    >
       <View className="flex-row items-center gap-3">
         <PaceMark size={40} />
-        <Text className="font-sans text-[24px] font-semibold tracking-[-0.04em] text-fg">
-          {t("app.name")}
-        </Text>
+        <Text className="font-sans text-title1 text-label-primary">{t("app.name")}</Text>
       </View>
       <View className="gap-1">
-        <Text accessibilityRole="header" className="font-sans text-[24px] font-semibold text-fg">
+        <Text accessibilityRole="header" className="font-sans text-title1 text-label-primary">
           {t("oauth.title")}
         </Text>
-        <Text className="font-sans text-[14px] text-muted">{t("oauth.body")}</Text>
+        <Text className="font-sans text-subhead font-normal text-label-secondary">
+          {t("oauth.body")}
+        </Text>
       </View>
       {phase.kind === "invalid" ? (
-        <Text accessibilityRole="alert" className="font-sans text-[14px] text-warn">
+        <Text accessibilityRole="alert" className="font-sans text-subhead font-normal text-danger">
           {t(phase.key)}
         </Text>
       ) : null}
       {phase.kind === "redirecting" ? (
-        <Text accessibilityLiveRegion="polite" className="font-sans text-[14px] text-fg2">
+        <Text
+          accessibilityLiveRegion="polite"
+          className="font-sans text-subhead font-normal text-label-secondary"
+        >
           {t("oauth.redirecting", { name: phase.name })}
         </Text>
       ) : null}
-      <ReadyStep consent={consent} renderWidget={renderWidget} />
+      <ReadyStep consent={consent} onSignIn={onSignIn} renderWidget={renderWidget} />
     </View>
   );
 };

@@ -1,10 +1,14 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 import * as Notifications from "expo-notifications";
+import * as SecureStore from "expo-secure-store";
+
+import type { FakeSecureStore } from "#app/testing/secure-store.fake.ts";
 
 import * as firebaseProject from "#app/platform/firebase-project.ts";
 import { pushStore, registerPush, setPushChoice } from "#app/platform/notifications.ts";
 import { SettingsScreen } from "#app/screens/settings-screen.tsx";
 import { isControl } from "#app/test/focus-target.ts";
+import { refusingStore } from "#app/test/refusing-store.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
@@ -120,15 +124,53 @@ describe("SettingsScreen", () => {
     const runtime = await createTestRuntime({ world: "empty" });
     await renderScreen(<SettingsScreen />, runtime);
     expect(nightHours()).not.toBeChecked();
-    await fireEvent(nightHours(), "valueChange", true);
+    await fireEvent.press(nightHours());
     await waitFor(() => {
       expect(runtime.state.store.getState().settings.nightHours).toBe(true);
     });
     expect(nightHours()).toBeChecked();
-    await fireEvent(nightHours(), "valueChange", false);
+    await fireEvent.press(nightHours());
     await waitFor(() => {
       expect(runtime.state.store.getState().settings.nightHours).toBe(false);
     });
+  });
+
+  it("says so and turns night hours back when the device refuses to save it, then rests", async () => {
+    const disk = refusingStore();
+    const runtime = await createTestRuntime({ eventStore: disk.eventStore, world: "empty" });
+    await renderScreen(<SettingsScreen />, runtime);
+    disk.refuse();
+    await fireEvent.press(nightHours());
+    expect(await screen.findByText(en("actionError.persist_failed"))).toBeOnTheScreen();
+    expect(nightHours()).not.toBeChecked();
+    expect(runtime.state.store.getState().settings.nightHours).toBe(false);
+    expect(disk.refused).toEqual([1]);
+  });
+
+  it("says so when the device refuses to save the language", async () => {
+    const disk = refusingStore();
+    const runtime = await createTestRuntime({ eventStore: disk.eventStore, world: "empty" });
+    await renderScreen(<SettingsScreen />, runtime);
+    disk.refuse();
+    await fireEvent.press(screen.getByRole("radio", { name: en("settings.language.ru") }));
+    expect(await screen.findByText(en("actionError.persist_failed"))).toBeOnTheScreen();
+    expect(runtime.state.store.getState().settings.language).toBe("en");
+  });
+
+  it("says so when the device refuses to save a notification switch", async () => {
+    const disk = refusingStore();
+    const runtime = await createTestRuntime({ eventStore: disk.eventStore, world: "empty" });
+    await renderScreen(<SettingsScreen />, runtime);
+    disk.refuse();
+    const digestOnWeb = screen.getByLabelText(
+      en("notify.switch", {
+        channel: en("notify.channel.web"),
+        kind: en("notify.kind.deadline_digest"),
+      }),
+    );
+    await fireEvent.press(digestOnWeb);
+    expect(await screen.findByText(en("actionError.persist_failed"))).toBeOnTheScreen();
+    expect(digestOnWeb).not.toBeChecked();
   });
 
   it("switches one kind of notification on one channel, the others as they were", async () => {
@@ -145,7 +187,7 @@ describe("SettingsScreen", () => {
       }),
     );
     expect(digestOnWeb).not.toBeChecked();
-    await fireEvent(digestOnWeb, "valueChange", true);
+    await fireEvent.press(digestOnWeb);
     await waitFor(() => {
       expect(runtime.state.store.getState().settings.notificationChannels.deadline_digest).toEqual({
         app: false,
@@ -282,6 +324,23 @@ describe("SettingsScreen", () => {
     jest.restoreAllMocks();
   });
 
+  it("says so and keeps the previous pick when the phone refuses to save a method", async () => {
+    fakeNotifications.state.granted = true;
+    fakeNotifications.state.pushToken = "fcm-token";
+    const runtime = await createTestRuntime({ routes: pushRoutes().routes, world: "empty" });
+    await setPushChoice(null);
+    await renderScreen(<SettingsScreen />, runtime);
+    const poll = await screen.findByRole("radio", { name: en("settings.push.option.poll") });
+    (SecureStore as unknown as FakeSecureStore).writes.isRefused = true;
+    try {
+      await fireEvent.press(poll);
+      expect(await screen.findByText(en("settings.push.notSaved"))).toBeOnTheScreen();
+      expect(screen.getByRole("radio", { name: en("settings.push.option.auto") })).toBeChecked();
+    } finally {
+      (SecureStore as unknown as FakeSecureStore).writes.isRefused = false;
+    }
+  });
+
   it("keeps the picked method shown and selected while offline", async () => {
     fakeNotifications.state.granted = true;
     fakeNotifications.state.pushToken = "fcm-token";
@@ -340,12 +399,88 @@ describe("SettingsScreen", () => {
     jest.restoreAllMocks();
   });
 
-  it("logs out and goes to the login card", async () => {
-    await renderScreen(<SettingsScreen />, await createTestRuntime({ world: "empty" }));
+  it("logs out, and leaves the way to the login card to the route gate (PR A re-review N1)", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    const logout = jest.spyOn(runtime.auth, "logout");
+    await renderScreen(<SettingsScreen />, runtime);
     await fireEvent.press(screen.getByRole("button", { name: en("settings.logout") }));
     await waitFor(() => {
-      expect(router.replace).toHaveBeenCalledWith("/login");
+      expect(logout).toHaveBeenCalledTimes(1);
     });
+    // A navigation after the log-out's answer remounted a login screen the gate already showed,
+    // emptying what the person had started typing there (bug class 75).
+    await act(async () => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 50);
+      });
+    });
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it("reads the outbox at the press: a change whose count has not come back yet still asks (PR A re-review N2)", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    const logout = jest.spyOn(runtime.auth, "logout");
+    // The outbox's read is slow (IndexedDB behind another tab's writes): nothing is known before
+    // it answers, so a count read ahead read 0 and dropped the change without a word.
+    const held = Promise.withResolvers<number>();
+    const reads = jest.fn(async () => await held.promise);
+    await renderScreen(<SettingsScreen />, { ...runtime, unsyncedCount: reads });
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.logout") }));
+    expect(logout).not.toHaveBeenCalled();
+    await act(async () => {
+      held.resolve(1);
+      await Promise.resolve();
+    });
+    expect(
+      await screen.findByText("1 change has not synced yet: logging out now loses it."),
+    ).toBeOnTheScreen();
+    expect(logout).not.toHaveBeenCalled();
+  });
+
+  it("asks when the outbox cannot be read, without naming a count (PR A re-review N2)", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    const logout = jest.spyOn(runtime.auth, "logout");
+    const reads = jest.fn(async () => {
+      throw new Error("IndexedDB refused");
+    });
+    await renderScreen(<SettingsScreen />, { ...runtime, unsyncedCount: reads });
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.logout") }));
+    expect(await screen.findByText(en("settings.logout.unsynced.unknown"))).toBeOnTheScreen();
+    expect(logout).not.toHaveBeenCalled();
+    // Still reachable: the person can log out anyway.
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.logout.anyway") }));
+    await waitFor(() => {
+      expect(logout).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("asks before Log out discards changes that have not synced, and can wait (QA round 23 R23-02)", async () => {
+    const runtime = await createTestRuntime({
+      routes: { "POST /api/sync/push": () => problem(503, "offline") },
+      world: "empty",
+    });
+    const logout = jest.spyOn(runtime.auth, "logout");
+    await runtime.actions.setNightHours(true);
+    await runtime.actions.setLanguage("en");
+    await renderScreen(<SettingsScreen />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.logout") }));
+    // Nothing is discarded yet: the question names how many, and offers to wait.
+    expect(
+      await screen.findByText("2 changes have not synced yet: logging out now loses them."),
+    ).toBeOnTheScreen();
+    expect(logout).not.toHaveBeenCalled();
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.logout.wait") }));
+    expect(screen.queryByText(/have not synced yet/u)).toBeNull();
+    expect(logout).not.toHaveBeenCalled();
+    // Log out stays reachable: asked again, the person chooses to log out anyway.
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.logout") }));
+    await fireEvent.press(
+      await screen.findByRole("button", { name: en("settings.logout.anyway") }),
+    );
+    await waitFor(() => {
+      expect(logout).toHaveBeenCalledTimes(1);
+    });
+    expect(router.replace).not.toHaveBeenCalled();
   });
 
   it("waits for Telegram before deleting and can poll after the session disappears", async () => {
@@ -354,16 +489,15 @@ describe("SettingsScreen", () => {
       id,
       expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
     }));
-    await renderScreen(
-      <SettingsScreen />,
-      await createTestRuntime({
-        routes: {
-          "POST /api/account/confirmations": created,
-          [`GET /api/account/confirmations/${id}`]: () => ({ status: "confirmed" }),
-        },
-        world: "empty",
-      }),
-    );
+    const runtime = await createTestRuntime({
+      routes: {
+        "POST /api/account/confirmations": created,
+        [`GET /api/account/confirmations/${id}`]: () => ({ status: "confirmed" }),
+      },
+      world: "empty",
+    });
+    const finished = jest.spyOn(runtime.auth, "finishAccountDeletion");
+    await renderScreen(<SettingsScreen />, runtime);
     await fireEvent.press(screen.getByRole("button", { name: en("settings.deleteAccount") }));
     expect(created).not.toHaveBeenCalled();
     await fireEvent.press(
@@ -372,10 +506,12 @@ describe("SettingsScreen", () => {
     expect(screen.getByText(en("settings.confirmation.waiting"))).toBeOnTheScreen();
     await waitFor(
       () => {
-        expect(router.replace).toHaveBeenCalledWith("/login");
+        expect(finished).toHaveBeenCalledTimes(1);
       },
       { timeout: 4000 },
     );
+    // The route gate takes a signed-out device to the login card; no navigation of its own.
+    expect(router.replace).not.toHaveBeenCalled();
     expect(created).toHaveBeenCalledTimes(1);
   });
 
@@ -384,11 +520,11 @@ describe("SettingsScreen", () => {
     await fireEvent.press(screen.getByRole("button", { name: en("settings.deleteAccount") }));
     const remove = screen.getByRole("button", { name: en("settings.deleteAccount.confirm") });
     expect(en("settings.deleteAccount.confirm")).toMatch(/Telegram/u);
-    expect(String(remove.props["className"])).toMatch(/border-warn/u);
+    expect(String(remove.props["className"])).toMatch(/border-danger/u);
     await fireEvent.press(screen.getByRole("button", { name: en("common.cancel") }));
     await fireEvent.press(screen.getByRole("button", { name: en("settings.wipe") }));
     const wipe = screen.getByRole("button", { name: en("settings.wipe.confirm") });
-    expect(String(wipe.props["className"])).toMatch(/border-warn/u);
+    expect(String(wipe.props["className"])).toMatch(/border-danger/u);
   });
 
   it("keeps focus through Wipe's and Delete's first confirm: onto Cancel and back to the opener (bug class 5)", async () => {
@@ -417,31 +553,31 @@ describe("SettingsScreen", () => {
     const id = "123e4567-e89b-42d3-a456-426614174003";
     // This device's clock runs ahead: the request already looks over here.
     const statuses = ["pending", "confirmed"];
-    await renderScreen(
-      <SettingsScreen />,
-      await createTestRuntime({
-        routes: {
-          "POST /api/account/confirmations": () => ({
-            id,
-            expiresAt: new Date(Date.now() - 60_000).toISOString(),
-          }),
-          [`GET /api/account/confirmations/${id}`]: () => ({
-            status: statuses.shift() ?? "confirmed",
-          }),
-        },
-        world: "empty",
-      }),
-    );
+    const runtime = await createTestRuntime({
+      routes: {
+        "POST /api/account/confirmations": () => ({
+          id,
+          expiresAt: new Date(Date.now() - 60_000).toISOString(),
+        }),
+        [`GET /api/account/confirmations/${id}`]: () => ({
+          status: statuses.shift() ?? "confirmed",
+        }),
+      },
+      world: "empty",
+    });
+    const finished = jest.spyOn(runtime.auth, "finishAccountDeletion");
+    await renderScreen(<SettingsScreen />, runtime);
     await fireEvent.press(screen.getByRole("button", { name: en("settings.deleteAccount") }));
     await fireEvent.press(
       screen.getByRole("button", { name: en("settings.deleteAccount.confirm") }),
     );
     await waitFor(
       () => {
-        expect(router.replace).toHaveBeenCalledWith("/login");
+        expect(finished).toHaveBeenCalledTimes(1);
       },
       { timeout: 7000 },
     );
+    expect(router.replace).not.toHaveBeenCalled();
     expect(screen.queryByText(en("settings.confirmation.expired"))).toBeNull();
   }, 15_000);
 

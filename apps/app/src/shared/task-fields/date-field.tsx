@@ -7,7 +7,6 @@ import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
 import { Calendar } from "#app/ui/calendar.tsx";
 import { Chip } from "#app/ui/chip.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
 import { TimeInput } from "#app/ui/time-input.tsx";
 
 /** A time a person sets, with the zone it was set in; `null` when not set. */
@@ -56,14 +55,13 @@ export const DateChip = ({
 }) => {
   const t = useT();
   const viewer = useViewer();
-  const { palette } = useTheme();
   const unset = t(emptyDateLabel(kind));
   const text = value === null ? unset : zonedText({ ...value, mode: "due" }, viewer);
   const Icon = DATE_ICONS[kind];
   return (
     <Chip
       label={`${t(dateLabel(kind))}: ${text}`}
-      leading={<Icon color={palette.fg2} size={14} strokeWidth={1.75} />}
+      leading={(color) => <Icon color={color} size={14} strokeWidth={1.75} />}
       onPress={onToggle}
       selected={isOpen}
     >
@@ -101,7 +99,7 @@ export const DatePanel = ({
     }
   };
   return (
-    <View className="gap-3 rounded-xl border border-line bg-bg p-3">
+    <View className="gap-3 rounded-xl border border-separator bg-app p-3">
       <Calendar
         labels={{ next: t("calendar.nextMonth"), previous: t("calendar.previousMonth") }}
         language={viewer.language}
@@ -113,7 +111,7 @@ export const DatePanel = ({
         today={today}
       />
       <View className="flex-row items-center gap-2">
-        <Text className="font-sans text-[13px] text-muted">
+        <Text className="font-sans text-footnote text-label-secondary">
           {t(kind === "final" ? "form.finalTime" : "composer.dueTime")}
         </Text>
         <TimeInput
@@ -126,7 +124,7 @@ export const DatePanel = ({
           value={time}
         />
         {tz === viewer.deviceTz ? null : (
-          <Text className="font-sans text-[12px] tabular-nums text-muted">
+          <Text className="font-sans text-caption font-normal tabular-nums text-label-tertiary">
             {t("add.dueZone", { tz })}
           </Text>
         )}

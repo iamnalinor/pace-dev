@@ -131,6 +131,17 @@ Reducers are `(state, event) => state` and pure. `settings-reducer.ts` is the fi
 the `notificationChannels` switches on top
 of `DEFAULT_SETTINGS`); the task, project and preset reducers come in stage 1.
 
+A full rebuild costs time linear in the log (bug-lessons class 55): `materialize` and
+`materializeAt` fold as one batch (`materialize/transient.ts`), in which a reducer's map writes
+(`assoc`, `putById`) copy a map once and then write that copy in place, and a subset of a map is
+read through a kept index (`keysWhere`), never by scanning the map per event. Outside a batch
+(the incremental `apply`) the same calls copy. After a rebuild the maps it made are frozen (a batch
+nested in another freezes the outer one's maps first, see `inBatch`); on the incremental path every
+change makes new objects, immutable by type and lint, and leaves the frozen ones alone.
+`materialize-cost.test.ts` holds the budget. The client merges an action's events into its sorted
+`events` and `log` with `mergeEvents` (a binary search and a copy) instead of sorting them again;
+`state-cost.test.ts` holds that per-action budget.
+
 High-volume phone facts (the calendar copy, app usage) are **not** events. They have
 their own tables in the Durable Object (`calendar_events`, `usage_sessions`, and `phone_uses`:
 when a phone was really in use, which automatic sleep reads instead of its app sessions),
@@ -245,6 +256,11 @@ global; everything per user lives in the Durable Object.
 ## Sync protocol
 
 Clients keep their own log and an outbox; the server keeps the authoritative sequence.
+A local action is shown first and written after (`packages/client/src/local-log.ts`): the
+state integrates the events at once, writes to the local store run one after another in the
+order integrated, and a refused write takes its events back (the state rebuilt by the
+materializer from the rest) and answers `persist_failed`. The outbox is the store's, so only
+what landed on the disk is ever pushed.
 
 | Call | Request | Response | Rules |
 |---|---|---|---|

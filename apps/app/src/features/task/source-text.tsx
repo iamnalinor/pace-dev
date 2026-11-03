@@ -18,21 +18,21 @@ export const SourceText = ({ text }: { readonly text: null | string }) => {
       <Pressable
         accessibilityRole="button"
         aria-expanded={isShown}
-        className="min-h-11 flex-row items-center gap-1.5"
+        className="min-h-hit-web flex-row items-center gap-2"
         onPress={() => {
           setIsShown((shown) => !shown);
         }}
       >
-        <Text className="font-sans text-[13px] text-fg2">{t("task.source")}</Text>
+        <Text className="font-sans text-footnote text-label-secondary">{t("task.source")}</Text>
         {isShown ? (
-          <ChevronUp color={palette.muted} size={16} strokeWidth={2} />
+          <ChevronUp color={palette["label.secondary"]} size={16} strokeWidth={2} />
         ) : (
-          <ChevronDown color={palette.muted} size={16} strokeWidth={2} />
+          <ChevronDown color={palette["label.secondary"]} size={16} strokeWidth={2} />
         )}
       </Pressable>
       {isShown ? (
         <Text
-          className="rounded-lg bg-surface p-3 font-sans text-[14px] leading-5 text-fg"
+          className="rounded-lg bg-cell p-3 font-sans text-subhead font-normal text-label-primary"
           selectable
         >
           {text}

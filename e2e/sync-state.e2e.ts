@@ -1,12 +1,13 @@
-import type { Page, WebSocketRoute } from "@playwright/test";
+import type { Locator, Page, WebSocketRoute } from "@playwright/test";
 
 import { formByHand, nowTasks, taskForm } from "./support/composer.ts";
 import { EMPTY_COPY } from "./support/first-sync.ts";
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { API_URL, loginViaApi } from "./support/login.ts";
+import { outboxSent } from "./support/outbox.ts";
 import { isBare, screenUrls, STAND_IN_IDS } from "./support/routes.ts";
 import { settle } from "./support/screen-checks.ts";
-import { type LivedIn, seedLivedIn } from "./support/seed.ts";
+import { type LivedIn, pullAll, seedLivedIn } from "./support/seed.ts";
 import { hasPulledAfterPush, recordSyncTraffic, repeated } from "./support/sync-traffic.ts";
 
 /** The titles of the tasks created in the server's log of the account behind `token`. */
@@ -95,6 +96,95 @@ test("a first sync that outlasts the cover shows no final empty copy in either l
   expect(seen.filter((text) => EMPTY_COPY.test(text))).toEqual([]);
 });
 
+/** How long the failing first pull is watched for its backoff (review M2). */
+const QUIET_FAILING_MS = 6000;
+
+// Now, Day and Projects each said their final empty words in QA 21 (M4). The browser sits in
+// another zone than the account's (Moscow): the empty copy must not write its own (QA 23 R23-01).
+test.describe("a first pull answered with HTTP 500", () => {
+  test.use({ timezoneId: "Asia/Tokyo" });
+  for (const url of ["/", "/day", "/projects"]) {
+    test(`${url} after a first pull answered with HTTP 500 shows no final empty copy, and a line with Retry says it has not loaded (QA 21 M4)`, async ({
+      page,
+    }) => {
+      test.setTimeout(60_000);
+      const { token } = await loginViaApi(page);
+      await seedLivedIn(token);
+      const server = { isFailing: true };
+      // A failing deploy answers the socket no better than the pull.
+      await page.routeWebSocket(/\/api\/sync\/live/u, async (socket) => {
+        await (server.isFailing ? socket.close() : Promise.resolve(socket.connectToServer()));
+      });
+      const pushed: string[] = [];
+      page.on("request", (request) => {
+        if (request.url().includes("/api/sync/push")) {
+          pushed.push(request.postData() ?? "");
+        }
+      });
+      const failedPulls: number[] = [];
+      await page.route("**/api/sync/pull**", async (route) => {
+        if (server.isFailing) {
+          failedPulls.push(Date.now());
+        }
+        await (server.isFailing
+          ? route.fulfill({ body: '{"code":"internal"}', status: 500 })
+          : route.fallback());
+      });
+      await page.addInitScript(() => {
+        const seen: string[] = [];
+        Object.assign(globalThis, { seenTexts: seen });
+        new MutationObserver(() => {
+          const body = document.querySelector("body");
+          // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- innerText leaves out what is not drawn (the covered app); textContent keeps it
+          seen.push(body === null ? "" : body.innerText);
+        }).observe(document, { characterData: true, childList: true, subtree: true });
+      });
+      await page.goto(url);
+      const line = page.getByRole("status").filter({ hasText: "Your data has not loaded yet" });
+      await expect(line).toBeVisible({ timeout: 15_000 });
+      await expect(
+        page.getByRole("progressbar", { name: "Loading your data…" }).first(),
+      ).toBeVisible();
+      await expectNoA11yViolations(page);
+      // What the page said while the pull failed is judged (the loaded account may be empty).
+      const seen = await page.evaluate(
+        () => (globalThis as unknown as { seenTexts: string[] }).seenTexts,
+      );
+      expect(seen.filter((text) => EMPTY_COPY.test(text))).toEqual([]);
+      // The failing pull backs off (1 s doubling to 60 s), never hammers the server (review M2): in
+      // 6 s of watching, a few tries at most (a loop without backoff sends dozens).
+      const watchedFrom = Date.now();
+      // A window of time is what is measured here, not a condition to wait for.
+      await new Promise((resolve) => {
+        setTimeout(resolve, QUIET_FAILING_MS);
+      });
+      const watched = failedPulls.filter((at) => at >= watchedFrom);
+      expect(watched.length).toBeLessThanOrEqual(4);
+      // The server is back: Retry loads the account at once and the line goes.
+      server.isFailing = false;
+      await line.getByRole("button", { name: "Try again" }).click();
+      // The account's language came with its data.
+      await expect(page.getByRole("link", { name: "Сейчас" })).toBeVisible({ timeout: 10_000 });
+      await expect(line).toHaveCount(0);
+      // Nothing of the account's was written while it was unknown: no zone is pushed after the
+      // recovery (the device's Tokyo is asked about on Now, never written over Moscow). A window of
+      // time is what is measured here: the loop's first tick after the recovery pushes what waits.
+      await new Promise((resolve) => {
+        setTimeout(resolve, QUIET_FAILING_MS);
+      });
+      expect(pushed.filter((body) => body.includes('"timezone"'))).toEqual([]);
+      // Whichever channel carried it: the push after the recovery can go over the live socket,
+      // which `page.on("request")` does not see (re-review N5). The log the server keeps holds
+      // no zone of this device's.
+      const zones = (await pullAll(token)).filter(
+        (event) =>
+          event.type === "settings.updated" && JSON.stringify(event.payload).includes("Asia/Tokyo"),
+      );
+      expect(zones).toEqual([]);
+    });
+  }
+});
+
 /** The first sync's cover lasts this long at most (`FIRST_SYNC_COVER_MS` in the app's sync frame). */
 const COVER_MS = 10_000;
 
@@ -110,9 +200,12 @@ const withIds = (url: string, seeded: LivedIn): string => {
 /**
 Every screen a signed-in person reads data on, from the router's folder (QA rounds 18 M5, 19 M1
 and 20 M1 each fixed the screens the last round named, and the next round found another: bug-lessons
-class 90). Signing in and the walk-through send a signed-in person on.
+class 90). Signing in and the walk-through send a signed-in person on. The dev gallery
+(`/dev/gallery`, never in a release build) draws fixtures, not the account's data, by design.
 */
-const DATA_URLS = screenUrls(STAND_IN_IDS).filter((url) => !isBare(url));
+const DATA_URLS = screenUrls(STAND_IN_IDS).filter(
+  (url) => !isBare(url) && !url.startsWith("/dev/"),
+);
 
 /** The switches and choices the page draws, as `role:name`. */
 const drawnChoices = async (page: Page): Promise<readonly string[]> =>
@@ -134,8 +227,9 @@ const NOT_ACCOUNT_VALUES: readonly { readonly match: RegExp; readonly why: strin
     why: "the theme is this device's own choice, kept on the device, not in the account",
   },
   {
-    match: /^\/add radio:/u,
-    why: "open (round 6-D, for the owner): a share opens New task's form at once, its presets and projects the built-in ones until the log arrives",
+    match:
+      /^\/add radio:(?:Start: |Due: |Estimate: No estimate$|Does not repeat$|Every |Weekdays$)/u,
+    why: "the new task's own start, due, estimate and repeat: nothing the account holds (its categories, importance and projects wait, pr48 follow-up A1)",
   },
 ];
 
@@ -209,7 +303,7 @@ test("offline, a line says so; a task written meanwhile goes out on reconnect an
   const traffic = recordSyncTraffic(page);
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Now" })).toBeVisible();
-  const line = page.getByRole("status").filter({ hasText: "You are offline" });
+  const line = page.getByRole("status").filter({ hasText: "Offline · changes will sync" });
   await expect(line).toHaveCount(0);
   await context.setOffline(true);
   await expect(line).toBeVisible();
@@ -245,7 +339,7 @@ for (const [width, height] of [
     await expect(heading).toBeVisible();
     const before = await heading.boundingBox();
     await context.setOffline(true);
-    const line = page.getByRole("status").filter({ hasText: "You are offline" });
+    const line = page.getByRole("status").filter({ hasText: "Offline · changes will sync" });
     await expect(line).toBeVisible();
     expect(await heading.boundingBox()).toEqual(before);
     // The pill keeps to the top of the page, under the browser's bar, and is no wider than it.
@@ -280,7 +374,7 @@ test("a server gone while the tab sits idle: the line says offline without a wri
   const traffic = recordSyncTraffic(page);
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Now" })).toBeVisible();
-  const line = page.getByRole("status").filter({ hasText: "You are offline" });
+  const line = page.getByRole("status").filter({ hasText: "Offline · changes will sync" });
   await expect.poll(() => sockets.length).toBeGreaterThan(0);
   await expect(line).toHaveCount(0);
   // The socket's opening asks for one catch-up pull (what landed before it was there), now the
@@ -379,10 +473,10 @@ test("a server back after a long outage: Retry and a return to the window clear 
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Now" })).toBeVisible();
   await expect.poll(() => sockets.length).toBeGreaterThan(0);
-  const line = page.getByRole("status").filter({ hasText: "You are offline" });
+  const line = page.getByRole("status").filter({ hasText: "Offline · changes will sync" });
   const waysBack = [
     async () => {
-      await line.getByRole("button", { name: "Retry" }).click();
+      await line.getByRole("button", { name: "Try again" }).click();
     },
     async () => {
       await page.evaluate(() => {
@@ -429,3 +523,80 @@ test("the first load asks for each thing once: one pull of the log, one of the p
   expect(repeated(asked)).toEqual([]);
   expect(asked.filter((call) => call.includes("since=0"))).toHaveLength(1);
 });
+
+test("Day's first load asks for the day's app usage once, though two of its parts read it (QA 21 L5)", async ({
+  page,
+}) => {
+  const { token } = await loginViaApi(page);
+  await seedLivedIn(token);
+  const asked: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname === "/api/usage") {
+      asked.push(`${url.pathname}${url.search}`);
+    }
+  });
+  await page.goto("/day");
+  await expect(page.getByRole("heading", { name: "Экранное время" })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect.poll(() => asked.length).toBeGreaterThan(0);
+  await new Promise((resolve) => {
+    // A window of time is what is measured here, not a condition to wait for.
+    setTimeout(resolve, 2000);
+  });
+  expect(repeated(asked)).toEqual([]);
+});
+
+/** A control's box on the page; a control not drawn fails the test here. */
+const boxOf = async (
+  locator: Locator,
+): Promise<{ readonly x: number; readonly y: number; readonly height: number }> => {
+  const box = await locator.boundingBox();
+  expect(box).not.toBeNull();
+  return box ?? { height: 0, x: 0, y: 0 };
+};
+
+for (const [width, height] of [
+  [390, 844],
+  [1440, 900],
+] as const) {
+  test(`offline, Log out asks first in a block of its own, Wait takes the focus, Escape gives it back, at ${String(width)} (QA round 23 R23-02, design pass M8)`, async ({
+    context,
+    page,
+  }) => {
+    await page.setViewportSize({ height, width });
+    await loginViaApi(page);
+    await page.goto("/settings");
+    await expect(page.getByRole("button", { exact: true, name: "Log out" })).toBeVisible();
+    // The start's own write (a new account's time zone) sent first: the press counts the outbox
+    // as it is, so only the change made below is in it.
+    await outboxSent(page);
+    // Offline, a setting changed here waits in the outbox.
+    await context.setOffline(true);
+    await page.getByRole("switch", { name: "Show night hours" }).click();
+    const logOut = page.getByRole("button", { exact: true, name: "Log out" });
+    await logOut.focus();
+    await page.keyboard.press("Enter");
+    const confirm = page.getByRole("group", {
+      name: "1 change has not synced yet: logging out now loses it.",
+    });
+    const wait = confirm.getByRole("button", { name: "Wait" });
+    const anyway = confirm.getByRole("button", { name: "Log out anyway" });
+    await expect(wait).toBeFocused();
+    await expectNoA11yViolations(page);
+    // A line of its own, the width of the column, under Export (beside it, its buttons sat at the
+    // far edge, 500 px from the question); each button a full target on one line.
+    const block = await boxOf(confirm);
+    const exportBox = await boxOf(page.getByRole("button", { name: "Export data" }));
+    expect(block.y).toBeGreaterThanOrEqual(exportBox.y + exportBox.height);
+    expect(Math.abs(block.x - exportBox.x)).toBeLessThan(2);
+    for (const box of [await boxOf(wait), await boxOf(anyway)]) {
+      expect(box.height).toBeGreaterThanOrEqual(44);
+      expect(box.height).toBeLessThan(56);
+    }
+    await page.keyboard.press("Escape");
+    await expect(confirm).toHaveCount(0);
+    await expect(logOut).toBeFocused();
+  });
+}

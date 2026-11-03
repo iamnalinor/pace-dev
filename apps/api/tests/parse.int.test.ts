@@ -518,6 +518,16 @@ describe("POST /api/parse: no model", () => {
     expect(await parseLimited(token, { text: "позвонить маме" })).toMatchObject({
       reason: "limited",
     });
+    // Every provider refused it for good (a content filter, a 400): no later read would differ, so
+    // the app is not offered "Read it when it's back", and a deferred text is not kept (N7).
+    const strict = [{ model: fakeParseModel(() => ({ badRequestWith: 400 })), name: "strict" }];
+    expect(await parseWith(strict, token, { text: "позвонить в банк" })).toMatchObject({
+      reason: "unreadable",
+      status: "unavailable",
+    });
+    expect(await parseWith(strict, token, { defer: true, text: "позвонить в банк" })).toMatchObject(
+      { reason: "unreadable", status: "unavailable" },
+    );
     // Kept: the providers may be back soon (none said when); the queue reads it at its next try.
     const kept = await parseWith(
       [{ model: fakeParseModel(() => ({ unavailableWith: 500 })), name: "down" }],
@@ -625,6 +635,30 @@ describe("POST /api/parse: no model", () => {
       "8",
     ]);
     expect(state.tasks.byId[taskId]?.sources.map((source) => source.text)).toContain(text);
+  });
+
+  it("moves a text every provider refuses for good to the Inbox once, then goes quiet (review M2)", async () => {
+    const token = await loginAsDev("1002");
+    // `#refused`: the fake provider answers this request with a 400 (a content filter).
+    const text = "#refused купить хлеб";
+    expect(await parseLimited(token, { defer: true, text })).toMatchObject({ status: "queued" });
+    const stub = await storeOf(token);
+    await stub.noteLlmLimits({ fake: "2000-01-01T00:00:00.000Z" }, new Date().toISOString());
+    // Each drain an hour after the last, past any wait it set: three refusals, then the Inbox.
+    const inboxed = async () =>
+      Object.values((await stateFor(token)).tasks.byId).filter(
+        (task) => task.title === text && task.presetId === "inbox",
+      ).length;
+    for (const hours of [1, 2]) {
+      await stub.drainParses(new Date(Date.now() + hours * 3_600_000).toISOString());
+      expect(await inboxed()).toBe(0);
+    }
+    await stub.drainParses(new Date(Date.now() + 3 * 3_600_000).toISOString());
+    expect(await inboxed()).toBe(1);
+    // The queue is empty: later alarms write nothing more and ask nothing.
+    await stub.drainParses(new Date(Date.now() + 4 * 3_600_000).toISOString());
+    await stub.drainParses(new Date(Date.now() + 30 * 3_600_000).toISOString());
+    expect(await inboxed()).toBe(1);
   });
 
   it("puts a deferred delete in the Inbox instead of deleting unseen", async () => {

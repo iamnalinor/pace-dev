@@ -13,13 +13,12 @@ import { appLabels, readPhoneEvents } from "#app/platform/phone-data.ts";
 import {
   calendarKey,
   dismissedKeys,
-  dismiss as rememberDismissed,
   type SeriesRule,
   seriesRules,
-  setSeriesRule,
   usePhoneMemoryVersion,
 } from "#app/platform/phone-memory.ts";
 import { useFeed } from "#app/shared/notifications/use-feed.ts";
+import { useLatestLoad, usePhoneAnswers } from "#app/shared/tracking/use-phone-answers.ts";
 import { activityLabel, type DayModel, eventAnswers } from "@pace/client";
 import {
   addDaysIn,
@@ -141,11 +140,14 @@ export const useDayPhone = (day: DayModel, now: string): DayPhone => {
   const { date, zone } = day;
   // A new day, the minute tick or a change to what the phone remembers changes the answer.
   const memory = usePhoneMemoryVersion();
+  const loadLatest = useLatestLoad(setLoaded);
+  const readNow = useCallback(async () => {
+    await loadLatest(async () => await load({ date, zone }, now));
+  }, [loadLatest, date, zone, now]);
   const reload = useCallback(() => {
-    void (async () => {
-      setLoaded(await load({ date, zone }, now));
-    })();
-  }, [date, zone, now]);
+    void readNow();
+  }, [readNow]);
+  const answered = usePhoneAnswers(readNow, memory);
   useEffect(() => {
     reload();
     const subscription = AppState.addEventListener("change", (next) => {
@@ -157,24 +159,22 @@ export const useDayPhone = (day: DayModel, now: string): DayPhone => {
       subscription.remove();
     };
   }, [reload, memory]);
-  const remember = (rule: SeriesRule): void => {
-    void (async () => {
-      await setSeriesRule(rule);
-      reload();
-    })();
+  // What was answered here this session holds whatever the phone's storage did with it.
+  const known: Loaded = {
+    ...loaded,
+    dismissed: new Set([...loaded.dismissed, ...answered.dismissed]),
+    rules: [
+      ...loaded.rules.filter((rule) => answered.rules.every((each) => each.series !== rule.series)),
+      ...answered.rules,
+    ],
   };
-  const shown = loaded.calendar.filter(
+  const shown = known.calendar.filter(
     (event) =>
-      !loaded.dismissed.has(calendarKey(event)) &&
-      ruleOf(loaded, event) !== "skip" &&
+      !known.dismissed.has(calendarKey(event)) &&
+      ruleOf(known, event) !== "skip" &&
       answers.get(calendarEventKey(event)) !== "skipped",
   );
-  const dismiss = (key: string): void => {
-    void (async () => {
-      await rememberDismissed(key);
-      reload();
-    })();
-  };
+  const { dismiss, remember } = answered;
   return {
     askCalendar: () => {
       void (async () => {
@@ -186,7 +186,7 @@ export const useDayPhone = (day: DayModel, now: string): DayPhone => {
       access: loaded.access,
       autoLog: shown.filter(
         (event) =>
-          ruleOf(loaded, event) === "attended" &&
+          ruleOf(known, event) === "attended" &&
           event.endAt <= now &&
           !isCalendarLogged(day.entries, event),
       ),

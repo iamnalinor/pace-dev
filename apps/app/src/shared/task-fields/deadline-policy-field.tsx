@@ -58,7 +58,9 @@ const FixedDate = ({
       }}
       ref={wrapperRef}
     >
-      <Text className="font-sans text-[12px] text-muted">{t("form.final")}</Text>
+      <Text className="font-sans text-caption font-normal text-label-tertiary">
+        {t("form.final")}
+      </Text>
       <DateChip
         isOpen={isOpen}
         kind="final"
@@ -103,10 +105,10 @@ const TwoStageFields = ({
   const mode = finalModeOf(value);
   return (
     <View className="gap-2 pl-2">
-      <Text className="font-sans text-[12px] leading-5 text-muted">
+      <Text className="font-sans text-caption font-normal text-label-tertiary">
         {t("form.deadlineSoftHint")}
       </Text>
-      <View className="flex-row flex-wrap gap-1.5">
+      <View className="flex-row flex-wrap gap-2">
         {mode === "none" ? (
           <Chip
             onPress={() => {
@@ -179,8 +181,10 @@ export const DeadlinePolicyField = ({
   const t = useT();
   return (
     <View className="gap-2">
-      <Text className="font-sans text-[12px] text-muted">{t("form.deadlinePolicy")}</Text>
-      <View className="flex-row flex-wrap gap-1.5">
+      <Text className="font-sans text-caption font-normal text-label-tertiary">
+        {t("form.deadlinePolicy")}
+      </Text>
+      <View className="flex-row flex-wrap gap-2">
         <Chip
           onPress={() => {
             onChange({ kind: "hard" });

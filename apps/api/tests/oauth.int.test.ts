@@ -1,8 +1,10 @@
+import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
 import { OAUTH_SCOPES } from "@pace/core";
 
+import worker from "../src/worker.ts";
 import { api, call, json, readJson } from "./helpers.ts";
 import {
   API_ORIGIN,
@@ -64,6 +66,52 @@ describe("discovery", () => {
     // What an MCP client given that URL discovers: the resource it is about to get tokens for.
     const metadata = await read(new URL("/.well-known/oauth-protected-resource/mcp", mcpUrl).href);
     expect(metadata["resource"]).toBe(mcpUrl);
+  });
+
+  it("serves the protected resource metadata at whatever address it is reached (pr48 follow-up A7)", async () => {
+    // A self-hoster behind a proxy or on a LAN address: the client that fetches the well-known
+    // document there gets the canonical resource, not a 404.
+    const response = await api.fetch(
+      new Request("https://pace.lan:8443/.well-known/oauth-protected-resource/mcp"),
+    );
+    expect(response.status).toBe(200);
+    expect(await readJson<Metadata>(response)).toMatchObject({
+      authorization_servers: [API_ORIGIN],
+      resource: `${API_ORIGIN}/mcp`,
+    });
+  });
+
+  it("keeps answering when API_ORIGIN is blank, taking the origin it is reached at (pr48 follow-up A7)", async () => {
+    // The config reads a blank or malformed API_ORIGIN as unset; the provider must do the same
+    // instead of failing to build (which answered every request with 500).
+    const reached = "https://pace.self:8443";
+    // The generated `Cloudflare.Env` types API_ORIGIN as this repo's two values; a self-hoster's
+    // deploy can hold any string, so the blank one is set past the type.
+    const blank: Cloudflare.Env = { ...env };
+    const override: Readonly<Record<string, string>> = { API_ORIGIN: "  " };
+    Object.assign(blank, override);
+    const fetchWith = async (path: string): Promise<Response> => {
+      const ctx = createExecutionContext();
+      const response = await worker.fetch(new Request(`${reached}${path}`), blank, ctx);
+      await waitOnExecutionContext(ctx);
+      return response;
+    };
+    const instance = await fetchWith("/api/instance");
+    expect(instance.status).toBe(200);
+    expect(await readJson<Metadata>(instance)).toMatchObject({ apiOrigin: reached });
+    const metadata = await fetchWith("/.well-known/oauth-protected-resource/mcp");
+    expect(metadata.status).toBe(200);
+    expect(await readJson<Metadata>(metadata)).toMatchObject({
+      authorization_servers: [reached],
+      resource: `${reached}/mcp`,
+    });
+  });
+
+  it("leaves other paths of the well-known namespace unanswered at another address", async () => {
+    const response = await api.fetch(
+      new Request("https://pace.lan:8443/.well-known/oauth-protected-resource/other"),
+    );
+    expect(response.status).toBe(404);
   });
 
   it("challenges an unauthenticated MCP call with the resource metadata URL", async () => {

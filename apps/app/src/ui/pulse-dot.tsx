@@ -26,7 +26,7 @@ export const PulseDot = ({ className }: { readonly className: string }) => {
   // The class names sit on a plain view: reanimated views drop them on the web.
   return (
     <Animated.View style={style}>
-      <View className={cx("h-2 w-2 rounded-full", className)} />
+      <View className={cx("h-2 w-2 rounded-pill", className)} />
     </Animated.View>
   );
 };

@@ -1,21 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { usePace } from "#app/app-state.tsx";
 import { loadDeviceId } from "#app/platform/device-id.ts";
 import { IS_PHONE } from "#app/platform/device.ts";
-import { useUsage } from "@pace/client/react";
-import { type SatRow, whereSat } from "@pace/core";
+import { type SatRow, type UsageRow, whereSat } from "@pace/core";
 
 /**
-Where the time of a block went on the person's devices, from what they sent over [from, to).
+Where the time of a block went on the person's devices, from what they sent (the screen's one
+read of the day's usage, QA round 21 L5).
 On a phone its own apps are left out: the phone shows those itself, in more detail.
 */
 export const useWhereSat = (
-  from: string,
-  to: string,
+  usage: readonly UsageRow[],
 ): ((startAt: string, endAt: string) => readonly SatRow[]) => {
-  const { api } = usePace();
-  const usage = useUsage(api, from, to);
   const [ownId, setOwnId] = useState<null | string>(null);
   useEffect(() => {
     if (!IS_PHONE) {

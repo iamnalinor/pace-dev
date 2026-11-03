@@ -3,7 +3,7 @@ import { Text, View } from "react-native";
 
 import type { ThemePreference } from "#app/platform/theme.ts";
 
-import { useAuth, usePace, useSettings, useT } from "#app/app-state.tsx";
+import { usePace, useSettings, useT } from "#app/app-state.tsx";
 import { BackgroundHint } from "#app/features/permissions/background-hint.tsx";
 import { usePermissions } from "#app/features/permissions/use-permissions.ts";
 import { SessionsSection } from "#app/features/sessions/sessions-section.tsx";
@@ -20,6 +20,8 @@ import { SettingsLinks } from "#app/features/settings/settings-links.tsx";
 import { TimezoneRow } from "#app/features/settings/timezone-row.tsx";
 import { IS_PHONE } from "#app/platform/device.ts";
 import { DestinationScreen } from "#app/screens/destination-screen.tsx";
+import { LogoutButton } from "#app/shared/logout-button.tsx";
+import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button } from "#app/ui/button.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { KnownAfterSync } from "#app/ui/empty-state.tsx";
@@ -38,10 +40,14 @@ const Row = ({
   readonly children: React.ReactNode;
   readonly label: string;
 }) => (
-  <View accessibilityLabel={label} className="gap-2 border-b border-line px-5 py-4" role="group">
+  <View
+    accessibilityLabel={label}
+    className="gap-2 border-b border-separator px-5 py-4"
+    role="group"
+  >
     <Text
       accessibilityRole="header"
-      className="font-sans text-[11px] uppercase tabular-nums tracking-[0.06em] text-muted"
+      className="font-sans text-caption2 font-normal uppercase tabular-nums text-label-tertiary"
     >
       {label}
     </Text>
@@ -77,6 +83,7 @@ const LookRows = () => {
   const theme = useTheme();
   const settings = useSettings();
   const { actions } = usePace();
+  const run = useRunAction();
   return (
     <>
       <Row label={t("settings.theme")}>
@@ -93,7 +100,7 @@ const LookRows = () => {
         <KnownAfterSync>
           <Segmented
             onChange={(language) => {
-              void actions.setLanguage(language);
+              void run(actions.setLanguage(language));
             }}
             options={LANGUAGES.map((value) => ({ label: t(`settings.language.${value}`), value }))}
             value={settings.language}
@@ -107,7 +114,7 @@ const LookRows = () => {
             isOn={settings.nightHours}
             label={t("settings.nightHours")}
             onChange={(isOn) => {
-              void actions.setNightHours(isOn);
+              void run(actions.setNightHours(isOn));
             }}
           />
         </KnownAfterSync>
@@ -119,12 +126,6 @@ const LookRows = () => {
 export const SettingsScreen = () => {
   const t = useT();
   const isWide = useIsWide();
-  const router = useRouter();
-  const { auth } = useAuth();
-  const logout = async (): Promise<void> => {
-    await auth.logout();
-    router.replace("/login");
-  };
   return (
     <DestinationScreen title={t("settings.title")}>
       <LookRows />
@@ -169,9 +170,7 @@ export const SettingsScreen = () => {
         {/* Export data and Log out side by side on a computer, full width on a phone. */}
         <View className={cx("gap-3", isWide && "flex-row flex-wrap")}>
           {IS_PHONE ? null : <ExportRow />}
-          <Button onPress={() => void logout()} variant="secondary">
-            {t("settings.logout")}
-          </Button>
+          <LogoutButton />
         </View>
         <DangerZone />
       </View>

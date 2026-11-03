@@ -29,6 +29,8 @@ export type Session = {
   readonly ready: Promise<void>;
   readonly store: StoreApi<AuthState>;
   readonly token: () => string | undefined;
+  /** Whether this session ended (signed out, for any reason) and no new one began. */
+  readonly hasEnded: () => boolean;
   readonly signIn: (granted: Granted) => Promise<User>;
   /**
   Why, when the person did not sign out here: the server no longer knew the session
@@ -75,6 +77,14 @@ const notesOf = (
   },
 });
 
+/** A session that began: no word of an earlier one's end is left. */
+const signedIn = (user: null | User): AuthState => ({
+  endedElsewhere: undefined,
+  endedInAnotherTab: undefined,
+  status: "signed-in",
+  user,
+});
+
 /** The in-memory token (read synchronously by the API client) mirrored to the session store. */
 export const createSession = (
   sessionStore: SessionStore,
@@ -83,30 +93,24 @@ export const createSession = (
   const store = createStore<AuthState>(() => ({ status: "loading", user: null }));
   let cached: string | undefined;
   let ending: string | undefined;
+  let hasEnded = false;
   return {
     adopt: async (token) => {
       cached = token;
+      hasEnded = false;
       await sessionStore.set(token);
-      store.setState({
-        endedElsewhere: undefined,
-        endedInAnotherTab: undefined,
-        status: "signed-in",
-        user: null,
-      });
+      store.setState(signedIn(null));
     },
     ready: (async (): Promise<void> => {
       cached = (await sessionStore.get()) ?? undefined;
       store.setState({ status: cached === undefined ? "signed-out" : "signed-in" });
     })(),
+    hasEnded: () => hasEnded,
     signIn: async (granted) => {
       cached = granted.token;
+      hasEnded = false;
       await sessionStore.set(granted.token);
-      store.setState({
-        endedElsewhere: undefined,
-        endedInAnotherTab: undefined,
-        status: "signed-in",
-        user: granted.user,
-      });
+      store.setState(signedIn(granted.user));
       return granted.user;
     },
     ...notesOf(notes),
@@ -117,6 +121,7 @@ export const createSession = (
     signOut: async (reason) => {
       const leaving = cached;
       cached = undefined;
+      hasEnded = true;
       // A store that fails to forget still leaves this tab signed out. The store is shared by
       // the browser's tabs: it is cleared only while it still holds the session this tab ends,
       // never another tab's newer one (a stale tab's late 401, round 6 I1). A store that

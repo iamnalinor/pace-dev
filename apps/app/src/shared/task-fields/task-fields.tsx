@@ -3,11 +3,13 @@ import { type TextInput, View } from "react-native";
 
 import type { RepeatChangeProblem } from "@pace/client";
 
-import { useLanguage, useT } from "#app/app-state.tsx";
+import { useIsAccountUnknown, useLanguage, useT } from "#app/app-state.tsx";
 import { focusField } from "#app/platform/focus-field.ts";
+import { IMPORTANCE_HUES } from "#app/ui/color.tsx";
+import { KnownAfterSync } from "#app/ui/empty-state.tsx";
 import { RadioChips } from "#app/ui/radio-chips.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
-import { IMPORTANCE_COLORS, ImportanceSchema, presetLabel } from "@pace/core";
+import { ImportanceSchema, presetLabel } from "@pace/core";
 
 import type { TaskFormOptions, TaskFormValues } from "./task-form-types.ts";
 
@@ -116,7 +118,7 @@ const ChoiceFields = ({
       />
       <RadioChips
         choices={ImportanceSchema.options.map((importance) => ({
-          color: IMPORTANCE_COLORS[importance],
+          color: IMPORTANCE_HUES[importance],
           text: t(`importance.${importance}`),
           value: importance,
         }))}
@@ -186,6 +188,9 @@ export const TaskFields = ({
   readonly isStartChosen?: boolean;
 }) => {
   const t = useT();
+  // The categories, their estimates and the projects are the account's: until a sync of this
+  // session succeeded, the built-in ones are not drawn as its own (/add during a first sync, class 62).
+  const isUnknown = useIsAccountUnknown();
   const titleRef = useRef<TextInput>(null);
   const [panel, setPanel] = useState<Panel>(null);
   const [isFinalOpen, setIsFinalOpen] = useState(false);
@@ -200,7 +205,7 @@ export const TaskFields = ({
   }, [isTitleFocused]);
   return (
     <View
-      className="gap-3.5"
+      className="gap-4"
       onTouchStart={() => {
         setPanel(null);
         setIsFinalOpen(false);
@@ -219,9 +224,11 @@ export const TaskFields = ({
         submitBehavior={onSubmit === undefined ? "blurAndSubmit" : "submit"}
         value={values.title}
       />
-      <ChoiceFields onChange={onChange} options={options} values={values} />
+      <KnownAfterSync>
+        <ChoiceFields onChange={onChange} options={options} values={values} />
+      </KnownAfterSync>
       <WhenFields
-        fallback={options.estimates[values.presetId] ?? null}
+        fallback={isUnknown ? null : (options.estimates[values.presetId] ?? null)}
         onChange={onChange}
         onClose={() => {
           setPanel(null);

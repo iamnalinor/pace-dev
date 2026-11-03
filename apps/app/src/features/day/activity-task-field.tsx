@@ -5,6 +5,7 @@ import { Pressable, Text, View } from "react-native";
 import type { Task } from "@pace/core";
 
 import { useAppState, useT } from "#app/app-state.tsx";
+import { spacePress } from "#app/ui/space-press.ts";
 import { TextField } from "#app/ui/text-field.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 
@@ -43,20 +44,25 @@ export const ActivityTaskField = ({
   };
   return (
     <View className="gap-2">
-      <Text className="font-sans text-[12px] text-muted">{t("day.taskLink")}</Text>
+      <Text className="font-sans text-caption font-normal text-label-tertiary">
+        {t("day.taskLink")}
+      </Text>
       <Pressable
         accessibilityLabel={t("day.taskSelection", { title: label })}
         accessibilityRole="button"
         aria-expanded={isOpen}
-        className="min-h-11 flex-row items-center justify-between gap-2 rounded-lg border border-line bg-surface px-3 active:opacity-80"
+        className="min-h-hit-web flex-row items-center justify-between gap-2 rounded-lg border border-outline bg-cell px-3 active:opacity-80"
         onPress={() => {
           setIsOpen((current) => !current);
         }}
       >
-        <Text className="min-w-0 flex-1 font-sans text-[14px] text-fg" numberOfLines={1}>
+        <Text
+          className="min-w-0 flex-1 font-sans text-subhead font-normal text-label-primary"
+          numberOfLines={1}
+        >
           {label}
         </Text>
-        <ChevronDown color={palette.muted} size={16} />
+        <ChevronDown color={palette["label.secondary"]} size={16} />
       </Pressable>
       {isOpen ? (
         <View accessibilityLabel={t("day.taskLink")} className="gap-1" role="radiogroup">
@@ -79,7 +85,7 @@ export const ActivityTaskField = ({
             />
           ))}
           {matches.length === 0 ? (
-            <Text className="px-3 py-2 font-sans text-[13px] text-muted">
+            <Text className="px-3 py-2 font-sans text-footnote text-label-secondary">
               {t("day.noTaskMatches")}
             </Text>
           ) : null}
@@ -102,14 +108,15 @@ const TaskChoice = ({
     accessibilityLabel={label}
     accessibilityRole="radio"
     aria-checked={isSelected}
-    className="min-h-11 justify-center rounded-lg px-3 active:opacity-75"
+    className="min-h-hit-web justify-center rounded-lg px-3 active:opacity-75"
     onPress={onPress}
+    {...spacePress(onPress)}
   >
     <Text
       className={
         isSelected
-          ? "font-sans text-[14px] font-medium text-accentQuietText"
-          : "font-sans text-[14px] text-fg"
+          ? "font-sans text-subhead text-accent-text"
+          : "font-sans text-subhead font-normal text-label-primary"
       }
       numberOfLines={2}
     >

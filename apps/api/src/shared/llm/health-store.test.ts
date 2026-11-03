@@ -4,7 +4,12 @@ import { describe, expect, it, vi } from "vitest";
 import type { LlmHealth } from "./health-object.ts";
 import type { Health, Verdict } from "./health.ts";
 
-import { HEALTH_CACHE_MS, inBackground, objectHealth } from "./health-store.ts";
+import {
+  HEALTH_CACHE_MS,
+  HEALTH_FAILURE_CACHE_MS,
+  inBackground,
+  objectHealth,
+} from "./health-store.ts";
 
 /**
 The isolate's side of the health memory, against the deployment's real `LlmHealth` object in
@@ -109,11 +114,37 @@ describe("objectHealth", () => {
         ([line]) => JSON.parse(String(line)) as { level: string; message: string },
       );
       const notRead = "llm: provider health not read; asking in the configured order";
+      // The failed read is remembered briefly: the record right after it does not ask again.
       expect(lines.map(({ level, message }) => [level, message])).toEqual([
-        ["error", notRead],
         ["error", notRead],
         ["error", "llm: provider health not saved"],
       ]);
+    } finally {
+      errors.mockRestore();
+    }
+  });
+
+  it("gives up on an object that does not answer in time, and asks again only after a short while (round 7 review 3)", async () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const { calls, namespace } = fakeNamespace({
+        // A read that never settles: the parse and the bot's 7 s budget must not wait on it.
+        read: async () => await new Promise<never>(() => undefined),
+        record: broken,
+      });
+      let clock = 0;
+      const health = objectHealth(namespace, { cache: {}, clock: () => clock, readTimeoutMs: 20 });
+      expect(await health.read()).toEqual({});
+      expect(await health.read()).toEqual({});
+      expect(calls.read).toBe(1);
+      clock = HEALTH_FAILURE_CACHE_MS - 1;
+      await health.read();
+      expect(calls.read).toBe(1);
+      // Briefly: far sooner than a good read's cache window.
+      expect(HEALTH_FAILURE_CACHE_MS).toBeLessThan(HEALTH_CACHE_MS);
+      clock = HEALTH_FAILURE_CACHE_MS;
+      await health.read();
+      expect(calls.read).toBe(2);
     } finally {
       errors.mockRestore();
     }

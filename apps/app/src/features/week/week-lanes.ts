@@ -3,8 +3,11 @@ import type { Lane } from "@pace/client";
 /** The room between side-by-side lanes, as a share of the column. */
 const LANE_GAP_PERCENT = 1;
 
-/** The column's edges the blocks keep clear of: the left rule and the usage strip, and the right. */
-const COLUMN_INSET_PX = 8;
+/**
+The column's edges the blocks keep clear of: the left rule and the usage strip, and the right. It
+restates the blocks' `left-1 right-0.5` (week-screen.test.tsx reads both, bug-lessons class 11).
+*/
+export const COLUMN_INSET_PX = 6;
 
 /** A thumb's target: on a phone each lane of a day is at least this wide (QA round 18 L6). */
 const LANE_TARGET_PX = 44;

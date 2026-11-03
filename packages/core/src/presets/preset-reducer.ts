@@ -2,6 +2,7 @@ import type { EventOf } from "../events/event-schema.ts";
 import type { Reducer } from "../materialize/materializer.ts";
 import type { Preset, PresetDefinition } from "../model/preset.ts";
 
+import { putById as put } from "../materialize/transient.ts";
 import { ok } from "../result.ts";
 import { BASE_PRESETS, isBuiltInPreset } from "./base-presets.ts";
 import { parsePresetDefinition, PresetIdSchema } from "./preset-schema.ts";
@@ -16,10 +17,6 @@ const USER_PRESET_ORDER = 100;
 /** Own-property lookup: a preset id must never resolve to something on `Object.prototype`. */
 export const presetById = (state: PresetsState, id: string): Preset | undefined =>
   Object.hasOwn(state.byId, id) ? state.byId[id] : undefined;
-
-const put = (state: PresetsState, preset: Preset): PresetsState => ({
-  byId: { ...state.byId, [preset.id]: preset },
-});
 
 /**
 A creation is ignored when the id is taken (this is what makes the example seed

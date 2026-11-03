@@ -33,7 +33,7 @@ const useGate = (): {
 };
 
 /** A blank page of the app's own background, so nothing flashes while the gate is read. */
-const Blank = () => <View className="flex-1 bg-bg" />;
+const Blank = () => <View className="flex-1 bg-app" />;
 
 /**
 Holds the navigator back until the gate knows where to go, then never again. Mounted any later

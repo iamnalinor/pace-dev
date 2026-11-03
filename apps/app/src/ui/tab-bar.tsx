@@ -12,6 +12,7 @@ import { useWaitingCount } from "../shared/use-waiting-count.ts";
 import { CountBadge } from "./count-badge.tsx";
 import { cx } from "./cx.ts";
 import { useIsWide } from "./layout.ts";
+import { spacePress } from "./space-press.ts";
 import { useTheme } from "./theme-provider.tsx";
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>["tabBar"]>>[0];
@@ -58,21 +59,22 @@ const Tab = ({
       aria-selected={isFocused}
       className="min-h-12 flex-1 items-center justify-center gap-0.5"
       onPress={onPress}
+      {...spacePress(onPress)}
     >
       <View>
         <Icon
-          color={isFocused ? palette.accentQuietText : palette.muted}
+          color={isFocused ? palette["accent.text"] : palette["label.secondary"]}
           size={ICON_SIZE}
           strokeWidth={STROKE}
         />
-        <View className="absolute -right-3 -top-1.5">
+        <View className="absolute -top-2 left-5">
           <CountBadge count={count} />
         </View>
       </View>
       <Text
         className={cx(
-          "font-sans text-[11px]",
-          isFocused ? "font-medium text-accentQuietText" : "text-muted",
+          "font-sans text-caption2",
+          isFocused ? "font-medium text-accent-text" : "font-normal text-label-secondary",
         )}
         numberOfLines={1}
       >
@@ -92,7 +94,7 @@ const BottomTabs = ({ descriptors, navigation, state }: TabBarProps) => {
   return (
     <View
       aria-label={t("nav.main")}
-      className="flex-row border-t border-line bg-bg px-1 pt-1.5"
+      className="flex-row border-t border-separator bg-app px-1 pt-2"
       role="tablist"
       style={{ paddingBottom: Math.max(insets.bottom, 8) + 4 }}
     >

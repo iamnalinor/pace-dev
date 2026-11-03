@@ -2,10 +2,7 @@ import type { EventOf } from "../events/event-schema.ts";
 import type { Reducer } from "./materializer.ts";
 
 import { type Project, projectById, type ProjectsState } from "../model/project.ts";
-
-const put = (state: ProjectsState, project: Project): ProjectsState => ({
-  byId: { ...state.byId, [project.id]: project },
-});
+import { putById as put } from "./transient.ts";
 
 /** A second creation for an existing id is a no-op (projects are created on the fly by name). */
 const created = (state: ProjectsState, event: EventOf<"project.created">): ProjectsState => {

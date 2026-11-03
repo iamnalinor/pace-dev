@@ -78,7 +78,9 @@ jobs:
     # Only worth its minutes once the fast checks pass.
     needs: checks
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # The chromium project ran ~20 min on a runner once the overhaul's suites landed (200 tests),
+    # and the latency step runs after it on fresh servers; 20 cut the run off mid-chromium.
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
@@ -97,7 +99,15 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-      - run: bun test:e2e
+      # The tap-latency budget measures the CPU, and its ceilings were measured with the project run
+      # alone on fresh servers (e2e/latency.e2e.ts): so CI runs it the same way, as a step of its
+      # own after the rest, against a freshly started Worker (fresh state) and web server (the same
+      # build, not rebuilt). A latency run right after ~200 tests on the same servers read 296 ms
+      # against a 240 ms ceiling (bug-lessons log, A9 fix round 3); the ceilings stay Task 5.6's.
+      - run: bunx playwright test --project chromium
+      - run: bunx playwright test --project latency --no-deps
+        env:
+          E2E_REUSE_WEB_BUILD: 1
       - uses: actions/upload-artifact@v7
         if: failure()
         with:

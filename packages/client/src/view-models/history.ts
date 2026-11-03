@@ -7,6 +7,8 @@ import {
   isCorrection,
   materializeAt,
   type MessageKey,
+  presetById,
+  presetLabel,
   shownLabel,
   taskById,
 } from "@pace/core";
@@ -28,6 +30,7 @@ export type HistoryEntry = {
   readonly recordedAt: string;
   readonly source: Event["source"];
   readonly taskId: null | string;
+  /** What the line names: the task, the activity or the preset, as it is called now. */
   readonly taskTitle: null | string;
   /** Not a correction and not revoked: the undo button applies. */
   readonly revocable: boolean;
@@ -64,19 +67,48 @@ const taskIdOf = (event: Event, log: readonly Event[]): null | string => {
     : null;
 };
 
-/** What the line names: the task, else the activity (as it is called now). */
+/** A preset by its name now (an Undo picks between them, QA round 23 R23-07), else as written. */
+const presetTitleOf = (state: HistorySource, event: Event): null | string | undefined => {
+  if (!PRESET_EVENTS.has(event.type) || !("id" in event.payload)) {
+    return undefined;
+  }
+  const preset = presetById(state.presets, event.payload.id);
+  if (preset !== undefined) {
+    return presetLabel(preset, state.settings.language);
+  }
+  return "name" in event.payload ? (event.payload.name ?? null) : null;
+};
+
+const PRESET_EVENTS: ReadonlySet<Event["type"]> = new Set([
+  "preset.archived",
+  "preset.created",
+  "preset.updated",
+]);
+
+/** An activity as it is called now, else as the event wrote it. */
+const activityTitleOf = (state: HistorySource, event: Event): null | string | undefined => {
+  if (!("activityId" in event.payload)) {
+    return undefined;
+  }
+  const activity = state.time.activities[event.payload.activityId];
+  const label =
+    activity?.label ?? ("label" in event.payload ? (event.payload.label ?? null) : null);
+  return label === null
+    ? null
+    : shownLabel({ id: event.payload.activityId, label }, state.settings.language);
+};
+
+/** What the line names: the task, else the activity or the preset (as it is called now). */
 const titleOf = (state: HistorySource, event: Event, taskId: null | string): null | string => {
   const current = taskId === null ? undefined : taskById(state.tasks, taskId);
   if (current !== undefined) {
     return current.title;
   }
-  if ("activityId" in event.payload) {
-    const activity = state.time.activities[event.payload.activityId];
-    const label =
-      activity?.label ?? ("label" in event.payload ? (event.payload.label ?? null) : null);
-    return label === null
-      ? null
-      : shownLabel({ id: event.payload.activityId, label }, state.settings.language);
+  // `undefined`: not this kind of event; `null`: this kind, with nothing to name.
+  for (const named of [activityTitleOf(state, event), presetTitleOf(state, event)]) {
+    if (named !== undefined) {
+      return named;
+    }
   }
   return event.type === "task.created" ? event.payload.title : null;
 };

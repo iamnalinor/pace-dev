@@ -1,4 +1,4 @@
-import type { ProjectColorName } from "../design/tokens.ts";
+import type { HueName } from "../design/token-types.ts";
 import type { ActivityCategory } from "./model.ts";
 
 export { ACTIVITY_CATEGORIES } from "../events/payloads.ts";
@@ -6,19 +6,19 @@ export { ACTIVITY_CATEGORIES } from "../events/payloads.ts";
 /** Where attention is the point: the productivity charts look at these. */
 export const FOCUS_CATEGORIES: ReadonlySet<ActivityCategory> = new Set(["work", "study", "task"]);
 
-/** Each category's color in tags, buttons and charts. */
-export const CATEGORY_COLORS: Readonly<Record<ActivityCategory, ProjectColorName>> = {
+/** Each category's hue: twelve categories, twelve distinct hues (a line or dot in the `stroke`). */
+export const CATEGORY_HUES: Readonly<Record<ActivityCategory, HueName>> = {
   work: "blue",
   study: "violet",
-  task: "teal",
-  food: "amber",
-  commute: "slate",
-  hygiene: "teal",
-  rest: "green",
-  chores: "slate",
+  task: "green",
+  food: "orange",
+  commute: "lime",
+  hygiene: "cyan",
+  rest: "teal",
+  chores: "amber",
   social: "pink",
-  sport: "green",
-  sleep: "violet",
+  sport: "red",
+  sleep: "indigo",
   other: "slate",
 };
 

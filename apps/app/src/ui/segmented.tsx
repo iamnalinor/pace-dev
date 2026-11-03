@@ -14,7 +14,7 @@ export const Segmented = <T extends string>({
   readonly options: readonly SegmentedOption<T>[];
   readonly value: T;
 }) => (
-  <View className="flex-row flex-wrap gap-1.5" role="radiogroup">
+  <View className="flex-row flex-wrap gap-2" role="radiogroup">
     {options.map((option) => (
       <Chip
         key={option.value}

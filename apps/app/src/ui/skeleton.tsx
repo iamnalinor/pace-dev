@@ -13,7 +13,7 @@ import { cx } from "./cx.ts";
 import { PLACEHOLDER_BREATH } from "./motion.ts";
 
 /** The rows' text widths vary a little, so the placeholder reads as a list, not a grid. */
-const NAME_WIDTHS = ["w-40", "w-28", "w-36"] as const;
+const NAME_WIDTHS = ["w-32", "w-20", "w-24"] as const;
 const META_WIDTHS = ["w-24", "w-32", "w-20"] as const;
 
 /**
@@ -38,18 +38,18 @@ export const Skeleton = ({
       <Animated.View style={style}>
         <View className="gap-1">
           {Array.from({ length: rows }, (_, index) => (
-            <View className="min-h-14 flex-row items-center gap-3 py-2" key={index}>
-              <View className="h-8 w-8 rounded-full bg-placeholder" />
+            <View className="min-h-row flex-row items-center gap-3 py-2" key={index}>
+              <View className="h-8 w-8 rounded-pill bg-label-quaternary" />
               <View className="flex-1 gap-2">
                 <View
                   className={cx(
-                    "h-3.5 rounded-full bg-placeholder",
+                    "h-4 rounded-pill bg-label-quaternary",
                     NAME_WIDTHS[index % NAME_WIDTHS.length],
                   )}
                 />
                 <View
                   className={cx(
-                    "h-3 rounded-full bg-placeholder",
+                    "h-3 rounded-pill bg-label-quaternary",
                     META_WIDTHS[index % META_WIDTHS.length],
                   )}
                 />

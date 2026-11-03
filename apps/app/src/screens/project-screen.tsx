@@ -4,15 +4,16 @@ import { Text, View } from "react-native";
 
 import type { ProjectViewModel } from "@pace/client";
 
-import { useAppState, usePace, useT } from "#app/app-state.tsx";
+import { useAppState, useLanguage, usePace, useT } from "#app/app-state.tsx";
 import { ProjectForm } from "#app/features/projects/project-form.tsx";
 import { FoldedSection, TaskRows } from "#app/shared/task-list.tsx";
+import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button } from "#app/ui/button.tsx";
 import { washClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { EmptyState } from "#app/ui/empty-state.tsx";
 import { IconButton } from "#app/ui/icon-button.tsx";
-import { projectById } from "@pace/core";
+import { formatCount, projectById } from "@pace/core";
 
 import { PushedScreen } from "./pushed-screen.tsx";
 
@@ -23,8 +24,10 @@ const Figure = ({ label, value }: { readonly label: string; readonly value: stri
     className="flex-1 gap-0.5"
     role="group"
   >
-    <Text className="font-sans text-[11px] text-fg2">{label}</Text>
-    <Text className="font-sans text-[18px] tabular-nums text-fg">{value}</Text>
+    <Text className="font-sans text-caption2 font-normal text-label-secondary">{label}</Text>
+    <Text className="font-sans text-headline font-normal tabular-nums text-label-primary">
+      {value}
+    </Text>
   </View>
 );
 
@@ -38,6 +41,7 @@ const EditProject = ({
 }) => {
   const t = useT();
   const { actions } = usePace();
+  const run = useRunAction();
   const isArchived = useAppState(
     (state) => projectById(state.projects, project.id)?.archived ?? false,
   );
@@ -47,7 +51,7 @@ const EditProject = ({
         extra={
           <Button
             onPress={() => {
-              void actions.updateProject(project.id, { archived: !isArchived });
+              void run(actions.updateProject(project.id, { archived: !isArchived }));
               onDone();
             }}
             variant="ghost"
@@ -77,20 +81,21 @@ const EditProject = ({
 /** Open, on time and late, on the project's own wash. */
 const Stats = ({ project }: { readonly project: ProjectViewModel }) => {
   const t = useT();
+  const language = useLanguage();
   const { stats } = project;
   return (
     <View
       className={cx(
-        "mx-4 mb-4 flex-row gap-2 rounded-xl border p-3.5",
-        project.color === null ? "border-line bg-surface" : washClass(project.color),
+        "mx-4 mb-4 flex-row gap-2 rounded-xl border p-4",
+        project.color === null ? "border-separator bg-cell" : washClass(project.color),
       )}
     >
-      <Figure label={t("project.stat.open")} value={String(stats.open)} />
+      <Figure label={t("project.stat.open")} value={formatCount(stats.open, language)} />
       <Figure
         label={t("project.stat.onTime")}
-        value={`${String(stats.onTime.done)}/${String(stats.onTime.total)}`}
+        value={`${formatCount(stats.onTime.done, language)}/${formatCount(stats.onTime.total, language)}`}
       />
-      <Figure label={t("project.stat.late")} value={String(stats.late)} />
+      <Figure label={t("project.stat.late")} value={formatCount(stats.late, language)} />
     </View>
   );
 };
@@ -131,7 +136,9 @@ export const ProjectScreen = ({ id }: { readonly id: string }) => {
         />
       ) : null}
       {project.description === null ? null : (
-        <Text className="mx-5 mb-3 font-sans text-[14px] text-fg2">{project.description}</Text>
+        <Text className="mx-5 mb-3 font-sans text-subhead font-normal text-label-secondary">
+          {project.description}
+        </Text>
       )}
       <Stats project={project} />
       {project.open.length + project.future.length + project.done.length === 0 ? (

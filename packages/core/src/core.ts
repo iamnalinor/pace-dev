@@ -62,20 +62,7 @@ export {
   SyncPushOutputSchema,
 } from "./api/schemas/sync.ts";
 export * from "./automation.ts";
-export { contrastRatio, parseHex, relativeLuminance, type Rgb } from "./design/contrast.ts";
-export {
-  IMPORTANCE_COLORS,
-  type Palette,
-  type PaletteName,
-  PLACEHOLDER_DIM,
-  type ProjectColorName,
-  type RadiusName,
-  STATUS_COLORS,
-  type ThemeName,
-  THEMES,
-  type Tokens,
-  tokens,
-} from "./design/tokens.ts";
+export * from "./design.ts";
 export {
   type Event,
   EVENT_TYPES,
@@ -98,7 +85,9 @@ export {
   TaskStatusSchema,
   TimeZoneSchema,
 } from "./events/payloads.ts";
-export { sortEvents } from "./events/sort.ts";
+export { mergeEvents, sortEvents } from "./events/sort.ts";
+export { capitalize, clipText, clipWords, initials, splitGraphemes } from "./format/initials.ts";
+export { formatCount, formatNumber, formatPercent, type NumberOptions } from "./format/numbers.ts";
 export { en } from "./i18n/en.ts";
 export { EVENT_LABEL_KEYS } from "./i18n/event-labels.ts";
 export * from "./i18n/i18n.ts";
@@ -129,6 +118,8 @@ export { coreReducer, type CoreState, INITIAL_CORE_STATE } from "./materialize/c
 export {
   apply,
   effectiveEvents,
+  effectiveInOrder,
+  foldEffective,
   isCorrection,
   materialize,
   materializeAt,
@@ -200,8 +191,9 @@ export {
   EXAMPLE_PRESET_IDS,
   exampleCoursePresetEvents,
   type ExamplePresetId,
+  isExampleToSeed,
 } from "./presets/example-presets.ts";
-export { byPresetOrder, presetLabel } from "./presets/preset-label.ts";
+export { byPresetOrder, presetLabel, storedPresetName } from "./presets/preset-label.ts";
 export {
   INITIAL_PRESETS_STATE,
   presetById,

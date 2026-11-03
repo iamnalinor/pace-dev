@@ -21,13 +21,15 @@ export const InboxScreen = () => {
   const decisions = reviewDecisions(review);
   return (
     <Screen header={<ScreenHeader title={t("inbox.title")} />}>
-      <Text className="mx-5 mb-3 font-sans text-[12px] text-muted">{t("inbox.hint")}</Text>
+      <Text className="mx-5 mb-3 font-sans text-caption font-normal text-label-tertiary">
+        {t("inbox.hint")}
+      </Text>
       {waitingCount(inbox, review) === 0 ? <EmptyState>{t("inbox.empty")}</EmptyState> : null}
       {decisions.length === 0 ? null : (
-        <View aria-label={t("review.title")} className="mb-4 gap-2.5 px-4" role="list">
+        <View aria-label={t("review.title")} className="mb-4 gap-3 px-4" role="list">
           <Text
             accessibilityRole="header"
-            className="px-1 font-sans text-[11px] uppercase tracking-[0.06em] text-muted"
+            className="px-1 font-sans text-caption2 font-normal uppercase text-label-tertiary"
           >
             {t("review.title")}
           </Text>
@@ -36,7 +38,7 @@ export const InboxScreen = () => {
           ))}
         </View>
       )}
-      <View aria-label={t("inbox.title")} className="gap-2.5 px-4" role="list">
+      <View aria-label={t("inbox.title")} className="gap-3 px-4" role="list">
         {inbox.cards.map((card) => (
           <CardView card={card} key={card.id} />
         ))}

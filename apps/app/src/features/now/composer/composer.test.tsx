@@ -4,8 +4,10 @@ import type { PaceRuntime } from "#app/runtime.ts";
 import type { ParseField, TaskDraft } from "@pace/core";
 
 import { requestNewTask } from "#app/shared/new-task-request.ts";
+import { classLinePx, classPx } from "#app/test/class-px.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { FAKE_STORE_ID, fakeUser } from "@pace/client/testing";
 import { HW_ID, WORK_ID } from "@pace/core/testing";
 
 import { ComposerProvider } from "./composer-flow.tsx";
@@ -96,6 +98,26 @@ const created = (runtime: Awaited<ReturnType<typeof createTestRuntime>>, title: 
   Object.values(runtime.state.store.getState().tasks.byId).find((task) => task.title === title);
 
 describe("Composer", () => {
+  it("keeps the line's size handler across renders, so a re-render never makes the web textarea measure itself (bug-lessons 108)", async () => {
+    // react-native-web reads the textarea's scrollHeight (a forced layout) whenever this handler
+    // changes: a new function each render made every tap that re-rendered Now pay for a layout.
+    await renderComposer(await createTestRuntime());
+    const before: unknown = line().props["onContentSizeChange"];
+    await fireEvent.changeText(line(), "buy a cable");
+    await fireEvent(line(), "focus");
+    expect(line().props["onContentSizeChange"]).toBe(before);
+  });
+
+  it("grows the line with its text up to eight lines of its type, then scrolls inside (bug-lessons 11, mirrors)", async () => {
+    await renderComposer(await createTestRuntime());
+    await fireEvent.changeText(line(), "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten");
+    await fireEvent(line(), "contentSizeChange", {
+      nativeEvent: { contentSize: { height: 1000, width: 300 } },
+    });
+    const eightLines = 8 * classLinePx(line()) + 2 * classPx(line(), "py");
+    expect((line().props as { style: { height: number } }).style.height).toBe(eightLines);
+  });
+
   it("shows the category estimate in the chip but only overrides in its picker", async () => {
     await renderComposer(await createTestRuntime());
     await fireEvent.press(button("nav.newTask"));
@@ -315,6 +337,60 @@ describe("Composer", () => {
     expect(screen.queryByText(en("assistant.couldNotRead"))).toBeNull();
   });
 
+  it.each([
+    ["limited", "assistant.unread.limitedSoon", true],
+    ["unreachable", "assistant.unread.unreachable", true],
+    ["unreadable", "assistant.unread.unreadable", false],
+    ["off", "assistant.unread.off", false],
+  ] as const)(
+    "says why no model read the line when the rules found nothing either: %s (QA 21 M3)",
+    async (reason, key, canReadLater) => {
+      const unread = { ...PARSED, actions: [], reason, retryAt: null, status: "unavailable" };
+      await renderComposer(
+        await createTestRuntime({ routes: { "POST /api/parse": () => unread } }),
+      );
+      await fireEvent.changeText(line(), "close task Nonexistent");
+      await enter();
+      expect(await screen.findByText(en(key))).toBeOnTheScreen();
+      expect(screen.queryByText(en("assistant.couldNotRead"))).toBeNull();
+      expect(screen.queryAllByRole("button", { name: en("composer.aiLater") }).length > 0).toBe(
+        canReadLater,
+      );
+    },
+  );
+
+  it.each([
+    ["off", 1],
+    ["unreadable", 1],
+    ["limited", 1],
+    // The servers may be back the next moment: Enter asks again.
+    ["unreachable", 2],
+  ] as const)(
+    "a pasted line no model could read (%s) is asked again by Enter only when that may change (QA round 23 R23-04)",
+    async (reason, calls) => {
+      const parse = jest.fn(() => ({
+        ...PARSED,
+        actions: [],
+        reason,
+        retryAt: reason === "limited" ? "2026-10-06T13:00:00.000Z" : null,
+        status: "unavailable",
+      }));
+      await renderComposer(await createTestRuntime({ routes: { "POST /api/parse": parse } }));
+      // From an empty line at once: a paste, read before any Enter.
+      await fireEvent.changeText(line(), "купить подарок бабушке");
+      await waitFor(() => {
+        expect(parse).toHaveBeenCalledTimes(1);
+      });
+      await enter();
+      await act(async () => {
+        await new Promise((resolve) => {
+          setTimeout(resolve, 300);
+        });
+      });
+      expect(parse).toHaveBeenCalledTimes(calls);
+    },
+  );
+
   it("shows no answer hint while the assistant asks nothing", async () => {
     await renderComposer(await createTestRuntime({ routes: { "POST /api/parse": () => PARSED } }));
     await fireEvent.changeText(line(), "срочно почта");
@@ -375,6 +451,33 @@ describe("Composer", () => {
       requestNewTask();
     });
     expect(formTitle()).toBeOnTheScreen();
+  });
+
+  it("draws no built-in category, importance or project as the account's before a sync of this session succeeded (pr48 follow-up A1, class 62)", async () => {
+    const pull = Promise.withResolvers<unknown>();
+    const runtime = await createTestRuntime({
+      routes: {
+        "GET /api/sync/pull": async () => await pull.promise,
+        "POST /api/auth/dev": () => ({ token: "tok_dev", user: fakeUser }),
+      },
+      world: "empty",
+    });
+    await runtime.auth.loginWithDev("1");
+    // A share or the shortcut opens /add's form during a fresh browser's first sync.
+    await renderComposer(runtime);
+    await fireEvent.press(button("nav.newTask"));
+    expect(title()).toBeOnTheScreen();
+    for (const key of ["composer.category", "edit.importance", "composer.project"] as const) {
+      expect(screen.queryByText(en(key))).toBeNull();
+    }
+    expect(screen.getByRole("progressbar", { name: en("sync.loadingData") })).toBeOnTheScreen();
+    await act(async () => {
+      pull.resolve({ events: [], more: false, seq: 0, storeId: FAKE_STORE_ID });
+      await Promise.resolve();
+    });
+    expect(await screen.findByText(en("composer.category"))).toBeOnTheScreen();
+    expect(screen.getByText(en("edit.importance"))).toBeOnTheScreen();
+    expect(screen.getByText(en("composer.project"))).toBeOnTheScreen();
   });
 
   it("reads the line on Enter into a preview; a second Enter approves it", async () => {
@@ -520,6 +623,34 @@ describe("Composer", () => {
       { domain: "task", text: "оплатить связь", thread: [] },
       { defer: true, domain: "task", text: "оплатить связь" },
     ]);
+  });
+
+  it("closes the preview's decision in the log when the line is kept for later (round 7 review minor)", async () => {
+    const resolved: unknown[] = [];
+    let calls = 0;
+    const runtime = await createTestRuntime({
+      routes: {
+        "POST /api/decisions/resolve": ({ body }) => {
+          resolved.push(body);
+          return { resolved: 1 };
+        },
+        "POST /api/parse": () => {
+          calls += 1;
+          return calls === 1
+            ? { ...unavailable("unreachable"), decisionId: "d1" }
+            : { ...unavailable("unreachable"), actions: [], status: "queued" };
+        },
+      },
+    });
+    await renderComposer(runtime);
+    await fireEvent.changeText(line(), "оплатить связь");
+    await enter();
+    await fireEvent.press(await screen.findByRole("button", { name: en("composer.aiLater") }));
+    expect(await screen.findByText(en("composer.aiQueuedSoon"))).toBeOnTheScreen();
+    // A later reading of the same text takes the preview's place: not left open in /decisions.
+    await waitFor(() => {
+      expect(resolved).toEqual([{ decisions: [{ id: "d1", resolution: "corrected" }] }]);
+    });
   });
 
   it("says it could not read this one, and offers no reading later, when every model answered out of shape", async () => {

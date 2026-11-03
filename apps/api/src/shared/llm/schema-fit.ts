@@ -83,11 +83,28 @@ const requiredOf = (node: Node): readonly string[] =>
     : [];
 
 /**
+The root lists whose absence says "nothing here" and nothing more: a model that has no question
+leaves `questions` out (round 7 review 4). Never `actions`: an answer without it is no reading.
+*/
+const ROOT_EMPTY_WHEN_ABSENT: ReadonlySet<string> = new Set(["questions"]);
+
+/** The root's required lists in `ROOT_EMPTY_WHEN_ABSENT` that `value` left out, as empty lists. */
+const rootListsLeftOut = (
+  value: Readonly<Record<string, unknown>>,
+  node: Node,
+): readonly (readonly [string, readonly never[]])[] =>
+  requiredOf(node)
+    .filter((key) => ROOT_EMPTY_WHEN_ABSENT.has(key) && !Object.hasOwn(value, key))
+    .filter((key) => nodeOf(node.properties?.[key]).type === "array")
+    .map((key) => [key, []] as const);
+
+/**
 `value` with every required key it left out that may be null set to null ("does not apply"),
 below the root (bug class 85): a best-effort endpoint's model drops the keys it has nothing for,
 though the schema asks for all of them. A list is never filled, at the root least of all: an
-answer with no `actions` is no reading, not "nothing to do" (bug class 95). A key that may not be
-null stays missing, for the strict check to refuse.
+answer with no `actions` is no reading, not "nothing to do" (bug class 95); the one exception is
+a root list in `ROOT_EMPTY_WHEN_ABSENT` (`questions`). A key that may not be null stays missing,
+for the strict check to refuse.
 */
 export const fillAbsent = (value: unknown, schema: unknown, isRoot = true): unknown => {
   const node = branchFor(nodeOf(schema), value);
@@ -103,7 +120,7 @@ export const fillAbsent = (value: unknown, schema: unknown, isRoot = true): unkn
     Object.hasOwn(properties, key) ? fillAbsent(item, properties[key], false) : item,
   ]);
   const added = isRoot
-    ? []
+    ? rootListsLeftOut(value, node)
     : requiredOf(node)
         .filter((key) => !Object.hasOwn(value, key) && isNullable(nodeOf(properties[key])))
         .map((key) => [key, null] as const);

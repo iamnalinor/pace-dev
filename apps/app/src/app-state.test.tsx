@@ -255,6 +255,57 @@ describe("PaceProvider", () => {
     });
   });
 
+  it("writes no time zone while the first pull fails, and only the account's answer decides it (QA round 23 R23-01)", async () => {
+    const accountZone = "Europe/Moscow";
+    expect(accountZone).not.toBe((await setup()).runtime.clock.deviceTz);
+    let isUp = false;
+    const { eventStore, runtime } = await setup({
+      "GET /api/sync/pull": () =>
+        isUp
+          ? {
+              events: [
+                {
+                  deviceId: "other",
+                  id: "01ARZ3NDEKTSV4RRFFQ69G5FZY",
+                  occurredAt: "2026-10-01T10:00:00.000Z",
+                  payload: { timezone: accountZone },
+                  precision: "exact",
+                  recordedAt: "2026-10-01T10:00:00.000Z",
+                  seq: 1,
+                  source: "web",
+                  type: "settings.updated",
+                },
+              ],
+              more: false,
+              seq: 1,
+              storeId: "store-test",
+            }
+          : problem(500, "internal"),
+    });
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    await act(async () => {
+      await runtime.auth.loginWithDev("1");
+    });
+    await waitFor(() => {
+      expect(runtime.sync.status.getState().lastError).not.toBeNull();
+    });
+    // The empty copy wrote nothing of the account's: nothing waits to be pushed.
+    expect(await eventStore.listPending()).toEqual([]);
+    expect(runtime.state.store.getState().settings.timezone).toBeNull();
+    isUp = true;
+    await act(async () => {
+      await runtime.sync.syncNow();
+    });
+    await waitFor(() => {
+      expect(runtime.state.store.getState().settings.timezone).toBe(accountZone);
+    });
+    expect(await eventStore.listPending()).toEqual([]);
+  });
+
   it("follows the account language", async () => {
     const { runtime } = await setup();
     await runtime.auth.loginWithDev("1");
@@ -404,6 +455,65 @@ describe("PaceProvider", () => {
     expect(screen.getByTestId("auth")).toHaveTextContent("signed-out:-");
     // The half-typed line goes with the account: a share after the next sign-in is only the share.
     expect(mockForgetLineDraft).toHaveBeenCalledTimes(1);
+  });
+
+  it("after Log out the network goes quiet: only the logout names the session, nothing goes without one (QA round 22 R22-02)", async () => {
+    const { api, runtime } = await setup();
+    await runtime.auth.loginWithDev("1");
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("sync")).toHaveTextContent("synced");
+    });
+    const before = api.calls.length;
+    await act(async () => {
+      await runtime.auth.logout();
+    });
+    await act(async () => {
+      // Whatever the sign-out sets off (the wipe, the loop's last tick, a foreground return).
+      await new Promise((resolve) => {
+        setTimeout(resolve, 50);
+      });
+    });
+    // The server check (`/api/instance`) is public and names no one.
+    const named = api.calls.slice(before).filter((call) => call.path !== "/api/instance");
+    expect(named.map((call) => [call.path, call.headers["authorization"]])).toEqual([
+      ["/api/auth/logout", "Bearer tok_dev"],
+    ]);
+    expect(screen.getByTestId("auth")).toHaveTextContent("signed-out:-");
+    expect(runtime.auth.store.getState().endedElsewhere).toBeUndefined();
+  });
+
+  it("a session refused at start asks nothing more once it is signed out (QA round 22 R22-02)", async () => {
+    const { api, runtime } = await setup({
+      "GET /api/me": () => problem(401, "auth/unauthorized"),
+    });
+    await runtime.auth.loginWithDev("1");
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    await act(async () => {
+      await runtime.auth.me();
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("auth")).toHaveTextContent("signed-out:-");
+    });
+    const after = api.calls.length;
+    await act(async () => {
+      runtime.sync.soon();
+      await runtime.notifications.refresh();
+      await new Promise((resolve) => {
+        setTimeout(resolve, 50);
+      });
+    });
+    expect(api.calls.slice(after)).toEqual([]);
+    // A remote end is still told as one: the login card explains it.
+    expect(runtime.auth.store.getState().endedElsewhere).toBe(true);
   });
 
   it("starts the background check once signed in, and stops it on logout", async () => {
@@ -663,6 +773,150 @@ describe("a stale tab of a browser signed in again elsewhere (round 6 I1)", () =
     await expect(shared.get()).resolves.toBe("tok_other_tab");
     await expect(eventStore.listPending()).resolves.toHaveLength(1);
     await expect(eventStore.getStoreId()).resolves.not.toBeNull();
+  });
+});
+
+describe("a stale tab's sign-out racing another tab's sign-in (re-review N3)", () => {
+  it("keeps the copy another tab claimed between the stale tab's check and its wipe", async () => {
+    const shared = createMemorySessionStore();
+    const server = { isOldEnded: false };
+    const { eventStore, runtime } = await setup(
+      { "GET /api/me": () => (server.isOldEnded ? problem(401, "auth/unauthorized") : fakeMe) },
+      shared,
+    );
+    await runtime.auth.loginWithDev("1");
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    await waitFor(async () => {
+      await expect(eventStore.getStoreId()).resolves.not.toBeNull();
+      await expect(eventStore.listPending()).resolves.toEqual([]);
+    });
+    runtime.sync.stop();
+    // The other tab logged out (the store holds no session when the stale tab looks), then signed
+    // in again and wrote before the stale tab's wipe had its turn.
+    const isStoredInShared = runtime.auth.isSessionStored;
+    jest.spyOn(runtime.auth, "isSessionStored").mockImplementation(async () => {
+      const isStored = await isStoredInShared();
+      await shared.set("tok_other_tab");
+      // What the other tab's client does at its sign-in, on the store both tabs share.
+      await runtime.claimLocalCopy("tok_other_tab");
+      await eventStore.append([
+        {
+          deviceId: "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+          id: "01JOTHERTAB0000000000000000",
+          occurredAt: "2026-10-06T10:00:00.000Z",
+          payload: { language: "ru" },
+          precision: "exact",
+          recordedAt: "2026-10-06T10:00:00.000Z",
+          source: "web",
+          type: "settings.updated",
+        },
+      ]);
+      return isStored;
+    });
+    const before = runtime.state.copy();
+    server.isOldEnded = true;
+    await shared.clear();
+    await act(async () => {
+      await runtime.auth.me();
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("auth")).toHaveTextContent("signed-out:-");
+    });
+    // The stale tab's clear was asked for (its state is emptied) and had its turn in the queue.
+    await waitFor(() => {
+      expect(runtime.state.copy()).toBeGreaterThan(before);
+    });
+    await act(async () => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 50);
+      });
+    });
+    await expect(eventStore.listPending()).resolves.toHaveLength(1);
+    await expect(eventStore.getStoreId()).resolves.not.toBeNull();
+  });
+});
+
+/** Signed in on a shared session store, synced, then one change left unsent. */
+const syncedWithUnsent = async (shared: SessionStore) => {
+  const { eventStore, runtime } = await setup({}, shared);
+  await runtime.auth.loginWithDev("1");
+  await render(
+    <PaceProvider runtime={runtime}>
+      <Probe />
+    </PaceProvider>,
+  );
+  await waitFor(async () => {
+    await expect(eventStore.getStoreId()).resolves.not.toBeNull();
+    await expect(eventStore.listPending()).resolves.toEqual([]);
+  });
+  await act(async () => {
+    runtime.sync.stop();
+    await runtime.state.dispatch({
+      occurredAt: "2026-10-06T10:00:00.000Z",
+      payload: { language: "ru" },
+      type: "settings.updated",
+    });
+  });
+  return { eventStore, runtime };
+};
+
+describe("this tab's own sign-out (fix round 2 review M1, A9 review I1)", () => {
+  it("empties the copy when no session is left, whatever mark is on it", async () => {
+    const shared = createMemorySessionStore();
+    const { eventStore, runtime } = await syncedWithUnsent(shared);
+    // An older or foreign mark stayed (a claim that failed, a token replaced while signed in).
+    await runtime.claimLocalCopy("tok_other_tab");
+    await act(async () => {
+      await runtime.auth.logout();
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("auth")).toHaveTextContent("signed-out:-");
+    });
+    // The person left this browser: nothing of the account stays (a shared computer).
+    await waitFor(async () => {
+      await expect(eventStore.listAll()).resolves.toEqual([]);
+    });
+    await expect(eventStore.listPending()).resolves.toEqual([]);
+    await expect(eventStore.getStoreId()).resolves.toBeNull();
+  });
+
+  it("keeps the copy while another tab's session is still stored: its unsent change survives", async () => {
+    const shared = createMemorySessionStore();
+    const { eventStore, runtime } = await syncedWithUnsent(shared);
+    // Another tab logged this session out and signed in again: the browser stays signed in.
+    await shared.set("tok_other_tab");
+    await runtime.claimLocalCopy("tok_other_tab");
+    await act(async () => {
+      await runtime.auth.logout();
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("auth")).toHaveTextContent("signed-out:-");
+    });
+    await act(async () => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 50);
+      });
+    });
+    await expect(shared.get()).resolves.toBe("tok_other_tab");
+    await expect(eventStore.listPending()).resolves.toHaveLength(1);
+    await expect(eventStore.getStoreId()).resolves.not.toBeNull();
+  });
+
+  it("empties the copy when the shared store cannot be read (fails toward privacy)", async () => {
+    const shared = createMemorySessionStore();
+    const { eventStore, runtime } = await syncedWithUnsent(shared);
+    await shared.set("tok_other_tab");
+    jest.spyOn(shared, "get").mockRejectedValue(new Error("SecurityError"));
+    await act(async () => {
+      await runtime.auth.logout();
+    });
+    await waitFor(async () => {
+      await expect(eventStore.listAll()).resolves.toEqual([]);
+    });
   });
 });
 

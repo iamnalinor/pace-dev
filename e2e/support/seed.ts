@@ -340,6 +340,26 @@ const rentSeries = (now: number): readonly Seeded[] => {
   ];
 };
 
+/** One event of the account's log as the server keeps it (the parts a test reads). */
+export type LoggedEvent = { readonly type: string; readonly payload: unknown };
+
+/**
+The account's whole log as the server keeps it, page after page: what was written, whichever
+channel carried it (an HTTP push or the live socket).
+*/
+export const pullAll = async (token: string, since = 0): Promise<readonly LoggedEvent[]> => {
+  const headers = { Authorization: `Bearer ${token}` };
+  const pulled = await fetch(`${API_URL}/api/sync/pull?since=${String(since)}&limit=500`, {
+    headers,
+  });
+  const page = (await pulled.json()) as {
+    readonly events: readonly LoggedEvent[];
+    readonly more: boolean;
+    readonly seq: number;
+  };
+  return page.more ? [...page.events, ...(await pullAll(token, page.seq))] : page.events;
+};
+
 /**
 `POST /api/sync/push` as a client sends it: a pull first confirms the store, and the push
 names it (the server refuses a push for any other store).
@@ -358,8 +378,12 @@ export const pushAsClient = async (
   });
 };
 
-/** Pushes the lived-in log for the account behind `token`; every event must be accepted. */
-export const seedLivedIn = async (token: string, now: number = Date.now()): Promise<LivedIn> => {
+/**
+Pushes the lived-in log for the account behind `token`; every event must be accepted. Its times are
+relative to `now` (the wall clock by default): a test that reads a day or a week passes a fixed
+instant, and stands the page's clock there too (bug-lessons 9).
+*/
+export const seedLivedIn = async (token: string, now = Date.now()): Promise<LivedIn> => {
   const ids = {
     algebraId: ulid(now - 5 * DAY),
     doneTaskId: ulid(now - 5 * DAY + 1),

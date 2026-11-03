@@ -1,7 +1,12 @@
 import type { Event, Me, User } from "@pace/core";
 
 /** One fake route: returns a JSON body (or a full `Response`) for `METHOD /path`. */
-export type FakeRoute = (request: { readonly body: unknown; readonly url: URL }) => unknown;
+export type FakeRoute = (request: {
+  readonly body: unknown;
+  readonly url: URL;
+  /** The request's headers, lower-cased names (what `Headers` gives). */
+  readonly headers: Readonly<Record<string, string>>;
+}) => unknown;
 
 export type FakeCall = {
   readonly body: unknown;
@@ -32,7 +37,7 @@ export const createFakeFetch = (routes: Readonly<Record<string, FakeRoute>>): Fa
       if (route === undefined) {
         return Response.json({ code: "not-found", message: "No route" }, { status: 404 });
       }
-      const result = await route({ body, url });
+      const result = await route({ body, headers, url });
       return result instanceof Response ? result : Response.json(result);
     },
     pathsCalled: (prefix) =>
@@ -92,7 +97,7 @@ export const fakeMe: Me = { ...fakeUser, storeId: FAKE_STORE_ID };
 export const fakeInstance = {
   apiOrigin: "https://api.test",
   botUsername: "PaceTestBot",
-  features: { assistant: true, push: true },
+  features: { assistant: true, mcp: true, push: true },
   loginMethods: ["telegram-widget", "telegram-deeplink"],
   minClientProtocol: 1,
   name: "Pace",

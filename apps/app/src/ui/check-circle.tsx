@@ -2,6 +2,7 @@ import { Check } from "lucide-react-native";
 import { Pressable, View } from "react-native";
 
 import { cx } from "./cx.ts";
+import { spacePress } from "./space-press.ts";
 import { useTheme } from "./theme-provider.tsx";
 
 /** The round check of a task row: an outlined circle, filled once checked. */
@@ -18,25 +19,26 @@ export const CheckCircle = ({
 }) => {
   const { palette } = useTheme();
   return (
-    // A 44px target around the 22px circle (hitSlop does nothing on the web); the negative
-    // margin keeps the row's layout as if only the circle were there.
+    // A 48 target around the 24 circle (hitSlop does nothing on the web); the negative margin
+    // keeps the row's layout as if only the circle were there.
     <Pressable
       accessibilityLabel={label}
       accessibilityRole="checkbox"
       aria-checked={checked}
       aria-disabled={onPress === undefined}
-      className="-m-[11px] mt-[-10px] h-11 w-11 items-center justify-center rounded-full"
+      className="-m-3 h-12 w-12 items-center justify-center rounded-pill"
       disabled={onPress === undefined}
       onPress={onPress}
+      {...spacePress(onPress)}
     >
       <View
         className={cx(
-          "h-[22px] w-[22px] items-center justify-center rounded-full border-[1.5px]",
-          checked ? "border-fg bg-fg" : "border-muted",
+          "h-6 w-6 items-center justify-center rounded-pill border-stroke",
+          checked ? "border-label-primary bg-label-primary" : "border-outline",
           dashed && "border-dashed",
         )}
       >
-        {checked ? <Check color={palette.bg} size={14} strokeWidth={2.5} /> : null}
+        {checked ? <Check color={palette["bg.app"]} size={14} strokeWidth={2.5} /> : null}
       </View>
     </Pressable>
   );

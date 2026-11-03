@@ -29,6 +29,8 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "actionError.event/duplicate": "Это уже записано.",
   "actionError.event/not-found": "Этой записи больше нет.",
   "actionError.undo/nothing": "Отменять нечего.",
+  "actionError.persist_failed":
+    "Не удалось сохранить это на устройстве, поэтому ничего не изменилось. Попробуйте снова.",
   "actionError.task/unknown": "Этой задачи больше нет.",
   "actionError.subtask/unknown": "Этой подзадачи больше нет.",
   "actionError.subtask/submitted": "Отправленная подзадача остаётся в задаче.",
@@ -44,6 +46,7 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "actionError.preset/built-in":
     "У стандартного пресета нельзя поменять id и родителя; Inbox удалить нельзя.",
   "actionError.preset/exists": "Пресет с таким id уже есть.",
+  "actionError.preset/name-taken": "Пресет с таким названием уже есть. Выберите другое название.",
   "actionError.preset/invalid-definition": "Некоторые значения некорректны.",
   "actionError.preset/no-base": "Выберите, что наследует пресет.",
   "actionError.preset/self-extends": "Пресет не может наследовать сам себя.",
@@ -130,7 +133,7 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "form.removeSubtask": "Убрать {label}",
   "form.create": "Создать",
   "form.estimateDefault": "По умолчанию ({duration})",
-  "form.estimateTyped": "Другое: 50, 2,5 ч",
+  "form.estimateTyped": "Другое: 50, 2,5\u{A0}ч",
   "composer.send": "Отправить ассистенту",
   "composer.form.suggested": "Предлагает ассистент",
   "composer.label": "Новая задача",
@@ -218,6 +221,10 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "assistant.approve": "Подтвердить",
   "assistant.review": "Посмотреть действия ассистента",
   "assistant.approved": "Готово",
+  "assistant.approvedMore.one": "и ещё {count} действие",
+  "assistant.approvedMore.few": "и ещё {count} действия",
+  "assistant.approvedMore.many": "и ещё {count} действий",
+  "assistant.approvedMore.other": "и ещё {count} действия",
   "assistant.correct": "Уточнить для ассистента…",
   "assistant.sendCorrection": "Отправить уточнение",
   "assistant.reading": "Ассистент разбирает текст…",
@@ -226,6 +233,16 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "assistant.rulesUsedUnreadable":
     "Ассистент не смог разобрать этот текст. Это разбор по правилам; проверьте действия перед подтверждением.",
   "assistant.couldNotRead": "Не удалось разобрать текст. Попробуйте ещё раз.",
+  "assistant.unread.limited":
+    "У ассистента закончились запросы примерно до {time}, а правила здесь ничего не нашли. Попробуйте после этого.",
+  "assistant.unread.limitedSoon":
+    "У ассистента пока закончились запросы, а правила здесь ничего не нашли. Попробуйте позже.",
+  "assistant.unread.unreachable":
+    "Не удалось связаться с ассистентом, а правила здесь ничего не нашли. Попробуйте чуть позже.",
+  "assistant.unread.unreadable":
+    "Ассистент не смог разобрать эту строку, а правила здесь ничего не нашли. Переформулируйте.",
+  "assistant.unread.off":
+    "На этом сервере нет ассистента, а правила здесь ничего не нашли. Переформулируйте.",
   "assistant.couldNotRevise":
     "Не удалось уточнить действия. Предыдущий вариант сохранён на экране.",
   "assistant.tooManyCorrections":

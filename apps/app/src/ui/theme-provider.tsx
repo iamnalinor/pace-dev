@@ -1,9 +1,11 @@
 import { createContext, type ReactNode, use, useMemo } from "react";
 import { View } from "react-native";
 
-import { type Palette, type ThemeName, tokens } from "@pace/core";
+import type { ThemeName } from "@pace/core";
 
 import {
+  type Palette,
+  paletteOf,
   paletteVars,
   type ThemePreference,
   type ThemePreferenceHandle,
@@ -20,16 +22,26 @@ export type Theme = {
 
 const ThemeContext = createContext<null | Theme>(null);
 
-/** Resolves the device preference and defines the `--pace-*` variables on the root view. */
-export const ThemeProvider = ({ children }: { readonly children: ReactNode }) => {
-  const { preference, scheme, setPreference } = useThemePreference();
+/**
+Resolves the device preference and defines the `--pace-*` variables on the root view. `forced`
+draws a subtree in one scheme whatever the device says (the dev gallery's `theme` param).
+*/
+export const ThemeProvider = ({
+  children,
+  forced,
+}: {
+  readonly children: ReactNode;
+  readonly forced?: ThemeName;
+}) => {
+  const { preference, scheme: preferred, setPreference } = useThemePreference();
+  const scheme = forced ?? preferred;
   const theme = useMemo<Theme>(
-    () => ({ palette: tokens[scheme], preference, scheme, setPreference }),
+    () => ({ palette: paletteOf(scheme), preference, scheme, setPreference }),
     [preference, scheme, setPreference],
   );
   return (
     <ThemeContext value={theme}>
-      <View className="flex-1 bg-bg" style={paletteVars(scheme)}>
+      <View className="flex-1 bg-app" style={paletteVars(scheme)}>
         {children}
       </View>
     </ThemeContext>

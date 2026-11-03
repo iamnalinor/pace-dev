@@ -398,8 +398,10 @@ describe("Settings → Devices and sessions", () => {
     expect(within(row).getByText("End this session? This device signs out.")).toBeOnTheScreen();
     await fireEvent.press(within(row).getByRole("button", { name: "Revoke" }));
     await waitFor(() => {
-      expect(router.replace).toHaveBeenCalledWith("/login");
+      expect(runtime.auth.store.getState().status).toBe("signed-out");
     });
+    // The route gate takes a signed-out device to the login card; no navigation of its own (N1).
+    expect(router.replace).not.toHaveBeenCalled();
     expect(server.deleted).toEqual(["01CHROME"]);
     expect(runtime.auth.token()).toBeUndefined();
     // The server ended it already: no logout that would answer 401 (QA round 15 L2).
@@ -753,8 +755,11 @@ describe("Settings → Devices and sessions", () => {
     await fireEvent.press(await screen.findByRole("button", { name: "Connect an AI app" }));
     expect(await screen.findByText(`${serverApi}/mcp`)).toBeOnTheScreen();
     expect(screen.queryByText(`${usedApi}/mcp`)).toBeNull();
+    // The line names both addresses and what to do (QA round 21 L6).
     expect(
-      screen.getByText("This server's public address differs from the one this device uses."),
+      screen.getByText(
+        `AI apps must use the address above, not the one this device uses (${usedApi}).`,
+      ),
     ).toBeOnTheScreen();
     // A phone has no clipboard module: the URL goes on through the share sheet.
     expect(screen.getByRole("button", { name: "Send the URL" })).toBeOnTheScreen();
@@ -772,6 +777,28 @@ describe("Settings → Devices and sessions", () => {
     });
   });
 
+  it("says AI apps cannot connect, with no URL to copy, on a server without MCP (re-review N4)", async () => {
+    const usedApi = serverStore.getState().origin;
+    await renderSettings({
+      "GET /api/instance": () => ({
+        ...fakeInstance,
+        apiOrigin: usedApi,
+        features: { ...fakeInstance.features, mcp: false },
+      }),
+      "GET /api/sessions": () => SessionsOutputSchema.parse({ sessions: [] }),
+    });
+    await waitFor(() => {
+      expect(serverStore.getState().instance?.features.mcp).toBe(false);
+    });
+    await fireEvent.press(await screen.findByRole("button", { name: "Connect an AI app" }));
+    expect(
+      await screen.findByText("AI apps cannot connect to this server: they need an https address."),
+    ).toBeOnTheScreen();
+    expect(screen.queryByText(`${usedApi}/mcp`)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Send the URL" })).toBeNull();
+    expect(screen.queryByText("Claude")).toBeNull();
+  });
+
   it("says nothing about the address when the server's public API is the one in use", async () => {
     const usedApi = serverStore.getState().origin;
     await renderSettings({
@@ -783,7 +810,7 @@ describe("Settings → Devices and sessions", () => {
     });
     await fireEvent.press(await screen.findByRole("button", { name: "Connect an AI app" }));
     expect(await screen.findByText(`${usedApi}/mcp`)).toBeOnTheScreen();
-    expect(screen.queryByText(/public address differs/u)).toBeNull();
+    expect(screen.queryByText(/AI apps must use the address above/u)).toBeNull();
   });
 });
 

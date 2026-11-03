@@ -1,5 +1,10 @@
+import type { Request } from "@playwright/test";
+
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
-import { DEV_TELEGRAM_ID, loginViaApi, resetAccount } from "./support/login.ts";
+import { DEV_TELEGRAM_ID, freshTelegramId, loginViaApi, resetAccount } from "./support/login.ts";
+import { outboxSent } from "./support/outbox.ts";
+import { pushAsClient, seedLivedIn, ulid } from "./support/seed.ts";
+import { documentGround, rgb } from "./support/theme-colors.ts";
 
 test("dev login → Now → tabs → Russian → logout", async ({ page }) => {
   await resetAccount(DEV_TELEGRAM_ID);
@@ -39,6 +44,157 @@ test("dev login → Now → tabs → Russian → logout", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Sign in to Pace" })).toBeVisible();
 });
 
+test("after Log out the network goes quiet: no request names the session, nothing is refused, a reload explains nothing (QA round 22 R22-02)", async ({
+  page,
+}) => {
+  const { token } = await loginViaApi(page);
+  // A lived-in account (calendar, notifications, a running activity), read in English.
+  await seedLivedIn(token);
+  const at = new Date().toISOString();
+  const english = await pushAsClient(token, [
+    {
+      deviceId: "e2e-seed",
+      id: ulid(Date.now()),
+      occurredAt: at,
+      payload: { language: "en" },
+      precision: "exact",
+      recordedAt: at,
+      source: "web",
+      type: "settings.updated",
+    },
+  ]);
+  expect(english.ok).toBe(true);
+  // Everything is recorded with the wall-clock time it was seen; the press is stamped on the page
+  // itself (same machine, same clock), so a poll that went out just before it is never counted.
+  const asked: { readonly at: number; readonly request: Request; readonly path: string }[] = [];
+  const refused: { readonly at: number; readonly what: string }[] = [];
+  const errors: { readonly at: number; readonly text: string }[] = [];
+  const sockets: number[] = [];
+  const pending = new Set<unknown>();
+  page.on("request", (request) => {
+    pending.add(request);
+    const { pathname } = new URL(request.url());
+    if (pathname.startsWith("/api/")) {
+      // Stamped as it leaves: `timing()` stays empty for a request that never got an answer.
+      asked.push({ at: Date.now(), path: pathname, request });
+    }
+  });
+  page.on("requestfinished", (request) => {
+    pending.delete(request);
+  });
+  page.on("requestfailed", (request) => {
+    pending.delete(request);
+  });
+  page.on("response", (response) => {
+    if (response.status() >= 400) {
+      refused.push({ at: Date.now(), what: `${String(response.status())} ${response.url()}` });
+    }
+  });
+  page.on("console", (message) => {
+    if (message.type() === "error") {
+      errors.push({ at: Date.now(), text: message.text() });
+    }
+  });
+  page.on("websocket", () => {
+    sockets.push(Date.now());
+  });
+  // Now and Day mounted first: their calendar reads, the sync loop and the socket all run.
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Now" })).toBeVisible();
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Day" }).click();
+  await expect(page.getByRole("heading", { name: "Day" })).toBeVisible();
+  await page
+    .getByRole("navigation", { name: "Main" })
+    .getByRole("link", { name: "Settings" })
+    .click();
+  // The start has had its answers (sync, calendar, notifications) and the socket is open.
+  await expect.poll(() => pending.size).toBe(0);
+  expect(sockets.length).toBeGreaterThan(0);
+  const logOut = page.getByRole("button", { name: "Log out" });
+  await logOut.evaluate((button) => {
+    button.addEventListener(
+      "pointerdown",
+      () => {
+        document.documentElement.dataset["pressedAt"] = String(Date.now());
+      },
+      { capture: true, once: true },
+    );
+  });
+  await logOut.click();
+  await expect(page).toHaveURL(/\/login$/u);
+  // Long enough for a socket close, a retry or a screen's refetch to show itself.
+  // eslint-disable-next-line playwright/no-wait-for-timeout, sonarjs/no-fixed-wait-in-tests -- a quiet network is the absence of requests over a window; no DOM condition marks it
+  await page.waitForTimeout(2000);
+  const pressedAt = Number(
+    await page.evaluate(() => globalThis.document.documentElement.dataset["pressedAt"]),
+  );
+  expect(pressedAt).toBeGreaterThan(0);
+  const after = asked
+    // The browser's own start time once answered; the stamp for one never answered (it then
+    // counts as the sign-out's: the check fails closed).
+    .filter(
+      ({ at, request }) =>
+        (request.timing().startTime > 0 ? request.timing().startTime : at) >= pressedAt,
+    )
+    .map(({ path, request }) => ({
+      auth: request.headers()["authorization"] ?? null,
+      method: request.method(),
+      path,
+    }));
+  expect(after.filter((request) => request.auth !== null)).toEqual([
+    { auth: `Bearer ${token}`, method: "POST", path: "/api/auth/logout" },
+  ]);
+  // Only the public server check may follow, and it names no one.
+  expect(after.filter((request) => request.path !== "/api/instance").map((r) => r.path)).toEqual([
+    "/api/auth/logout",
+  ]);
+  // No socket opens again with the ended session.
+  expect(sockets.filter((at) => at >= pressedAt)).toEqual([]);
+  expect(refused.filter(({ at }) => at >= pressedAt).map(({ what }) => what)).toEqual([]);
+  expect(errors.filter(({ at }) => at >= pressedAt).map(({ text }) => text)).toEqual([]);
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Sign in to Pace" })).toBeVisible();
+  await expect(page.getByText(/You were signed out/u)).toHaveCount(0);
+  expect(refused.filter(({ at }) => at >= pressedAt).map(({ what }) => what)).toEqual([]);
+  expect(errors.filter(({ at }) => at >= pressedAt).map(({ text }) => text)).toEqual([]);
+});
+
+test("a slow log-out answer leaves the login form as the person is filling it in (PR A re-review N1, bug class 75)", async ({
+  page,
+}) => {
+  const telegramId = freshTelegramId();
+  await loginViaApi(page, telegramId);
+  // The server's answer to the log-out is held, as on a slow phone or a busy Durable Object.
+  let isReleased = false;
+  await page.route("**/api/auth/logout", async (route) => {
+    await new Promise((resolve) => {
+      setTimeout(resolve, 2000);
+    });
+    isReleased = true;
+    await route.continue();
+  });
+  await page.goto("/settings");
+  await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
+  // The start's own write (the time zone) sent, so Log out has nothing to ask about.
+  await outboxSent(page);
+  const answered = page.waitForResponse("**/api/auth/logout");
+  await page.getByRole("button", { exact: true, name: "Log out" }).click();
+  // Signed out on the device at once: the login screen is there before the server answers.
+  await expect(page).toHaveURL(/\/login$/u);
+  const field = page.getByLabel("Telegram id");
+  await field.fill(telegramId);
+  expect(isReleased).toBe(false);
+  await answered;
+  // A follow-up that runs once the answer is in shows itself within a few frames.
+  // eslint-disable-next-line playwright/no-wait-for-timeout, sonarjs/no-fixed-wait-in-tests -- the bug is a remount after the answer; no DOM condition marks that it did not happen
+  await page.waitForTimeout(500);
+  await expect(field).toHaveValue(telegramId);
+  await expect(page.getByRole("button", { name: "Sign in as dev" })).toBeEnabled();
+  await page.getByRole("button", { name: "Sign in as dev" }).click();
+  await expect(page.getByRole("heading", { name: "Now" })).toBeVisible();
+});
+
 test("the theme choice is kept per device and paints the page", async ({ page }) => {
   await loginViaApi(page);
   await page.emulateMedia({ colorScheme: "dark" });
@@ -59,20 +215,20 @@ test("the theme choice is kept per device and paints the page", async ({ page })
       .locator('meta[name="theme-color"]')
       .evaluateAll((metas) => metas.map((meta) => meta.getAttribute("content"))),
   });
-  await expect.poll(pageColors).toMatchObject({ body: "rgb(244, 245, 247)" });
+  await expect.poll(pageColors).toMatchObject({ body: rgb(documentGround("light", false)) });
   // Both theme colours (the system's dark and light) now say the app's light, none the dark one.
-  expect((await pageColors()).themeColors).not.toContain("#0b0b0c");
+  expect((await pageColors()).themeColors).not.toContain(documentGround("dark", false));
   await page.reload();
   await expect(page.getByRole("radio", { name: "Light" })).toBeChecked();
   expect(await background()).toBe(light);
-  expect((await pageColors()).body).toBe("rgb(244, 245, 247)");
+  expect((await pageColors()).body).toBe(rgb(documentGround("light", false)));
   await page.getByRole("radio", { name: "System" }).click();
   await expect.poll(background).not.toBe(light);
   // System, reloaded on a dark system: the page follows the system again, from the first paint on.
   await page.reload();
   await expect(page.getByRole("radio", { name: "System" })).toBeChecked();
   expect(await background()).not.toBe(light);
-  expect((await pageColors()).body).toBe("rgb(11, 11, 12)");
+  expect((await pageColors()).body).toBe(rgb(documentGround("dark", false)));
 });
 
 test("the App Link landing offers to open the app", async ({ page }) => {
@@ -187,12 +343,21 @@ test("a page older than its server offers Refresh, and a refresh with a fitting 
 }) => {
   const instance = { isTooNew: true };
   await page.route("**/api/instance", async (route) => {
-    const response = await route.fetch();
-    const body = (await response.json()) as Record<string, unknown>;
-    await route.fulfill({
-      json: instance.isTooNew ? { ...body, minClientProtocol: 99, protocol: 99 } : body,
-      response,
-    });
+    // Refresh reloads the page: a read of the instance still on its way then belongs to a page
+    // that is gone, and its response is disposed under the handler (a run of fix round 2). The
+    // reloaded page asks again, and that read is the one the test judges.
+    try {
+      const response = await route.fetch();
+      const body = (await response.json()) as Record<string, unknown>;
+      await route.fulfill({
+        json: instance.isTooNew ? { ...body, minClientProtocol: 99, protocol: 99 } : body,
+        response,
+      });
+    } catch (error) {
+      if (!(error instanceof Error && error.message.includes("disposed"))) {
+        throw error;
+      }
+    }
   });
   await loginViaApi(page);
   await page.goto("/");

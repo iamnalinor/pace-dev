@@ -5,12 +5,12 @@ import {
   activityLabel,
   addDaysIn,
   addMinutesIso,
-  CATEGORY_COLORS,
+  CATEGORY_HUES,
   type CoreState,
   formatInZone,
   type Gap,
+  type HueName,
   LANGUAGES,
-  type ProjectColorName,
   type QueryContext,
   shownLabel,
   startOfDayIn,
@@ -25,7 +25,7 @@ export type DayRow = {
   readonly activityId: string;
   readonly label: string;
   readonly category: ActivityCategory;
-  readonly color: ProjectColorName;
+  readonly color: HueName;
   readonly startAt: string;
   readonly endAt: string;
   readonly minutes: number;
@@ -120,7 +120,7 @@ const editTargetOf = (
 
 export type DayTotal = {
   readonly category: ActivityCategory;
-  readonly color: ProjectColorName;
+  readonly color: HueName;
   readonly minutes: number;
 };
 
@@ -160,7 +160,7 @@ export const dayModel = (state: CoreState, date: null | string, ctx: QueryContex
       target: editTargetOf({ ...segment, label }, state.time.activities[segment.activityId]),
       row: {
         ...segment,
-        color: CATEGORY_COLORS[segment.category],
+        color: CATEGORY_HUES[segment.category],
         label,
         showsLabel: !isCategoryName(label, segment.category),
         taskLink: taskLinkOf(state, segment),
@@ -190,7 +190,7 @@ export const dayModel = (state: CoreState, date: null | string, ctx: QueryContex
     totals: Object.entries(day.totals)
       .map(([category, minutes]) => ({
         category: category as ActivityCategory,
-        color: CATEGORY_COLORS[category as ActivityCategory],
+        color: CATEGORY_HUES[category as ActivityCategory],
         minutes,
       }))
       .toSorted((a, b) => b.minutes - a.minutes),

@@ -69,7 +69,7 @@ export const enShell = {
   "appLink.missing": "This link has no login token.",
   "oauth.title": "Connecting an app",
   "oauth.body":
-    "An app is asking for access to your Pace account. Check what it wants, then sign in with Telegram to allow it.",
+    "An app is asking for access to your Pace account. Check what it wants before you allow it.",
   "oauth.unverified": "This app registered itself; its name is not verified.",
   "oauth.publishedBy": "Published by {domain}",
   "oauth.redirectTo": "Access will be sent to {host}.",
@@ -84,6 +84,12 @@ export const enShell = {
   "oauth.scope.offlineAccess": "Stay connected without asking again",
   "oauth.identify": "Sign in with Telegram to continue",
   "oauth.signedInAs": "Signed in as {name}",
+  "oauth.sessionEnded": "Your Pace session has ended. Sign in again to continue.",
+  "oauth.deviceToken":
+    "This Pace sign-in cannot connect apps. Log out of Pace in this browser, sign in again and retry.",
+  "oauth.identityConflict": "This page sent two sign-ins at once. Reload it and allow again.",
+  "oauth.widgetMissing": "Can't see the Telegram button?",
+  "oauth.signInFirst": "Sign in to Pace first",
   "oauth.allow": "Allow",
   "oauth.deny": "Deny",
   "oauth.devUse": "Continue as dev",
@@ -160,6 +166,17 @@ export const enShell = {
   "settings.categoryEstimates.hint":
     "An activity's own estimate comes first, then this setting, past runs and the built-in value.",
   "settings.logout": "Log out",
+  "settings.logout.unsynced.one": "{count} change has not synced yet: logging out now loses it.",
+  "settings.logout.unsynced.few":
+    "{count} changes have not synced yet: logging out now loses them.",
+  "settings.logout.unsynced.many":
+    "{count} changes have not synced yet: logging out now loses them.",
+  "settings.logout.unsynced.other":
+    "{count} changes have not synced yet: logging out now loses them.",
+  "settings.logout.unsynced.unknown":
+    "Some changes may not have synced yet: logging out now loses them.",
+  "settings.logout.wait": "Wait",
+  "settings.logout.anyway": "Log out anyway",
   "settings.deleteAccount": "Delete account",
   "settings.deleteAccount.warning":
     "This deletes the account for good: tasks, time, presets, the decision log and every connected app. It cannot be undone.",
@@ -186,14 +203,15 @@ export const enShell = {
   "common.back": "Back",
   "common.accept": "Accept",
   "common.skip": "Skip",
-  "common.retry": "Retry",
+  "common.retry": "Try again",
   "common.home": "Go home",
-  "errors.offline": "You are offline. Changes will sync when you reconnect.",
-  "sync.retry": "Retry",
+  "errors.offline": "Offline · changes will sync later",
+  "sync.retry": "Try again",
   "sync.firstSync": "Syncing your data",
   "sync.stillSyncing": "Still syncing your data…",
   "sync.firstSyncLine": "Syncing your data…",
   "sync.loadingData": "Loading your data…",
+  "sync.notSyncedYet": "Your data has not loaded yet.",
   "errors.llmUnavailable": "The assistant is unavailable right now. Try again in a moment.",
   "errors.notFound": "Not found.",
   "errors.pageNotFound": "Page not found",

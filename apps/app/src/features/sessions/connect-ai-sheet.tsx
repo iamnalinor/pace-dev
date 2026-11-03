@@ -18,40 +18,32 @@ const CLIENTS: readonly { readonly name: MessageKey; readonly steps: MessageKey 
   { name: "connectAi.other", steps: "connectAi.otherSteps" },
 ];
 
-/**
-"Connect an AI app": the current server's MCP URL (its own public API, not the build's nor
-the address this device reaches it at, when those differ: said in a line) to copy, and
-where Claude, ChatGPT and any other MCP client with OAuth take it. The app then signs in on
-Pace's consent page and shows up in Devices and sessions.
-*/
-export const ConnectAiSheet = ({
-  onClose,
-  open,
+/** The URL to copy, the line about another address, and each client's steps. */
+const ConnectSteps = ({
+  isPublicOriginOther,
+  url,
+  usedOrigin,
 }: {
-  readonly open: boolean;
-  readonly onClose: () => void;
+  readonly isPublicOriginOther: boolean;
+  readonly url: string;
+  readonly usedOrigin: string;
 }) => {
   const t = useT();
-  // The server's public API, its OAuth resource (round 7 review 1), not the address in use.
-  const { isPublicOriginOther, mcpUrl: url } = useServerInfo();
   const [isCopied, setIsCopied] = useState(false);
   return (
-    <Sheet
-      closeLabel={t("common.close")}
-      name="connect-ai"
-      onClose={onClose}
-      title={t("connectAi.open")}
-      visible={open}
-    >
-      <Text className="font-sans text-[14px] leading-[20px] text-fg">{t("connectAi.intro")}</Text>
+    <>
+      <Text className="font-sans text-subhead font-normal text-label-primary">
+        {t("connectAi.intro")}
+      </Text>
       <View className="gap-2">
-        <Text className="font-sans text-[11px] uppercase tracking-[0.06em] text-muted">
+        <Text className="font-sans text-caption2 font-normal uppercase text-label-tertiary">
           {t("connectAi.url")}
         </Text>
         <CodeText>{url}</CodeText>
         {isPublicOriginOther ? (
-          <Text className="font-sans text-[12px] leading-[17px] text-muted">
-            {t("connectAi.otherAddress")}
+          // An instruction about the address above, so a meta line, not the quietest tier.
+          <Text className="font-sans text-caption font-normal text-label-secondary">
+            {t("connectAi.otherAddress", { used: usedOrigin })}
           </Text>
         ) : null}
         <Button
@@ -71,15 +63,56 @@ export const ConnectAiSheet = ({
       </View>
       {CLIENTS.map((client) => (
         <View className="gap-1" key={client.name}>
-          <Text accessibilityRole="header" className="font-sans text-[15px] font-semibold text-fg">
+          <Text
+            accessibilityRole="header"
+            className="font-sans text-callout font-semibold text-label-primary"
+          >
             {t(client.name)}
           </Text>
-          <Text className="font-sans text-[14px] leading-[20px] text-fg2">{t(client.steps)}</Text>
+          <Text className="font-sans text-subhead font-normal text-label-secondary">
+            {t(client.steps)}
+          </Text>
         </View>
       ))}
-      <Text className="font-sans text-[12px] leading-[17px] text-muted">
+      <Text className="font-sans text-caption font-normal text-label-tertiary">
         {t("connectAi.revokeHint")}
       </Text>
+    </>
+  );
+};
+
+/**
+"Connect an AI app": the current server's MCP URL (its own public API, not the build's nor
+the address this device reaches it at, when those differ: said in a line) to copy, and
+where Claude, ChatGPT and any other MCP client with OAuth take it. The app then signs in on
+Pace's consent page and shows up in Devices and sessions. A server without MCP says so instead.
+*/
+export const ConnectAiSheet = ({
+  onClose,
+  open,
+}: {
+  readonly open: boolean;
+  readonly onClose: () => void;
+}) => {
+  const t = useT();
+  // The server's public API, its OAuth resource (round 7 review 1), not the address in use.
+  const { apiOrigin: usedOrigin, isPublicOriginOther, mcpUrl: url } = useServerInfo();
+  return (
+    <Sheet
+      closeLabel={t("common.close")}
+      name="connect-ai"
+      onClose={onClose}
+      title={t("connectAi.open")}
+      visible={open}
+    >
+      {url === null ? (
+        // The server has no MCP (no https origin, re-review N4): no URL that answers 503.
+        <Text className="font-sans text-subhead font-normal text-label-primary">
+          {t("connectAi.unavailable")}
+        </Text>
+      ) : (
+        <ConnectSteps isPublicOriginOther={isPublicOriginOther} url={url} usedOrigin={usedOrigin} />
+      )}
     </Sheet>
   );
 };

@@ -62,16 +62,17 @@ export const ruNotify: { readonly [K in keyof typeof enNotify]: string } = {
   "settings.push.hint": "Как этот телефон получает уведомления",
   "settings.push.option.auto": "Автоматически",
   "settings.push.option.fcm": "Google",
-  "settings.push.option.poll": "Фоновая проверка (каждые ~15 мин)",
+  "settings.push.option.poll": "Фоновая проверка (каждые ~15\u{A0}мин)",
   "settings.push.option.none": "Только в приложении",
   "settings.push.fcm": "FCM доставляет их через пуш-сервис Google, даже когда Pace закрыт.",
   "settings.push.poll":
-    "Pace проверяет уведомления в фоне примерно каждые 15 минут, а пока он открыт — сразу.",
+    "Pace проверяет уведомления в фоне примерно каждые 15\u{A0}минут, а пока он открыт — сразу.",
   "settings.push.none":
     "Этот телефон не показывает уведомления; все они — в колокольчике приложения.",
   "settings.push.denied":
     "Этот телефон их не показывает: уведомления не разрешены (Настройки → Разрешения).",
   "settings.push.otherProject": "Google недоступен: у этого сервера другой проект Firebase.",
+  "settings.push.notSaved": "Телефон не смог сохранить этот выбор. Попробуйте снова.",
   "settings.push.unavailable": "{method} сейчас недоступен.",
   "settings.notifications.hint": "Куда приходит каждый вид уведомлений.",
   "settings.push.web":

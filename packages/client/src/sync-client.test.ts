@@ -18,6 +18,7 @@ import {
 } from "./fake-fetch.fake.ts";
 import { say } from "./fake-socket.fake.ts";
 import { createFakeSyncServer, type FakeRequest } from "./fake-sync-server.fake.ts";
+import { createHeldEventStore } from "./held-event-store.fake.ts";
 import { STABLE_MS } from "./live-timers.ts";
 import { createMemorySessionStore } from "./session.ts";
 import { type AppStateHandle, createAppState } from "./state.ts";
@@ -187,6 +188,39 @@ describe("createSyncClient pull", () => {
     await expect(sync.syncNow()).resolves.toEqual({ ok: true, value: { pulled: 0, pushed: 0 } });
     expect(state.store.getState().events).toEqual([]);
     await expect(store.getCursor()).resolves.toBe(5);
+  });
+});
+
+describe("createSyncClient across a wipe", () => {
+  it("drops a page pulled for the copy a sign-out wiped meanwhile (fix round 1 of QA 22)", async () => {
+    const held: { release?: () => void } = {};
+    const { state, store, sync } = await setup({
+      "GET /api/sync/pull": async () => {
+        await new Promise<void>((resolve) => {
+          held.release = resolve;
+        });
+        return {
+          events: [settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(9), { language: "ru" })],
+          more: false,
+          seq: 7,
+          storeId: STORE_ID,
+        };
+      },
+    });
+    const syncing = sync.syncNow();
+    await vi.waitFor(() => {
+      expect(held.release).toBeDefined();
+    });
+    // The person logs out while the first page is on its way: the local copy is wiped.
+    await state.clear();
+    held.release?.();
+    const result = await syncing;
+    expect(result.ok).toBe(false);
+    // The old account's page never lands in the fresh copy: no events, no cursor, no store id.
+    expect(state.store.getState().events).toEqual([]);
+    await expect(store.listAll()).resolves.toEqual([]);
+    await expect(store.getCursor()).resolves.toBe(0);
+    await expect(store.getStoreId()).resolves.toBeNull();
   });
 });
 
@@ -440,6 +474,185 @@ describe("createSyncClient: a write while the first pull is under way (QA round 
   });
 });
 
+describe("createSyncClient reset with local writes in flight", () => {
+  const remote = settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(9), { language: "ru" });
+
+  it("drops a write queued behind one in flight: nothing of the old copy is pushed afterwards", async () => {
+    const held = createHeldEventStore();
+    await held.store.setStoreId(STORE_ID);
+    await held.store.setCursor(9);
+    await held.store.setSyncVersion(SYNC_SCHEMA_VERSION);
+    const { calls, state, sync } = await started(held.store, {
+      "GET /api/sync/pull": ({ url }) =>
+        url.searchParams.get("since") === "0"
+          ? { events: [remote], more: false, seq: 1, storeId: "store-b" }
+          : { ...EMPTY_PAGE, seq: 9, storeId: "store-b" },
+      "POST /api/sync/push": acceptAll,
+    });
+    held.hold();
+    const first = state.dispatch({
+      occurredAt: at(11),
+      payload: { language: "en" },
+      type: "settings.updated",
+    });
+    const second = state.dispatch({
+      occurredAt: at(12),
+      payload: { timezone: "UTC" },
+      type: "settings.updated",
+    });
+    const run = sync.syncNow();
+    await vi.waitFor(() => {
+      expect(held.writes).toHaveLength(1);
+    });
+    await held.writes[0]?.resolve();
+    // The reset's own pull (the remote event) is written once the old copy is gone.
+    await vi.waitFor(() => {
+      expect(held.writes).toHaveLength(2);
+    });
+    expect(held.writes[1]?.events).toEqual([remote]);
+    await held.writes[1]?.resolve();
+    await expect(run).resolves.toMatchObject({ ok: true });
+    await expect(second).resolves.toEqual({ error: "persist_failed", ok: false });
+    await first;
+    held.release();
+    await expect(sync.syncNow()).resolves.toMatchObject({ ok: true, value: { pushed: 0 } });
+    expect(calls.filter((call) => call.path === "/api/sync/push")).toHaveLength(0);
+    await expect(held.store.listAll()).resolves.toEqual([remote]);
+    await expect(held.store.listPending()).resolves.toEqual([]);
+  });
+});
+
+/** The ids of every event pushed so far, in order. */
+const pushedIds = (calls: ReturnType<typeof createFakeFetch>["calls"]): readonly string[] =>
+  calls
+    .filter((call) => call.path === "/api/sync/push")
+    .flatMap((call) => (call.body as { events: readonly Event[] }).events.map(({ id }) => id));
+
+/** The pull route `answer`, keeping the cursor of every pull it was asked for. */
+const recordedPull = (answer: FakeRoute) => {
+  const sinces: string[] = [];
+  const route: FakeRoute = (request) => {
+    sinces.push(request.url.searchParams.get("since") ?? "");
+    return answer(request);
+  };
+  return { route, sinces };
+};
+
+/** A held store already paired with the server's store `STORE_ID` up to `cursor`. */
+const paired = async (cursor: number) => {
+  const held = createHeldEventStore();
+  await held.store.setStoreId(STORE_ID);
+  await held.store.setCursor(cursor);
+  await held.store.setSyncVersion(SYNC_SCHEMA_VERSION);
+  return held;
+};
+
+/**
+The steady state after a write the local store refused (Task 2.5, bug-lessons 108; CLAUDE.md's
+contract rule): the network goes quiet, no request is repeated for the same id.
+*/
+describe("createSyncClient after the local store refused a write", () => {
+  const remote = settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(9), { language: "ru" });
+
+  it("never pushes a refused local action and answers it persist_failed", async () => {
+    const held = await paired(0);
+    const pull = recordedPull(noPull);
+    const { calls, state, sync } = await started(held.store, {
+      "GET /api/sync/pull": pull.route,
+      "POST /api/sync/push": acceptAll,
+    });
+    held.hold();
+    const action = state.dispatch({
+      occurredAt: at(11),
+      payload: { language: "en" },
+      type: "settings.updated",
+    });
+    await vi.waitFor(() => {
+      expect(held.writes).toHaveLength(1);
+    });
+    held.writes[0]?.reject();
+    await expect(action).resolves.toEqual({ error: "persist_failed", ok: false });
+    held.release();
+    await expect(sync.syncNow()).resolves.toEqual({ ok: true, value: { pulled: 0, pushed: 0 } });
+    await expect(sync.syncNow()).resolves.toEqual({ ok: true, value: { pulled: 0, pushed: 0 } });
+    expect(pushedIds(calls)).toEqual([]);
+    expect(pull.sinces).toEqual(["0", "0"]);
+    expect(state.store.getState().events).toEqual([]);
+  });
+
+  it("pulls a refused page again once from the same cursor, then moves on and goes quiet", async () => {
+    const held = await paired(4);
+    const pull = recordedPull(({ url }) =>
+      url.searchParams.get("since") === "4"
+        ? { events: [remote], more: false, seq: 5, storeId: STORE_ID }
+        : { ...EMPTY_PAGE, seq: 5 },
+    );
+    const { calls, state, sync } = await started(held.store, {
+      "GET /api/sync/pull": pull.route,
+      "POST /api/sync/push": acceptAll,
+    });
+    held.hold();
+    const refused = sync.syncNow();
+    await vi.waitFor(() => {
+      expect(held.writes).toHaveLength(1);
+    });
+    held.writes[0]?.reject();
+    await expect(refused).resolves.toMatchObject({ ok: false });
+    await expect(held.store.getCursor()).resolves.toBe(4);
+    expect(state.store.getState().events).toEqual([]);
+    held.release();
+    expect(pull.sinces).toEqual(["4"]);
+
+    await expect(sync.syncNow()).resolves.toEqual({ ok: true, value: { pulled: 1, pushed: 0 } });
+    expect(pull.sinces).toEqual(["4", "4"]);
+    await expect(held.store.getCursor()).resolves.toBe(5);
+    expect(state.store.getState().events).toEqual([remote]);
+
+    await expect(sync.syncNow()).resolves.toEqual({ ok: true, value: { pulled: 0, pushed: 0 } });
+    expect(pull.sinces).toEqual(["4", "4", "5"]);
+    expect(pushedIds(calls)).toEqual([]);
+    await expect(held.store.listPending()).resolves.toEqual([]);
+  });
+
+  it("pushes a dependent action after a refused one exactly once, then the network is quiet", async () => {
+    const held = await paired(0);
+    const { calls, state, sync } = await started(held.store, {
+      "GET /api/sync/pull": noPull,
+      "POST /api/sync/push": acceptAll,
+    });
+    held.hold();
+    const created = state.dispatch({
+      occurredAt: at(10),
+      payload: { fields: {}, presetId: "personal", subtasks: [], taskId: "t1", title: "Essay" },
+      type: "task.created",
+    });
+    const closed = state.dispatch({
+      occurredAt: at(11),
+      payload: { outcome: "done", taskId: "t1" },
+      type: "task.closed",
+    });
+    await vi.waitFor(() => {
+      expect(held.writes).toHaveLength(1);
+    });
+    held.writes[0]?.reject();
+    await expect(created).resolves.toEqual({ error: "persist_failed", ok: false });
+    await vi.waitFor(() => {
+      expect(held.writes).toHaveLength(2);
+    });
+    await held.writes[1]?.resolve();
+    const written = await closed;
+    if (!written.ok) {
+      throw new Error(written.error);
+    }
+    held.release();
+    // By decision (bug-lessons 108, Task 2.5 fix round 1 b) the orphan stays and is sent once.
+    await expect(sync.syncNow()).resolves.toMatchObject({ ok: true, value: { pushed: 1 } });
+    await expect(sync.syncNow()).resolves.toMatchObject({ ok: true, value: { pushed: 0 } });
+    expect(pushedIds(calls)).toEqual([written.value.id]);
+    await expect(held.store.listPending()).resolves.toEqual([]);
+  });
+});
+
 describe("createSyncClient after an update that reads more of the log", () => {
   const remote = settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(9), { language: "ru" });
   // Older clients refused ids past 64 characters and moved their cursor past such events.
@@ -590,7 +803,7 @@ describe("createSyncClient scheduling", () => {
           most = Math.max(most, open);
           await gate.promise;
           open -= 1;
-          return acceptAll({ body, url: new URL("https://api.test") });
+          return acceptAll({ body, headers: {}, url: new URL("https://api.test") });
         },
       },
       localEvents(1),
@@ -648,7 +861,7 @@ describe("createSyncClient scheduling", () => {
             isFirst = false;
             await gate.promise;
           }
-          return acceptAll({ body, url });
+          return acceptAll({ body, headers: {}, url });
         },
       },
       localEvents(1),
@@ -767,7 +980,7 @@ describe("createSyncClient soon", () => {
             isFirst = false;
             await gate.promise;
           }
-          return acceptAll({ body, url });
+          return acceptAll({ body, headers: {}, url });
         },
       },
       localEvents(1),

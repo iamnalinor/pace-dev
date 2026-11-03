@@ -99,6 +99,7 @@ export const enTime = {
   "day.noDeviceData": "No data yet from {device}",
   "day.dataUpTo": "{device} data up to {time}",
   "day.screenTime": "Screen time",
+  "day.screenTimeFailed": "Couldn't load screen time.",
   "day.deviceTime": "{device} · {duration}",
   "day.showAll": "Show all {count}",
   "day.showLess": "Show less",

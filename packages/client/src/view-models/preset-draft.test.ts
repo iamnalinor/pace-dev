@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { BASE_PRESETS, INITIAL_PRESETS_STATE, PresetIdSchema } from "@pace/core";
+import {
+  BASE_PRESETS,
+  INITIAL_PRESETS_STATE,
+  newId,
+  PresetIdSchema,
+  storedPresetName,
+} from "@pace/core";
 
 import {
   definitionIssues,
@@ -9,6 +15,7 @@ import {
   inheritedOf,
   isOverridden,
   newDraft,
+  newPresetId,
   setSub,
   setValue,
   slugify,
@@ -105,6 +112,23 @@ describe("freePresetId (QA round 18 L4: nobody types an id)", () => {
   });
 });
 
+describe("newPresetId (pr48 follow-up: two devices naming a preset alike offline)", () => {
+  it("gives two devices that create the same name offline two ids, each still read from the name", () => {
+    const one = newPresetId(INITIAL_PRESETS_STATE, "Gym", newId());
+    const other = newPresetId(INITIAL_PRESETS_STATE, "Gym", newId());
+    expect(one).not.toBe(other);
+    for (const id of [one, other]) {
+      expect(id).toMatch(/^gym-[0-9a-z]{6}$/u);
+      expect(PresetIdSchema.safeParse(id).success).toBe(true);
+    }
+  });
+
+  it("stays a valid id past the slug's cut", () => {
+    const id = newPresetId(INITIAL_PRESETS_STATE, "a".repeat(80), newId());
+    expect(PresetIdSchema.safeParse(id).success).toBe(true);
+  });
+});
+
 describe("editorDraft", () => {
   it("opens an untouched default preset with nothing overridden", () => {
     expect(editorDraft(BASE_PRESETS.work)).toEqual({
@@ -113,6 +137,17 @@ describe("editorDraft", () => {
       id: "work",
       name: "Work",
     });
+  });
+
+  it("opens a default under the name the account's language shows (QA round 23 R23-06)", () => {
+    expect(editorDraft(BASE_PRESETS.work, "ru").name).toBe("Работа");
+    // A default someone renamed keeps what they typed.
+    expect(editorDraft({ ...BASE_PRESETS.work, name: "Job" }, "ru").name).toBe("Job");
+    // Saved unchanged, in either language, it keeps its shipped name (shown per language).
+    expect(storedPresetName("work", "Работа")).toBe(BASE_PRESETS.work.name);
+    expect(storedPresetName("work", " Work ")).toBe(BASE_PRESETS.work.name);
+    expect(storedPresetName("work", "Job")).toBe("Job");
+    expect(storedPresetName("gym-x", "Работа")).toBe("Работа");
   });
 
   it("opens an edited default preset and a user preset on what they store", () => {

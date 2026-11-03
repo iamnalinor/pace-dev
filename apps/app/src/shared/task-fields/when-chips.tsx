@@ -19,7 +19,7 @@ export const WhenChips = ({
   readonly toggle: (panel: Exclude<Panel, null>) => void;
   readonly values: TaskFormValues;
 }) => (
-  <View className="flex-row flex-wrap gap-1.5">
+  <View className="flex-row flex-wrap gap-2">
     <DateChip
       isOpen={panel === "start"}
       kind="start"

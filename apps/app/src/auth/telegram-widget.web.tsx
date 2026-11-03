@@ -38,6 +38,9 @@ const watchFrames = (host: HTMLElement, label: string, onFrame: () => void): (()
     const frames = host.querySelectorAll("iframe");
     for (const frame of frames) {
       frame.title = label;
+      // Whatever the frame loads (Telegram's button, its error, a network's block page) stays
+      // inside the widget's own box (owner bug 2026-11-03).
+      frame.style.maxWidth = "100%";
     }
     if (frames.length > 0) {
       onFrame();
@@ -99,20 +102,27 @@ export const TelegramWidget = ({ botUsername, label, onAuth, texts }: Props) => 
   }, [botUsername, label]);
 
   return (
-    <View className="min-h-11 items-center justify-center gap-1">
+    <View className="w-full items-center justify-center gap-1">
       {phase === "failed" ? (
-        <Text className="font-sans text-[13px] text-warn">{texts.failed}</Text>
+        <Text className="font-sans text-footnote text-danger">{texts.failed}</Text>
       ) : null}
       {phase === "loading" || phase === "slow" ? (
         <View className="flex-row items-center gap-2">
           <ActivityIndicator accessibilityLabel={texts.loading} size="small" />
-          <Text className="font-sans text-[13px] text-muted">{texts.loading}</Text>
+          <Text className="font-sans text-footnote text-label-secondary">{texts.loading}</Text>
         </View>
       ) : null}
       {phase === "slow" ? (
-        <Text className="font-sans text-[12px] text-muted">{texts.slow}</Text>
+        <Text className="font-sans text-caption font-normal text-label-tertiary">{texts.slow}</Text>
       ) : null}
-      <div data-testid="telegram-widget" ref={hostRef} style={{ display: "flex" }} />
+      {/* The frame's own box: as wide as the card, clipped, so it never overlaps what follows. */}
+      <View className="min-h-hit-web w-full items-center justify-center overflow-hidden">
+        <div
+          data-testid="telegram-widget"
+          ref={hostRef}
+          style={{ display: "flex", justifyContent: "center", maxWidth: "100%" }}
+        />
+      </View>
     </View>
   );
 };

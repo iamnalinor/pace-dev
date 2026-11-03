@@ -1,6 +1,7 @@
 import { ScrollView } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
+import { signInPathFor } from "#app/auth/sign-in-path.ts";
 import { TelegramWidget } from "#app/auth/telegram-widget.web.tsx";
 import { ConsentFlow } from "#app/features/oauth/consent-flow.tsx";
 import { useServerInfo } from "#app/platform/server-store.ts";
@@ -15,11 +16,14 @@ export const OAuthScreen = () => {
   const { botUsername } = useServerInfo();
   return (
     <ScrollView
-      className="flex-1 bg-bg"
-      contentContainerClassName="mx-auto min-h-full w-full max-w-[430px] justify-center px-4 py-8"
+      className="flex-1 bg-app"
+      contentContainerClassName="mx-auto min-h-full w-full max-w-auth-card justify-center px-4 py-8"
     >
       <ConsentFlow
         authQuery={globalThis.location.search.slice(1)}
+        onSignIn={() => {
+          navigateTo(signInPathFor(globalThis.location));
+        }}
         redirect={navigateTo}
         renderWidget={(onAuth) => (
           <TelegramWidget

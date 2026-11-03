@@ -85,3 +85,15 @@ describe("the month view's keyboard (QA round 19 L5)", () => {
     expect(tabStops()).toEqual(["Tuesday, October 20"]);
   });
 });
+
+describe("the picked day", () => {
+  it("fills the picked day with the accent and reads it in the on-accent colour", async () => {
+    await show({ selected: "2026-10-14" });
+    const picked = screen.getByRole("button", { name: /October 14/ });
+    expect(picked.props["className"]).toContain("bg-accent");
+    expect(picked.props["className"]).not.toContain("bg-accent-quiet");
+    expect(screen.getByText("14").props["className"]).toContain("text-accent-on");
+    const other = screen.getByRole("button", { name: /October 15/ });
+    expect(other.props["className"]).not.toContain("bg-accent");
+  });
+});

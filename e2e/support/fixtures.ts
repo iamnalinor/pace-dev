@@ -1,5 +1,11 @@
 import { AxeBuilder } from "@axe-core/playwright";
-import { expect, type Page } from "@playwright/test";
+import {
+  test as base,
+  type BrowserContext,
+  type BrowserContextOptions,
+  expect,
+  type Page,
+} from "@playwright/test";
 
 /** Fails on serious/critical WCAG 2.2 AA violations of the current page. */
 export const expectNoA11yViolations = async (page: Page): Promise<void> => {
@@ -16,4 +22,42 @@ export const expectNoA11yViolations = async (page: Page): Promise<void> => {
   expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
 };
 
-export { expect, test } from "@playwright/test";
+export { expect } from "@playwright/test";
+
+/** A context a test opens beside its own page; see `openContext`. */
+export type OpenContext = (options?: BrowserContextOptions) => Promise<BrowserContext>;
+
+/** Every page of the context lets go of its handlers, then the context closes (class 63). */
+export const releaseContext = async (context: BrowserContext): Promise<void> => {
+  for (const page of context.pages()) {
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+  }
+  await context.close();
+};
+
+/**
+Every test's page lets go of its route handlers when the test ends: a handler still awaiting
+`route.fetch()` (the app polls `/api/instance`, re-reads `/api/sessions`) otherwise throws
+"Test ended" after its test, an error that belongs to no test and stops the run (full e2e of A9
+fix round 3, `login.e2e.ts` "a page older than its server…"; bug class 63). A test that needs a
+browser context of its own (two devices, two tabs, a viewport) opens it with `openContext`, which
+does the same for its pages and closes it whether the test passed or failed (PR A CI fix review I2);
+`browser.newContext()` is not called in a test file (lint).
+*/
+export const test = base.extend<{ readonly openContext: OpenContext }>({
+  openContext: async ({ browser }, use) => {
+    const opened: BrowserContext[] = [];
+    await use(async (options) => {
+      const context = await browser.newContext(options);
+      opened.push(context);
+      return context;
+    });
+    for (const context of opened) {
+      await releaseContext(context);
+    }
+  },
+  page: async ({ page }, use) => {
+    await use(page);
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+  },
+});

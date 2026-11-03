@@ -14,7 +14,7 @@ export const PaceMark = ({ size = 56 }: { readonly size?: number }) => {
       <Path
         d="M18 30 L48 60 L18 90"
         fill="none"
-        stroke={palette.faint}
+        stroke={palette["label.tertiary"]}
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth={16}
@@ -22,12 +22,12 @@ export const PaceMark = ({ size = 56 }: { readonly size?: number }) => {
       <Path
         d="M58 30 L88 60 L58 90"
         fill="none"
-        stroke={palette.accentText}
+        stroke={palette.logo}
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth={16}
       />
-      <Circle cx={106} cy={60} fill={palette.fg} r={8} />
+      <Circle cx={106} cy={60} fill={palette["label.primary"]} r={8} />
     </Svg>
   );
 };
@@ -45,7 +45,7 @@ export const PaceLogo = ({
     <Text
       accessibilityLabel={heading}
       accessibilityRole="header"
-      className="font-sans text-[34px] font-semibold tracking-tight text-fg"
+      className="font-sans text-largeTitle font-semibold text-label-primary"
     >
       {wordmark}
     </Text>

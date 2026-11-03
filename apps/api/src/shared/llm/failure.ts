@@ -7,6 +7,8 @@ class 97): an in-stream error object has no HTTP status and may still be a rate 
 
 import { StreamProviderError } from "ai";
 
+import type { ParseUnavailableReason } from "@pace/core";
+
 const DEFAULT_RETRY_MS = 60_000;
 /** A refused key (401/403) stays refused until someone changes it: rest it this long. */
 const REFUSED_KEY_MS = 60 * 60_000;
@@ -33,6 +35,19 @@ const statusOf = (error: unknown): null | number => {
   const fields = fieldsOf(error);
   const status = fields["statusCode"] ?? fields["code"];
   return typeof status === "number" ? status : null;
+};
+
+/** 4xx statuses about the provider, the key or the moment, not about this request. */
+const NOT_ABOUT_THE_REQUEST: ReadonlySet<number> = new Set([401, 403, 404, 408, 409, 410, 429]);
+
+/**
+Whether the provider refused this request for good (a 400 or 422: a content filter, a context too
+long, a malformed request): asking again with the same text gets the same answer. A 5xx, a dropped
+connection, a timeout, a rate limit or a refused key is never one: those pass (review I2).
+*/
+export const isRequestRefusal = (error: unknown): boolean => {
+  const status = statusOf(error);
+  return status !== null && status >= 400 && status < 500 && !NOT_ABOUT_THE_REQUEST.has(status);
 };
 
 /** An in-stream error object's own words for what it is: its `code` and `type`, lower case. */
@@ -223,4 +238,23 @@ export const unwellReasonOf = (error: unknown): null | UnwellReason => {
     return error.name === "TimeoutError" || error.name === "AbortError" ? "timeout" : "dropped";
   }
   return SERVER_WORDS.test(wordsOf(error)) ? "server-error" : null;
+};
+
+/**
+Why a read no model answered failed: no model, every answer out of shape or every provider refused
+it for good (no later read would differ: re-review N7), a rest, or none of these.
+*/
+export const reasonOf = (read: {
+  readonly hasProviders: boolean;
+  readonly isHopeless: boolean;
+  readonly isRefused: boolean;
+  readonly retryAt: null | string;
+}): ParseUnavailableReason => {
+  if (!read.hasProviders) {
+    return "off";
+  }
+  if (read.isHopeless || read.isRefused) {
+    return "unreadable";
+  }
+  return read.retryAt === null ? "unreachable" : "limited";
 };

@@ -1,8 +1,9 @@
 import { Pressable, View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
-import { PROJECT_FILL } from "#app/ui/color.tsx";
+import { fillClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
+import { spacePress } from "#app/ui/space-press.ts";
 import { type ProjectColorName, ProjectColorSchema } from "@pace/core";
 
 /** The project colors as round swatches; each is a radio named after its color. */
@@ -30,19 +31,22 @@ export const ColorSwatches = ({
             accessibilityRole="radio"
             aria-checked={isChosen}
             className={cx(
-              "h-11 w-11 items-center justify-center rounded-full",
-              isChosen && "bg-raised",
+              "h-hit-web w-hit-web items-center justify-center rounded-pill",
+              isChosen && "bg-fill-3",
             )}
             key={color}
             onPress={() => {
               onChange(color);
             }}
+            {...spacePress(() => {
+              onChange(color);
+            })}
           >
             <View
               className={cx(
-                "h-5 w-5 rounded-full",
-                PROJECT_FILL[color],
-                isChosen && "border-2 border-fg",
+                "h-5 w-5 rounded-pill",
+                fillClass(color),
+                isChosen && "border-2 border-label-primary",
               )}
             />
           </Pressable>

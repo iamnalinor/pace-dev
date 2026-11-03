@@ -14,24 +14,24 @@ import { KEYBOARD, useHotkey } from "./use-hotkey.tsx";
 export type ButtonVariant = "danger" | "ghost" | "primary" | "secondary";
 
 const CONTAINER: Readonly<Record<ButtonVariant, string>> = {
-  danger: "border-2 border-warn bg-surface",
+  danger: "border-2 border-danger bg-cell",
   ghost: "bg-transparent",
   primary: "bg-accent",
-  secondary: "border border-line bg-surface",
+  secondary: "border border-outline bg-cell",
 };
 
 const LABEL: Readonly<Record<ButtonVariant, string>> = {
-  danger: "text-warn",
-  ghost: "text-fg2",
-  primary: "text-accentFg",
-  secondary: "text-fg",
+  danger: "text-danger",
+  ghost: "text-label-secondary",
+  primary: "text-accent-on",
+  secondary: "text-label-primary",
 };
 
 const HINT: Readonly<Record<ButtonVariant, string>> = {
-  danger: "text-warn",
-  ghost: "text-muted",
-  primary: "text-accentFg",
-  secondary: "text-muted",
+  danger: "text-danger",
+  ghost: "text-label-secondary",
+  primary: "text-accent-on",
+  secondary: "text-label-secondary",
 };
 
 /**
@@ -58,9 +58,9 @@ const useWidthStyle = (width: ButtonWidth | undefined): typeof AT_TEXT_WIDTH | u
 /** The icon in the label's colour. */
 const iconColor = (variant: ButtonVariant, palette: ReturnType<typeof useTheme>["palette"]) => {
   if (variant === "primary") {
-    return palette.accentFg;
+    return palette["accent.on"];
   }
-  return variant === "danger" ? palette.warn : palette.fg;
+  return variant === "danger" ? palette["status.danger"] : palette["label.primary"];
 };
 
 /** The shortcut after the label, the way this computer names it; nothing without a keyboard. */
@@ -74,7 +74,7 @@ export const KeyHint = ({
   hotkey === undefined || KEYBOARD === null ? null : (
     <Text
       aria-hidden
-      className={cx("font-sans text-[12px] font-normal tabular-nums", HINT[variant])}
+      className={cx("font-sans text-caption font-normal tabular-nums", HINT[variant])}
     >
       {formatHotkey(hotkey, KEYBOARD)}
     </Text>
@@ -98,7 +98,7 @@ const Label = ({
       {Icon === undefined ? null : (
         <Icon color={iconColor(variant, palette)} size={18} strokeWidth={1.75} />
       )}
-      <Text className={cx("shrink text-center font-sans text-[15px] font-medium", LABEL[variant])}>
+      <Text className={cx("shrink text-center font-sans text-callout font-medium", LABEL[variant])}>
         {children}
       </Text>
       <KeyHint hotkey={hotkey} variant={variant} />

@@ -54,6 +54,86 @@ describe("createApiClient", () => {
     });
   });
 
+  it("once the session ended, never sends a call that needs one: it fails here as the server would (QA round 22 R22-02)", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse(200, { status: "ok" }));
+    const client = createApiClient({
+      baseUrl: "https://api.test",
+      fetch: fetchMock,
+      sessionEnded: () => true,
+      token: () => undefined,
+    });
+    const call = client.call(endpoints.sync.pull, { query: { since: "0" } });
+    await expect(call).rejects.toBeInstanceOf(ApiError);
+    await expect(call).rejects.toMatchObject({ code: "auth/unauthorized", status: 401 });
+    // The same contract flag the Worker mounts its guard from (`mount`): a public call still goes.
+    await client.call(endpoints.health, {});
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith("https://api.test/api/health", expect.anything());
+  });
+
+  it("sends a call with the credential it is given, whatever the session in use (a logout after the device forgot it)", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse(200, { ok: true }));
+    const client = createApiClient({
+      baseUrl: "https://api.test",
+      fetch: fetchMock,
+      token: () => undefined,
+    });
+    await client.call(endpoints.auth.logout, {}, { credential: "ending" });
+    expect(fetchMock).toHaveBeenCalledWith("https://api.test/api/auth/logout", {
+      headers: {
+        Accept: "application/json",
+        Authorization: "Bearer ending",
+        "X-Pace-Protocol": "1",
+      },
+      method: "POST",
+    });
+  });
+
+  it("a call held for a session check gives up at once when its caller aborts it (CI fix review I1)", async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse(200, { deliveries: {}, items: [], more: false }),
+    );
+    const never = new Promise<never>(() => undefined);
+    const client = createApiClient({
+      baseUrl: "https://api.test",
+      fetch: fetchMock,
+      sessionCheck: async () => await never,
+      token: () => "tok",
+    });
+    const controller = new AbortController();
+    const held = client.call(
+      endpoints.notifications.list,
+      { query: { limit: 50 } },
+      { signal: controller.signal },
+    );
+    controller.abort();
+    await expect(held).rejects.toMatchObject({ name: "AbortError" });
+    expect(fetchMock).not.toHaveBeenCalled();
+    // Aborted before it began: refused at once too, nothing sent.
+    await expect(
+      client.call(
+        endpoints.notifications.list,
+        { query: { limit: 50 } },
+        { signal: controller.signal },
+      ),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("a check that fails lets the held call go on with its own outcome (CI fix review m1)", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse(200, { status: "ok" }));
+    const client = createApiClient({
+      baseUrl: "https://api.test",
+      fetch: fetchMock,
+      sessionCheck: async () => {
+        throw new Error("the check broke");
+      },
+      token: () => "tok",
+    });
+    await expect(client.call(endpoints.health, {})).resolves.toEqual({ status: "ok" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("turns error bodies into ApiError with the server's code", async () => {
     const client = createApiClient({
       baseUrl: "https://api.test",

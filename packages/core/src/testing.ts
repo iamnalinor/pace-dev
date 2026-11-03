@@ -24,6 +24,7 @@ export {
   TRK_NOW,
   TRK_START,
 } from "./materialize/task-fixture.fake.ts";
+export { yearOfUse } from "./materialize/year-of-use.fake.ts";
 export {
   ALGEBRA_ID,
   artboardEvents,
@@ -60,3 +61,16 @@ export {
   WAITING_IDS,
   WORK_ID,
 } from "./queries/fixture.fake.ts";
+export {
+  GALLERY_SETS,
+  type GalleryBlock,
+  type GalleryData,
+  type GalleryProject,
+  type GalleryRunning,
+  type GallerySession,
+  type GallerySet,
+  type GallerySignIn,
+  type GallerySubtask,
+  type GalleryTask,
+} from "./testing/gallery-types.ts";
+export { galleryData } from "./testing/worst-case.ts";

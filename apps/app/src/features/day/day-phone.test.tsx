@@ -2,9 +2,10 @@ import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-
 import * as Calendar from "expo-calendar";
 import * as SecureStore from "expo-secure-store";
 
+import type * as PhoneMemory from "#app/platform/phone-memory.ts";
 import type { FakeSecureStore } from "#app/testing/secure-store.fake.ts";
 
-import { seriesRules, setSeriesRule } from "#app/platform/phone-memory.ts";
+import { removeSeriesRule, seriesRules, setSeriesRule } from "#app/platform/phone-memory.ts";
 import { heldRoute } from "#app/test/held-route.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
@@ -62,6 +63,25 @@ jest.mock("../../../modules/pace-native/index.ts", () => ({
     queryUsageEvents: async () => (mockAccess.granted ? mockEvents : []),
   },
 }));
+
+/** Holds the phone's write of a dismissal while set: Android's keystore is slow to write. */
+const mockDismissHold: { current: null | Promise<unknown>; waiting: number } = {
+  current: null,
+  waiting: 0,
+};
+jest.mock("#app/platform/phone-memory.ts", (): unknown => {
+  const actual = jest.requireActual<typeof PhoneMemory>("#app/platform/phone-memory.ts");
+  return {
+    ...actual,
+    dismiss: async (key: string) => {
+      if (mockDismissHold.current !== null) {
+        mockDismissHold.waiting += 1;
+        await mockDismissHold.current;
+      }
+      await actual.dismiss(key);
+    },
+  };
+});
 
 const calendar = Calendar as unknown as FakeCalendar;
 
@@ -291,6 +311,84 @@ describe("Day with the phone's data", () => {
     ]);
   });
 
+  it("shows a series again once its skip rule, given here, is removed in Permissions", async () => {
+    const daily = { frequency: "daily" };
+    const gym = (id: string, start: string, end: string) => ({
+      allDay: false,
+      calendarId: "cal-1",
+      endDate: utcAt(end),
+      id,
+      recurrenceRule: daily,
+      startDate: utcAt(start),
+      title: "Gym",
+    });
+    calendar.state.events = [
+      gym("gym-a", "05:00:00", "06:00:00"),
+      gym("gym-b", "09:00:00", "10:00:00"),
+    ];
+    const runtime = await createTestRuntime({
+      routes: { "POST /api/calendar/skip": () => ({ ok: true }) },
+    });
+    await renderScreen(<DayScreen />, runtime);
+    const list = await screen.findByLabelText("From your calendar");
+    const [first] = within(list).getAllByRole("button", { name: "Skip" });
+    if (first !== undefined) {
+      await fireEvent.press(first);
+    }
+    await fireEvent.press(await screen.findByRole("button", { name: "Every time" }));
+    await waitFor(async () => {
+      expect(await seriesRules()).toEqual([{ rule: "skip", series: "cal-1:Gym", title: "Gym" }]);
+    });
+    await waitFor(() => {
+      expect(screen.queryByText("Gym")).toBeNull();
+    });
+    // Settings → Permissions forgets the rule while Day stays mounted behind it.
+    await act(async () => {
+      await removeSeriesRule("cal-1:Gym");
+    });
+    // The waved-away occurrence stays away; the other one is asked about again.
+    await waitFor(() => {
+      expect(screen.getAllByText("Gym")).toHaveLength(1);
+    });
+  });
+
+  it("stops logging a series by itself once its attended rule, given here, is removed", async () => {
+    const daily = { frequency: "daily" };
+    const standup = (id: string, start: string, end: string) => ({
+      allDay: false,
+      calendarId: "cal-1",
+      endDate: utcAt(end),
+      id,
+      recurrenceRule: daily,
+      startDate: utcAt(start),
+      title: "Standup",
+    });
+    calendar.state.events = [standup("standup-a", "07:00:00", "07:15:00")];
+    const runtime = await createTestRuntime();
+    await renderScreen(<DayScreen />, runtime);
+    const list = await screen.findByLabelText("From your calendar");
+    await fireEvent.press(within(list).getByRole("button", { name: "Attended" }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Every time" }));
+    await waitFor(async () => {
+      expect(await seriesRules()).toHaveLength(1);
+    });
+    await act(async () => {
+      await removeSeriesRule("cal-1:Standup");
+    });
+    // Another occurrence has ended meanwhile: with the rule gone, it waits to be asked about.
+    calendar.state.events = [
+      standup("standup-a", "07:00:00", "07:15:00"),
+      standup("standup-b", "08:00:00", "08:15:00"),
+    ];
+    await act(async () => {
+      await removeSeriesRule("cal-1:Nothing");
+    });
+    await waitFor(() => {
+      expect(screen.getAllByText("Standup").length).toBeGreaterThanOrEqual(2);
+    });
+    expect(activities(runtime).map((activity) => activity.label)).toEqual(["Standup"]);
+  });
+
   it("logs an always-attended series by itself and hides an always-skipped one", async () => {
     await setSeriesRule({ rule: "attended", series: "cal-1:Standup", title: "Standup" });
     await setSeriesRule({ rule: "skip", series: "cal-1:Gym", title: "Gym" });
@@ -378,6 +476,61 @@ describe("Day and the notification pool", () => {
     await waitFor(() => {
       expect(screen.queryByText("Seminar")).toBeNull();
     });
+  });
+
+  it("hides a skipped event once the server took it, without waiting for the phone to save it (bug-lessons 108)", async () => {
+    const { skip } = await withPool([]);
+    // The phone's own storage is slow to write (Android's keystore): the card must not wait.
+    const saving = Promise.withResolvers<undefined>();
+    mockDismissHold.current = saving.promise;
+    mockDismissHold.waiting = 0;
+    try {
+      await fireEvent.press(await seminarSkip());
+      await waitFor(() => {
+        expect(skip.waiting()).toBe(1);
+      });
+      await act(async () => {
+        skip.answer({ ok: true });
+        await Promise.resolve();
+      });
+      await waitFor(() => {
+        expect(mockDismissHold.waiting).toBe(1);
+      });
+      expect(screen.queryByText("Seminar")).toBeNull();
+    } finally {
+      mockDismissHold.current = null;
+      saving.resolve(undefined);
+    }
+  });
+
+  it("keeps a skipped event hidden when the phone refuses to save it (no unhandled rejection)", async () => {
+    const { skip } = await withPool([]);
+    const saving = Promise.withResolvers<undefined>();
+    mockDismissHold.current = saving.promise;
+    mockDismissHold.waiting = 0;
+    try {
+      await fireEvent.press(await seminarSkip());
+      await waitFor(() => {
+        expect(skip.waiting()).toBe(1);
+      });
+      await act(async () => {
+        skip.answer({ ok: true });
+        await Promise.resolve();
+      });
+      await waitFor(() => {
+        expect(mockDismissHold.waiting).toBe(1);
+      });
+      await act(async () => {
+        saving.reject(new Error("keystore refused the write"));
+        await new Promise((resolve) => {
+          setTimeout(resolve, 50);
+        });
+      });
+      // The server took the skip; the phone not keeping it does not bring the card back.
+      expect(screen.queryByText("Seminar")).toBeNull();
+    } finally {
+      mockDismissHold.current = null;
+    }
   });
 
   it("keeps an event whose skip did not go through, and says so", async () => {

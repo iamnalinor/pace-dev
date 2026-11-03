@@ -23,6 +23,8 @@ import {
   WORK_ID,
 } from "@pace/core/testing";
 
+import { createMemoryEventStore } from "../adapters/memory-event-store.ts";
+import { createAppState } from "../state.ts";
 import { repeatChangeProblem } from "../view-models/repeat-change.ts";
 import { ESTIMATE_BUCKET_MINUTES } from "./estimate-hints.ts";
 import { setupActions, unwrap } from "./fixture.fake.ts";
@@ -716,6 +718,31 @@ describe("presets", () => {
     await expect(world.actions.seedExamplePresets()).resolves.toEqual({ ok: true, value: [] });
   });
 
+  it("seeds the examples in the account's language (QA round 23 R23-06)", async () => {
+    const world = await setupActions([]);
+    unwrap(await world.actions.setLanguage("ru"));
+    const seeded = unwrap(await world.actions.seedExamplePresets());
+    expect(
+      seeded.map((event) => (event.type === "preset.created" ? event.payload.name : null)),
+    ).toEqual(["ДЗ по алгебре", "ДЗ по матанализу", "ДЗ по истории"]);
+  });
+
+  it("leaves out an example whose name a preset already goes by (review M6)", async () => {
+    const world = await setupActions([]);
+    unwrap(
+      await world.actions.createPreset({
+        definition: {},
+        extends: "hw",
+        id: "mine",
+        name: "algebra hw",
+      }),
+    );
+    const seeded = unwrap(await world.actions.seedExamplePresets());
+    expect(seeded.map((event) => event.type === "preset.created" && event.payload.id)).toEqual(
+      EXAMPLE_PRESET_IDS.filter((id) => id !== "hw.algebra"),
+    );
+  });
+
   it("moves a preset one place in the picker order, renumbering only what changed", async () => {
     const world = await setupActions([]);
     const order = () =>
@@ -868,8 +895,9 @@ describe("review", () => {
     });
   });
 
-  it("rematerializes after a correction and confirms or undoes automatic outcomes", async () => {
-    const world = await setupActions();
+  it("shows a correction without a second rebuild and confirms or undoes automatic outcomes", async () => {
+    const store = createMemoryEventStore();
+    const world = await setupActions(undefined, store);
     await world.actions.ensureInstances();
     const item = reviewItems(world.state.store.getState(), ctx()).find(
       (entry) => entry.kind === "confirm-auto-outcome",
@@ -878,8 +906,15 @@ describe("review", () => {
       throw new Error("no review item");
     }
     unwrap(await world.actions.runReviewAction(item, "confirm"));
-    expect(world.rematerializeCalls()).toBe(1);
+    // The store's integrate rebuilt on the correction already: no re-read of the whole log, and
+    // the state is what a fresh read of the disk derives (class 55 / 108).
+    expect(world.rematerializeCalls()).toBe(0);
     expect(taskOf(world, CALC_HW5_ID)?.closed?.confirmed).toBe(true);
+    const fresh = createAppState({ deviceId: "dev-1", now: () => NOW, source: "web", store });
+    await fresh.ready;
+    const { version: _shown, ...shown } = world.state.store.getState();
+    const { version: _read, ...read } = fresh.store.getState();
+    expect(shown).toEqual(read);
     await expect(world.actions.confirmAutoOutcome(CALC_HW5_ID)).resolves.toEqual({
       error: "action/nothing-to-do",
       ok: false,

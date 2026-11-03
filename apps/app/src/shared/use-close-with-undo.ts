@@ -3,6 +3,7 @@ import { useCallback } from "react";
 import type { ActionResult } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
+import { toastQuote } from "#app/ui/toast.tsx";
 
 import { useRunAction } from "./use-run-action.ts";
 
@@ -23,7 +24,7 @@ export const useCloseWithUndo = (): ((taskId: string, title: string) => ActionRe
         closed === undefined
           ? undefined
           : {
-              success: t("now.doneToast", { title }),
+              success: t("now.doneToast", { title: toastQuote(title) }),
               action: {
                 label: t("common.undo"),
                 onPress: () => {

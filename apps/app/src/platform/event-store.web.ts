@@ -2,7 +2,7 @@ import { type DBSchema, type IDBPDatabase, openDB } from "idb";
 
 import type { Event } from "@pace/core";
 
-import { createMemoryEventStore, type EventStore } from "@pace/client";
+import { canClearCopy, createMemoryEventStore, type EventStore } from "@pace/client";
 
 import type { LocalEventStore } from "./event-store.ts";
 
@@ -11,6 +11,7 @@ const DB_VERSION = 1;
 const CURSOR_KEY = "cursor";
 const STORE_ID_KEY = "storeId";
 const SYNC_VERSION_KEY = "syncVersion";
+const OWNER_KEY = "owner";
 
 type PaceDb = DBSchema & {
   readonly events: {
@@ -72,8 +73,18 @@ const markSynced = async (db: Db, ids: readonly string[]): Promise<void> => {
   await tx.done;
 };
 
-const clear = async (db: Db): Promise<void> => {
+/**
+One read-write transaction for the check and the clear: another tab's writes wait behind it, so a
+copy it claimed in the meantime is never wiped by a stale tab (re-review N3).
+*/
+const clear = async (db: Db, ifOwner: string | undefined): Promise<void> => {
   const tx = db.transaction(["events", "pending", "meta"], "readwrite");
+  const row = await tx.objectStore("meta").get(OWNER_KEY);
+  const owner = row?.value ?? null;
+  if (!canClearCopy(typeof owner === "string" ? owner : null, ifOwner)) {
+    await tx.done;
+    return;
+  }
   await Promise.all([
     tx.objectStore("events").clear(),
     tx.objectStore("pending").clear(),
@@ -86,8 +97,8 @@ const idbBackend = (db: Db): EventStore => ({
   append: async (events) => {
     await append(db, events);
   },
-  clear: async () => {
-    await clear(db);
+  clear: async (ifOwner) => {
+    await clear(db, ifOwner);
   },
   getCursor: async () => {
     const row = await db.get("meta", CURSOR_KEY);
@@ -108,6 +119,9 @@ const idbBackend = (db: Db): EventStore => ({
   },
   setCursor: async (seq) => {
     await db.put("meta", { key: CURSOR_KEY, value: seq });
+  },
+  setOwner: async (mark) => {
+    await db.put("meta", { key: OWNER_KEY, value: mark });
   },
   setStoreId: async (storeId) => {
     await db.put("meta", { key: STORE_ID_KEY, value: storeId });
@@ -134,7 +148,7 @@ type Backend = { readonly isShared: boolean; readonly store: EventStore };
 
 /**
 The local event log in IndexedDB (database `pace`): events, the outbox, and in `meta` the cursor,
-the store id and the sync version.
+the store id, the sync version and the owner.
 */
 export const createEventStore = (): LocalEventStore => {
   let backendPromise: Promise<Backend> | undefined;
@@ -149,9 +163,9 @@ export const createEventStore = (): LocalEventStore => {
         await store.append(events);
       });
     },
-    clear: async () => {
+    clear: async (ifOwner) => {
       await call(async (store) => {
-        await store.clear();
+        await store.clear(ifOwner);
       });
     },
     getCursor: async () => await call(async (store) => await store.getCursor()),
@@ -167,6 +181,11 @@ export const createEventStore = (): LocalEventStore => {
     setCursor: async (seq) => {
       await call(async (store) => {
         await store.setCursor(seq);
+      });
+    },
+    setOwner: async (mark) => {
+      await call(async (store) => {
+        await store.setOwner(mark);
       });
     },
     setStoreId: async (storeId) => {

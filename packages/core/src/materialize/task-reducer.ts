@@ -10,6 +10,7 @@ import {
   type TaskFields,
   type TasksState,
 } from "../model/task.ts";
+import { putById as put } from "./transient.ts";
 
 /** Events applied to an existing task; `task.created` is the one that needs the state instead. */
 type AppliedEventType = Exclude<
@@ -314,10 +315,6 @@ const isTaskEvent = (event: Event): event is TaskEvent => Object.hasOwn(HANDLERS
 
 const applyTaskEvent = <K extends AppliedEventType>(task: Task, event: TaskEvent<K>): Task =>
   HANDLERS[event.type](task, event);
-
-const put = (state: TasksState, task: Task): TasksState => ({
-  byId: { ...state.byId, [task.id]: task },
-});
 
 /** Deterministic instance ids make a repeated creation a no-op. */
 const created = (state: TasksState, event: EventOf<"task.created">): TasksState =>

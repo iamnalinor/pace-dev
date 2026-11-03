@@ -8,7 +8,7 @@ export const PermissionsScreen = () => {
   const t = useT();
   return (
     <PushedScreen title={t("permissions.title")}>
-      <Text className="px-5 pb-3 font-sans text-[14px] leading-5 text-fg2">
+      <Text className="px-5 pb-3 font-sans text-subhead font-normal text-label-secondary">
         {t("permissions.web")}
       </Text>
     </PushedScreen>

@@ -26,8 +26,10 @@ export const ruSessions: { readonly [K in keyof typeof enSessions]: string } = {
   "connectAi.intro":
     "Pace работает как MCP-сервер. Добавьте этот адрес в ИИ-приложение с поддержкой MCP: оно откроет Pace для входа через Telegram, а вы выберете, что ему можно видеть и менять.",
   "connectAi.url": "Адрес сервера",
+  "connectAi.unavailable":
+    "ИИ-приложения не могут подключиться к этому серверу: им нужен адрес с https.",
   "connectAi.otherAddress":
-    "Публичный адрес этого сервера отличается от того, что использует это устройство.",
+    "ИИ-приложениям нужен адрес выше, а не тот, что использует это устройство ({used}).",
   "connectAi.copy": "Скопировать адрес",
   "connectAi.share": "Отправить адрес",
   "connectAi.copied": "Скопировано",

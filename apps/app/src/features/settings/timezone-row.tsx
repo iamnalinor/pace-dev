@@ -1,6 +1,7 @@
 import { Text, View } from "react-native";
 
 import { usePace, useSettings, useT } from "#app/app-state.tsx";
+import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button } from "#app/ui/button.tsx";
 import { zonesDiffer } from "@pace/core";
 
@@ -14,6 +15,7 @@ worth a warning, but the device zone stays one tap away whenever the names diffe
 export const TimezoneRow = () => {
   const t = useT();
   const { actions, hooks } = usePace();
+  const run = useRunAction();
   const { now } = hooks.useClock();
   const device = deviceTimeZone();
   // Until the first sync assigns one, the account runs on the device zone (queries do too).
@@ -21,21 +23,21 @@ export const TimezoneRow = () => {
   const isOffsetDifferent = zonesDiffer({ at: now, tz: account }, { at: now, tz: device });
   return (
     <View className="gap-2">
-      <Text className="font-sans text-[14px] tabular-nums text-fg">
+      <Text className="font-sans text-subhead font-normal tabular-nums text-label-primary">
         {t("settings.timezone.account", { tz: account })}
       </Text>
       {account === device ? null : (
-        <Text className="font-sans text-[13px] text-muted">
+        <Text className="font-sans text-footnote text-label-secondary">
           {t("settings.timezone.device", { tz: device })}
         </Text>
       )}
       {isOffsetDifferent ? (
-        <Text className="font-sans text-[13px] text-warn">{t("settings.timezone.differs")}</Text>
+        <Text className="font-sans text-footnote text-warn">{t("settings.timezone.differs")}</Text>
       ) : null}
       {account === device ? null : (
         <Button
           onPress={() => {
-            void actions.setTimezone(device);
+            void run(actions.setTimezone(device));
           }}
           variant="secondary"
         >

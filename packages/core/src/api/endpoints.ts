@@ -207,7 +207,12 @@ export const endpoints = {
       path: "/api/oauth/client-info",
       query: OAuthClientInfoQuerySchema,
     }),
-    /** Allow: proves the person's identity (Telegram widget or dev id), stores the grant, returns the client redirect. */
+    /**
+    Allow: proves who is allowing, stores the grant for that user, returns the client redirect. The
+    proof is the browser's Pace session (its bearer in `Authorization`; revoked or expired is 401
+    `auth/unauthorized`) or, signed out, a Telegram widget payload (or a dev id outside
+    production) in the body; both at once is 422 `auth/identity-conflict`.
+    */
     complete: endpoint({
       auth: false,
       body: OAuthCompleteBodySchema,

@@ -7,6 +7,9 @@ import { createTestRuntime } from "#app/test/runtime.ts";
 
 import { TabBar } from "./tab-bar.tsx";
 
+// jest renders the phone, where Space is no key; the web's handler is the one under test here.
+jest.mock("./space-press.ts", (): unknown => jest.requireActual("./space-press.web.ts"));
+
 type Props = ComponentProps<typeof TabBar>;
 
 const ROUTES = ["index", "day", "inbox", "more", "add"] as const;
@@ -46,11 +49,33 @@ describe("TabBar", () => {
     expect(navigate).toHaveBeenCalledWith("more", undefined);
   });
 
+  it("opens a tab on Space as well as Enter (ARIA tabs; react-native-web ignores Space on role tab)", async () => {
+    const navigate = jest.fn();
+    await renderScreen(<TabBar {...propsAt("index", navigate)} />, await createTestRuntime());
+    const target = {};
+    const day = screen.getByRole("tab", { name: en("nav.day") });
+    (day.props["onKeyDown"] as (event: unknown) => void)({
+      currentTarget: target,
+      key: " ",
+      preventDefault: () => undefined,
+      target,
+    });
+    expect(navigate).toHaveBeenCalledWith("day", undefined);
+  });
+
   it("puts the count of what waits on the Inbox tab only, and hides it at zero", async () => {
     await renderScreen(<TabBar {...propsAt("index", jest.fn())} />, await createTestRuntime());
     const inbox = screen.getByRole("tab", { name: en("nav.inboxWaiting", { count: 4 }) });
     expect(within(inbox).getByText("4")).toBeOnTheScreen();
     expect(screen.getAllByTestId("count-badge")).toHaveLength(1);
+  });
+
+  it("anchors the badge at the icon's trailing top and grows it away from the icon (never back over it)", async () => {
+    await renderScreen(<TabBar {...propsAt("index", jest.fn())} />, await createTestRuntime());
+    const anchor = screen.getByTestId("count-badge").parent?.props["className"] as string;
+    const classes = anchor.split(" ");
+    expect(classes).toContain("left-5");
+    expect(classes.some((name) => /^-?right-/.test(name))).toBe(false);
   });
 
   it("has no badge on an empty Inbox", async () => {

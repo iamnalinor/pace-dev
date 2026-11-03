@@ -26,6 +26,9 @@ import unicorn from "eslint-plugin-unicorn";
 import { defineConfig, globalIgnores } from "eslint/config";
 import tseslint from "typescript-eslint";
 
+import { GENERATED_CLASSES } from "./scripts/design/generate-design.ts";
+import { plugin as pace } from "./scripts/eslint-rules/index.ts";
+
 /** Fails loudly if a plugin stops shipping a config we rely on (instead of silently linting less). */
 const required = <T>(value: T | undefined, name: string): T => {
   if (value === undefined) {
@@ -33,6 +36,12 @@ const required = <T>(value: T | undefined, name: string): T => {
   }
   return value;
 };
+
+/** The type-aware rules off, for files linted without types (ours too: it reads return types). */
+const UNTYPED_RULES = {
+  ...tseslint.configs.disableTypeChecked.rules,
+  "pace/promise-function-async": "off",
+} as const;
 
 /** Syntax banned everywhere; a block that adds its own entries must spread these (the option replaces). */
 const RESTRICTED_SYNTAX = [
@@ -63,6 +72,41 @@ const ELEMENT_DEEP_EQUAL = {
     "CallExpression[callee.property.name=/^(toEqual|toStrictEqual)$/][callee.object.callee.name='expect'][callee.object.arguments.0.callee.property.name=/^(getAll|queryAll|findAll)/], CallExpression[callee.property.name=/^(toEqual|toStrictEqual)$/][callee.object.callee.name='expect'][callee.object.arguments.0.callee.name=/^(listsNamed|picker)$/]",
 };
 
+/** A test's own browser context, released whether it passed or failed (bug-lessons class 63). */
+const OWN_CONTEXT = {
+  message:
+    "A context opened here outlives a failed test with its route handlers (bug-lessons 63): use the `openContext` fixture from e2e/support/fixtures.ts.",
+  selector: "CallExpression[callee.property.name='newContext']",
+};
+
+/** Text the person reads is written by core's formatters (bug-lessons classes 110 and 111). */
+const DISPLAY_TEXT_SYNTAX = [
+  {
+    message:
+      "toFixed prints a decimal point in every language and never groups: use formatNumber / formatCount / formatPercent from @pace/core.",
+    selector: "CallExpression[callee.property.name='toFixed']",
+  },
+  {
+    message:
+      "Cutting the first character of a string by UTF-16 unit leaves half an emoji: use initials / capitalize from @pace/core.",
+    selector:
+      "CallExpression[callee.property.name=/^(slice|substring|substr)$/][arguments.0.value=0][arguments.1.value=1], CallExpression[callee.property.name='charAt'][arguments.0.value=0]",
+  },
+];
+
+/**
+An action answers a `Result`; dropped with `void`, a refusal (`persist_failed`: the device could not
+save it) takes the change back with no word (bug-lessons 108). `ensureInstances` answers a count.
+*/
+const ACTION_ANSWER_SYNTAX = [
+  {
+    message:
+      "An action's answer is never dropped: `void run(actions.…)` with useRunAction (#app/shared/use-run-action.ts) shows a refusal's sentence.",
+    selector:
+      "UnaryExpression[operator='void'] > CallExpression[callee.object.name='actions'][callee.property.name!='ensureInstances'], UnaryExpression[operator='void'] > CallExpression[callee.object.property.name='actions']",
+  },
+];
+
 const TESTS = [
   "**/*.test.{ts,tsx}",
   "**/*.fake.ts",
@@ -92,6 +136,8 @@ const CONFIG_FILES = [
 ];
 // Expo tooling loads these as CommonJS under Node, so they are plain JS with `require`.
 const APP_JS_CONFIGS = ["apps/app/*.js", "apps/app/plugins/*.js"];
+// Classic scripts the browser loads as they are (the CSP forbids inline ones): no bundler, no types.
+const WEB_SCRIPTS = ["apps/app/public/*.js"];
 // Shared domain logic and view-models: pure and immutable (functional rules apply).
 const PURE_LAYERS = ["packages/core/src/**/*.ts", "packages/client/src/view-models/**/*.ts"];
 // Factories whose *inferred* type is the contract (Hono's `hc` derives the client from it).
@@ -116,8 +162,12 @@ export default defineConfig([
     "apps/app/android/",
     "apps/app/.expo/",
     "apps/app/expo-env.d.ts",
+    // Written by scripts/design/generate-design.ts; `bun lint` checks it is current instead.
+    "apps/app/src/ui/generated/",
     // Parallel agents' git worktrees: each is a whole checkout with its own config.
     ".claude/worktrees/",
+    // Gitignored tool output (ESLint's own cache, screenshot runs with their Playwright traces).
+    ".cache/",
   ]),
 
   // ── Base: JS + TypeScript, type-aware ───────────────────────────────────────
@@ -129,7 +179,13 @@ export default defineConfig([
       parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
     },
     linterOptions: { reportUnusedDisableDirectives: "error", reportUnusedInlineConfigs: "error" },
+    plugins: { pace },
     rules: {
+      // Upstream's `promise-function-async` also autofixes a function that answers a promise *or*
+      // something else (`() => inFlight`), and `return-await` then makes it
+      // `async () => await inFlight`: it never answers `undefined` again (the `sync.hold` hang,
+      // pr48 follow-up A8). `pace/` runs the same rule and keeps the report, without that fix.
+      "pace/promise-function-async": "error",
       "@typescript-eslint/consistent-type-definitions": ["error", "type"],
       "@typescript-eslint/consistent-type-exports": "error",
       "@typescript-eslint/consistent-type-imports": [
@@ -150,7 +206,6 @@ export default defineConfig([
       ],
       "@typescript-eslint/no-useless-empty-export": "error",
       "@typescript-eslint/prefer-readonly": "error",
-      "@typescript-eslint/promise-function-async": "error",
       "@typescript-eslint/require-array-sort-compare": "error",
       "@typescript-eslint/return-await": ["error", "always"],
       "@typescript-eslint/restrict-template-expressions": ["error", { allowNumber: true }],
@@ -309,6 +364,11 @@ export default defineConfig([
     },
   },
   {
+    files: ["scripts/eslint-rules/index.ts"],
+    // The plugin entry point, imported by eslint.config.ts.
+    rules: { "check-file/no-index": "off" },
+  },
+  {
     files: ["apps/app/modules/**/index.ts"],
     // Expo local modules are resolved by their folder's index.ts (autolinking convention).
     rules: { "check-file/no-index": "off" },
@@ -420,7 +480,7 @@ export default defineConfig([
       // React 19's ReactNode includes Promise, so this rule would "fix" components that
       // return children into `async` components — which breaks them. Async code in the
       // UIs is still covered by no-floating-promises / no-misused-promises.
-      "@typescript-eslint/promise-function-async": "off",
+      "pace/promise-function-async": "off",
       "max-lines-per-function": ["error", { max: 80, skipBlankLines: true, skipComments: true }],
     },
   },
@@ -437,6 +497,35 @@ export default defineConfig([
       "better-tailwindcss": { cwd: "apps/app", tailwindConfig: "tailwind.config.js" },
     },
   },
+  // The display-text bans (bug-lessons 110, 111) cover every source that builds text a person
+  // reads: the app's screens and the client's view-models (scripts/eslint-scoped-bans.test.ts).
+  // The app also never drops an action's answer (bug-lessons 108).
+  {
+    files: ["packages/client/src/view-models/**/*.ts"],
+    ignores: TESTS,
+    rules: { "no-restricted-syntax": ["error", ...RESTRICTED_SYNTAX, ...DISPLAY_TEXT_SYNTAX] },
+  },
+  {
+    files: ["apps/app/src/**/*.{ts,tsx}"],
+    ignores: TESTS,
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        ...RESTRICTED_SYNTAX,
+        ...DISPLAY_TEXT_SYNTAX,
+        ...ACTION_ANSWER_SYNTAX,
+      ],
+    },
+  },
+  // Design values come from the tokens (spec §9.3). A warning, counted in
+  // context/design/redesign-plan.md, until the app is migrated; then it becomes an error. A class
+  // outside GENERATED_CLASSES (the token scales and layout utilities) is off the scale.
+  {
+    files: APP,
+    ignores: TESTS,
+    plugins: { pace },
+    rules: { "pace/no-raw-design-values": ["warn", { allowedClasses: GENERATED_CLASSES }] },
+  },
   {
     // Plain scripts the web page loads before the app (no bundler, no types): checked as browser JS.
     files: ["apps/app/public/*.js"],
@@ -446,7 +535,7 @@ export default defineConfig([
       parserOptions: { project: false, projectService: false },
       sourceType: "script",
     },
-    rules: { ...tseslint.configs.disableTypeChecked.rules },
+    rules: UNTYPED_RULES,
   },
   {
     files: APP_JS_CONFIGS,
@@ -462,11 +551,29 @@ export default defineConfig([
       sourceType: "commonjs",
     },
     rules: {
-      ...tseslint.configs.disableTypeChecked.rules,
+      ...UNTYPED_RULES,
       // Expo loads these with Node's CommonJS loader.
       "@typescript-eslint/no-require-imports": "off",
       "unicorn/prefer-module": "off",
       "import-x/no-commonjs": "off",
+    },
+  },
+  {
+    files: WEB_SCRIPTS,
+    ...tseslint.configs.disableTypeChecked,
+    languageOptions: {
+      globals: {
+        document: "readonly",
+        localStorage: "readonly",
+        matchMedia: "readonly",
+      },
+      parserOptions: { project: false, projectService: false },
+      sourceType: "script",
+    },
+    rules: {
+      ...UNTYPED_RULES,
+      // A classic script: no modules, nothing to export.
+      "unicorn/prefer-module": "off",
     },
   },
 
@@ -502,6 +609,10 @@ export default defineConfig([
   {
     ...playwright.configs["flat/recommended"],
     files: ["e2e/**/*.ts"],
+  },
+  {
+    files: ["e2e/**/*.e2e.ts"],
+    rules: { "no-restricted-syntax": ["error", ...RESTRICTED_SYNTAX, OWN_CONTEXT] },
   },
 
   // ── Declaration files: ambient/global augmentation needs `interface` and `import()` types

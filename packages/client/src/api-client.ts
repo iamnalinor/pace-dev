@@ -7,6 +7,8 @@ import {
   PROTOCOL_HEADER,
 } from "@pace/core";
 
+import { heldUntilChecked } from "./held-call.ts";
+
 /** An HTTP error from the API, with the machine-readable `code` when the server sent one. */
 export class ApiError extends Error {
   readonly code: string;
@@ -32,20 +34,30 @@ export class ApiUnreachable extends Error {
   }
 }
 
-/** What a caller may add to one request: a signal that gives up on it. */
-export type CallOptions = { readonly signal?: AbortSignal };
+/**
+What a caller may add to one request: a signal that gives up on it, and a credential sent instead of
+the one in use.
+*/
+export type CallOptions = { readonly credential?: string; readonly signal?: AbortSignal };
 
 export type ApiClient = {
   /** The in-memory credential the next request will send. */
   readonly currentSessionToken: () => string | undefined;
   /** Reads the same in-memory credential that `call` uses before sending a request. */
   readonly isCurrentSession: (session: string) => boolean;
+  /**
+  `options.credential` sends that token instead of the one in use: a logout, sent after this
+  device forgot its session, still names the session it ends.
+  */
   readonly call: <E extends EndpointShape>(
     endpoint: E,
     input: EndpointInput<E>,
     options?: CallOptions,
   ) => Promise<EndpointOutput<E>>;
 };
+
+/** What the Worker answers a call that needs a session and names none (`requireAuth`). */
+const UNAUTHORIZED = "auth/unauthorized";
 
 type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
 
@@ -104,12 +116,7 @@ const readAnswer = async (response: Response, init: RequestInit): Promise<unknow
   }
 };
 
-/**
-Typed HTTP client for the Pace API, driven by the shared endpoint contract. The bearer
-token is read on every request so a login or logout takes effect immediately; every request
-also says which protocol this build speaks (`X-Pace-Protocol`).
-*/
-export const createApiClient = (options: {
+type ApiClientOptions = {
   readonly baseUrl: string;
   readonly fetch?: FetchLike;
   readonly token: () => string | undefined;
@@ -118,7 +125,53 @@ export const createApiClient = (options: {
   call fails, with the endpoint it was.
   */
   readonly onUnauthorized?: (credential: string, endpoint: EndpointShape) => void;
-}): ApiClient => {
+  /** Whether this device's session ended and no new one began: nothing that needs one is sent. */
+  readonly sessionEnded?: () => boolean;
+  /**
+  A check of the session in use that is under way (a 401 heard, `me` on its way), or `undefined`.
+  A call that would send that session waits for its answer and then sends whatever is current (or
+  nothing, once it ended): the session's end is never sent again while it is being confirmed (CI
+  run 41668309388). `me` and the log-out are never held: the check is `me`.
+  */
+  readonly sessionCheck?: (endpoint: EndpointShape) => Promise<unknown> | undefined;
+};
+
+/**
+The token a call sends, read once a check of the session under way is answered (a call naming its
+own credential, the log-out, waits for nothing); none for a call that needs one once the session
+ended (it throws).
+*/
+const credentialFor = async (
+  options: ApiClientOptions,
+  endpoint: EndpointShape,
+  callOptions: CallOptions,
+): Promise<string | undefined> => {
+  const checking =
+    endpoint.auth && callOptions.credential === undefined
+      ? options.sessionCheck?.(endpoint)
+      : undefined;
+  if (checking !== undefined) {
+    await heldUntilChecked(checking, callOptions.signal);
+  }
+  const credential = callOptions.credential ?? options.token();
+  if (credential === undefined && endpoint.auth && options.sessionEnded?.() === true) {
+    throw new ApiError(401, UNAUTHORIZED, "Not signed in");
+  }
+  return credential;
+};
+
+/**
+Typed HTTP client for the Pace API, driven by the shared endpoint contract. The bearer
+token is read on every request so a login or logout takes effect immediately; every request
+also says which protocol this build speaks (`X-Pace-Protocol`).
+
+Once this device's session has ended (`sessionEnded`: signed out by hand, from the list or by a
+401), a call whose contract needs a session (`auth: true`, the flag the Worker mounts its guard
+from) is not sent without one: it fails here with the server's own 401 `auth/unauthorized`, so a
+screen or a loop still running after the sign-out asks nothing (QA round 22 R22-02). A device that
+never had a session reaches no screen that makes such calls (the route gate).
+*/
+export const createApiClient = (options: ApiClientOptions): ApiClient => {
   const doFetch: FetchLike = options.fetch ?? (async (input, init) => await fetch(input, init));
   return {
     currentSessionToken: options.token,
@@ -129,7 +182,7 @@ export const createApiClient = (options: {
         params?: Record<string, string>;
         query?: Record<string, string>;
       };
-      const credential = options.token();
+      const credential = await credentialFor(options, endpoint, callOptions);
       // The protocol rides on every call: a server too new for this app refuses it (426
       // `client/outdated`), which surfaces as an ApiError like any other refusal.
       const headers: Record<string, string> = {

@@ -27,17 +27,17 @@ const IncompatibleScreen = () => {
   const { auth } = useAuth();
   const { origin, reason } = useStore(serverStore);
   return (
-    <View className="flex-1 justify-center bg-bg px-6">
+    <View className="flex-1 justify-center bg-app px-6">
       {/* A centred column on a computer, as the login card is, not the window's left edge. */}
-      <View className="w-full max-w-[440px] gap-8 self-center">
+      <View className="w-full max-w-message gap-8 self-center">
         <View className="gap-3">
-          <Text accessibilityRole="header" className="font-sans text-[22px] font-semibold text-fg">
+          <Text accessibilityRole="header" className="font-sans text-title1 text-label-primary">
             {t("server.mismatch")}
           </Text>
-          <Text className="font-sans text-[15px] leading-[21px] text-fg2">
+          <Text className="font-sans text-callout text-label-secondary">
             {t(reason === "client-outdated" ? WAY_OUT.appOutdated : WAY_OUT.serverOutdated)}
           </Text>
-          <Text className="font-sans text-[13px] text-muted">
+          <Text className="font-sans text-footnote text-label-secondary">
             {t("server.line", { host: serverHost(origin) })}
           </Text>
         </View>
@@ -45,6 +45,8 @@ const IncompatibleScreen = () => {
           {reason === "client-outdated" && WAY_OUT.reload !== null ? (
             <Button onPress={WAY_OUT.reload}>{t("update.refresh")}</Button>
           ) : null}
+          {/* No Wait here: this server can take nothing until one side is updated, so the outbox
+              cannot go anyway, and Log out is the only way out (QA round 23 R23-02 ruling). */}
           <Button onPress={() => void auth.logout()} variant="secondary">
             {t("settings.logout")}
           </Button>

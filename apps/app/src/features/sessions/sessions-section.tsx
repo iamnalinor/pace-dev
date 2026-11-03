@@ -1,4 +1,3 @@
-import { useRouter } from "expo-router";
 import { type RefObject, useRef, useState } from "react";
 import { Text, View } from "react-native";
 
@@ -28,7 +27,9 @@ const ListFailed = ({ onRetry }: { readonly onRetry: () => void }) => {
     // The ghost button sits under the line, its label flush with it: wrapped beside the line it
     // came out indented by its own padding (QA round 15 L10).
     <View className="items-start">
-      <Text className="font-sans text-[14px] text-muted">{t("sessions.failed")}</Text>
+      <Text className="font-sans text-subhead font-normal text-label-secondary">
+        {t("sessions.failed")}
+      </Text>
       <View className="-ml-4">
         <Button onPress={onRetry} variant="ghost">
           {t("sessions.retry")}
@@ -48,7 +49,6 @@ logout to answer 401 (QA round 15 L2, round 6 M1). `ok` once it ended and the lo
 const useEndThisDevice = (
   sessions: Sessions,
 ): ((id: string) => Promise<{ readonly ok: boolean }>) => {
-  const router = useRouter();
   const { auth } = useAuth();
   const runtime = usePace();
   return async (id) => {
@@ -68,7 +68,7 @@ const useEndThisDevice = (
       return { ok: false };
     }
     release();
-    router.replace("/login");
+    // Signed out: the route gate takes the device to the login card (bug class 75).
     return { ok: true };
   };
 };
@@ -142,7 +142,10 @@ const ReadyList = ({
         />
       ))}
       {hasEndFailed ? (
-        <Text accessibilityRole="alert" className="pt-1 font-sans text-[14px] text-warn">
+        <Text
+          accessibilityRole="alert"
+          className="pt-1 font-sans text-subhead font-normal text-danger"
+        >
           {t("sessions.revokeFailed")}
         </Text>
       ) : null}
@@ -197,7 +200,7 @@ export const SessionsSection = () => {
   };
   return (
     <View className="gap-3">
-      <Text className="font-sans text-[13px] leading-[18px] text-muted">{t("sessions.hint")}</Text>
+      <Text className="font-sans text-footnote text-label-secondary">{t("sessions.hint")}</Text>
       {IS_PHONE ? <CalendarSyncRow /> : null}
       <SessionList afterLast={computerButtonRef} sessions={sessions} />
       <View className={cx("gap-2", isWide && "flex-row flex-wrap")}>

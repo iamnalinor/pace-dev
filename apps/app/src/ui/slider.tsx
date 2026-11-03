@@ -57,19 +57,22 @@ export const Slider = ({ label, max, onChange, onSlide, value }: SliderProps) =>
         aria-valuemax={max}
         aria-valuemin={0}
         aria-valuenow={shown}
-        className="h-11 justify-center"
+        className="h-hit-web justify-center"
         hitSlop={8}
         onAccessibilityAction={onAction}
         onLayout={(event) => {
           setWidth(Math.max(event.nativeEvent.layout.width - THUMB, 1));
         }}
       >
-        <View className="mx-[13px] h-2 rounded-full bg-track">
-          <View className="h-2 rounded-full bg-fg" style={{ width: `${share * 100}%` }} />
+        <View className="mx-3 h-2 rounded-pill bg-fill-4">
+          <View
+            className="h-2 rounded-pill bg-label-primary"
+            style={{ width: `${share * 100}%` }}
+          />
         </View>
         <View
           className={cx(
-            "absolute h-[26px] w-[26px] rounded-full border-2 border-fg bg-surface",
+            "absolute h-6 w-6 rounded-pill border-2 border-label-primary bg-cell",
             draft !== null && "scale-110",
           )}
           style={{ left: share * width }}

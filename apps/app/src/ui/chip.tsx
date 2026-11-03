@@ -2,35 +2,37 @@ import type { ReactNode, Ref } from "react";
 
 import { Pressable, Text, View } from "react-native";
 
-import type { ProjectColorName } from "@pace/core";
-
-import { inkClass, OUTLINE, PROJECT_FILL } from "./color.tsx";
+import { inkClass, outlineClass, type TagColor } from "./color.tsx";
 import { cx } from "./cx.ts";
+import { spacePress } from "./space-press.ts";
+import { useTheme } from "./theme-provider.tsx";
 
 /**
-Unselected: the page's surface inside a 2px outline (in the chip's color, else a hairline
-gray). Selected: filled with the color; a neutral chip gets the raised surface and an ink
-outline instead — never a black pill.
+Unselected: the cell inside a 2px outline (in the chip's hue, else the control outline). Selected: the
+solid accent with its own edge, a step the unselected ring cannot be mistaken for (accent against
+the cell is ≥ 3:1 in both themes, WCAG 1.4.11): a 12 % hue tint under the same ring read as "not
+chosen" (V2-02). The chip's hue stays in the ring of the ones not chosen.
 */
-const chipFill = (color: null | ProjectColorName, isSelected: boolean): string => {
-  if (color === null) {
-    return isSelected ? "border-2 border-fg bg-raised" : "border-2 border-line bg-surface";
+const chipFill = (color: null | TagColor, isSelected: boolean): string => {
+  if (isSelected) {
+    return "border-2 border-accent bg-accent";
   }
-  return isSelected
-    ? `border-2 ${OUTLINE[color]} ${PROJECT_FILL[color]}`
-    : `border-2 ${OUTLINE[color]} bg-surface`;
+  return color === null
+    ? "border-2 border-outline bg-cell"
+    : `border-2 ${outlineClass(color)} bg-cell`;
 };
 
-const chipText = (color: null | ProjectColorName, isSelected: boolean): string => {
+const chipText = (color: null | TagColor, isSelected: boolean): string => {
   if (isSelected) {
-    return color === null ? "font-medium text-fg" : "font-medium text-onColor";
+    return "font-medium text-accent-on";
   }
-  return color === null ? "text-fg2" : inkClass(color);
+  return color === null ? "text-label-secondary" : inkClass(color);
 };
 
 /**
-A 32px pill (36 when tall): the project filter and the pickers of the forms. The pill sits in
-a 44px-tall target that does not take room in the layout, so a thumb never misses it.
+A 32px pill (40 when tall): the project filter and the pickers of the forms. The pill sits in
+a 48px-tall target (`h-hit`) that does not take room in the layout, so a thumb never misses it:
+the negative margin is half the difference (8 or 4), so the layout box is exactly the pill.
 */
 export const Chip = ({
   children,
@@ -44,11 +46,12 @@ export const Chip = ({
   tall = false,
 }: {
   readonly children: string;
-  /** Drawn in this colour: washed, and filled with it once chosen. */
-  readonly color?: null | ProjectColorName;
+  /** Drawn in this colour: ringed and inked in it; the accent fill marks it once chosen. */
+  readonly color?: null | TagColor;
   /** Spoken instead of the visible text when the text alone is ambiguous. */
   readonly label?: string;
-  readonly leading?: ReactNode;
+  /** An icon drawn in the colour it is given: `accent.on` on a chosen chip, secondary off it. */
+  readonly leading?: (color: string) => ReactNode;
   readonly onPress: () => void;
   /** The pressable itself: for a group that moves focus between its chips, or for focus to be
   moved onto it when the control that held it goes away. */
@@ -56,30 +59,37 @@ export const Chip = ({
   readonly selected?: boolean;
   /** In a group with one tab stop (`RadioChips`): 0 for the chosen chip, -1 for the others. */
   readonly tabIndex?: -1 | 0;
-  /** 36px with 13px text: the time pills of the close sheet. */
+  /** 40px: the time pills of the close sheet. */
   readonly tall?: boolean;
-}) => (
-  <Pressable
-    accessibilityLabel={label}
-    accessibilityRole="radio"
-    aria-checked={selected}
-    className={cx("justify-center active:opacity-80", tall ? "-my-1 h-11" : "-my-1.5 h-11")}
-    onPress={onPress}
-    ref={ref}
-    {...(tabIndex !== undefined && { tabIndex })}
-  >
-    <View
-      className={cx(
-        "flex-row items-center gap-1.5 rounded-pill px-3",
-        tall ? "h-9" : "h-8",
-        chipFill(color, selected),
-      )}
+}) => {
+  const { palette } = useTheme();
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="radio"
+      aria-checked={selected}
+      className={cx("justify-center active:opacity-80", tall ? "-my-1 h-hit" : "-my-2 h-hit")}
+      onPress={onPress}
+      ref={ref}
+      {...(tabIndex !== undefined && { tabIndex })}
+      {...spacePress(onPress)}
     >
-      {leading}
-      <Text className={cx("font-sans text-[12px]", chipText(color, selected))}>{children}</Text>
-    </View>
-  </Pressable>
-);
+      <View
+        className={cx(
+          "flex-row items-center gap-2 rounded-pill px-3",
+          tall ? "h-10" : "h-8",
+          chipFill(color, selected),
+        )}
+        testID="chip-pill"
+      >
+        {leading?.(palette[selected ? "accent.on" : "label.secondary"])}
+        <Text className={cx("font-sans text-caption font-normal", chipText(color, selected))}>
+          {children}
+        </Text>
+      </View>
+    </Pressable>
+  );
+};
 
 /**
 A chip that does something rather than being picked ("Start from: Homework" opens a new preset):
@@ -95,11 +105,13 @@ export const ActionChip = ({
 }) => (
   <Pressable
     accessibilityRole="button"
-    className="-my-1.5 h-11 justify-center active:opacity-80"
+    className="-my-2 h-hit justify-center active:opacity-80"
     onPress={onPress}
   >
     <View className={cx("h-8 flex-row items-center rounded-pill px-3", chipFill(null, false))}>
-      <Text className={cx("font-sans text-[12px]", chipText(null, false))}>{children}</Text>
+      <Text className={cx("font-sans text-caption font-normal", chipText(null, false))}>
+        {children}
+      </Text>
     </View>
   </Pressable>
 );

@@ -5,9 +5,11 @@ import Animated from "react-native-reanimated";
 
 import type { NowRow } from "@pace/client";
 
+import { useLanguage } from "#app/app-state.tsx";
 import { ROW_ENTER, ROW_EXIT, ROW_LAYOUT } from "#app/ui/motion.ts";
 import { RowList } from "#app/ui/row-list.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
+import { formatCount } from "@pace/core";
 
 import { useOpenTask } from "./task-opener.tsx";
 import { TaskRow } from "./task-row.tsx";
@@ -120,6 +122,7 @@ export const FoldedSection = ({
   readonly title: string;
 }) => {
   const { palette } = useTheme();
+  const language = useLanguage();
   const [isOpen, setIsOpen] = useState(initiallyOpen);
   if (count === 0) {
     return null;
@@ -130,13 +133,13 @@ export const FoldedSection = ({
       <Pressable
         accessibilityRole="button"
         aria-expanded={isOpen}
-        className="mx-3 h-11 flex-row items-center gap-1.5 border-t border-line px-2 active:opacity-70"
+        className="mx-3 h-hit-web flex-row items-center gap-2 border-t border-separator px-2 active:opacity-70"
         onPress={() => {
           setIsOpen(!isOpen);
         }}
       >
-        <Text className="font-sans text-[13px] font-medium text-fg2">{`${title} · ${String(count)}`}</Text>
-        <Icon color={palette.muted} size={16} strokeWidth={2} />
+        <Text className="font-sans text-footnote font-medium text-label-secondary">{`${title} · ${formatCount(count, language)}`}</Text>
+        <Icon color={palette["label.secondary"]} size={16} strokeWidth={2} />
       </Pressable>
       {isOpen ? children : null}
     </View>

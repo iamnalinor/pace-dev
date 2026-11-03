@@ -27,6 +27,8 @@ export const enInput = {
   "actionError.event/duplicate": "This was already recorded.",
   "actionError.event/not-found": "That record does not exist anymore.",
   "actionError.undo/nothing": "Nothing to undo.",
+  "actionError.persist_failed":
+    "Could not save this on the device, so it was not changed. Try again.",
   "actionError.task/unknown": "That task does not exist anymore.",
   "actionError.subtask/unknown": "That subtask does not exist anymore.",
   "actionError.subtask/submitted": "A sent subtask stays on the task.",
@@ -42,6 +44,7 @@ export const enInput = {
   "actionError.preset/built-in":
     "A default preset keeps its id and has no parent; the inbox cannot be deleted.",
   "actionError.preset/exists": "A preset with this id already exists.",
+  "actionError.preset/name-taken": "A preset with this name already exists. Choose another name.",
   "actionError.preset/invalid-definition": "Some values are not valid.",
   "actionError.preset/no-base": "Choose what the preset extends.",
   "actionError.preset/self-extends": "A preset cannot extend itself.",
@@ -215,6 +218,10 @@ export const enInput = {
   "assistant.approve": "Approve",
   "assistant.review": "Review assistant actions",
   "assistant.approved": "Done",
+  "assistant.approvedMore.one": "and {count} more action",
+  "assistant.approvedMore.few": "and {count} more actions",
+  "assistant.approvedMore.many": "and {count} more actions",
+  "assistant.approvedMore.other": "and {count} more actions",
   "assistant.correct": "Correct the assistant…",
   "assistant.sendCorrection": "Send correction",
   "assistant.reading": "The assistant is reading…",
@@ -223,6 +230,16 @@ export const enInput = {
   "assistant.rulesUsedUnreadable":
     "The assistant couldn't read this one. These actions come from local rules; check them before approving.",
   "assistant.couldNotRead": "The assistant could not read this. Try again.",
+  "assistant.unread.limited":
+    "The assistant is out of requests until about {time}, and the rules found nothing here. Try again after that.",
+  "assistant.unread.limitedSoon":
+    "The assistant is out of requests for now, and the rules found nothing here. Try again later.",
+  "assistant.unread.unreachable":
+    "The assistant could not be reached, and the rules found nothing here. Try again in a moment.",
+  "assistant.unread.unreadable":
+    "The assistant couldn't read this one, and the rules found nothing here. Rephrase it.",
+  "assistant.unread.off":
+    "This server has no assistant, and the rules found nothing here. Rephrase it.",
   "assistant.couldNotRevise":
     "The assistant could not revise these actions. Your previous preview is still here.",
   "assistant.tooManyCorrections": "That is five corrections. Approve or cancel, then start again.",

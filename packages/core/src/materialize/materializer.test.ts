@@ -7,6 +7,8 @@ import { newId } from "../ids.ts";
 import {
   apply,
   effectiveEvents,
+  effectiveInOrder,
+  foldEffective,
   materialize,
   materializeAt,
   type Reducer,
@@ -167,6 +169,20 @@ describe("materialize", () => {
         expect(materialize(withoutTarget, titles, {})).toEqual(rest);
       }),
     );
+  });
+
+  it("is effectiveInOrder then foldEffective: a caller that keeps the list derives it once", () => {
+    const events = [
+      closed(E, at(3), B),
+      created(A, at(1), "a"),
+      amend(newId(), at(4), { patch: { title: "b2" }, targetId: B }),
+      created(B, at(2), "b"),
+      revoke(D, at(5), E),
+    ];
+    const ordered = effectiveInOrder(events);
+    expect(ordered.map((event) => event.id)).toEqual([A, B]);
+    expect(foldEffective(ordered, titles, {})).toEqual(materialize(events, titles, {}));
+    expect(foldEffective(ordered, titles, {})).toEqual({ [A]: "a", [B]: "b2" });
   });
 
   it("materializes 20k events under 200 ms with a trivial reducer", () => {

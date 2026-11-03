@@ -108,6 +108,17 @@ Every test starts on an account of its own: `loginViaApi` (`e2e/support/login.ts
 next id of the worker's whitelisted block and deletes that account first (`DELETE /api/test/account`),
 so parallel tests, `--repeat-each` and reruns against a reused server never share state.
 
+### The worst-case gallery and the overflow sweep
+
+`/dev/gallery?set=demo|worst|empty|one&lang=ru|en&theme=light|dark` shows the kit's components
+from fixtures (`packages/core/src/testing/worst-case.ts`): 300-character titles, 37 subtasks, a
+23 h 59 m block. The route exists only in a build made with `EXPO_PUBLIC_DEV_LOGIN=1`, a
+build-time constant: also under `expo start`, where the variable must be set in the shell
+(otherwise the route is the not-found screen). `e2e/worst-case.e2e.ts` opens every set at 390,
+320 and 1440 px in both languages and fails on any text wider than its box that is not in the
+set's `KNOWN` list (with its finding id), and on a `KNOWN` entry that no longer matches. A new
+component or screen gets a gallery section in the same change.
+
 ### Every screen, on real-looking data
 
 Feature tests start from an empty account, so they never see what months of use put in the
@@ -148,6 +159,28 @@ trace and a screenshot; CI uploads `playwright-report/`.
 - Locally the servers are reused if already running (`reuseExistingServer`); the accounts
   are reset at each login, so a reused API is fine. A reused web build is not rebuilt: stop
   the server (or `bun run build`) after changing the app.
+
+### The design review matrix
+
+`e2e/latency.e2e.ts` is the tap-latency budget (bug-lessons 108: tap → next frame ≤ 100 ms, p75 of
+9 after a warm-up, CPU slowed 4× through CDP, Event Timing grouped by `interactionId`). It is its
+own Playwright project, `latency`, which depends on `chromium`: `bun test:e2e` runs it after every
+other test, alone and serially. To run only it, `bunx playwright test --project latency --no-deps`.
+`BUDGET_MS` stays the target and is never raised. A case over it for a reason a later task owns
+has a regression ceiling instead (`CEILINGS`, a ratchet like the lint baseline): the case fails
+past its ceiling, and its gap to the budget is recorded as an `over budget` annotation naming the
+owner task. A ceiling is the largest p75 of five isolated runs × 1.25, rounded up to 10 ms. To
+lower one (the owner task, or anyone who made the case faster), run the project alone five times
+on a fresh build, apply the same formula and write the lower number; never a higher one. Once the
+case is within the budget, delete its entry: the case then asserts the 100 ms budget.
+
+`e2e/design-shots.e2e.ts` is not a test of behaviour: it shoots every route plus the sheets,
+dialogs, pickers, toasts, empty, loading, error and offline states and a keyboard-focus pass at
+1440×900 and 390×844, light and dark, English and Russian (8 combos, Telegram ids 3300–3315).
+It is off by default (the regular run skips it); `DESIGN_SHOTS=<dir>` turns it on, and
+`DESIGN_SHOTS_ONLY=<groups>` / `DESIGN_SHOTS_STATES=<names>` narrow it. A control it cannot find
+is listed in `<dir>/manifest-<combo>.json` instead of failing the run. See
+[qa.md](qa.md#the-design-review-matrix) for when to re-shoot it.
 
 ## Mutation testing
 

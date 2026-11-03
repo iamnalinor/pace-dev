@@ -1,6 +1,6 @@
 import type { z } from "zod";
 
-import type { ProjectColorName } from "../design/tokens.ts";
+import type { ProjectColorName } from "../design/token-types.ts";
 import type { ImportanceSchema } from "../events/payloads.ts";
 
 export type Importance = z.output<typeof ImportanceSchema>;

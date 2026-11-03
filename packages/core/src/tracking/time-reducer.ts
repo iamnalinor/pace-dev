@@ -2,24 +2,31 @@ import type { Event, EventOf, EventType } from "../events/event-schema.ts";
 import type { Reducer } from "../materialize/materializer.ts";
 import type { Activity, TimeState } from "./model.ts";
 
+import { assoc, keyIndex, keysWhere } from "../materialize/transient.ts";
+
+/** The main activities still running: what a main start may close. */
+const OPEN_MAIN = keyIndex<Activity>(
+  (activity) => !activity.isLogged && !activity.isAlongside && activity.endAt === null,
+);
+
 const withActivity = (state: TimeState, activity: Activity): TimeState => ({
   ...state,
-  activities: { ...state.activities, [activity.id]: activity },
+  activities: assoc(state.activities, activity.id, activity),
 });
 
-/** A main start closes the main activity still running before it (one main at a time). */
+/**
+A main start closes the main activity still running before it (one main at a time). Only the open
+main activities are looked at: in a rebuild that is an index, not every activity ever (class 55).
+*/
 const closeRunning = (activities: TimeState["activities"], at: string): TimeState["activities"] =>
-  Object.fromEntries(
-    Object.entries(activities).map(([id, activity]) => [
-      id,
-      !activity.isLogged &&
-      !activity.isAlongside &&
-      activity.endAt === null &&
-      activity.startAt <= at
-        ? { ...activity, endAt: at }
-        : activity,
-    ]),
-  );
+  keysWhere(activities, OPEN_MAIN)
+    .map((id) => activities[id])
+    .filter((activity): activity is Activity => activity !== undefined && activity.startAt <= at)
+    // eslint-disable-next-line unicorn/no-array-reduce -- each close writes onto the map the previous one made
+    .reduce(
+      (closed, activity) => assoc(closed, activity.id, { ...activity, endAt: at }),
+      activities,
+    );
 
 const started = (state: TimeState, event: EventOf<"activity.started">): TimeState => {
   const { payload } = event;

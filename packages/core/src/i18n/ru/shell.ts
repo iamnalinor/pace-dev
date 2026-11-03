@@ -69,7 +69,7 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "appLink.missing": "В этой ссылке нет токена входа.",
   "oauth.title": "Подключение приложения",
   "oauth.body":
-    "Приложение запрашивает доступ к вашему аккаунту Pace. Проверьте, что оно хочет, и войдите через Telegram, чтобы разрешить.",
+    "Приложение запрашивает доступ к вашему аккаунту Pace. Проверьте, что оно хочет, прежде чем разрешить.",
   "oauth.unverified": "Приложение зарегистрировалось само; его название не проверено.",
   "oauth.publishedBy": "Опубликовано {domain}",
   "oauth.redirectTo": "Доступ будет передан на {host}.",
@@ -84,6 +84,12 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "oauth.scope.offlineAccess": "Оставаться подключённым без повторных запросов",
   "oauth.identify": "Войдите через Telegram, чтобы продолжить",
   "oauth.signedInAs": "Вы вошли как {name}",
+  "oauth.sessionEnded": "Сеанс Pace завершён. Войдите снова, чтобы продолжить.",
+  "oauth.deviceToken":
+    "Этот вход в Pace не может подключать приложения. Выйдите из Pace в этом браузере, войдите снова и повторите.",
+  "oauth.identityConflict": "Страница отправила два входа сразу. Обновите её и разрешите снова.",
+  "oauth.widgetMissing": "Не видно кнопки Telegram?",
+  "oauth.signInFirst": "Сначала войдите в Pace",
   "oauth.allow": "Разрешить",
   "oauth.deny": "Отклонить",
   "oauth.devUse": "Продолжить как dev",
@@ -131,7 +137,7 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "permissions.appInfo": "О приложении",
   "permissions.background": "Разрешите Pace проверять в фоне",
   "permissions.background.why":
-    "Уведомления придут в течение ~15 минут, а не через несколько часов.",
+    "Уведомления придут в течение ~15\u{A0}минут, а не через несколько часов.",
   "permissions.on": "Включено",
   "permissions.off": "Выключено",
   "permissions.blocked": "Выключено в настройках Android",
@@ -161,6 +167,18 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "settings.categoryEstimates.hint":
     "Сначала оценка конкретной активности, затем эта настройка, история и встроенное значение.",
   "settings.logout": "Выйти",
+  "settings.logout.unsynced.one":
+    "{count} изменение ещё не синхронизировано: если выйти сейчас, оно пропадёт.",
+  "settings.logout.unsynced.few":
+    "{count} изменения ещё не синхронизированы: если выйти сейчас, они пропадут.",
+  "settings.logout.unsynced.many":
+    "{count} изменений ещё не синхронизированы: если выйти сейчас, они пропадут.",
+  "settings.logout.unsynced.other":
+    "{count} изменения ещё не синхронизированы: если выйти сейчас, они пропадут.",
+  "settings.logout.unsynced.unknown":
+    "Возможно, не все изменения синхронизированы: если выйти сейчас, они пропадут.",
+  "settings.logout.wait": "Подождать",
+  "settings.logout.anyway": "Всё равно выйти",
   "settings.deleteAccount": "Удалить аккаунт",
   "settings.deleteAccount.warning":
     "Аккаунт удалится навсегда: задачи, время, пресеты, журнал решений и все подключённые приложения. Отменить это нельзя.",
@@ -187,14 +205,15 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "common.back": "Назад",
   "common.accept": "Принять",
   "common.skip": "Пропустить",
-  "common.retry": "Повторить",
+  "common.retry": "Попробовать снова",
   "common.home": "На главную",
-  "errors.offline": "Нет сети. Изменения синхронизируются при подключении.",
-  "sync.retry": "Повторить",
+  "errors.offline": "Нет сети · изменения отправятся позже",
+  "sync.retry": "Попробовать снова",
   "sync.firstSync": "Синхронизируем данные",
   "sync.stillSyncing": "Синхронизация ещё идёт…",
   "sync.firstSyncLine": "Синхронизируем данные…",
   "sync.loadingData": "Загружаем ваши данные…",
+  "sync.notSyncedYet": "Данные ещё не загрузились.",
   "errors.llmUnavailable": "Ассистент сейчас недоступен. Попробуйте чуть позже.",
   "errors.notFound": "Не найдено.",
   "errors.pageNotFound": "Страница не найдена",

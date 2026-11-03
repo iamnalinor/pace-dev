@@ -74,6 +74,12 @@ export type LiveChannelOptions = {
   a socket that opens ends the streak.
   */
   readonly onFailedToOpen?: () => void;
+  /**
+  A check of the session that is under way (a 401 heard, `me` on its way), or `undefined`: a
+  (re)connect waits for its answer and then opens with whatever session is current, so the
+  session's end is not sent again while it is being confirmed (CI run 41668309388).
+  */
+  readonly sessionCheck?: () => Promise<unknown> | undefined;
   /** Defaults to the global `WebSocket`; tests pass a fake. */
   readonly createSocket?: (url: string, protocols: readonly string[]) => SocketLike;
 };
@@ -299,6 +305,32 @@ const whenClosed = (
   }
 };
 
+/**
+A check of the session under way: the (re)connect waits for its answer and then tries again,
+unless the channel was stopped meanwhile or a start since connected it (CI run 41668309388).
+*/
+const isWaitingForCheck = (
+  options: LiveChannelOptions,
+  line: Line,
+  connect: () => void,
+): boolean => {
+  const checking = options.sessionCheck?.();
+  if (checking === undefined) {
+    return false;
+  }
+  void (async (): Promise<void> => {
+    try {
+      await checking;
+    } catch {
+      // Answered either way: the session in use (or none) decides below.
+    }
+    if (line.current() === undefined) {
+      connect();
+    }
+  })();
+  return true;
+};
+
 export const createLiveChannel = (options: LiveChannelOptions): LiveChannel => {
   const createSocket = options.createSocket ?? globalSocket;
   const status = createStore<LiveStatus>(() => ({ isConnected: false }));
@@ -312,7 +344,10 @@ export const createLiveChannel = (options: LiveChannelOptions): LiveChannel => {
     whenClosed(code, { connect, line, run, status, timers });
   };
   function connect(): void {
-    const token = options.token();
+    // Stopped: nothing to open, no waiter left. While a check of the session is under way there is
+    // no session to open with: it connects once answered.
+    const token =
+      !run.isRunning() || isWaitingForCheck(options, line, connect) ? undefined : options.token();
     if (createSocket === undefined || token === undefined || !run.isRunning()) {
       return;
     }

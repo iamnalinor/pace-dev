@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { newId } from "@pace/core";
 
 import { TOOLS } from "../src/mcp/server.ts";
-import { json, loginAsDev } from "./helpers.ts";
+import { json, loginAsDev, pushEvents } from "./helpers.ts";
 import { mcpResult, obtainToken } from "./oauth-flow.ts";
 
 const byText = (a: unknown, b: unknown): number => String(a).localeCompare(String(b));
@@ -499,6 +499,17 @@ describe("presets", () => {
         name: "Dup",
       }),
     ).toContain("preset/exists");
+    // A name another preset in use goes by, a default's in either language too (QA 21 L4).
+    for (const name of ["ops", "Работа"]) {
+      expect(
+        await errorText(token, "create_preset", {
+          definition: {},
+          extends: "work",
+          id: "work.same",
+          name,
+        }),
+      ).toContain("preset/name-taken");
+    }
     expect(
       await errorText(token, "create_preset", {
         definition: { bogus: 1 },
@@ -515,6 +526,43 @@ describe("presets", () => {
       name: "Operations",
     });
     expect(await errorText(token, "archive_preset", { id: "inbox" })).toContain("preset/built-in");
+  });
+
+  it("edits a preset that shares its name with another, and seeds around a taken name (review I1, M6)", async () => {
+    // An account of its own: the store of 1001 already holds the examples from the test above.
+    const token = (await obtainToken({ ...READ_WRITE, devTelegramId: "1002" })).tokens.access_token;
+    // Two "Gym" as an offline merge (or an older app) leaves them: written past the name rule.
+    const at = new Date().toISOString();
+    const created = (id: string) => ({
+      deviceId: "test",
+      id: newId(),
+      occurredAt: at,
+      payload: { definition: {}, extends: "hw", id, name: "Gym" },
+      precision: "exact",
+      recordedAt: at,
+      source: "app",
+      type: "preset.created",
+    });
+    await pushEvents(await loginAsDev("1002"), [
+      created("gym-aaaaaa"),
+      created("gym-bbbbbb"),
+      {
+        ...created("mine"),
+        payload: { definition: {}, extends: "hw", id: "mine", name: "Algebra HW" },
+      },
+    ]);
+    await okTool(token, "update_preset", {
+      definition: { defaultEstimateMinutes: 45 },
+      id: "gym-aaaaaa",
+    });
+    // Renaming into a name another preset goes by is still refused.
+    expect(
+      await errorText(token, "update_preset", { id: "gym-bbbbbb", name: "Algebra HW" }),
+    ).toContain("preset/name-taken");
+    expect(await okTool(token, "seed_example_presets")).toMatchObject({
+      created: ["hw.calculus", "hw.history"],
+      skipped: ["hw.algebra"],
+    });
   });
 });
 
@@ -585,7 +633,8 @@ const writeFixture = async (token: string): Promise<Fixture> => {
     definition: {},
     extends: "work",
     id: presetId,
-    name: "Contract",
+    // Each fixture its own name: names are unique among the presets in use (QA 21 L4).
+    name: `Contract ${presetId}`,
   });
   return { missedId, presetId, solveId: String(rows(marked["events"])[0]?.["id"]), taskId };
 };

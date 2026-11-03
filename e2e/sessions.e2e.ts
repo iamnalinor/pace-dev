@@ -193,6 +193,10 @@ for (const size of SIZES) {
     test("shows the local server's MCP URL under Connect an AI app", async ({ page }) => {
       await loginViaApi(page);
       await page.goto("/settings");
+      // The list loads under its skeleton and Connect an AI app moves up as it does (108 px at
+      // 390; plan carry-over, Task 4.11): a click mid-move misses, so the list goes first.
+      const section = page.getByRole("group", { name: "Devices and sessions" });
+      await expect(section.getByText("This device")).toBeVisible();
       await page.getByRole("button", { name: "Connect an AI app" }).click();
       await expect(page.getByText(`${API_URL}/mcp`, { exact: true })).toBeVisible();
       await expect(page.getByRole("button", { name: "Copy the URL" })).toBeVisible();

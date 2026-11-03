@@ -3,6 +3,7 @@ import type { Task } from "../model/task.ts";
 
 import { err, ok, type Result } from "../result.ts";
 import { BASE_PRESETS, type BasePreset, isBuiltInPreset } from "./base-presets.ts";
+import { presetLabel } from "./preset-label.ts";
 import { presetById, type PresetsState } from "./preset-reducer.ts";
 import { PresetDefinitionSchema, PresetIdSchema } from "./preset-schema.ts";
 
@@ -15,6 +16,7 @@ export type PresetValidationError =
   | "preset/built-in"
   | "preset/exists"
   | "preset/invalid-definition"
+  | "preset/name-taken"
   | "preset/no-base"
   | "preset/self-extends"
   | ChainError;
@@ -187,6 +189,39 @@ const validateParent = (
   return chain.value.presets.some((preset) => preset.id === id) ? "preset/cycle" : undefined;
 };
 
+/** A name as two presets would be told apart by it: trimmed, case and width folded. */
+const nameKey = (name: string): string => name.trim().normalize("NFKC").toLocaleLowerCase();
+
+/** Every name a preset goes by, as keys: its own, and a default's label in either language. */
+const namesOf = (preset: Preset): readonly string[] =>
+  [preset.name, presetLabel(preset, "en"), presetLabel(preset, "ru")].map((name) => nameKey(name));
+
+/**
+Whether another preset in use (not archived) already goes by `name`: its own name, or a default's
+label in either language (a "Work" beside the default "Work" read as two identical chips, QA round
+21 L4). Checked only when the name changes: presets that already share a name (an offline merge,
+or names given before they had to differ) stay editable, the default they shadow too (review I1).
+*/
+const validateName = (
+  state: PresetsState,
+  id: string,
+  name: string,
+): PresetValidationError | undefined => {
+  const wanted = nameKey(name);
+  const current = presetById(state, id);
+  if (current !== undefined && namesOf(current).includes(wanted)) {
+    return undefined;
+  }
+  const isTaken = Object.values(state.byId).some(
+    (preset) => preset.id !== id && !preset.archived && namesOf(preset).includes(wanted),
+  );
+  return isTaken ? "preset/name-taken" : undefined;
+};
+
+/** Whether a preset `id` may go by `name`: no other preset in use goes by it (or it is its own). */
+export const isPresetNameFree = (state: PresetsState, id: string, name: string): boolean =>
+  validateName(state, id, name) === undefined;
+
 /** Everything the editor must check before emitting `preset.created` / `preset.updated`. */
 export const validatePresetInput = (
   state: PresetsState,
@@ -196,6 +231,7 @@ export const validatePresetInput = (
   const problem =
     validateId(state, input.id, mode) ??
     validateParent(state, input.id, input.extends) ??
+    validateName(state, input.id, input.name) ??
     (PresetDefinitionSchema.safeParse(input.definition).success
       ? undefined
       : "preset/invalid-definition");

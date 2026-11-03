@@ -78,7 +78,7 @@ export const UpdateStrip = ({ onRefresh }: { readonly onRefresh: () => void }) =
     <Animated.View style={[CLIP, style]}>
       <View
         accessibilityLiveRegion="polite"
-        className="flex-row flex-wrap items-center justify-center gap-x-4 gap-y-1.5 bg-accentQuiet px-4 py-2.5"
+        className="flex-row flex-wrap items-center justify-center gap-x-4 gap-y-2 bg-accent-quiet px-4 py-3"
         onLayout={(event) => {
           height.set(
             withTiming(event.nativeEvent.layout.height, {
@@ -90,7 +90,7 @@ export const UpdateStrip = ({ onRefresh }: { readonly onRefresh: () => void }) =
         role="status"
         style={{ paddingTop: insets.top + 10 }}
       >
-        <Text className="shrink text-center font-sans text-sm text-accentQuietFg">
+        <Text className="shrink text-center font-sans text-subhead font-normal text-accent-text">
           {t("update.message")}
         </Text>
         <Pressable
@@ -105,13 +105,11 @@ export const UpdateStrip = ({ onRefresh }: { readonly onRefresh: () => void }) =
           onPress={onRefresh}
           style={{
             // Outlined in the strip's own foreground at 40%, washed at 10% under the pointer.
-            backgroundColor: isHovered ? `${palette.accentQuietFg}1a` : "transparent",
-            borderColor: `${palette.accentQuietFg}66`,
+            backgroundColor: isHovered ? `${palette["accent.text"]}1a` : "transparent",
+            borderColor: `${palette["accent.text"]}66`,
           }}
         >
-          <Text className="font-sans text-sm font-medium text-accentQuietFg">
-            {t("update.refresh")}
-          </Text>
+          <Text className="font-sans text-subhead text-accent-text">{t("update.refresh")}</Text>
         </Pressable>
       </View>
     </Animated.View>
@@ -134,7 +132,7 @@ export const UpdateFrame = ({
   const insets = useSafeAreaInsets();
   const below = useMemo(() => (isOpen ? { ...insets, top: 0 } : insets), [insets, isOpen]);
   return (
-    <View className="flex-1 bg-bg">
+    <View className="flex-1 bg-app">
       {isOpen ? <UpdateStrip onRefresh={onRefresh} /> : null}
       <SafeAreaInsetsContext value={below}>{children}</SafeAreaInsetsContext>
     </View>

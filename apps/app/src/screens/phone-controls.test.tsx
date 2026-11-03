@@ -23,7 +23,10 @@ activities), with the store's log as what a press may change besides the screen.
 
 /** Renders `ui` on a fresh artboard runtime; the store's log length is what a write changes. */
 const onArtboard = (ui: ReactElement) => async () => {
-  const runtime = await createTestRuntime();
+  // A server that answers: Day's usage read succeeds (its failure line has its own test, R23-08).
+  const runtime = await createTestRuntime({
+    routes: { "GET /api/usage": () => ({ sessions: [] }) },
+  });
   await renderScreen(ui, runtime);
   return { extra: () => runtime.state.store.getState().log.length };
 };

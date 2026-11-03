@@ -24,9 +24,7 @@ const QuestionBlock = ({
   readonly onAnswer: (option: string) => void;
   readonly question: ParseQuestion;
 }) => {
-  const text = (
-    <Text className="font-sans text-[13px] leading-5 text-question">{question.question}</Text>
-  );
+  const text = <Text className="font-sans text-footnote text-question">{question.question}</Text>;
   if (question.options.length === 0) {
     return text;
   }
@@ -40,7 +38,7 @@ const QuestionBlock = ({
             accessibilityRole="button"
             accessibilityState={{ disabled: busy, selected: option === chosen }}
             className={cx(
-              "h-11 justify-center active:opacity-80",
+              "h-hit-web justify-center active:opacity-80",
               busy && option !== chosen && "opacity-50",
             )}
             disabled={busy}
@@ -52,10 +50,12 @@ const QuestionBlock = ({
             <View
               className={cx(
                 "h-8 justify-center rounded-pill px-3",
-                option === chosen ? "border-2 border-fg bg-raised" : "border border-line bg-bg",
+                option === chosen
+                  ? "border-2 border-label-primary bg-fill-3"
+                  : "border border-outline bg-app",
               )}
             >
-              <Text className="font-sans text-[13px] text-fg">{option}</Text>
+              <Text className="font-sans text-footnote text-label-primary">{option}</Text>
             </View>
           </Pressable>
         ))}
@@ -75,10 +75,15 @@ const AnsweredLine = ({ answered }: { readonly answered: Answered }) => {
     <View
       accessibilityLabel={t("assistant.answered", answered)}
       accessible
-      className="flex-row items-start gap-1.5"
+      className="flex-row items-start gap-2"
     >
-      <Check color={palette.fg2} size={16} strokeWidth={2} style={{ marginTop: 2 }} />
-      <Text className="shrink font-sans text-[13px] leading-5 text-fg2">
+      <Check
+        color={palette["label.secondary"]}
+        size={16}
+        strokeWidth={2}
+        style={{ marginTop: 2 }}
+      />
+      <Text className="shrink font-sans text-footnote text-label-secondary">
         {`${answered.question} — ${answered.option}`}
       </Text>
     </View>
@@ -149,7 +154,7 @@ export const Questions = ({
         />
       ))}
       {hint === null ? null : (
-        <Text className="font-sans text-[13px] leading-5 text-muted">{t(hint)}</Text>
+        <Text className="font-sans text-footnote text-label-secondary">{t(hint)}</Text>
       )}
     </>
   );

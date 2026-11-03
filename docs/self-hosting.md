@@ -42,8 +42,14 @@ server at the latest release.
    - `WEB_ORIGIN`: where your web app is served (`https://pace.example.dev`), the only origin the
      API's CORS admits.
    - `API_ORIGIN`: your API's own origin (`https://pace-api.example.dev`): the OAuth issuer and the
-     MCP resource. A blank or malformed value is ignored (and logged): the origin requests arrive
-     at is used instead.
+     MCP resource, normalised (case, a trailing slash and a default port do not matter). It must be
+     https, or plain http on `localhost`/`127.x`/`[::1]`; a blank, malformed or other plain-http
+     value is ignored (and logged), and the origin requests arrive at is used instead. A server
+     reached only over plain http on a LAN (`http://192.168.…`) works for the app, but its OAuth and
+     MCP routes answer 503: AI apps need https. AI apps must reach the MCP endpoint at exactly `<API_ORIGIN>/mcp` (their
+     tokens are bound to it, and Settings → Connect an AI app shows that URL), so set it to the
+     address those apps can reach. The computer agent's `--api` uses bearer tokens and works at any
+     address the Worker answers on, so "Add a computer" gives the address the device uses.
 
    For the web app, change the custom domain in `apps/app/wrangler.web.jsonc` too.
 4. **Secrets** (in `apps/api`, `bunx wrangler secret put <NAME>`):
