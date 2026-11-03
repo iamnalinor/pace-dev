@@ -1211,6 +1211,31 @@ The same rule applies when a previously successful channel is no longer configur
 - **Sweep and guard.** Both Log out buttons (Settings, the versions screen) share `LogoutButton`.
   The half-typed line is already per-account by design (class 103). `settings.test.tsx` pins it.
 
+### 118. A cross-cutting state drawn by every call site on its own
+- **Bug.** Review F-CMP-01 (redesign spec §4.1.1): 21 of the app's 63 pressables gave no feedback at all
+  when pressed, the rest drew it each in its own way (43 `active:opacity-*`, four disabled opacities), and
+  none had a hover or an Android ripple. NativeWind's `active:` is a React state, so even the feedback that
+  existed came a render after the finger, and react-native-web held press-in back another 50 ms.
+- **Missed because.** Each control was written and tested on its own, for what it does when pressed, never
+  for what the person sees while pressing; jest draws no pixels and no test listed the pressables to ask
+  each the same question. Nothing made the shared state the default: a bare React Native `Pressable` was as
+  easy to reach as a kit one.
+- **Rule.** A state every control must show (pressed, hover, focus, selected, disabled) is drawn once, by
+  one kit primitive, and a call site cannot opt out by reaching past it: the raw primitive is banned by
+  lint outside the kit, with the way to the kit in the message. Feedback that must be instant is drawn by
+  the platform (a native ripple, a CSS `:active`), never by a React state.
+- **Sweep and guard.** `ui/pressable.tsx` (+ `.web.tsx`) is the state layer: Android ripple in `fill.3`,
+  web `[data-pace-press]` in `global.css` (hover `fill.1` only for a hovering pointer, pressed `fill.2` in
+  0 ms and out `duration.xs`, forced colours), `delayPressIn={0}` on the web, haptics through
+  `platform/haptics.ts`. Guards: `no-restricted-imports` of React Native's `Pressable`/`Touchable*` in
+  `src/features/**` and `src/shared/**` (a warning held by the exact ratchet `BARE_PRESSABLE_WARNINGS`, 33
+  at introduction, lowered as the kit tasks migrate each caller, then an error); `pace/no-raw-design-values`
+  reports any `active:` class outside `ui/pressable.tsx` as `pressedClass` (the 46 that exist were already
+  counted in `DESIGN_VALUE_WARNINGS`); `pressable.test.tsx`, `pressable.web.test.tsx` and
+  `state-layer.test.ts` (the CSS held to the motion tokens). The callers (Button, IconButton, Chip, rows)
+  move in their own tasks (redesign plan 3.x); `src/screens`, `src/auth` and `src/platform` are not under
+  the import ban yet (four files).
+
 ## Log
 
 New bugs go here with their class; a new class gets its own section above.
@@ -1573,3 +1598,4 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-03 | Full e2e of fix round 1: R23-02's first `LogoutButton` read the outbox (an IndexedDB await) between the press and the log-out; `live.e2e.ts` "a stale tab's late 401…" then failed 2 runs in 3 under parallel load (the tab that logged out showed "You signed out in another tab" and its login form was emptied), and the versions screen asked about an outbox its server can never take (the app's own zone write) | 75 (a session-ending race: a run started in the pause carried the token the log-out then ended; not fully traced, see the report) | yes: the one other place that gained a pause before `auth.logout` was this button; the versions screen goes back to a plain Log out (ruling: nothing can be sent to a server that does not fit, so Wait cannot help) | missed because the app test has no second tab and no sync loop; the count is now read ahead (`useUnsyncedCount`, refreshed on every log and sync change), so a press with nothing unsent logs out with no pause; the stale-tab and versions-screen e2e pass 3/3 each |
 | 2026-11-03 | Design pass M8 (PR A): R23-02's Log out confirm, dropped into Settings' `flex-row flex-wrap` account row, took `flex-1` beside Export data on a computer: the question sat at the row's start and Wait / Log out anyway at its far end, about 500 px apart, with no box tying them (1440, both languages) | 5 (layout that unit tests cannot see; an inline confirm laid out by the row it replaces a button in) | yes: the app's other block confirms (Delete preset, Wipe data / Delete account) are a card on a line of their own (Devices' End session is a row confirm, inside its own row, and keeps that shape); Log out now is too on a computer (`w-full` card), and on a phone, where the row is a column already, it stays bare so «Всё равно выйти» keeps one line at 390 | missed because R23-02 was tested in jest (no layout) and never shot; `sync-state.e2e.ts` "offline, Log out asks first in a block of its own…" at 390 and 1440 (the block starts under Export at its left edge, each button 44–55 px high, Wait focused, Escape gives focus back; red at 1440 on the old layout) |
 | 2026-11-03 | Design pass M8 (PR A): the offline and not-loaded pills were three lines (72 px) in Russian at 390 beside the longer «Попробовать снова» of R23-09 (QA round 21 L9 again); the not-loaded line also said «Пробуем снова…» next to a «Попробовать снова» button | 109 (UI copy lengthened without measuring the narrowest width in Russian) | yes: the only other text sharing a row with a retry label is the Day screen-time line, which sits on its own line above its button; the pills now say spec 5.0.5's line («Нет сети · изменения отправятся позже», "Offline · changes will sync later") and «Данные ещё не загрузились.» / "Your data has not loaded yet." | missed because `offline-pill.e2e.ts` ran in English only; it now checks both pills in Russian at 390 keep to two lines (≤ 56 px; red at 72 before) |
+| 2026-11-03 | Task 3.1 (review F-CMP-01): 21 of 63 pressables drew no press feedback; the rest used NativeWind `active:opacity-*`, a React render late (and 50 ms later again on the web) | 118 (new) | partly: the state layer exists and both bans count every remaining caller (33 bare imports in features/shared, 46 `active:` classes); the callers move in their own kit tasks, each lowering its ratchet | `pressable.test.tsx`, `pressable.web.test.tsx`, `state-layer.test.ts`; `no-restricted-imports` with `BARE_PRESSABLE_WARNINGS`; `pressedClass` in `pace/no-raw-design-values`; `eslint-scoped-bans.test.ts`, `eslint-ratchet.test.ts` |
