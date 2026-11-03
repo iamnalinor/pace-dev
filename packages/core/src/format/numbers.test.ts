@@ -65,7 +65,10 @@ describe("formatPercent", () => {
 
 const fresh = async () => await import("./numbers.ts");
 
-describe("without a working Intl.NumberFormat", () => {
+/** `fresh` loads the module afresh: a cold transform can outlast vitest's 5 s default under load. */
+const FRESH_IMPORT_MS = 30_000;
+
+describe("without a working Intl.NumberFormat", { timeout: FRESH_IMPORT_MS }, () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.resetModules();

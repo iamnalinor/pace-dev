@@ -1148,6 +1148,40 @@ The same rule applies when a previously successful channel is no longer configur
 - **Rule.** Replacing a native control with a drawn one inherits none of the native keyboard contract: write down what the native one did (Space, Enter, arrows, focus ring) and give the drawn one the same, on the web through `spacePress` (`ui/space-press.web.ts`). A page-wide rule is checked in the browser, against the computed style of each kind of control it is meant to reach, not by reading the stylesheet.
 - **Sweep and guard.** Every `Pressable` with role radio, checkbox or switch now spreads `spacePress`; the input rule excludes the slider. Guards: `space-press.web.test.ts`, `e2e/keyboard.e2e.ts` (Space on a switch and a chip; the computed ring of a switch and of the range slider is the focus role), a stylesheet test that no input-hiding rule reaches the slider. Disabled controls get no action: `spacePress(onPress, isDisabled)` (a sent subtask is `disabled`, react-native-web leaves it click-focusable and the browser still delivers Space, which revoked its solved mark), guarded by `task-screen.test.tsx` and `space-press-callers.test.ts` (a file that disables a control passes the state). `spacePress` goes on radio, checkbox, switch and tab roles, never on `role="button"` or a native `<button>` (they press on Space already: it would fire twice); the phone's tab bar has it too.
 
+### 114. An autofix that changes what the code means
+- **Bug.** pr48 follow-ups (implementers, round 7): `bun lint` turned the drain's getter
+  `() => inFlight` (a `Promise | undefined`) into `async () => await inFlight`. The getter never
+  answered `undefined` again, so `drain`'s loop `run !== undefined` never ended and `sync.hold`
+  hung. `@typescript-eslint/promise-function-async` reports a "hybrid" return (a promise or
+  something else) and still inserts `async`; `return-await` (`always`) then adds the `await`.
+- **Missed because.** The fix runs inside `bun lint`, which every change runs and nobody reads as a
+  code change; the sync tests caught it only because a hold happened to be tested. Nothing tested
+  the lint config's fixes themselves.
+- **Rule.** An autofix may only change form, never meaning. A rule whose fix can change what a
+  function returns (adds `async`, unwraps, narrows) keeps its report and loses that fix: run it
+  through a `pace/` wrapper that drops the fix for the case, never an inline disable. A function
+  that answers a promise or something else carries an explicit return type (the upstream message
+  says so).
+- **Sweep and guard.** `pace/promise-function-async` (`scripts/eslint-rules/promise-function-async.ts`)
+  runs the upstream rule and drops its fix for `missingAsyncHybridReturn`; its RuleTester pins
+  "reported, output unchanged" and a config test pins that the upstream rule stays off. Swept:
+  `return-await`'s fix only adds `await` inside an `async` function (no change of meaning on its
+  own). The config's many other fixers (unicorn, perfectionist, stylistic) were not audited one by
+  one: a reviewer reads what `bun lint` changed in a diff like any other code.
+
+### 115. A test's time budget set on an idle machine
+- **Bug.** pr48 follow-ups (implementers): `ids-no-prng.test.ts` timed out once under load. Each
+  of its tests loads `ids.ts` and ulidx afresh after `vi.resetModules()`; the cold transform took
+  more than vitest's 5 s default while the rest of the suite ran.
+- **Missed because.** The suite is written and run on a machine with time to spare; a cold import
+  costs milliseconds there. `initials.test.ts` had met the same thing and got its own timeout,
+  but nothing carried that to other files that import afresh.
+- **Rule.** A test whose work grows with the machine's load (a fresh import of a module graph, a
+  real worker start) states its own timeout, sized for a loaded CI runner, next to a line saying why.
+- **Sweep and guard.** Every test file that calls `vi.resetModules()` and imports afresh
+  (`ids-no-prng`, `numbers`, `initials`); `scripts/fresh-import-timeout.test.ts` fails a new one
+  without a `timeout:`.
+
 ## Log
 
 New bugs go here with their class; a new class gets its own section above.
@@ -1491,3 +1525,5 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-03 | pr48 follow-up (self-hosting): `/.well-known/oauth-protected-resource/mcp` answered 404 when the Worker was reached at another host than `API_ORIGIN` (a proxy, a LAN name): the OAuth provider serves it only at the canonical URL | 102 (an address bound to an identity: here the identity's document was only answered at the identity's own address) | yes: the provider's other well-known (`oauth-authorization-server`) answers at any host already; its 401 challenge at another host names no metadata (RFC 9728 §3.3, left as the library has it) and a token used there is refused "Invalid audience" before our handler; our own `invalid_token` challenge now names `<own origin>/.well-known/…` (it built the URL from the request), one constant `MCP_RESOURCE_METADATA_PATH` | `oauth.int.test.ts` (reached at `https://pace.lan:8443`: 200 and the canonical `resource`; another path of the namespace still 404) |
 | 2026-11-03 | pr48 follow-up (self-hosting), found in the sweep: a blank or malformed `API_ORIGIN` took the whole Worker down (every request a `TypeError` from the OAuth provider's constructor, "resource must be an absolute HTTPS URI"), though the config and `docs/self-hosting.md` say it is ignored and the reached origin used | 1 (one decision, "the Worker's own origin", made in three places: the config, `/api/instance`, the provider's construction) | yes: every reader of `API_ORIGIN` (`worker.ts`, `app.ts`'s instance, the MCP challenge) goes through `ownOrigin` in `shared/config.ts` | `oauth.int.test.ts` (the Worker with `API_ORIGIN: "  "`: `/api/instance` and the resource metadata answer with the reached origin; red before: `TypeError`) |
 | 2026-11-03 | QA round 21 L6: the line under Connect an AI app's URL said "This server's public address differs from the one this device uses.", naming neither address nor what to do | 99 (a failure's reason dropped at a boundary: the two addresses were known and not said) | yes: the other place the two addresses meet (Add a computer's `--api`, the reached one by design, class 83) needs no line; `docs/self-hosting.md` now says which address each one is | `sessions.test.tsx` (the line names the device's address, that AI apps need the one above, and the `API_ORIGIN` remedy; EN and RU) |
+| 2026-11-03 | pr48 follow-up (tooling): lint autofix turned `() => inFlight` into `async () => await inFlight`, and the drain over it never ended (`sync.hold` hung; the tests caught it) | 114 (new) | yes: `return-await` alone only adds `await` where the function is already `async`; the hybrid-return fix of `promise-function-async` was the one that changes meaning | `pace/promise-function-async` replaces the upstream rule (report kept, fix dropped for `missingAsyncHybridReturn`); `promise-function-async.test.ts` (RuleTester red before: the output had `async`; the resolved config runs `pace/` and not upstream) |
+| 2026-11-03 | pr48 follow-up (tooling): `ids-no-prng.test.ts` timed out once under load (5 s default) | 115 (new) | yes: every file that calls `vi.resetModules()` and imports afresh (`numbers.test.ts` had no timeout either; `initials.test.ts` had one) | both get `FRESH_IMPORT_MS` (30 s); `scripts/fresh-import-timeout.test.ts` (red before: both files listed) |

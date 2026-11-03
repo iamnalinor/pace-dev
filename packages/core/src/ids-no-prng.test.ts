@@ -24,7 +24,13 @@ afterEach(() => {
   vi.resetModules();
 });
 
-describe("ids on a platform without a PRNG yet", () => {
+/**
+Each test loads `ids.ts` and ulidx afresh (after `vi.resetModules()`): a cold transform that on a
+loaded machine outlasts vitest's 5 s default (it once timed out, pr48 follow-up A8).
+*/
+const FRESH_IMPORT_MS = 30_000;
+
+describe("ids on a platform without a PRNG yet", { timeout: FRESH_IMPORT_MS }, () => {
   it("loads: the PRNG is looked up at the first id, not on import", async () => {
     platform.hasPrng = false;
     await expect(import("./ids.ts")).resolves.toHaveProperty("newId");

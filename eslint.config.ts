@@ -37,6 +37,12 @@ const required = <T>(value: T | undefined, name: string): T => {
   return value;
 };
 
+/** The type-aware rules off, for files linted without types (ours too: it reads return types). */
+const UNTYPED_RULES = {
+  ...tseslint.configs.disableTypeChecked.rules,
+  "pace/promise-function-async": "off",
+} as const;
+
 /** Syntax banned everywhere; a block that adds its own entries must spread these (the option replaces). */
 const RESTRICTED_SYNTAX = [
   {
@@ -166,7 +172,13 @@ export default defineConfig([
       parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
     },
     linterOptions: { reportUnusedDisableDirectives: "error", reportUnusedInlineConfigs: "error" },
+    plugins: { pace },
     rules: {
+      // Upstream's `promise-function-async` also autofixes a function that answers a promise *or*
+      // something else (`() => inFlight`), and `return-await` then makes it
+      // `async () => await inFlight`: it never answers `undefined` again (the `sync.hold` hang,
+      // pr48 follow-up A8). `pace/` runs the same rule and keeps the report, without that fix.
+      "pace/promise-function-async": "error",
       "@typescript-eslint/consistent-type-definitions": ["error", "type"],
       "@typescript-eslint/consistent-type-exports": "error",
       "@typescript-eslint/consistent-type-imports": [
@@ -187,7 +199,6 @@ export default defineConfig([
       ],
       "@typescript-eslint/no-useless-empty-export": "error",
       "@typescript-eslint/prefer-readonly": "error",
-      "@typescript-eslint/promise-function-async": "error",
       "@typescript-eslint/require-array-sort-compare": "error",
       "@typescript-eslint/return-await": ["error", "always"],
       "@typescript-eslint/restrict-template-expressions": ["error", { allowNumber: true }],
@@ -462,7 +473,7 @@ export default defineConfig([
       // React 19's ReactNode includes Promise, so this rule would "fix" components that
       // return children into `async` components — which breaks them. Async code in the
       // UIs is still covered by no-floating-promises / no-misused-promises.
-      "@typescript-eslint/promise-function-async": "off",
+      "pace/promise-function-async": "off",
       "max-lines-per-function": ["error", { max: 80, skipBlankLines: true, skipComments: true }],
     },
   },
@@ -517,7 +528,7 @@ export default defineConfig([
       parserOptions: { project: false, projectService: false },
       sourceType: "script",
     },
-    rules: { ...tseslint.configs.disableTypeChecked.rules },
+    rules: UNTYPED_RULES,
   },
   {
     files: APP_JS_CONFIGS,
@@ -533,7 +544,7 @@ export default defineConfig([
       sourceType: "commonjs",
     },
     rules: {
-      ...tseslint.configs.disableTypeChecked.rules,
+      ...UNTYPED_RULES,
       // Expo loads these with Node's CommonJS loader.
       "@typescript-eslint/no-require-imports": "off",
       "unicorn/prefer-module": "off",
@@ -553,7 +564,7 @@ export default defineConfig([
       sourceType: "script",
     },
     rules: {
-      ...tseslint.configs.disableTypeChecked.rules,
+      ...UNTYPED_RULES,
       // A classic script: no modules, nothing to export.
       "unicorn/prefer-module": "off",
     },
