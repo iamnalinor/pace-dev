@@ -3,6 +3,9 @@
 Branch: worktree branch, pushed as `wip/task-3.9`. Base: `a67cc50` (PR B's tip; the worktree had been
 created on `main`, it was reset onto B's tip before any work).
 
+Commits: `202929a` the controls (all bullets); `99973ba` e2e fixes (destructive contrast, gallery
+wrap, badge hang in the sweep, stale F-DAT-01 entries); then this report.
+
 ## What shipped, per bullet
 - **Pressable shape / disabled / small-visual pattern (parked N1): done.** `shape` (radius token on
   the drawn box), `visual` (the drawn box when smaller than the target: the Pressable is the 48/44
@@ -51,6 +54,35 @@ created on `main`, it was reset onto B's tip before any work).
 - **Bug-lessons:** class 123 (new, F-COL-09 "contrast asserted for text only") + log rows for
   F-COL-09 (123), F-DAT-10 (6), QA21 L1 / chip press area (84), R23-10 (84), F-DAT-02 tags (109).
   `pairs.ts` gained the controls' marks.
+
+## Deviations
+- Button `destructive` is `bg.cell` in a 2 px danger ring, not the spec's `status.dangerQuiet`
+  fill: the danger label is 4.31:1 on that fill over the page (axe, `sync-state.e2e.ts`).
+- Segmented thumb gets a `label.tertiary` hairline (the bare `bg.elevated` thumb is 1.1:1 on the
+  track); track height = the target (48/44), not a 40 visual.
+- Tag padX 8 (spec 4) so the pill's curve clears the text; `min-h-5`, no fixed height.
+- Small button 32 (spec §4.2.3), not the plan's 36 (no 36 on the scale).
+- Skeleton bars stay `label.quaternary` (spec says `fill.3`, which fails the 1.5:1 guard);
+  breath unchanged (motion is Task 5.x).
+- EmptyState callers pass their one sentence as `title`; splitting copy into title/body is 4.x/4.13.
+- Android ripple of a small-visual control fills the target box (rounded by `shape`), not only the
+  visual — verify on hardware.
+
+## Tests
+- `bun test:app`: 150 suites, 1101 tests, all green.
+- `bun lint`: clean; ratchets lowered: design values 68 → 56, bare pressables 32 → 28, kit
+  primitives 10 → 8.
+- e2e (through the lock): `worst-case`, `sync-state`, `composer`, `keyboard` green (after fixes:
+  the destructive contrast, the gallery choice rows, the badge hang exemption, two stale F-DAT-01
+  entries removed).
+- F-DAT-02 entries in `worst-case.e2e.ts` ("Домашка по алгебре 6", "Алгебра", "Это не я", the worst
+  set's two) still match: they are not tags (time-bar / week labels / notification buttons, owned by
+  4.x); no Tag break is left, so there was no tag marker to remove.
+
+## Verify on Android hardware
+Ripple on small-visual controls (chips, switch, check circle, small buttons) and on whole-row
+toggles; the check circle's `confirm` haptic; the drawn switch in both themes; the slider's held
+step after release; the bell badge position at font scale 1.6.
 
 ## Files of the parallel implementers touched (mechanical, expect trivial conflicts)
 `ui/sheet.tsx` (IconButton `variant` dropped), `ui/sheet-actions.tsx` (`hotkey`→`shortcut`,
