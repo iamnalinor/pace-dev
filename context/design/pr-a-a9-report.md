@@ -185,7 +185,45 @@ worse of the two.
 
 ## Verification
 
-VERIFICATION_PLACEHOLDER
+Every run is on tip f63003a, the last code commit; the report commit follows it.
+
+**Lint.** `bun lint` passes with 0 errors. The design-value ratchet stays at exactly 74 warnings.
+
+**Unit, API and app suites:**
+
+| Suite | Result |
+|---|---|
+| `bun test:unit`, core | 878 passed |
+| `bun test:unit`, client | 517 passed |
+| `bun test:api` | 608 passed, 64 files |
+| `bun test:app` | 904 passed, 121 suites |
+
+**Full `bun test:e2e`** (fresh servers; :8787 and :4173 were free beforehand): 203 passed and 1
+failed, in 17.2 min.
+- **The failure.** `latency.e2e.ts` "a task row opening its screen" measured p75 296 ms against its
+  240 ms regression ceiling.
+- **Rerun.** The latency project was rerun alone (`--project=latency --no-deps`) and passed 10/10. The
+  task row passed too.
+- **Why it is noise.** The budget measures the CPU (4× throttling), and the full run shares the machine.
+  This change does not touch the task row or navigation. Tap latency is the open item that Task 5.6
+  owns.
+
+**New tests, each seen red before its fix:**
+
+| File | Cases |
+|---|---|
+| `oauth-session.int.test.ts` | 7 |
+| `oauth.test.tsx` | 3 new and 1 extended |
+| `sign-in-path.test.ts` | 1 |
+| `e2e/oauth-consent.e2e.ts` | 4 |
+| `app-state.test.tsx` (M1) | 1 |
+| `event-store.web.test.ts` (M2) | 3 |
+| `create-client.test.ts` (M7) | 1 |
+
+**Exceptions to "red first":**
+- `sign-in-path.test.ts` was written together with the helper it moved into.
+- The e2e cases were seen failing only for the reasons this report describes: the router's spelling of
+  the query, and the socket race.
 
 ## Concerns
 
