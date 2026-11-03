@@ -574,6 +574,7 @@ onPress>` (fills on press-in, `haptic="confirm"`, 48 dp target without negative 
       tags; `CountBadge` 120 → "99+".
 - [ ] Bug-lessons: F-COL-09 (off switch knob, new class "contrast asserted for text only"), F-DAT-10
       (class 6). Commit.
+- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): `ListRow` `toggle` (the whole row flips its Switch) and `select` (a radio with a trailing check) variants.
 
 ### Task 3.10: Sidebar and TabBar
 
@@ -591,6 +592,7 @@ toast/overlay layer.
 - [ ] Commit.
 
 ---
+- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): sidebar rows on `ListRow`/`NavItem` with the same 4 px selected bar as `ListRow`; rail haptics; the header scroll-edge fill (F-LAY-13: `bg.app` + a `separator` hairline once content scrolls under `ScreenHeader`), which no task owned.
 
 ## Batch 4 — Shared rows and screens (PR "Design overhaul 3/7: screens")
 
@@ -610,6 +612,7 @@ due as one formatted string).
       ≤ 40 row components initially; e2e — expanding a 1 050-row fold renders in < 500 ms and p95
       frame < 32 ms at 390 (F-DAT-03).
 - [ ] Commit.
+- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): `SectionHeader collapsible` (a `Disclosure` trigger), TaskRow on `ListRow`, the task folds on `Disclosure`.
 
 ### Task 4.2: Running card, time bar, pickers
 
@@ -627,6 +630,7 @@ whole bar folds only past the 40 % region budget (§3.3).
       start, stop and "past expected" once (F-A11Y-10, new bug-lessons class "Live region around a
       ticking value").
 - [ ] Commit.
+- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): the time bar's fold (`time-bar-fold.tsx`) merges in on the kit `Disclosure`/`Presence`.
 
 ### Task 4.3: Now
 
@@ -643,6 +647,7 @@ now-screen) (+ tests).
 - [ ] PR #48 follow-up: QA21 M2, a direct load of `/add` (the manifest's share and shortcut URL)
       focuses the New task form's field on a touch phone too (see "PR #48 follow-ups (triage)").
       QA round 23 R23-12 found it on a computer too (bare `/add` at 1440: focus on `BODY`).
+- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): Now's split becomes the Shell inspector (collapsed with nothing picked; the medium inspector as a sheet); the left-anchored content x = 280 and the 720 list column; "Show all" toggles on `Disclosure`; the composer's animated height without a clipped frame (the reviewer's design: grow the card ~160 ms on `easing.enter` with the new content laid out at opacity 0, fade it in ~120 ms from the grow's completion, the preview's Presence after it; reverse: fade 110, then shrink 160; `expectDescendantsStayInside` then counts only boxes with an effective opacity above 0). See spec §6 "composer unfold".
 
 ### Task 4.4: Day (structure; the line signature is Task 7.1)
 
@@ -653,6 +658,7 @@ now-screen) (+ tests).
 - [ ] Failing tests: Today button absent on today, present on another day; day switch replaces
       content with no crossfade (F-MOT-07). Commit.
 - [ ] PR #48 follow-up: QA21 L3, the activity sheet offers no end on the next day (see "PR #48 follow-ups (triage)").
+- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): `PeriodStepper` in the `ScreenHeader` `period` slot (DayNav sits there for now).
 
 ### Task 4.5: Task detail (screen and inspector)
 
@@ -690,6 +696,7 @@ label).
       last hour, or a joined target), with a test that places a 3-minute item at 23:56 and asserts
       its whole target is inside the scroller and covers no neighbour.
 - [ ] PR #48 follow-up: lanes below 44 px past six on a phone (see "PR #48 follow-ups (triage)").
+- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): `PeriodStepper` in the `ScreenHeader` `period` slot (WeekNav sits there for now).
 
 ### Task 4.7: Inbox, Review, Decisions
 
@@ -699,6 +706,7 @@ label).
       (F-A11Y-18). Commit.
 - [ ] PR #48 follow-up: QA21 L7, the rules preview says why the assistant is unavailable, per reason
       (see "PR #48 follow-ups (triage)").
+- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): Inbox's inspector on the Shell (and its medium sheet); Inbox's "Show all" toggles on `Disclosure`.
 
 ### Task 4.8: Projects, project page, presets
 
@@ -719,6 +727,7 @@ label).
       bars share one value column (F-LAY-14), period control as Day (F-CMP-05), charts use the hue
       family. Failing test: RU tile labels at 390 have no hyphenless word split (e2e text-metrics
       check). Commit.
+- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): `PeriodStepper` in the `ScreenHeader` `period` slot (WeekNav sits there for now).
 
 ### Task 4.10: History and Notifications
 
@@ -726,6 +735,7 @@ label).
 - [ ] History rows as `ListRow` with a single trailing "Undo" only on the latest undoable event of a
       group (F-CMP-14), snapshot rows not checkbox-like; Notifications feed grouped by day,
       virtualised. Commit.
+- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): Notifications as a top-level `ScreenHeader` destination on desktop; History's `PeriodStepper` in the `period` slot.
 
 ### Task 4.11: Settings
 
@@ -795,6 +805,7 @@ generated constants), presets `fadeIn/Out`, `riseIn/Out`, `sheetIn/Out`, `dialog
       scale ≥ 0.95; route push on web has ≥ 3 intermediate frames. Commit.
 - [ ] PR #48 follow-up: QA21 L2, the close sheet's height animates when its outcome changes
       (see "PR #48 follow-ups (triage)").
+- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): the §6 rows the kit built get their motion review here: "row → inspector" (built in fix round 1 as a `Presence slide` in the Shell; check the pane width does not animate when already open) and the disclosure close easing (`exit`, amended in §6).
 
 ### Task 5.6: Render budget — every latency case inside 100 ms
 
@@ -837,6 +848,7 @@ session so the first paint uses it), `ui/shell.web.tsx` (main, skip link).
       a big RU account's first screenshot after load contains no English UI string (F-DAT-04,
       bug-lessons 22); one `main` landmark and a skip link.
 - [ ] Commit.
+- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): the phone web's `main` landmark and skip link (the Shell gives them only beside a navigation region today; an `isRoot` prop).
 
 ### Task 6.2: Mobile-web baseline in `global.css`
 
@@ -849,6 +861,7 @@ session so the first paint uses it), `ui/shell.web.tsx` (main, skip link).
       touch hold); with a reduced visual viewport the focused time-bar field is inside it.
 - [ ] Bug-lessons: new classes "Browser default gesture left on" (F-WEB-06) and "A reload path that
       drops unsaved drafts" (Task 6.3). Commit.
+- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): `ui/screen.web.tsx`, the window scrolls on desktop (Task 3.4's brief): `body` no longer `overflow: hidden` in the generated `index.html`, the stack scenes and the fixed footer moved with it; the browser's scroll restoration, Space/PageDown from `body`, find-in-page, and `overscroll-behavior` on `html`. Until then the content region's scroller spans the region (`layout.e2e.ts` checks the wheel over the gutter).
 
 ### Task 6.3: Update banner, manifest, icons, favicons
 
