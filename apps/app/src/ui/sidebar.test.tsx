@@ -60,7 +60,7 @@ describe("Sidebar", () => {
     ]);
   });
 
-  it("goes to a destination by its address, navigated to rather than pushed (the web's `<a href>`: link.web.test, e2e/link)", async () => {
+  it("hands each destination's address to its link (navigate, not push, is the kit Link's: link.test; the web's `<a href>`: link.web.test, e2e/link)", async () => {
     await renderScreen(<Sidebar />, await createTestRuntime({ world: "empty" }));
     await fireEvent.press(screen.getByRole("link", { name: en("nav.week") }));
     expect(router.navigate).toHaveBeenCalledWith("/week");

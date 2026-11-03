@@ -1,4 +1,5 @@
-import { fireEvent, screen } from "@testing-library/react-native";
+import { act, fireEvent, screen } from "@testing-library/react-native";
+import { router, Stack, usePathname } from "expo-router";
 import { renderRouter } from "expo-router/testing-library";
 import { Linking, Text } from "react-native";
 
@@ -11,6 +12,16 @@ const routes = (link: React.ReactNode) => ({
   index: () => <ThemeProvider forced="light">{link}</ThemeProvider>,
   week: () => <Text>Week screen</Text>,
 });
+
+/** A page that says where it is, with a link to Week. */
+const Page = () => (
+  <ThemeProvider forced="light">
+    <Text>{`at ${usePathname()}`}</Text>
+    <Link href="/week" label="Week">
+      <Text>Week</Text>
+    </Link>
+  </ThemeProvider>
+);
 
 describe("Link (spec §4.1.1)", () => {
   it("is a link with the kit's state layer that goes to its address", async () => {
@@ -39,5 +50,18 @@ describe("Link (spec §4.1.1)", () => {
     await fireEvent.press(screen.getByRole("link", { name: "Algebra" }));
     expect(open).toHaveBeenCalledWith("https://example.com/algebra");
     open.mockRestore();
+  });
+
+  it("navigates rather than pushes: an open destination is shown again, not stacked twice (the sidebar's rule)", async () => {
+    await renderRouter({ _layout: () => <Stack />, index: Page, week: Page }, { initialUrl: "/" });
+    await fireEvent.press(screen.getByRole("link", { name: "Week" }));
+    expect(await screen.findByText("at /week")).toBeOnTheScreen();
+    // Pressed again on the open destination: one Week above Now still, so Back leads to Now.
+    await fireEvent.press(screen.getAllByRole("link", { name: "Week" }).at(-1) as never);
+    await act(async () => {
+      router.back();
+    });
+    expect(await screen.findByText("at /")).toBeOnTheScreen();
+    expect(router.canGoBack()).toBe(false);
   });
 });

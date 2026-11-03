@@ -32,6 +32,21 @@ describe("Link on the web", () => {
     expect(await screen.findByText("Week screen")).toBeOnTheScreen();
   });
 
+  it("has no address while disabled: the browser would follow an href the press refuses", async () => {
+    await renderRouter(
+      routes(
+        <Link disabled href="/week">
+          <Text>Week</Text>
+        </Link>,
+      ),
+    );
+    const link = screen.getByRole("link", { name: "Week" });
+    expect(link.props["href"]).toBeUndefined();
+    expect(link).toBeDisabled();
+    await fireEvent.press(link);
+    expect(screen.queryByText("Week screen")).toBeNull();
+  });
+
   it("opens an address outside the app in a new tab, without the opener", async () => {
     await renderRouter(
       routes(
