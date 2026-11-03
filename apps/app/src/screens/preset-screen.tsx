@@ -53,7 +53,7 @@ export const PresetScreen = ({
     <PushedScreen title={presetLabel(preset, language)}>
       <PresetForm
         canDelete={!preset.archived && preset.id !== "inbox"}
-        initial={editorDraft(preset)}
+        initial={editorDraft(preset, language)}
         isNew={false}
         key={preset.id}
         onDone={done}

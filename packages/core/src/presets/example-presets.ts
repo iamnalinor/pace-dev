@@ -1,6 +1,7 @@
 import type { EventInput } from "../events/event-schema.ts";
 import type { PresetDefinition } from "../model/preset.ts";
 
+import { type Language, t } from "../i18n/i18n.ts";
 import { presetById, type PresetsState } from "./preset-reducer.ts";
 import { isPresetNameFree } from "./resolve-preset.ts";
 
@@ -10,11 +11,8 @@ export type ExamplePresetId = (typeof EXAMPLE_PRESET_IDS)[number];
 
 const MOSCOW = "Europe/Moscow";
 
-const EXAMPLES: Readonly<
-  Record<ExamplePresetId, { readonly name: string; readonly definition: PresetDefinition }>
-> = {
+const EXAMPLES: Readonly<Record<ExamplePresetId, { readonly definition: PresetDefinition }>> = {
   "hw.algebra": {
-    name: "Algebra HW",
     definition: {
       deadlinePolicy: { kind: "resubmission", softDays: 7, finalAt: null, finalTz: null },
       recurrence: {
@@ -25,7 +23,6 @@ const EXAMPLES: Readonly<
     },
   },
   "hw.calculus": {
-    name: "Calculus HW",
     definition: {
       recurrence: {
         issued: { weekday: 2, time: "12:00" },
@@ -35,7 +32,6 @@ const EXAMPLES: Readonly<
     },
   },
   "hw.history": {
-    name: "History HW",
     definition: {
       defaultImportance: "nice_to_have",
       recurrence: {
@@ -47,17 +43,33 @@ const EXAMPLES: Readonly<
   },
 };
 
+/** Each example's name key: a seed is written in the account's language (QA round 23 R23-06). */
+const NAME_KEYS = {
+  "hw.algebra": "preset.example.algebra",
+  "hw.calculus": "preset.example.calculus",
+  "hw.history": "preset.example.history",
+} as const satisfies Record<ExamplePresetId, string>;
+
 /**
-The one-click seed offered on first login. The ids are fixed, so applying the seed
-again creates nothing: the reducer ignores a `preset.created` for an existing id.
+The one-click seed offered on first login, named in `language` (the account's). The ids are
+fixed, so applying the seed again creates nothing: the reducer ignores a `preset.created` for an
+existing id.
 */
-export const exampleCoursePresetEvents = (now: string): readonly EventInput[] =>
+export const exampleCoursePresetEvents = (
+  now: string,
+  language: Language = "en",
+): readonly EventInput[] =>
   EXAMPLE_PRESET_IDS.map((id) => ({
     type: "preset.created",
     occurredAt: now,
     precision: "exact",
     source: "web",
-    payload: { id, name: EXAMPLES[id].name, extends: "hw", definition: EXAMPLES[id].definition },
+    payload: {
+      id,
+      name: t(language, NAME_KEYS[id]),
+      extends: "hw",
+      definition: EXAMPLES[id].definition,
+    },
   }));
 
 /**

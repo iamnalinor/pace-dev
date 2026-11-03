@@ -32,6 +32,26 @@ describe("historyViewModel", () => {
     });
   });
 
+  it("names the preset a preset event is about, as it is called now (QA round 23 R23-07)", async () => {
+    const world = await setupActions([]);
+    const [created] = unwrap(
+      await world.actions.createPreset({ definition: {}, extends: "hw", id: "gym", name: "Gym" }),
+    );
+    const [renamed] = unwrap(
+      await world.actions.updatePreset({ definition: {}, extends: "hw", id: "gym", name: "Swim" }),
+    );
+    const [archived] = unwrap(await world.actions.archivePreset("gym"));
+    const named = (id: string | undefined) =>
+      historyViewModel(world.state.store.getState(), { atIso: NOW, deviceTz: MOSCOW }).events.find(
+        (entry) => entry.id === id,
+      )?.taskTitle;
+    expect([named(created?.id), named(renamed?.id), named(archived?.id)]).toEqual([
+      "Swim",
+      "Swim",
+      "Swim",
+    ]);
+  });
+
   it("shows the board at an instant and the log newest first with what can be undone", async () => {
     const world = await setupActions();
     const [solved] = unwrap(await world.actions.markSolved(HW_ID, "s5"));

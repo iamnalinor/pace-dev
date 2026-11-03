@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { BASE_PRESETS, INITIAL_PRESETS_STATE, newId, PresetIdSchema } from "@pace/core";
+import {
+  BASE_PRESETS,
+  INITIAL_PRESETS_STATE,
+  newId,
+  PresetIdSchema,
+  storedPresetName,
+} from "@pace/core";
 
 import {
   definitionIssues,
@@ -131,6 +137,17 @@ describe("editorDraft", () => {
       id: "work",
       name: "Work",
     });
+  });
+
+  it("opens a default under the name the account's language shows (QA round 23 R23-06)", () => {
+    expect(editorDraft(BASE_PRESETS.work, "ru").name).toBe("Работа");
+    // A default someone renamed keeps what they typed.
+    expect(editorDraft({ ...BASE_PRESETS.work, name: "Job" }, "ru").name).toBe("Job");
+    // Saved unchanged, in either language, it keeps its shipped name (shown per language).
+    expect(storedPresetName("work", "Работа")).toBe(BASE_PRESETS.work.name);
+    expect(storedPresetName("work", " Work ")).toBe(BASE_PRESETS.work.name);
+    expect(storedPresetName("work", "Job")).toBe("Job");
+    expect(storedPresetName("gym-x", "Работа")).toBe("Работа");
   });
 
   it("opens an edited default preset and a user preset on what they store", () => {

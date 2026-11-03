@@ -2,10 +2,12 @@ import {
   BASE_PRESETS,
   foldToLatin,
   isBuiltInPreset,
+  type Language,
   type Preset,
   type PresetDefinition,
   PresetDefinitionSchema,
   type PresetFields,
+  presetLabel,
   type PresetsState,
   type ResolvedPreset,
   resolvePreset,
@@ -28,15 +30,19 @@ export type PresetDraft = {
   readonly definition: PresetDefinition;
 };
 
-/** A default preset that was never edited still stores its shipped values: nothing is overridden. */
-export const editorDraft = (preset: Preset): PresetDraft => ({
+/**
+A default preset that was never edited still stores its shipped values: nothing is overridden.
+Its name is the one the list shows in `language` (QA round 23 R23-06: the field said "Work" under
+«Работа»); `storedPresetName` gives the shipped name back on save.
+*/
+export const editorDraft = (preset: Preset, language: Language = "en"): PresetDraft => ({
   definition:
     isBuiltInPreset(preset.id) && preset.definition === BASE_PRESETS[preset.id].definition
       ? {}
       : preset.definition,
   extends: preset.extends,
   id: preset.id,
-  name: preset.name,
+  name: presetLabel(preset, language),
 });
 
 /** A new preset starts from a parent, with nothing of its own yet. */

@@ -7,6 +7,7 @@ import {
   presetById,
   type PresetInput,
   type PresetInputMode,
+  storedPresetName,
   validatePresetInput,
 } from "@pace/core";
 
@@ -35,7 +36,9 @@ const savePreset = async (
   if (!definition.ok) {
     return err("preset/invalid-definition");
   }
-  const { id, name, order } = input;
+  const { id, order } = input;
+  // A default given back its label in the editor's language keeps its shipped name (R23-06).
+  const name = storedPresetName(id, input.name);
   const parent = input.extends;
   return await emit(deps, [
     stamp(
@@ -116,8 +119,8 @@ export const presetActions = (deps: ActionDeps): PresetActions => ({
   movePreset: movePreset(deps),
   createPreset: async (input) => await savePreset(deps, input, "create"),
   seedExamplePresets: async () => {
-    const { presets } = deps.state.store.getState();
-    const missing = exampleCoursePresetEvents(deps.clock.now()).filter((input) =>
+    const { presets, settings } = deps.state.store.getState();
+    const missing = exampleCoursePresetEvents(deps.clock.now(), settings.language).filter((input) =>
       isExampleToSeed(presets, input),
     );
     return await emit(

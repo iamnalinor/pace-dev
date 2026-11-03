@@ -10,6 +10,7 @@ import {
   presetById,
   type PresetValidationError,
   type Result,
+  storedPresetName,
   validatePresetInput,
 } from "@pace/core";
 
@@ -62,7 +63,10 @@ export const seedExamplePresets = defineTool({
     const skipped: string[] = [];
     return await runWrite(ctx, args, {
       build: (scope, when) => {
-        const seeds = exampleCoursePresetEvents(when.at).filter((event) => isPresetCreated(event));
+        // Named in the account's language (QA round 23 R23-06).
+        const seeds = exampleCoursePresetEvents(when.at, scope.state.settings.language).filter(
+          (event) => isPresetCreated(event),
+        );
         for (const seed of seeds) {
           // Skipped: an example already there, or one whose name a preset goes by (review M6).
           const list = isExampleToSeed(scope.state.presets, seed) ? created : skipped;
@@ -155,7 +159,7 @@ export const updatePreset = defineTool({
                   definition: args.definition,
                   extends: args.extends,
                   id: args.id,
-                  name: args.name,
+                  name: args.name === undefined ? undefined : storedPresetName(args.id, args.name),
                 },
                 type: "preset.updated",
               }),

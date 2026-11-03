@@ -193,7 +193,7 @@ export {
   type ExamplePresetId,
   isExampleToSeed,
 } from "./presets/example-presets.ts";
-export { byPresetOrder, presetLabel } from "./presets/preset-label.ts";
+export { byPresetOrder, presetLabel, storedPresetName } from "./presets/preset-label.ts";
 export {
   INITIAL_PRESETS_STATE,
   presetById,

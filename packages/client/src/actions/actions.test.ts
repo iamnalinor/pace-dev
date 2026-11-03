@@ -718,6 +718,15 @@ describe("presets", () => {
     await expect(world.actions.seedExamplePresets()).resolves.toEqual({ ok: true, value: [] });
   });
 
+  it("seeds the examples in the account's language (QA round 23 R23-06)", async () => {
+    const world = await setupActions([]);
+    unwrap(await world.actions.setLanguage("ru"));
+    const seeded = unwrap(await world.actions.seedExamplePresets());
+    expect(
+      seeded.map((event) => (event.type === "preset.created" ? event.payload.name : null)),
+    ).toEqual(["ДЗ по алгебре", "ДЗ по матанализу", "ДЗ по истории"]);
+  });
+
   it("leaves out an example whose name a preset already goes by (review M6)", async () => {
     const world = await setupActions([]);
     unwrap(
