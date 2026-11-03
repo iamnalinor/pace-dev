@@ -45,6 +45,12 @@ export type TextProps = Omit<NativeTextProps, Owned> &
     readonly level?: HeadingLevel | undefined;
     /** Chrome (tab labels, badges, bar buttons): font scaling capped at 1.6 (spec §3.2). */
     readonly chrome?: boolean | undefined;
+    /**
+    The full value of a cut text whose children are not one plain string (a name built of parts):
+    the web's `title` carries it, so the value stays readable (spec §4.1.2 rule 4). A plain string
+    child is its own full value.
+    */
+    readonly full?: string | undefined;
   };
 
 /** Each role's class, spelled out so Tailwind finds it (`numeric.live` is `text-numeric-live`). */
@@ -94,6 +100,7 @@ Splits the kit's props into what the native Text gets on both platforms and what
 export const textProps = ({
   chrome = false,
   className,
+  full: _full,
   level,
   lines,
   numeric = false,

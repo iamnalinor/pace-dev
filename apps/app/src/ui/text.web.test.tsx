@@ -29,6 +29,24 @@ describe("Text on the web", () => {
     expect(screen.getByText("An inbox capture").props["dataSet"]).toEqual({ textPolicy: "clamp" });
   });
 
+  it("marks a cut text built of parts when the caller gives its full value", async () => {
+    await render(
+      <Text full="Ann Lee" policy="truncate" role="footnote">
+        {"Ann"} {"Lee"}
+      </Text>,
+    );
+    expect(screen.getByText("Ann Lee").props["dataSet"]).toEqual({ textPolicy: "truncate" });
+  });
+
+  it("leaves a cut text built of parts unmarked without its full value (the sweep reports it)", async () => {
+    await render(
+      <Text policy="truncate" role="footnote">
+        {"Ann"} {"Lee"}
+      </Text>,
+    );
+    expect(screen.getByText("Ann Lee").props["dataSet"]).toBeUndefined();
+  });
+
   it("leaves wrapping text unmarked", async () => {
     await render(<Text role="body">Save</Text>);
     expect(screen.getByText("Save").props["dataSet"]).toBeUndefined();

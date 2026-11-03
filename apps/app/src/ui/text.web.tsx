@@ -7,11 +7,14 @@ export type { TextProps } from "./text-props.ts";
 
 /**
 The web's Text: a cut text says so to the overflow sweep (`e2e/worst-case.e2e.ts`) with
-`data-text-policy` and keeps its full value readable in the `title` (spec §4.1.2 rule 4).
+`data-text-policy` and keeps its full value readable in the `title` (spec §4.1.2 rule 4): its
+plain-string children, or `full` when they are not. A cut text with neither is not marked, so the
+sweep still reports it.
 */
 export const Text = (props: TextProps) => {
   const { native, policy } = textProps(props);
-  const ref = useMemo(() => titleRef(policy, props.children), [policy, props.children]);
+  const value = props.full ?? props.children;
+  const ref = useMemo(() => titleRef(policy, value), [policy, value]);
   return (
     <NativeText
       {...native}
