@@ -161,7 +161,7 @@ test.describe("a first pull answered with HTTP 500", () => {
       expect(watched.length).toBeLessThanOrEqual(4);
       // The server is back: Retry loads the account at once and the line goes.
       server.isFailing = false;
-      await line.getByRole("button", { name: "Retry" }).click();
+      await line.getByRole("button", { name: "Try again" }).click();
       // The account's language came with its data.
       await expect(page.getByRole("link", { name: "Сейчас" })).toBeVisible({ timeout: 10_000 });
       await expect(line).toHaveCount(0);
@@ -467,7 +467,7 @@ test("a server back after a long outage: Retry and a return to the window clear 
   const line = page.getByRole("status").filter({ hasText: "You are offline" });
   const waysBack = [
     async () => {
-      await line.getByRole("button", { name: "Retry" }).click();
+      await line.getByRole("button", { name: "Try again" }).click();
     },
     async () => {
       await page.evaluate(() => {

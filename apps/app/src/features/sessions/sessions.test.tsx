@@ -756,7 +756,7 @@ describe("Settings → Devices and sessions", () => {
     // The line names both addresses and what to do (QA round 21 L6).
     expect(
       screen.getByText(
-        `This device reaches the server at ${usedApi}, but AI apps must use the address above: Pace's sign-in for them works only there. If they can't reach it, whoever runs this server sets API_ORIGIN to an address they can.`,
+        `AI apps must use the address above, not the one this device uses (${usedApi}).`,
       ),
     ).toBeOnTheScreen();
     // A phone has no clipboard module: the URL goes on through the share sheet.

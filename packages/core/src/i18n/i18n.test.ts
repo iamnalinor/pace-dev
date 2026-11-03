@@ -134,6 +134,20 @@ describe("catalogs", () => {
   });
 });
 
+describe("one word per action", () => {
+  it("names retrying one way in each language (QA round 23 R23-09)", () => {
+    for (const catalog of [en, ru]) {
+      const words = new Set(
+        Object.entries(catalog)
+          // The crash screen's button reloads the app: another action, another word.
+          .filter(([key]) => key.endsWith(".retry") && key !== "crash.retry")
+          .map(([, value]) => value),
+      );
+      expect([...words]).toHaveLength(1);
+    }
+  });
+});
+
 describe("event labels", () => {
   it("name every event type in both languages", () => {
     const catalogs: readonly Readonly<Record<string, string>>[] = [en, ru];

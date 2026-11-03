@@ -85,7 +85,7 @@ for (const [width, height] of [
       expect(header.count).toBeGreaterThan(0);
       expect(header.covered).toEqual([]);
       await expectNoA11yViolations(page);
-      retries.push(await line.getByRole("button", { name: "Retry" }).boundingBox());
+      retries.push(await line.getByRole("button", { name: "Try again" }).boundingBox());
       await context.setOffline(false);
       await expect(line).toHaveCount(0);
     }
