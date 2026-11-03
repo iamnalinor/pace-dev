@@ -422,18 +422,13 @@ describe("SettingsScreen", () => {
     const logout = jest.spyOn(runtime.auth, "logout");
     // The outbox's read is slow (IndexedDB behind another tab's writes): nothing is known before
     // it answers, so a count read ahead read 0 and dropped the change without a word.
-    let answer: (count: number) => void = () => undefined;
-    const reads = jest.fn(
-      async () =>
-        await new Promise<number>((resolve) => {
-          answer = resolve;
-        }),
-    );
+    const held = Promise.withResolvers<number>();
+    const reads = jest.fn(async () => await held.promise);
     await renderScreen(<SettingsScreen />, { ...runtime, unsyncedCount: reads });
     await fireEvent.press(screen.getByRole("button", { name: en("settings.logout") }));
     expect(logout).not.toHaveBeenCalled();
     await act(async () => {
-      answer(1);
+      held.resolve(1);
       await Promise.resolve();
     });
     expect(
@@ -445,7 +440,9 @@ describe("SettingsScreen", () => {
   it("asks when the outbox cannot be read, without naming a count (PR A re-review N2)", async () => {
     const runtime = await createTestRuntime({ world: "empty" });
     const logout = jest.spyOn(runtime.auth, "logout");
-    const reads = jest.fn(async () => await Promise.reject(new Error("IndexedDB refused")));
+    const reads = jest.fn(async () => {
+      throw new Error("IndexedDB refused");
+    });
     await renderScreen(<SettingsScreen />, { ...runtime, unsyncedCount: reads });
     await fireEvent.press(screen.getByRole("button", { name: en("settings.logout") }));
     expect(await screen.findByText(en("settings.logout.unsynced.unknown"))).toBeOnTheScreen();

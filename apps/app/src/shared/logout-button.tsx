@@ -7,7 +7,7 @@ import { useConfirmFocus } from "#app/ui/confirm-focus.ts";
 import { cx } from "#app/ui/cx.ts";
 import { HOTKEYS } from "#app/ui/hotkeys.ts";
 import { useIsWide } from "#app/ui/layout.ts";
-import { plural } from "@pace/core";
+import { type Language, plural } from "@pace/core";
 
 /**
 The outbox's size read now, or null when the read failed: an unknown count asks, as a non-zero one
@@ -20,6 +20,21 @@ const readUnsynced = async (read: () => Promise<number>): Promise<null | number>
     return null;
   }
 };
+
+/** The confirm's question: how many changes would be lost, or that some may be, when unread. */
+const questionOf = (
+  t: ReturnType<typeof useT>,
+  language: Language,
+  count: null | number,
+): string =>
+  count === null
+    ? t("settings.logout.unsynced.unknown")
+    : plural(language, count, {
+        few: t("settings.logout.unsynced.few"),
+        many: t("settings.logout.unsynced.many"),
+        one: t("settings.logout.unsynced.one"),
+        other: t("settings.logout.unsynced.other"),
+      });
 
 /**
 Log out, which takes the local copy with it: when the outbox still holds changes the server has
@@ -37,25 +52,22 @@ export const LogoutButton = () => {
   const { sync, unsyncedCount } = usePace();
   const focus = useConfirmFocus();
   // What the confirm asks about: closed, a count, or `null` when the outbox could not be read.
-  const [asked, setAsked] = useState<{ readonly count: null | number } | null>(null);
-  const isReading = useRef(false);
-  // Signed out on the device before the server is told, so the route gate shows the login card at
-  // once; nothing navigates after the answer, which remounted that card under the person's typing
-  // (PR A re-review N1, bug class 118).
-  const logout = async (): Promise<void> => {
-    await auth.logout();
-  };
+  const [asked, setAsked] = useState<null | { readonly count: null | number }>(null);
+  const readingRef = useRef(false);
   // Read at the press, not ahead: a count read ahead was 0 until its first read answered and just
   // after a write until its refresh did, so a fresh change went without a word (re-review N2).
   const ask = async (): Promise<void> => {
-    if (isReading.current) {
+    if (readingRef.current) {
       return;
     }
-    isReading.current = true;
+    readingRef.current = true;
     const count = await readUnsynced(unsyncedCount);
-    isReading.current = false;
+    readingRef.current = false;
     if (count === 0) {
-      await logout();
+      // Signed out on the device before the server is told: the route gate shows the login card
+      // at once. Nothing navigates after it, which remounted that card under the person's typing
+      // (PR A re-review N1, bug class 118).
+      await auth.logout();
       return;
     }
     focus.toCancel();
@@ -68,15 +80,7 @@ export const LogoutButton = () => {
       </Button>
     );
   }
-  const question =
-    asked.count === null
-      ? t("settings.logout.unsynced.unknown")
-      : plural(language, asked.count, {
-          few: t("settings.logout.unsynced.few"),
-          many: t("settings.logout.unsynced.many"),
-          one: t("settings.logout.unsynced.one"),
-          other: t("settings.logout.unsynced.other"),
-        });
+  const question = questionOf(t, language, asked.count);
   // On a computer, a card on a line of its own, as the app's other inline confirms (Delete preset,
   // Wipe data): beside Export its buttons sat 500 px from the question. On a phone the row is a
   // column already, and a card's padding would wrap «Всё равно выйти» onto two lines at 390 px.
@@ -114,7 +118,11 @@ export const LogoutButton = () => {
           </Button>
         </View>
         <View className={cx(!isWide && "flex-1")}>
-          <Button onPress={() => void logout()} variant="danger" width={isWide ? "auto" : "fill"}>
+          <Button
+            onPress={() => void auth.logout()}
+            variant="danger"
+            width={isWide ? "auto" : "fill"}
+          >
             {t("settings.logout.anyway")}
           </Button>
         </View>
