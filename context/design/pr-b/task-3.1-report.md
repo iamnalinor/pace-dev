@@ -7,7 +7,7 @@
 - `a4264b4` feat(app): kit Pressable, the state layer (Android ripple fill.3, web CSS overlay, delayPressIn 0, haptics)
 - `c643b8b` lint: pressedClass for active: outside ui/pressable, bare-pressable import ban with its own exact ratchet (33)
 - `7645f8d` feat(app): state layer in the worst-case gallery
-- `d4e6455` docs: bug-lessons class 118 (F-CMP-01), lint baseline for Task 3.1, spec §4.1.1 built note
+- `d4e6455` docs: bug-lessons class 122 (F-CMP-01), lint baseline for Task 3.1, spec §4.1.1 built note
 
 ## What was built
 - `apps/app/src/platform/haptics.ts` (+ `haptics.web.ts`, a no-op): `haptic(kind)`, where kind is `confirm | tick | longPress | reject`. On Android it calls `performAndroidHapticsAsync` with Confirm, Clock_Tick, Long_Press or Reject. The call is fire-and-forget. A refusal from a phone without a vibrator is caught on purpose, with a comment saying why.
@@ -36,7 +36,7 @@
 - **Plan.** The "Lint baseline" in `context/design/redesign-plan.md` has the dated line for both numbers.
 
 ## Bug lessons and spec
-- **Bug lessons.** New class **118**, "A cross-cutting state drawn by every call site on its own", with rule, sweep and guard, plus one log row for F-CMP-01.
+- **Bug lessons.** New class **122** (numbered 118 before the merge of PR A fix round 3), "A cross-cutting state drawn by every call site on its own", with rule, sweep and guard, plus one log row for F-CMP-01.
 - **Spec.** The Pressable row in §4.1.1 gets a "Built (Task 3.1)" note. It records what was built, and what is not built yet: the auto-extended target and the disabled label/fill roles.
 
 ## Tests (all run)
@@ -74,7 +74,7 @@ Fixed test-first; Task 3.2's `onPress(event)` is kept.
 - **Minor 5 (ruling).** The web Pressable owns Space for tab, checkbox, radio and switch, with the disabled gate in one place. A caller's own `onKeyDown` runs first. If it already pressed on Space, the press is not repeated: `spacePress` prevents the key's default, and Pressable checks for that. Buttons are left to react-native-web.
   - No kit-Pressable caller spreads `spacePress` today. The remaining spreads are on raw React Native Pressables, which move to the kit in their own tasks; the guard keeps any that remain on a migrated control from double-firing. Tested.
 - **Minors 6–7.** The forced-colours tests assert exact declarations on exact selectors inside the block. The web test asserts the props of the element drawn; `aria-disabled="true"` is pinned in the markup test.
-- **Bug lessons.** Four log rows, under classes 106, 76, 5 and 106, each with its sweep and guard. Class 118's sweep note is updated.
+- **Bug lessons.** Four log rows, under classes 106, 76, 5 and 106, each with its sweep and guard. Class 122's sweep note is updated.
 - **Spec and plan.** The spec's §4.1.1 Pressable row and the plan's "Lint baseline" carry fix-round-1 lines.
 
 **Moved to Task 3.9:** `shape`, the auto-extended hit target (44 px web / 48 dp) and the disabled label/fill roles.

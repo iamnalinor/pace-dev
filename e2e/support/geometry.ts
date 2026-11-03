@@ -94,9 +94,6 @@ export const expectStaysInside = async (
   expect(escapes, `${child} inside ${container} in every frame`).toEqual([]);
 };
 
-/** The worst escape of any box inside a container in one frame, and whose it was. */
-type Escape = { readonly px: number; readonly what: string };
-
 /**
 Bug class 5 for a whole container (spec §6 composer unfold, F-MOT-08): samples every frame while
 `during` runs and settles, and fails when any box drawn inside the element matching `container`
@@ -112,6 +109,8 @@ export const expectDescendantsStayInside = async (
     forMs = 700,
   }: { readonly container: string; readonly during: () => Promise<void>; readonly forMs?: number },
 ): Promise<void> => {
+  /** The worst escape of any box inside a container in one frame, and whose it was. */
+  type Escape = { readonly px: number; readonly what: string };
   const sampling = page.evaluate(
     async ({ outer, span }) =>
       await new Promise<readonly Escape[]>((resolve) => {

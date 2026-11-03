@@ -85,7 +85,8 @@ export type ServerInfo = {
   OAuth resource is `<API_ORIGIN>/mcp` and an MCP client refuses tokens for any other; the address
   in use until the server has answered.
   */
-  readonly mcpUrl: string;
+  /** `null` when the server says it has no MCP (no https origin, re-review N4). */
+  readonly mcpUrl: null | string;
   /** The server names another public address than the one this device uses (Connect says so). */
   readonly isPublicOriginOther: boolean;
   /** The Telegram bot of the web login widget. */
@@ -100,6 +101,17 @@ export type ServerInfo = {
   readonly loginWebOrigin: null | string;
 };
 
+/**
+MCP at the server's public API, its OAuth resource; `null` when the server says it has none (no
+https origin, re-review N4). Before it answers, at the address in use.
+*/
+const mcpUrlOf = (instance: ServerState["instance"], origin: string): null | string => {
+  if (instance === null) {
+    return `${origin}/mcp`;
+  }
+  return instance.features.mcp ? `${instance.apiOrigin}/mcp` : null;
+};
+
 /** The current server's values from its instance; the build's defaults while it has not answered. */
 export const serverInfoOf = ({ instance, origin }: ServerState): ServerInfo => {
   const buildWeb = isBuildServer(origin) ? WEB_ORIGIN : null;
@@ -111,7 +123,7 @@ export const serverInfoOf = ({ instance, origin }: ServerState): ServerInfo => {
     // `API_ORIGIN` (`mcpUrl`, round 7 review 1).
     apiOrigin: origin,
     isPublicOriginOther: instance !== null && instance.apiOrigin !== origin,
-    mcpUrl: `${instance?.apiOrigin ?? origin}/mcp`,
+    mcpUrl: mcpUrlOf(instance, origin),
     botUsername: instance?.botUsername ?? TELEGRAM_BOT,
     loginWebOrigin: ownWeb,
     webOrigin: ownWeb ?? WEB_ORIGIN,

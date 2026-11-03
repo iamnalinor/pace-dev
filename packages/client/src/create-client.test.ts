@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { endpoints, LIVE_SESSION_ENDED, ParseResponseSchema } from "@pace/core";
 
@@ -14,6 +14,7 @@ import {
   fakeUser,
   problem,
 } from "./fake-fetch.fake.ts";
+import { createHeldEventStore } from "./held-event-store.fake.ts";
 import { createMemorySessionStore } from "./session.ts";
 
 const setup = async (
@@ -41,14 +42,13 @@ const setup = async (
   return { api, client };
 };
 
-type Listener = (event: { readonly code?: unknown; readonly data?: unknown }) => void;
-
 /** One socket the client opens; the test plays the server's close. */
 const oneSocket = (): {
   readonly create: (url: string, protocols: readonly string[]) => SocketLike;
   readonly opened: () => number;
   readonly emit: (type: string, event: { readonly code?: number }) => void;
 } => {
+  type Listener = (event: { readonly code?: unknown; readonly data?: unknown }) => void;
   const listeners: { type: string; listener: Listener }[] = [];
   let opened = 0;
   return {
@@ -82,6 +82,76 @@ describe("createPaceClient", () => {
     await expect(client.unsyncedCount()).resolves.toBe(2);
     await client.sync.syncNow();
     await expect(client.unsyncedCount()).resolves.toBe(0);
+  });
+
+  it("a stale tab's sign-out keeps the shared copy another tab claimed since (re-review N3)", async () => {
+    // Two tabs of one browser profile: one store, each tab its own client.
+    const store = createMemoryEventStore();
+    const tab = async (token: string): Promise<PaceClient> => {
+      const session = createMemorySessionStore();
+      await session.set(token);
+      const api = createFakeFetch({ ...emptySyncRoutes, "GET /api/me": () => fakeMe });
+      const client = createPaceClient({
+        baseUrl: "https://api.test",
+        deviceId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+        fetch: api.fetch,
+        now: () => "2026-10-06T12:00:00.000Z",
+        session,
+        source: "web",
+        store,
+      });
+      await client.auth.ready;
+      await client.state.ready;
+      return client;
+    };
+    const stale = await tab("tok_old");
+    await stale.claimLocalCopy("tok_old");
+    // The other tab logged out and in again before the stale tab heard: its copy, its change.
+    const fresh = await tab("tok_new");
+    await fresh.claimLocalCopy("tok_new");
+    await fresh.actions.setLanguage("ru");
+    await stale.dropLocalCopyOf("tok_old");
+    await expect(store.listPending()).resolves.toHaveLength(1);
+    // The copy's own session leaving drops it.
+    await fresh.dropLocalCopyOf("tok_new");
+    await expect(store.listPending()).resolves.toHaveLength(0);
+    // A copy nobody claimed (made before owners) goes too.
+    await fresh.actions.setNightHours(true);
+    await stale.dropLocalCopyOf("tok_old");
+    await expect(store.listPending()).resolves.toHaveLength(0);
+  });
+
+  it("a claim waits for the sign-out's clear queued before it (fix round 2 review M7)", async () => {
+    const held = createHeldEventStore();
+    const session = createMemorySessionStore();
+    await session.set("tok_old");
+    const api = createFakeFetch({ ...emptySyncRoutes, "GET /api/me": () => fakeMe });
+    const client = createPaceClient({
+      baseUrl: "https://api.test",
+      deviceId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+      fetch: api.fetch,
+      now: () => "2026-10-06T12:00:00.000Z",
+      session,
+      source: "web",
+      store: held.store,
+    });
+    await client.auth.ready;
+    await client.state.ready;
+    await client.claimLocalCopy("tok_old");
+    // A write in flight holds the queue; the old session's clear waits behind it, then the next
+    // sign-in of the same tab claims the copy at once.
+    held.hold();
+    const written = client.actions.setLanguage("ru");
+    const dropped = client.dropLocalCopyOf("tok_old");
+    const claimed = client.claimLocalCopy("tok_new");
+    await vi.waitFor(() => {
+      expect(held.writes).toHaveLength(1);
+    });
+    await held.writes[0]?.resolve();
+    await Promise.all([written, dropped, claimed]);
+    // The clear had its turn first (the copy was still the old session's): nothing stays.
+    await expect(held.store.listAll()).resolves.toEqual([]);
+    await expect(held.store.listPending()).resolves.toEqual([]);
   });
 
   it("signs out when the server closes the live socket because the session ended", async () => {

@@ -2,8 +2,6 @@ import { type KnownLiveServerMessage, LiveServerMessageSchema } from "@pace/core
 
 import type { SocketLike } from "./live.ts";
 
-type Listener = (event: { readonly code?: unknown; readonly data?: unknown }) => void;
-
 /** A socket the client opened, with the server's side played by the test. */
 export type FakeSocket = SocketLike & {
   readonly url: string;
@@ -37,6 +35,7 @@ export const fakeSockets = (): {
   const made: FakeSocket[] = [];
   return {
     create: (url, protocols) => {
+      type Listener = (event: { readonly code?: unknown; readonly data?: unknown }) => void;
       const listeners = new Map<string, Listener[]>();
       const emit = (type: string, event: { readonly code?: number; readonly data?: string }) => {
         const heard = listeners.get(type) ?? [];

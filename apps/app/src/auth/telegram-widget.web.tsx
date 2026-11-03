@@ -9,8 +9,6 @@ const WIDGET_SRC = "https://telegram.org/js/telegram-widget.js?22";
 /** After this long without the button, say so: telegram.org is slow from some networks. */
 const SLOW_AFTER_MS = 4000;
 
-type Phase = "failed" | "loading" | "ready" | "slow";
-
 type Props = {
   readonly botUsername: string;
   /** Accessible name for the button iframe the script injects (it ships without one). */
@@ -40,6 +38,9 @@ const watchFrames = (host: HTMLElement, label: string, onFrame: () => void): (()
     const frames = host.querySelectorAll("iframe");
     for (const frame of frames) {
       frame.title = label;
+      // Whatever the frame loads (Telegram's button, its error, a network's block page) stays
+      // inside the widget's own box (owner bug 2026-11-03).
+      frame.style.maxWidth = "100%";
     }
     if (frames.length > 0) {
       onFrame();
@@ -58,6 +59,7 @@ The Telegram Login Widget (web only): after a login Telegram redirects to `/auth
 which hands the signed payload back to this widget on the page that started the flow.
 */
 export const TelegramWidget = ({ botUsername, label, onAuth, texts }: Props) => {
+  type Phase = "failed" | "loading" | "ready" | "slow";
   const hostRef = useRef<HTMLDivElement>(null);
   const onAuthRef = useRef(onAuth);
   const [phase, setPhase] = useState<Phase>("loading");
@@ -100,7 +102,7 @@ export const TelegramWidget = ({ botUsername, label, onAuth, texts }: Props) => 
   }, [botUsername, label]);
 
   return (
-    <View className="min-h-hit-web items-center justify-center gap-1">
+    <View className="w-full items-center justify-center gap-1">
       {phase === "failed" ? (
         <Text className="font-sans text-footnote text-danger">{texts.failed}</Text>
       ) : null}
@@ -113,7 +115,14 @@ export const TelegramWidget = ({ botUsername, label, onAuth, texts }: Props) => 
       {phase === "slow" ? (
         <Text className="font-sans text-caption font-normal text-label-tertiary">{texts.slow}</Text>
       ) : null}
-      <div data-testid="telegram-widget" ref={hostRef} style={{ display: "flex" }} />
+      {/* The frame's own box: as wide as the card, clipped, so it never overlaps what follows. */}
+      <View className="min-h-hit-web w-full items-center justify-center overflow-hidden">
+        <div
+          data-testid="telegram-widget"
+          ref={hostRef}
+          style={{ display: "flex", justifyContent: "center", maxWidth: "100%" }}
+        />
+      </View>
     </View>
   );
 };

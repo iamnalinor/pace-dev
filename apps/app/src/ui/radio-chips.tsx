@@ -26,12 +26,6 @@ const STEP: Readonly<Record<string, -1 | 1>> = {
   ArrowUp: -1,
 };
 
-type KeyLike = {
-  readonly key?: string;
-  readonly nativeEvent?: { readonly key?: string };
-  readonly preventDefault?: () => void;
-};
-
 /** How a choice was made: a press (Enter, Space, a click or a tap) or an arrow moving through. */
 export type RadioVia = "arrow" | "press";
 
@@ -59,6 +53,11 @@ export const RadioChips = <T extends string>({
   readonly tall?: boolean;
   readonly value: T;
 }) => {
+  type KeyLike = {
+    readonly key?: string;
+    readonly nativeEvent?: { readonly key?: string };
+    readonly preventDefault?: () => void;
+  };
   const chipsRef = useRef(new Map<T, View>());
   // With nothing chosen among them (a choice made elsewhere), the first chip is the tab stop.
   const stop = choices.some((choice) => choice.value === value) ? value : choices[0]?.value;

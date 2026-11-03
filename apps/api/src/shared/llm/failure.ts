@@ -240,16 +240,20 @@ export const unwellReasonOf = (error: unknown): null | UnwellReason => {
   return SERVER_WORDS.test(wordsOf(error)) ? "server-error" : null;
 };
 
-/** Why a read no model answered failed: no model, every answer out of shape, a rest, or none of these. */
+/**
+Why a read no model answered failed: no model, every answer out of shape or every provider refused
+it for good (no later read would differ: re-review N7), a rest, or none of these.
+*/
 export const reasonOf = (read: {
   readonly hasProviders: boolean;
   readonly isHopeless: boolean;
+  readonly isRefused: boolean;
   readonly retryAt: null | string;
 }): ParseUnavailableReason => {
   if (!read.hasProviders) {
     return "off";
   }
-  if (read.isHopeless) {
+  if (read.isHopeless || read.isRefused) {
     return "unreadable";
   }
   return read.retryAt === null ? "unreachable" : "limited";

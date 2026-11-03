@@ -213,7 +213,8 @@ const apiOriginOf = (value: string | undefined): string | undefined => {
 
 /**
 The Worker's own origin for a request: the configured `API_ORIGIN` when it is usable, else the
-origin the request arrived at. What `/api/instance` names; OAuth and MCP use `oauthOrigin`.
+origin the request arrived at. What `/api/instance` names as `apiOrigin`; OAuth and MCP use
+`oauthOrigin`, and `/api/instance` reads it only for `features.mcp`.
 */
 export const ownOrigin = (configured: string | undefined, requestUrl: string): string =>
   apiOriginOf(configured) ?? new URL(requestUrl).origin;
@@ -221,7 +222,8 @@ export const ownOrigin = (configured: string | undefined, requestUrl: string): s
 /**
 The origin OAuth and MCP run at: `ownOrigin` when the OAuth provider accepts it, `null` when it
 does not (no usable `API_ORIGIN`, reached over plain http on a LAN): the Worker then serves the app
-without them. One rule for the provider, its challenge and `/api/instance`, so they never disagree.
+without them. One rule for the provider, its challenge and `/api/instance`'s `features.mcp`, so
+they never disagree.
 */
 export const oauthOrigin = (configured: string | undefined, requestUrl: string): null | string => {
   const origin = ownOrigin(configured, requestUrl);

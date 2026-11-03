@@ -21,11 +21,6 @@ const LABELS = ["Deep work", "Calculus", "Lunch", "Metro", "Gym", "Reading", "Ca
 
 const iso = (ms: number): string => new Date(ms).toISOString();
 
-type Body = Partial<Pick<EventInput, "source">> & Pick<EventInput, "payload" | "type">;
-
-/** One weighted step of the owner's day; it answers the event bodies it adds (none when it cannot). */
-type Step = (at: number) => readonly Body[];
-
 /**
 A year of the owner's use, `count` events long and the same for one `seed`: live activities
 (started, stopped, relabelled, adjusted, alongside ones), blocks logged afterwards and calendar
@@ -34,6 +29,10 @@ projects, presets, a series, settings, and corrections (amendments and revocatio
 The events come in the order they occurred; a logged block covers time before its event.
 */
 export const yearOfUse = (count: number, seed = 1): readonly Event[] => {
+  type Body = Partial<Pick<EventInput, "source">> & Pick<EventInput, "payload" | "type">;
+  /** One weighted step of the owner's day; it answers the event bodies it adds (none when it cannot). */
+  type Step = (at: number) => readonly Body[];
+
   const random = seededPrng(seed);
   const newId = createIdFactory(random);
   const pick = <T>(items: readonly T[]): T => items[Math.floor(random() * items.length)] as T;

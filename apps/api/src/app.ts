@@ -17,7 +17,7 @@ import { mountCloudRoutes } from "./cloud/cloud-routes.ts";
 import { mountLinkRoutes } from "./links/link-routes.ts";
 import { mountNotifyRoutes } from "./notify/notify-routes.ts";
 import { mountParseRoutes } from "./parse/parse-routes.ts";
-import { type Config, loadConfig, ownOrigin } from "./shared/config.ts";
+import { type Config, loadConfig, oauthOrigin, ownOrigin } from "./shared/config.ts";
 import { parseProviders } from "./shared/llm/providers.ts";
 import { createLogger } from "./shared/logger.ts";
 import { mount } from "./shared/mount.ts";
@@ -73,6 +73,8 @@ const mountPublicRoutes = (app: Hono<AppEnv>, deps: AppDeps): void => {
       features: {
         // The skipped slots were already logged by the calls that use the models; not again here.
         assistant: deps.parseProviders({ ...config, llmSkipped: [] }).length > 0,
+        // OAuth and MCP answer 503 without an origin the provider accepts (`worker.ts`).
+        mcp: oauthOrigin(config.apiOrigin, c.req.url) !== null,
         push: push.pushMethods.includes("fcm"),
       },
       loginMethods: ["telegram-widget" as const, "telegram-deeplink" as const],

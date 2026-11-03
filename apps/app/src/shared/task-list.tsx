@@ -37,7 +37,7 @@ export const TaskRows = ({
   readonly withTag?: boolean;
 }) => {
   const openTask = useOpenTask();
-  const { check, opensSheet } = useCheckTask();
+  const { check, doesOpenSheet } = useCheckTask();
   // Rows turning to dust after their check; each closes once its dust has gone.
   const [dissolving, setDissolving] = useState<ReadonlySet<string>>(() => new Set());
   // Rows whose dust has gone: they leave the list at once, so the rows below move up as the
@@ -55,7 +55,8 @@ export const TaskRows = ({
   }
   const settle = async (row: NowRow): Promise<void> => {
     setGone((current) => new Set([...current, row.id]));
-    if (await check(row)) {
+    const checking = await check(row);
+    if (checking.ok) {
       return;
     }
 
@@ -88,7 +89,7 @@ export const TaskRows = ({
               withTag={withTag}
               {...(!checked && {
                 onCheck: () => {
-                  if (opensSheet(row)) {
+                  if (doesOpenSheet(row)) {
                     void check(row);
                   } else {
                     setDissolving((current) => new Set([...current, row.id]));

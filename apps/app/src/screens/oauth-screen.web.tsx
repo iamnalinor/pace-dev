@@ -1,6 +1,7 @@
 import { ScrollView } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
+import { signInPathFor } from "#app/auth/sign-in-path.ts";
 import { TelegramWidget } from "#app/auth/telegram-widget.web.tsx";
 import { ConsentFlow } from "#app/features/oauth/consent-flow.tsx";
 import { useServerInfo } from "#app/platform/server-store.ts";
@@ -20,6 +21,9 @@ export const OAuthScreen = () => {
     >
       <ConsentFlow
         authQuery={globalThis.location.search.slice(1)}
+        onSignIn={() => {
+          navigateTo(signInPathFor(globalThis.location));
+        }}
         redirect={navigateTo}
         renderWidget={(onAuth) => (
           <TelegramWidget

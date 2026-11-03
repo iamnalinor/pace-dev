@@ -6,25 +6,6 @@ import { checkClasses, checkLooseClasses, type ClassScope } from "./class-checks
 import { isColorString, isNamedColorValue } from "./colors.ts";
 import { checkDurationProperty, createMotionCallChecks } from "./motion-checks.ts";
 
-/**
-Drives raw design values out of the app: colours (hex, `rgb()`/`hsl()`, CSS names on colour keys),
-radii, font metrics, durations (`duration:`, `.duration(n)`/`.delay(n)`, `withDelay`, timers beside
-reanimated, `*_MS`/`*DURATION`/`*DELAY` constants, spring physics) and Tailwind arbitrary values
-must come from the design tokens (`@pace/core` design package, the generated Tailwind scale).
-Spec §9.3.
-
-Message ids: rawColor, rawRadius, rawFontMetric, rawDuration, arbitraryClass, offScaleClass,
-pressedClass. `pressedClass`: a NativeWind `active:` class outside `ui/pressable.tsx`; press feedback
-is the kit's state layer (a native ripple, a CSS overlay), never a React render late (F-CMP-01).
-`offScaleClass` needs the generated class list (option `allowedClasses`); without it only the
-arbitrary-value (`[...]`) and raw-literal checks run.
-
-Known false-positive risk: any whole string that looks like a hex colour (`"#abc"`, `"#bad"`),
-and a `*_MS` constant that is not an animation (a poll interval): rename it or lift it into the
-tokens, as the rule asks.
-*/
-type Options = { allowedClasses?: readonly string[] };
-
 const CLASS_PROP = /classname$/i;
 // physical, logical (`borderStartStartRadius`) and mixed (`borderTopEndRadius`) corners
 const RADIUS_KEY =
@@ -98,8 +79,26 @@ const checkJsxAttribute = (
   }
 };
 
+/**
+Drives raw design values out of the app: colours (hex, `rgb()`/`hsl()`, CSS names on colour keys),
+radii, font metrics, durations (`duration:`, `.duration(n)`/`.delay(n)`, `withDelay`, timers beside
+reanimated, `*_MS`/`*DURATION`/`*DELAY` constants, spring physics) and Tailwind arbitrary values
+must come from the design tokens (`@pace/core` design package, the generated Tailwind scale).
+Spec §9.3.
+
+Message ids: rawColor, rawRadius, rawFontMetric, rawDuration, arbitraryClass, offScaleClass,
+pressedClass. `pressedClass`: a NativeWind `active:` class outside `ui/pressable.tsx`; press feedback
+is the kit's state layer (a native ripple, a CSS overlay), never a React render late (F-CMP-01).
+`offScaleClass` needs the generated class list (option `allowedClasses`); without it only the
+arbitrary-value (`[...]`) and raw-literal checks run.
+
+Known false-positive risk: any whole string that looks like a hex colour (`"#abc"`, `"#bad"`),
+and a `*_MS` constant that is not an animation (a poll interval): rename it or lift it into the
+tokens, as the rule asks.
+*/
 export const noRawDesignValues: Rule.RuleModule = {
   create(context) {
+    type Options = { allowedClasses?: readonly string[] };
     const filename = context.filename.replaceAll("\\", "/");
     if (DESIGN_PACKAGE.test(filename) || TEST_FILE.test(filename)) {
       return {};

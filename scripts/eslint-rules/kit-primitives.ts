@@ -33,8 +33,6 @@ type JsxName =
     }
   | { readonly type: "JSXNamespacedName" };
 
-type JsxAttribute = { readonly parent: { readonly name: JsxName } };
-
 /** What this file calls React Native's `Text`: named imports, and namespaces it reaches it through. */
 type TextNames = { readonly names: Set<string>; readonly namespaces: Set<string> };
 
@@ -90,6 +88,7 @@ export const kitPrimitives: Rule.RuleModule = {
         reportSource(node, node.source.type === "Literal" ? node.source.value : undefined);
       },
       "JSXAttribute[name.name='numberOfLines']"(node: Rule.Node) {
+        type JsxAttribute = { readonly parent: { readonly name: JsxName } };
         const { parent } = node as unknown as JsxAttribute;
         if (!isTextKit && isNativeText(parent.name, text)) {
           context.report({ messageId: "rawLineLimit", node });

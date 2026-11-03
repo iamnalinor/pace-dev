@@ -63,16 +63,23 @@ export type RangeRead<T> = {
   readonly retry: () => void;
 };
 
-/** The list over [from, to); empty until it arrives, and kept as it was when offline. */
+/**
+The list over [from, to); empty until it arrives, and kept as it was when a later read of the same
+range fails. Rows are held with the range they were read for: a screen that moves to another range
+in place (Day's date) never shows the last range's rows as this one's, before its read or after a
+failed one (re-review N6, class 62).
+*/
 const useRangeRead = <T>(
   fetcher: Fetcher<T>,
   api: ApiClient,
   { from, to }: Range,
 ): RangeRead<T> => {
-  const [read, setRead] = useState<{ readonly rows: readonly T[]; readonly isFailed: boolean }>({
-    isFailed: false,
-    rows: [],
-  });
+  const key = `${from}/${to}`;
+  const [read, setRead] = useState<{
+    readonly key: string;
+    readonly rows: readonly T[];
+    readonly isFailed: boolean;
+  }>({ isFailed: false, key, rows: [] });
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let isCurrent = true;
@@ -81,22 +88,26 @@ const useRangeRead = <T>(
       if (!isCurrent) {
         return;
       }
-      setRead((previous) =>
-        fetched === null
-          ? { isFailed: previous.rows.length === 0, rows: previous.rows }
-          : { isFailed: false, rows: fetched },
-      );
+      setRead((previous) => {
+        if (fetched !== null) {
+          return { isFailed: false, key, rows: fetched };
+        }
+        const rows = previous.key === key ? previous.rows : [];
+        return { isFailed: rows.length === 0, key, rows };
+      });
     };
     void load();
     return () => {
       isCurrent = false;
     };
-  }, [fetcher, api, from, to, attempt]);
+  }, [fetcher, api, from, to, key, attempt]);
+  const isThisRange = read.key === key;
   return {
-    ...read,
+    isFailed: isThisRange && read.isFailed,
     retry: () => {
       setAttempt((count) => count + 1);
     },
+    rows: isThisRange ? read.rows : [],
   };
 };
 

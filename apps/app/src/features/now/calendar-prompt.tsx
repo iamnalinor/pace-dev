@@ -69,7 +69,7 @@ type ShownEvent = NonNullable<ReturnType<typeof useCalendarPrompt>["event"]>;
 
 /**
 One event's card: its title and time, Attend and Skip. Each press goes to `onAnswer` with what
-it said and whether it went through; a refused Skip says so in a toast (the card stays).
+it said and whether it went through (`ok`); a refused Skip says so in a toast (the card stays).
 */
 const EventCard = ({
   event,
@@ -77,7 +77,7 @@ const EventCard = ({
   skip,
 }: {
   readonly event: ShownEvent;
-  readonly onAnswer: (key: MessageKey, sent: Promise<boolean>) => void;
+  readonly onAnswer: (key: MessageKey, sent: Promise<{ readonly ok: boolean }>) => void;
   readonly skip: (event: ShownEvent) => Promise<boolean>;
 }) => {
   const t = useT();
@@ -85,18 +85,18 @@ const EventCard = ({
   const { deviceTz } = useViewer();
   const run = useRunAction();
   const toast = useToast();
-  const didSkipOrSay = async (): Promise<boolean> => {
+  const skipOrSay = async (): Promise<{ readonly ok: boolean }> => {
     const isSkipped = await skip(event);
     if (!isSkipped) {
       toast.show({ message: t("notifications.failedAction") });
     }
-    return isSkipped;
+    return { ok: isSkipped };
   };
   const onAttend = (): void => {
     onAnswer("notify.resolved.attended", run(actions.startCalendar(event)));
   };
   const onSkip = (): void => {
-    onAnswer("notify.resolved.skipped", didSkipOrSay());
+    onAnswer("notify.resolved.skipped", skipOrSay());
   };
   return (
     <View
@@ -157,7 +157,8 @@ export const CalendarPrompt = () => {
             focus.toStatus();
             setOutcome({ eventKey, key, title: event.title });
             void (async () => {
-              if (await sent) {
+              const answer = await sent;
+              if (answer.ok) {
                 return;
               }
               focus.release();

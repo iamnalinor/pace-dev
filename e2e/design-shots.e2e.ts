@@ -398,8 +398,7 @@ const dayRow = async (ctx: Ctx, kind: "block" | "gap"): Promise<Locator> => {
   await open(page, "/day");
   const logAction = page.getByText(L("Log"));
   const rows = page.getByRole("button", { name: TIME_RANGE });
-  const wanted =
-    kind === "gap" ? rows.filter({ has: logAction }) : rows.filter({ hasNot: logAction });
+  const wanted = rows.filter(kind === "gap" ? { has: logAction } : { hasNot: logAction });
   await stepBackUntil(ctx, wanted);
   return first(wanted);
 };

@@ -42,9 +42,15 @@ export type LocalLog = {
   /**
   Drops the local copy (sign-out, another server, a reset store): the state is empty at once, and
   the store is cleared in the write queue, after the write in flight; a write still waiting
-  behind it is never made.
+  behind it is never made. With `ifOwner`, the store keeps a copy another session claimed since
+  (`EventStore.clear`); the state is emptied either way.
   */
-  readonly clear: () => Promise<void>;
+  readonly clear: (ifOwner?: string) => Promise<void>;
+  /**
+  Marks the copy as a session's (`EventStore.setOwner`) through the same write chain as `clear`,
+  so a sign-out's clear queued before it has its turn first (fix round 2 review M7).
+  */
+  readonly claim: (mark: string) => Promise<void>;
 };
 
 const settled = async (promise: Promise<unknown>): Promise<void> => {
@@ -267,12 +273,17 @@ export const createLocalLog = <S>(
     adopt: (events) => {
       memory.integrate(uniqueById(events).filter((event) => !memory.known.has(event.id)));
     },
-    clear: async () => {
+    clear: async (ifOwner) => {
       copy += 1;
       notOnDisk.clear();
       memory.replace([]);
       await write(async () => {
-        await eventStore.clear();
+        await eventStore.clear(ifOwner);
+      });
+    },
+    claim: async (mark) => {
+      await write(async () => {
+        await eventStore.setOwner(mark);
       });
     },
     has: (id) => memory.known.has(id),

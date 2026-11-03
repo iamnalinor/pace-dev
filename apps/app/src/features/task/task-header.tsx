@@ -21,8 +21,8 @@ const useDeleteTask = (view: TaskViewModel): (() => void) => {
   const run = useRunAction();
   return () => {
     void (async () => {
-      const result = await actions.deleteTask(view.id);
-      if (!(await run(Promise.resolve(result))) || !result.ok) {
+      const result = await run(actions.deleteTask(view.id));
+      if (!result.ok) {
         return;
       }
       back();

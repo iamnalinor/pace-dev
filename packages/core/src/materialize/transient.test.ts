@@ -2,12 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { assoc, inBatch, keyIndex, keysWhere } from "./transient.ts";
 
-type Entries = Readonly<Record<string, number>>;
-
 const EVEN = keyIndex<number>((value) => value % 2 === 0);
 const byText = (a: string, b: string): number => a.localeCompare(b);
 
 describe("assoc", () => {
+  type Entries = Readonly<Record<string, number>>;
   it("copies outside a batch and leaves the map it was given alone", () => {
     const map: Entries = { a: 1 };
     const next = assoc(map, "b", 2);

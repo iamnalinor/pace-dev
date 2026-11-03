@@ -4,10 +4,9 @@ import { documentGround } from "@pace/core";
 
 import { DocumentTheme } from "./document-theme.web.tsx";
 
-type Meta = { content: string };
-
 /** A stand-in for the browser's document: the root's dataset and the `theme-color` metas. */
 const fakeDocument = (metaCount: number) => {
+  type Meta = { content: string };
   const metas: Meta[] = Array.from({ length: metaCount }, () => ({ content: "" }));
   const asElement = (meta: Meta) => ({
     setAttribute: (name: string, value: string) => {

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/require-await -- the in-memory adapter implements the async port synchronously */
 import type { Event } from "@pace/core";
 
-import type { EventStore } from "../event-store.ts";
+import { canClearCopy, type EventStore } from "../event-store.ts";
 
 /** In-memory `EventStore`: the reference implementation, used by tests and as a fallback. */
 export const createMemoryEventStore = (): EventStore => {
@@ -10,6 +10,7 @@ export const createMemoryEventStore = (): EventStore => {
   let cursor = 0;
   let storeId: null | string = null;
   let syncVersion = 0;
+  let owner: null | string = null;
   return {
     append: async (incoming) => {
       for (const event of incoming) {
@@ -21,7 +22,11 @@ export const createMemoryEventStore = (): EventStore => {
         pending.add(event.id);
       }
     },
-    clear: async () => {
+    clear: async (ifOwner) => {
+      if (!canClearCopy(owner, ifOwner)) {
+        return;
+      }
+      owner = null;
       events.clear();
       pending.clear();
       cursor = 0;
@@ -41,6 +46,9 @@ export const createMemoryEventStore = (): EventStore => {
       for (const id of ids) {
         pending.delete(id);
       }
+    },
+    setOwner: async (mark) => {
+      owner = mark;
     },
     setCursor: async (seq) => {
       cursor = seq;

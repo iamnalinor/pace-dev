@@ -518,6 +518,16 @@ describe("POST /api/parse: no model", () => {
     expect(await parseLimited(token, { text: "позвонить маме" })).toMatchObject({
       reason: "limited",
     });
+    // Every provider refused it for good (a content filter, a 400): no later read would differ, so
+    // the app is not offered "Read it when it's back", and a deferred text is not kept (N7).
+    const strict = [{ model: fakeParseModel(() => ({ badRequestWith: 400 })), name: "strict" }];
+    expect(await parseWith(strict, token, { text: "позвонить в банк" })).toMatchObject({
+      reason: "unreadable",
+      status: "unavailable",
+    });
+    expect(await parseWith(strict, token, { defer: true, text: "позвонить в банк" })).toMatchObject(
+      { reason: "unreadable", status: "unavailable" },
+    );
     // Kept: the providers may be back soon (none said when); the queue reads it at its next try.
     const kept = await parseWith(
       [{ model: fakeParseModel(() => ({ unavailableWith: 500 })), name: "down" }],

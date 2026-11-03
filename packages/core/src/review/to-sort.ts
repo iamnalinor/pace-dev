@@ -226,9 +226,9 @@ const itemFor = (state: CoreState, task: Task, ctx: QueryContext): ReviewItem | 
     return unsortedItem(state, task, ctx);
   }
   const preset = presetOf(state, task);
-  return !preset.ok || !isActiveTask(task)
-    ? undefined
-    : (submittedItem(task, preset.value, ctx.now) ?? deadlinePassedItem(task, ctx.now));
+  return preset.ok && isActiveTask(task)
+    ? (submittedItem(task, preset.value, ctx.now) ?? deadlinePassedItem(task, ctx.now))
+    : undefined;
 };
 
 const oldestFirst = (a: ReviewItem, b: ReviewItem): number => {

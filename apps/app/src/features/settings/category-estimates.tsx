@@ -39,7 +39,8 @@ export const CategoryEstimates = () => {
               minutes={categoryEstimates[category] ?? null}
               onEstimate={(minutes) => {
                 void (async () => {
-                  if (await run(actions.setCategoryEstimate(category, minutes))) {
+                  const saving = await run(actions.setCategoryEstimate(category, minutes));
+                  if (saving.ok) {
                     setOpened(null);
                   }
                 })();

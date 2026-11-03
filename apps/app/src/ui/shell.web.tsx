@@ -8,9 +8,6 @@ import { Pressable } from "./pressable.tsx";
 import { Inspector, type ShellProps, useShellInsets } from "./shell-regions.tsx";
 import { Text } from "./text.tsx";
 
-/** The part of the `main` element the skip link moves the keyboard to. */
-type Focusable = { readonly focus?: (options?: { readonly preventScroll?: boolean }) => void };
-
 /** The id of the `main` element, the skip link's address. */
 const MAIN_ID = "pace-main";
 
@@ -56,6 +53,10 @@ export const Shell = ({ content, navigation, ...inspector }: ShellProps) => {
       {isTopLevel ? (
         <SkipLink
           onSkip={() => {
+            /** The part of the `main` element the skip link moves the keyboard to. */
+            type Focusable = {
+              readonly focus?: (options?: { readonly preventScroll?: boolean }) => void;
+            };
             (mainRef.current as Focusable | null)?.focus?.({ preventScroll: true });
           }}
         />

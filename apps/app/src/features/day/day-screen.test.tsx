@@ -97,6 +97,36 @@ describe("DayScreen", () => {
     expect(screen.queryByText(en("day.screenTimeFailed"))).toBeNull();
   });
 
+  it("never shows one day's screen time on another when the next read fails (re-review N6)", async () => {
+    // Today's usage arrives; then the network goes, and yesterday's read fails.
+    let isUp = true;
+    const usage = jest.fn(() =>
+      isUp
+        ? {
+            sessions: [
+              {
+                app: "code",
+                deviceId: "01LAPTOP",
+                deviceName: "Laptop",
+                endAt: addMinutesIso(NOW, -200),
+                startAt: addMinutesIso(NOW, -250),
+              },
+            ],
+          }
+        : problem(503, "offline"),
+    );
+    await renderScreen(
+      <DayScreen />,
+      await createTestRuntime({ routes: { "GET /api/usage": usage } }),
+    );
+    expect(await screen.findByText("Laptop · 50m")).toBeOnTheScreen();
+    isUp = false;
+    await fireEvent.press(screen.getByRole("button", { name: "Previous day" }));
+    // Yesterday could not be read: it says so, never today's 50 minutes as yesterday's.
+    expect(await screen.findByText(en("day.screenTimeFailed"))).toBeOnTheScreen();
+    expect(screen.queryByText("Laptop · 50m")).toBeNull();
+  });
+
   it("refuses a start that is not a time, saying so under the field", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(<DayScreen />, runtime);

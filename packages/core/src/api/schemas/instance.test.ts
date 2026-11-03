@@ -24,17 +24,28 @@ describe("the instance answer", () => {
       webOrigin: 42,
     });
     expect(read.loginMethods).toEqual(["telegram-deeplink"]);
-    expect(read.features).toEqual({ assistant: false, push: true });
+    expect(read.features).toEqual({ assistant: false, mcp: true, push: true });
     expect(read.webOrigin).toBeNull();
     expect(read).not.toHaveProperty("region");
   });
 
-  it("reads a server that names no features as one with every feature off (class 13)", () => {
+  it("reads a server that names no features as one with every feature off (class 13), but MCP", () => {
     const { features: _omitted, ...withoutFeatures } = answer;
+    // Every server served MCP before one could be without it (a LAN-http server, re-review N4):
+    // one that does not say has it.
     expect(endpoints.instance.output.parse(withoutFeatures).features).toEqual({
       assistant: false,
+      mcp: true,
       push: false,
     });
+  });
+
+  it("reads a server without MCP (no https origin) as `mcp: false` (re-review N4)", () => {
+    const read = endpoints.instance.output.parse({
+      ...answer,
+      features: { ...answer.features, mcp: false },
+    });
+    expect(read.features.mcp).toBe(false);
   });
 
   it("reads a server without a web app as `webOrigin: null`", () => {

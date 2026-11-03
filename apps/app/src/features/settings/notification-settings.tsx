@@ -76,9 +76,6 @@ export const NotificationChannels = () => {
   );
 };
 
-/** What the picker offers: automatic, then a way through the server, then Off. */
-type PushOption = "auto" | PushMethod;
-
 /**
 The methods to pick from: what the server takes (asked again when Settings opens, and on every
 registration, so a change while open shows); before it ever answered (offline), the method in
@@ -119,9 +116,9 @@ const pushLine = (
     return [t("settings.push.denied")];
   }
   const fellBack =
-    choice !== null && choice !== method
-      ? [t("settings.push.unavailable", { method: t(`settings.push.option.${choice}`) })]
-      : [];
+    choice === null || choice === method
+      ? []
+      : [t("settings.push.unavailable", { method: t(`settings.push.option.${choice}`) })];
   return [...fellBack, t(`settings.push.${method}`)];
 };
 
@@ -132,6 +129,8 @@ follows every change (`pushStore`): a pick, a start that registered again, the s
 changing (the live notice registers again).
 */
 export const PushStatus = () => {
+  /** What the picker offers: automatic, then a way through the server, then Off. */
+  type PushOption = "auto" | PushMethod;
   const t = useT();
   const { api } = usePace();
   const toast = useToast();

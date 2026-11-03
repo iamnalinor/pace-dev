@@ -4,9 +4,11 @@ import { env } from "cloudflare:workers";
 import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
 
+import { findUserIdByTelegramId } from "../src/auth/users.ts";
 import { oauthOrigin, ownOrigin } from "../src/shared/config.ts";
+import { d1 } from "../src/shared/db/d1.ts";
 import worker, { providerOptions } from "../src/worker.ts";
-import { readJson } from "./helpers.ts";
+import { loginAsDev, readJson } from "./helpers.ts";
 
 /**
 Review I3 of the PR #48 follow-ups: the Worker's own origin, configured or reached, is either one
@@ -73,12 +75,17 @@ describe("the Worker's own origin (review I3)", () => {
 });
 
 /** The Worker as deployed with `API_ORIGIN` set to `apiOrigin`, asked at `url`. */
-const fetchAt = async (url: string, apiOrigin: string): Promise<Response> => {
+const fetchAt = async (url: string, apiOrigin: string, init?: RequestInit): Promise<Response> => {
   const configured: Cloudflare.Env = { ...env };
-  const override: Readonly<Record<string, string>> = { API_ORIGIN: apiOrigin };
+  // The provider leaves its helpers on the env it is handed (the tests' shared one, after any
+  // request through it): a server it never fronted has none.
+  const override: Readonly<Record<string, string | undefined>> = {
+    API_ORIGIN: apiOrigin,
+    OAUTH_PROVIDER: undefined,
+  };
   Object.assign(configured, override);
   const ctx = createExecutionContext();
-  const response = await worker.fetch(new Request(url), configured, ctx);
+  const response = await worker.fetch(new Request(url, init), configured, ctx);
   await waitOnExecutionContext(ctx);
   return response;
 };
@@ -91,6 +98,10 @@ describe("a Worker no OAuth origin fits (review I3)", () => {
       expect(health.status).toBe(200);
       const instance = await fetchAt(`${lan}/api/instance`, apiOrigin);
       expect(instance.status).toBe(200);
+      // The app is told, so Connect an AI app does not hand out a URL that answers 503 (N4).
+      expect(await readJson<{ features: { mcp: boolean } }>(instance)).toMatchObject({
+        features: { mcp: false },
+      });
       for (const path of [
         "/mcp",
         "/oauth/token",
@@ -104,6 +115,31 @@ describe("a Worker no OAuth origin fits (review I3)", () => {
         expect(body.error_description).toContain("API_ORIGIN");
       }
     }
+  });
+
+  it("deletes an account with no OAuth provider mounted: the grants go through KV (re-review N4)", async () => {
+    const telegramId = "1001";
+    const token = await loginAsDev(telegramId);
+    const userId = await findUserIdByTelegramId(d1(env.DB), telegramId);
+    expect(userId).not.toBeNull();
+    // A grant left from when the server had an https origin, with one of its tokens.
+    await env.OAUTH_KV.put(`grant:${String(userId)}:g1`, JSON.stringify({ id: "g1" }));
+    await env.OAUTH_KV.put(`token:${String(userId)}:g1:t1`, "{}");
+    const response = await fetchAt(`${LAN}/api/test/account`, "", {
+      headers: { Authorization: `Bearer ${token}` },
+      method: "DELETE",
+    });
+    expect(response.status).toBe(200);
+    expect(await env.OAUTH_KV.get(`grant:${String(userId)}:g1`)).toBeNull();
+    expect(await env.OAUTH_KV.get(`token:${String(userId)}:g1:t1`)).toBeNull();
+    expect(await findUserIdByTelegramId(d1(env.DB), telegramId)).toBeNull();
+  });
+
+  it("says MCP is there when an origin fits (re-review N4)", async () => {
+    const instance = await fetchAt("https://pace-api.test/api/instance", "");
+    expect(await readJson<{ features: { mcp: boolean } }>(instance)).toMatchObject({
+      features: { mcp: true },
+    });
   });
 
   it("answers at a configured origin with a trailing slash, the well-known path too", async () => {

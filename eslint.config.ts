@@ -101,7 +101,7 @@ const ACTION_ANSWER_SYNTAX = [
   },
 ];
 
-/** React Native's (and gesture-handler's) pressables with no state layer (bug-lessons 118). */
+/** React Native's (and gesture-handler's) pressables with no state layer (bug-lessons 122). */
 const BARE_PRESSABLES = [
   "Pressable",
   "TouchableHighlight",

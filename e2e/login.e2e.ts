@@ -1,7 +1,8 @@
 import type { Request } from "@playwright/test";
 
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
-import { DEV_TELEGRAM_ID, loginViaApi, resetAccount } from "./support/login.ts";
+import { DEV_TELEGRAM_ID, freshTelegramId, loginViaApi, resetAccount } from "./support/login.ts";
+import { outboxSent } from "./support/outbox.ts";
 import { pushAsClient, seedLivedIn, ulid } from "./support/seed.ts";
 import { documentGround, rgb } from "./support/theme-colors.ts";
 
@@ -159,6 +160,41 @@ test("after Log out the network goes quiet: no request names the session, nothin
   expect(errors.filter(({ at }) => at >= pressedAt).map(({ text }) => text)).toEqual([]);
 });
 
+test("a slow log-out answer leaves the login form as the person is filling it in (PR A re-review N1, bug class 75)", async ({
+  page,
+}) => {
+  const telegramId = freshTelegramId();
+  await loginViaApi(page, telegramId);
+  // The server's answer to the log-out is held, as on a slow phone or a busy Durable Object.
+  let isReleased = false;
+  await page.route("**/api/auth/logout", async (route) => {
+    await new Promise((resolve) => {
+      setTimeout(resolve, 2000);
+    });
+    isReleased = true;
+    await route.continue();
+  });
+  await page.goto("/settings");
+  await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
+  // The start's own write (the time zone) sent, so Log out has nothing to ask about.
+  await outboxSent(page);
+  const answered = page.waitForResponse("**/api/auth/logout");
+  await page.getByRole("button", { exact: true, name: "Log out" }).click();
+  // Signed out on the device at once: the login screen is there before the server answers.
+  await expect(page).toHaveURL(/\/login$/u);
+  const field = page.getByLabel("Telegram id");
+  await field.fill(telegramId);
+  expect(isReleased).toBe(false);
+  await answered;
+  // A follow-up that runs once the answer is in shows itself within a few frames.
+  // eslint-disable-next-line playwright/no-wait-for-timeout, sonarjs/no-fixed-wait-in-tests -- the bug is a remount after the answer; no DOM condition marks that it did not happen
+  await page.waitForTimeout(500);
+  await expect(field).toHaveValue(telegramId);
+  await expect(page.getByRole("button", { name: "Sign in as dev" })).toBeEnabled();
+  await page.getByRole("button", { name: "Sign in as dev" }).click();
+  await expect(page.getByRole("heading", { name: "Now" })).toBeVisible();
+});
+
 test("the theme choice is kept per device and paints the page", async ({ page }) => {
   await loginViaApi(page);
   await page.emulateMedia({ colorScheme: "dark" });
@@ -307,12 +343,21 @@ test("a page older than its server offers Refresh, and a refresh with a fitting 
 }) => {
   const instance = { isTooNew: true };
   await page.route("**/api/instance", async (route) => {
-    const response = await route.fetch();
-    const body = (await response.json()) as Record<string, unknown>;
-    await route.fulfill({
-      json: instance.isTooNew ? { ...body, minClientProtocol: 99, protocol: 99 } : body,
-      response,
-    });
+    // Refresh reloads the page: a read of the instance still on its way then belongs to a page
+    // that is gone, and its response is disposed under the handler (a run of fix round 2). The
+    // reloaded page asks again, and that read is the one the test judges.
+    try {
+      const response = await route.fetch();
+      const body = (await response.json()) as Record<string, unknown>;
+      await route.fulfill({
+        json: instance.isTooNew ? { ...body, minClientProtocol: 99, protocol: 99 } : body,
+        response,
+      });
+    } catch (error) {
+      if (!(error instanceof Error && error.message.includes("disposed"))) {
+        throw error;
+      }
+    }
   });
   await loginViaApi(page);
   await page.goto("/");

@@ -8,7 +8,6 @@ import { noRawDesignValues } from "./no-raw-design-values.ts";
 
 RuleTester.describe = describe;
 RuleTester.it = it;
-RuleTester.itOnly = it.only;
 
 describe("no-raw-design-values", () => {
   it("names the plugin and versions it by the rule source", () => {

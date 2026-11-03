@@ -183,7 +183,7 @@ const askOne = async <T>(args: AskArgs<T>): Promise<Result<T, Failure>> => {
       onError: () => undefined,
       output: Output.object({ schema: check.shown }),
       prompt: prompt.prompt,
-      system: prompt.system,
+      instructions: prompt.system,
       ...(provider.providerOptions !== undefined && { providerOptions: provider.providerOptions }),
     });
     for await (const part of answer.stream) {
@@ -311,7 +311,7 @@ class ReadOutcome {
       code: isHopeless ? "llm/invalid-output" : "llm/unavailable",
       isRefused,
       limited,
-      reason: reasonOf({ hasProviders: this.hasProviders, isHopeless, retryAt }),
+      reason: reasonOf({ hasProviders: this.hasProviders, isHopeless, isRefused, retryAt }),
       retryAt,
     });
   }

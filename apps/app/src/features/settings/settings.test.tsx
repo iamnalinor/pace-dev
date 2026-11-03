@@ -399,11 +399,58 @@ describe("SettingsScreen", () => {
     jest.restoreAllMocks();
   });
 
-  it("logs out and goes to the login card", async () => {
-    await renderScreen(<SettingsScreen />, await createTestRuntime({ world: "empty" }));
+  it("logs out, and leaves the way to the login card to the route gate (PR A re-review N1)", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    const logout = jest.spyOn(runtime.auth, "logout");
+    await renderScreen(<SettingsScreen />, runtime);
     await fireEvent.press(screen.getByRole("button", { name: en("settings.logout") }));
     await waitFor(() => {
-      expect(router.replace).toHaveBeenCalledWith("/login");
+      expect(logout).toHaveBeenCalledTimes(1);
+    });
+    // A navigation after the log-out's answer remounted a login screen the gate already showed,
+    // emptying what the person had started typing there (bug class 75).
+    await act(async () => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 50);
+      });
+    });
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it("reads the outbox at the press: a change whose count has not come back yet still asks (PR A re-review N2)", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    const logout = jest.spyOn(runtime.auth, "logout");
+    // The outbox's read is slow (IndexedDB behind another tab's writes): nothing is known before
+    // it answers, so a count read ahead read 0 and dropped the change without a word.
+    const held = Promise.withResolvers<number>();
+    const reads = jest.fn(async () => await held.promise);
+    await renderScreen(<SettingsScreen />, { ...runtime, unsyncedCount: reads });
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.logout") }));
+    expect(logout).not.toHaveBeenCalled();
+    await act(async () => {
+      held.resolve(1);
+      await Promise.resolve();
+    });
+    expect(
+      await screen.findByText("1 change has not synced yet: logging out now loses it."),
+    ).toBeOnTheScreen();
+    expect(logout).not.toHaveBeenCalled();
+  });
+
+  it("asks when the outbox cannot be read, without naming a count (PR A re-review N2)", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    const logout = jest.spyOn(runtime.auth, "logout");
+    const reads = jest.fn(async () => {
+      throw new Error("IndexedDB refused");
+    });
+    await renderScreen(<SettingsScreen />, { ...runtime, unsyncedCount: reads });
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.logout") }));
+    expect(await screen.findByText(en("settings.logout.unsynced.unknown"))).toBeOnTheScreen();
+    expect(logout).not.toHaveBeenCalled();
+    // Still reachable: the person can log out anyway.
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.logout.anyway") }));
+    await waitFor(() => {
+      expect(logout).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -412,6 +459,7 @@ describe("SettingsScreen", () => {
       routes: { "POST /api/sync/push": () => problem(503, "offline") },
       world: "empty",
     });
+    const logout = jest.spyOn(runtime.auth, "logout");
     await runtime.actions.setNightHours(true);
     await runtime.actions.setLanguage("en");
     await renderScreen(<SettingsScreen />, runtime);
@@ -420,18 +468,19 @@ describe("SettingsScreen", () => {
     expect(
       await screen.findByText("2 changes have not synced yet: logging out now loses them."),
     ).toBeOnTheScreen();
-    expect(router.replace).not.toHaveBeenCalled();
+    expect(logout).not.toHaveBeenCalled();
     await fireEvent.press(screen.getByRole("button", { name: en("settings.logout.wait") }));
     expect(screen.queryByText(/have not synced yet/u)).toBeNull();
-    expect(router.replace).not.toHaveBeenCalled();
+    expect(logout).not.toHaveBeenCalled();
     // Log out stays reachable: asked again, the person chooses to log out anyway.
     await fireEvent.press(screen.getByRole("button", { name: en("settings.logout") }));
     await fireEvent.press(
       await screen.findByRole("button", { name: en("settings.logout.anyway") }),
     );
     await waitFor(() => {
-      expect(router.replace).toHaveBeenCalledWith("/login");
+      expect(logout).toHaveBeenCalledTimes(1);
     });
+    expect(router.replace).not.toHaveBeenCalled();
   });
 
   it("waits for Telegram before deleting and can poll after the session disappears", async () => {
@@ -440,16 +489,15 @@ describe("SettingsScreen", () => {
       id,
       expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
     }));
-    await renderScreen(
-      <SettingsScreen />,
-      await createTestRuntime({
-        routes: {
-          "POST /api/account/confirmations": created,
-          [`GET /api/account/confirmations/${id}`]: () => ({ status: "confirmed" }),
-        },
-        world: "empty",
-      }),
-    );
+    const runtime = await createTestRuntime({
+      routes: {
+        "POST /api/account/confirmations": created,
+        [`GET /api/account/confirmations/${id}`]: () => ({ status: "confirmed" }),
+      },
+      world: "empty",
+    });
+    const finished = jest.spyOn(runtime.auth, "finishAccountDeletion");
+    await renderScreen(<SettingsScreen />, runtime);
     await fireEvent.press(screen.getByRole("button", { name: en("settings.deleteAccount") }));
     expect(created).not.toHaveBeenCalled();
     await fireEvent.press(
@@ -458,10 +506,12 @@ describe("SettingsScreen", () => {
     expect(screen.getByText(en("settings.confirmation.waiting"))).toBeOnTheScreen();
     await waitFor(
       () => {
-        expect(router.replace).toHaveBeenCalledWith("/login");
+        expect(finished).toHaveBeenCalledTimes(1);
       },
       { timeout: 4000 },
     );
+    // The route gate takes a signed-out device to the login card; no navigation of its own.
+    expect(router.replace).not.toHaveBeenCalled();
     expect(created).toHaveBeenCalledTimes(1);
   });
 
@@ -503,31 +553,31 @@ describe("SettingsScreen", () => {
     const id = "123e4567-e89b-42d3-a456-426614174003";
     // This device's clock runs ahead: the request already looks over here.
     const statuses = ["pending", "confirmed"];
-    await renderScreen(
-      <SettingsScreen />,
-      await createTestRuntime({
-        routes: {
-          "POST /api/account/confirmations": () => ({
-            id,
-            expiresAt: new Date(Date.now() - 60_000).toISOString(),
-          }),
-          [`GET /api/account/confirmations/${id}`]: () => ({
-            status: statuses.shift() ?? "confirmed",
-          }),
-        },
-        world: "empty",
-      }),
-    );
+    const runtime = await createTestRuntime({
+      routes: {
+        "POST /api/account/confirmations": () => ({
+          id,
+          expiresAt: new Date(Date.now() - 60_000).toISOString(),
+        }),
+        [`GET /api/account/confirmations/${id}`]: () => ({
+          status: statuses.shift() ?? "confirmed",
+        }),
+      },
+      world: "empty",
+    });
+    const finished = jest.spyOn(runtime.auth, "finishAccountDeletion");
+    await renderScreen(<SettingsScreen />, runtime);
     await fireEvent.press(screen.getByRole("button", { name: en("settings.deleteAccount") }));
     await fireEvent.press(
       screen.getByRole("button", { name: en("settings.deleteAccount.confirm") }),
     );
     await waitFor(
       () => {
-        expect(router.replace).toHaveBeenCalledWith("/login");
+        expect(finished).toHaveBeenCalledTimes(1);
       },
       { timeout: 7000 },
     );
+    expect(router.replace).not.toHaveBeenCalled();
     expect(screen.queryByText(en("settings.confirmation.expired"))).toBeNull();
   }, 15_000);
 

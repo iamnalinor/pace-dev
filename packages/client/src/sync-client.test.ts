@@ -803,7 +803,7 @@ describe("createSyncClient scheduling", () => {
           most = Math.max(most, open);
           await gate.promise;
           open -= 1;
-          return acceptAll({ body, url: new URL("https://api.test") });
+          return acceptAll({ body, headers: {}, url: new URL("https://api.test") });
         },
       },
       localEvents(1),
@@ -861,7 +861,7 @@ describe("createSyncClient scheduling", () => {
             isFirst = false;
             await gate.promise;
           }
-          return acceptAll({ body, url });
+          return acceptAll({ body, headers: {}, url });
         },
       },
       localEvents(1),
@@ -980,7 +980,7 @@ describe("createSyncClient soon", () => {
             isFirst = false;
             await gate.promise;
           }
-          return acceptAll({ body, url });
+          return acceptAll({ body, headers: {}, url });
         },
       },
       localEvents(1),

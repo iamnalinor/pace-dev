@@ -82,6 +82,21 @@ form from every entry path in the table below; the keyboard; empty, loading, err
 offline states; the heuristics walk on every screen; and every owner request still not met. The
 e2e sweep above stands in for the scripted matrix here too.
 
+**The owner's step, once per release: connect a real MCP client end to end.** The Sonnet agent
+cannot connect Claude, and the e2e and the rounds sign in with the dev id, so only this walks the
+real identity step (bug class 119). Before tagging, the owner:
+1. adds the server's MCP URL to a real client (Claude Desktop or claude.ai's connectors, Claude
+   Code's `claude mcp add --transport http`);
+2. signs in through the consent page from a browser signed in to Pace, and again from a private
+   window (the Telegram widget, then "Sign in to Pace first" for a network that blocks it);
+3. calls one read tool and one write tool, then revokes the app in Settings → Devices and sessions
+   and checks that the client is refused;
+4. checks the deployed page cannot be framed: `curl -sI <web origin>/oauth/authorize` shows
+   `X-Frame-Options: DENY` and a `Content-Security-Policy` with `frame-ancestors 'none'` (the
+   single-page fallback serves this path, so the check is on the deploy, not the build).
+
+The result goes into the release notes' checklist.
+
 ## How
 
 1. Launch an agent with `model: "sonnet"` (background), using the prompt below. It must not
@@ -212,6 +227,7 @@ in gets a row and a test that submits from it.
 | Projects / presets | new; edit; archive and restore; extend a preset | `projects.test.tsx`, `presets.test.tsx` |
 | Settings | each switch and time; the push picker (Auto, Google, Pace checks, Off; offline; another Firebase project) | `settings.test.tsx` |
 | Add a computer, Connect an AI app (Settings → Devices and sessions) | Settings at phone and desktop width; each OS; revoke and disconnect with the inline confirm | `features/sessions/sessions.test.tsx`, `e2e/sessions.e2e.ts` |
+| MCP consent page (`/oauth/authorize`) | a browser signed in to Pace (Allow with the session, no widget); signed out (the Telegram widget; "Sign in to Pace first", back with the request intact); a session revoked while the page is open | `features/oauth/oauth.test.tsx`, `oauth-session.int.test.ts`, `e2e/oauth-consent.e2e.ts` |
 
 ## The design review matrix
 

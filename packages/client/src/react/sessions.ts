@@ -26,8 +26,6 @@ export type Sessions = {
   readonly createAgent: (name: string) => Promise<NewAgent>;
 };
 
-type Loaded = Pick<Sessions, "loadedAt" | "sessions" | "status">;
-
 /** The server has no such session (any more): a revoke of it has nothing left to do. */
 const isAlreadyEnded = (error: unknown): boolean =>
   error instanceof ApiError && error.code === "session/not-found";
@@ -52,6 +50,7 @@ const wasGoneOnRevoke = async (api: ApiClient, id: string): Promise<boolean> => 
 };
 
 export const useSessions = (api: ApiClient): Sessions => {
+  type Loaded = Pick<Sessions, "loadedAt" | "sessions" | "status">;
   const [loaded, setLoaded] = useState<Loaded>({
     loadedAt: null,
     sessions: [],

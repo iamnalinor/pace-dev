@@ -8,7 +8,6 @@ import { kitPrimitives } from "./kit-primitives.ts";
 
 RuleTester.describe = describe;
 RuleTester.it = it;
-RuleTester.itOnly = it.only;
 
 describe("kit-primitives", () => {
   it("is registered in the pace plugin", () => {

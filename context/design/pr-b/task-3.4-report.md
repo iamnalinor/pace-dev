@@ -59,7 +59,7 @@
 - **Docs.**
   - Spec: built notes for ScreenHeader, Shell, Screen and split-pane.
   - Bug-lessons rows:
-    - F-LAY-02/03, class 118;
+    - F-LAY-02/03, class 122;
     - the Jest default window being `medium`, class 113;
     - the skip link, class 113.
 

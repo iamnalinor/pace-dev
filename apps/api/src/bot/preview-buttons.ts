@@ -87,9 +87,6 @@ export const questionsOf = (read: {
   readonly questions?: readonly ParseQuestion[];
 }): readonly ParseQuestion[] => read.questions ?? [];
 
-/** What an option button needs of the remembered preview. */
-type Asked = { readonly questions?: readonly ParseQuestion[]; readonly awaitingChoice?: boolean };
-
 /**
 An option button: the same correction as a typed reply (`answerText`, the question quoted),
 checked against the preview it belongs to. A press of a preview that is gone or of an option
@@ -105,6 +102,8 @@ export const answerPreview = async (
     ...plain(t(turn.state.settings.language, "bot.expired")),
     isToast: true,
   };
+  /** What an option button needs of the remembered preview. */
+  type Asked = { readonly questions?: readonly ParseQuestion[]; readonly awaitingChoice?: boolean };
   const pending = (await turn.store.peek(id)) as Asked | undefined;
   const answer = answerAt(pending?.questions ?? [], at);
   if (pending?.awaitingChoice === true || !answer.ok) {

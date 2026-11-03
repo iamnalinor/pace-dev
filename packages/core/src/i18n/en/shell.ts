@@ -70,7 +70,7 @@ export const enShell = {
   "appLink.missing": "This link has no login token.",
   "oauth.title": "Connecting an app",
   "oauth.body":
-    "An app is asking for access to your Pace account. Check what it wants, then sign in with Telegram to allow it.",
+    "An app is asking for access to your Pace account. Check what it wants before you allow it.",
   "oauth.unverified": "This app registered itself; its name is not verified.",
   "oauth.publishedBy": "Published by {domain}",
   "oauth.redirectTo": "Access will be sent to {host}.",
@@ -85,6 +85,12 @@ export const enShell = {
   "oauth.scope.offlineAccess": "Stay connected without asking again",
   "oauth.identify": "Sign in with Telegram to continue",
   "oauth.signedInAs": "Signed in as {name}",
+  "oauth.sessionEnded": "Your Pace session has ended. Sign in again to continue.",
+  "oauth.deviceToken":
+    "This Pace sign-in cannot connect apps. Log out of Pace in this browser, sign in again and retry.",
+  "oauth.identityConflict": "This page sent two sign-ins at once. Reload it and allow again.",
+  "oauth.widgetMissing": "Can't see the Telegram button?",
+  "oauth.signInFirst": "Sign in to Pace first",
   "oauth.allow": "Allow",
   "oauth.deny": "Deny",
   "oauth.devUse": "Continue as dev",
@@ -168,6 +174,8 @@ export const enShell = {
     "{count} changes have not synced yet: logging out now loses them.",
   "settings.logout.unsynced.other":
     "{count} changes have not synced yet: logging out now loses them.",
+  "settings.logout.unsynced.unknown":
+    "Some changes may not have synced yet: logging out now loses them.",
   "settings.logout.wait": "Wait",
   "settings.logout.anyway": "Log out anyway",
   "settings.deleteAccount": "Delete account",

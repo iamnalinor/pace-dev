@@ -88,7 +88,9 @@ export default defineConfig({
             url: `http://localhost:${String(API_PORT)}/api/health`,
           },
           {
-            command: `bun run --cwd apps/app build:web && bun run --cwd apps/app serve:web dist ${String(WEB_PORT)}`,
+            // A second start in one CI job (the latency step, against fresh servers) serves the
+            // build the first start made: E2E_REUSE_WEB_BUILD skips the rebuild, not the restart.
+            command: `${process.env["E2E_REUSE_WEB_BUILD"] === "1" ? "" : "bun run --cwd apps/app build:web && "}bun run --cwd apps/app serve:web dist ${String(WEB_PORT)}`,
             // EXPO_PUBLIC_DEV_LOGIN shows the dev login form in the production build (the tests use it).
             env: {
               EXPO_PUBLIC_API_URL: `http://localhost:${String(API_PORT)}`,

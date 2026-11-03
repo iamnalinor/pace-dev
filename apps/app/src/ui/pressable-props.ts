@@ -82,20 +82,6 @@ type State = {
   readonly selected?: boolean;
 };
 
-/** What the state layer sets on the native Pressable on both platforms. */
-type SharedProps = {
-  readonly accessibilityLabel?: string;
-  readonly accessibilityRole: AccessibilityRole;
-  readonly accessibilityState: State;
-  readonly "aria-checked"?: "mixed" | boolean;
-  readonly "aria-expanded"?: boolean;
-  readonly "aria-selected"?: boolean;
-  readonly className: string;
-  readonly disabled: boolean;
-  readonly onLongPress: (() => void) | undefined;
-  readonly onPress: ((event: GestureResponderEvent) => void) | undefined;
-};
-
 /** What a caller asked the role to say, before the role is checked. */
 type AskedState = {
   readonly checked: "mixed" | boolean | undefined;
@@ -150,6 +136,19 @@ export const usePressableProps = <R extends AccessibilityRole>({
     }
     onLongPress?.();
   }, [haptic, onLongPress]);
+  /** What the state layer sets on the native Pressable on both platforms. */
+  type SharedProps = {
+    readonly accessibilityLabel?: string;
+    readonly accessibilityRole: AccessibilityRole;
+    readonly accessibilityState: State;
+    readonly "aria-checked"?: "mixed" | boolean;
+    readonly "aria-expanded"?: boolean;
+    readonly "aria-selected"?: boolean;
+    readonly className: string;
+    readonly disabled: boolean;
+    readonly onLongPress: (() => void) | undefined;
+    readonly onPress: ((event: GestureResponderEvent) => void) | undefined;
+  };
   const state = stateOf(role, { checked, expanded, isDisabled: disabled, selected });
   const shared: SharedProps = {
     ...(label !== undefined && { accessibilityLabel: label }),

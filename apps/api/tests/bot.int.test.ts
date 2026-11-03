@@ -204,11 +204,10 @@ const callbackUpdate = (data: string) => {
   };
 };
 
-type Keyboard = { inline_keyboard: { text: string; callback_data: string }[][] };
-
 /** The callback data of the preview button labelled `label` in the last message sent. */
 const buttonData = (label: string): string => {
   const preview = sent.findLast((call) => ["sendMessage", "editMessageText"].includes(call.method));
+  type Keyboard = { inline_keyboard: { text: string; callback_data: string }[][] };
   const keyboard = preview?.body["reply_markup"] as Keyboard | undefined;
   return (
     keyboard?.inline_keyboard.flat().find((button) => button.text === label)?.callback_data ?? ""
@@ -223,12 +222,11 @@ const chooseTaskPreview = async (): Promise<void> => {
   await webhook(callbackUpdate(choose));
 };
 
-type Pulled = {
-  events: { type: string; source: string; payload: Record<string, unknown> }[];
-};
-
 /** The last event of `type` the bot wrote for the user. */
 const pulledEvent = async (token: string, type: string) => {
+  type Pulled = {
+    events: { type: string; source: string; payload: Record<string, unknown> }[];
+  };
   const pulled = await json<Pulled>("/api/sync/pull", { token });
   return pulled.events.findLast((event) => event.type === type && event.source === "bot");
 };

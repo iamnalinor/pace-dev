@@ -1,4 +1,4 @@
-import type { Hono } from "hono";
+import type { Context, Hono } from "hono";
 
 import { authorizationErrorRedirect } from "@cloudflare/workers-oauth-provider";
 
@@ -10,6 +10,8 @@ import {
   type OAuthClientInfo,
   ok,
   requestedScopes,
+  type Result,
+  type TelegramLogin,
 } from "@pace/core";
 
 import type { AppEnv } from "../shared/app-env.ts";
@@ -18,7 +20,8 @@ import type { GrantMetadata } from "../shared/oauth-grants.ts";
 import { d1 } from "../shared/db/d1.ts";
 import { type Handler, mount, type Problem } from "../shared/mount.ts";
 import { oauthHelpers } from "../shared/oauth-helpers.ts";
-import { resolveTelegramIdentity } from "../shared/telegram-identity.ts";
+import { bearerOf, resolveSessionIdentity } from "../shared/session-identity.ts";
+import { resolveTelegramIdentity, type User } from "../shared/telegram-identity.ts";
 import { loadConsent, parseAuthorization } from "./consent.ts";
 
 const SCOPE_PROBLEMS: Readonly<Record<GrantScopesError, Problem>> = {
@@ -52,6 +55,39 @@ const clientInfo: Handler<typeof endpoints.oauth.clientInfo> = async ({ c, query
   return ok(info);
 };
 
+const IDENTITY_CONFLICT: Problem = {
+  code: "auth/identity-conflict",
+  message: "Send either the Pace session or a Telegram proof, not both",
+  status: 422,
+};
+
+/**
+Who is allowing: the browser's Pace session when the request carries its bearer, else the
+Telegram widget payload (or a dev id outside production) of a signed-out browser. One proof per
+request, so the grant can only ever belong to the user the page showed.
+*/
+const identityOf = async (
+  c: Context<AppEnv>,
+  body: {
+    readonly devTelegramId?: string | undefined;
+    readonly telegram?: TelegramLogin | undefined;
+  },
+): Promise<Result<User, Problem>> => {
+  const now = Date.now();
+  const bearer = bearerOf(c.req.header("Authorization"));
+  if (bearer !== undefined) {
+    const hasSecondProof = body.telegram !== undefined || body.devTelegramId !== undefined;
+    return hasSecondProof
+      ? err(IDENTITY_CONFLICT)
+      : await resolveSessionIdentity(d1(c.env.DB), c.get("config"), { now, token: bearer });
+  }
+  return await resolveTelegramIdentity(d1(c.env.DB), c.get("config"), {
+    devTelegramId: body.devTelegramId,
+    now,
+    telegram: body.telegram,
+  });
+};
+
 const complete: Handler<typeof endpoints.oauth.complete> = async ({ c, body }) => {
   const consent = await loadConsent(c, body.authQuery);
   if (!consent.ok) {
@@ -62,11 +98,7 @@ const complete: Handler<typeof endpoints.oauth.complete> = async ({ c, body }) =
   if (!scopes.ok) {
     return err(SCOPE_PROBLEMS[scopes.error]);
   }
-  const identity = await resolveTelegramIdentity(d1(c.env.DB), c.get("config"), {
-    devTelegramId: body.devTelegramId,
-    now: Date.now(),
-    telegram: body.telegram,
-  });
+  const identity = await identityOf(c, body);
   if (!identity.ok) {
     return identity;
   }
