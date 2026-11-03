@@ -82,9 +82,8 @@ working ledger; its last lines are the most recent rulings).
   sweep text for Important 5); N4 the inspector takes touches during its 160 ms exit
   (`pointerEvents="none"` while exiting). From 3.1/3.2: Space double-fire relies on the caller's
   `preventDefault`; `checked="mixed"` typed for radio/switch; disabled Link reacts only to `disabled`.
-- **Owner question pending**: the empty 48 px top band above the title on Inbox and More
-  (`context/design/comps/top-band/`). Default if he doesn't answer: **C** — the band only where it
-  holds controls (Now's bell, actions); Inbox and More get the usual 16–24 top padding.
+- **Owner decided (2026-11-03)**: the 48 px top band stays on every top-level screen, Inbox and More
+  included (variant A in `context/design/comps/top-band/`). Already as built; keep it.
 
 ## 4. Carried to PR B's QA round (re-check the way each was found, then its class)
 - QA round 23 fixes: R23-01 zone not written on an unknown account (5xx first pull → Retry); R23-02
@@ -140,7 +139,6 @@ landscape (the rail scrolls to Settings at ~844×390, the cutout and gesture are
 nor the content, a compact ListRow stays ≥ 48 dp); reduced motion.
 
 ## 7. Open items for the owner
-- The top band on Inbox and More (§3, default C).
 - Tap latency 120–300 ms at 4× CPU (Task 5.6).
 - Visual choices to confirm: Week blocks as a light tint with dark ink; icon tile `#0D0F15`.
 
