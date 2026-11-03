@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { useAppState, useLanguage, usePace, useT } from "#app/app-state.tsx";
 import { zonedText } from "#app/format/time.ts";
@@ -8,7 +8,7 @@ import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
 import { FirstSyncBody } from "#app/ui/empty-state.tsx";
 import { Icon } from "#app/ui/icon.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
+import { TextField } from "#app/ui/text-field.tsx";
 import { type DecisionView, decisionViews } from "@pace/client";
 import { useDecisions } from "@pace/client/react";
 
@@ -107,7 +107,6 @@ const SEARCH_PAUSE_MS = 350;
 export const DecisionsScreen = () => {
   const t = useT();
   const { api } = usePace();
-  const { palette } = useTheme();
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
   // It searches while typing, once the typing pauses; Enter searches at once.
@@ -139,15 +138,15 @@ export const DecisionsScreen = () => {
   return (
     <PushedScreen title={t("decisions.title")}>
       <View className="px-4 pb-3">
-        <TextInput
-          accessibilityLabel={t("decisions.search")}
-          className="min-h-hit-web rounded-lg border border-outline bg-cell px-3 font-sans text-callout text-label-primary"
+        <TextField
+          isLabelHidden
+          label={t("decisions.search")}
           onChangeText={setQuery}
           onSubmitEditing={() => {
             setSearch(query);
           }}
           placeholder={t("decisions.search")}
-          placeholderTextColor={palette["label.tertiary"]}
+          purpose="search"
           returnKeyType="search"
           value={query}
         />

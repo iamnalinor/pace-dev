@@ -102,8 +102,8 @@ export const ConnectAiSheet = ({
       closeLabel={t("common.close")}
       name="connect-ai"
       onClose={onClose}
+      open={open}
       title={t("connectAi.open")}
-      visible={open}
     >
       {url === null ? (
         // The server has no MCP (no https origin, re-review N4): no URL that answers 503.

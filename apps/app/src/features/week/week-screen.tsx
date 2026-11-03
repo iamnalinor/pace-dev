@@ -11,6 +11,7 @@ import { cx } from "#app/ui/cx.ts";
 import { FirstSyncBody } from "#app/ui/empty-state.tsx";
 import { Icon } from "#app/ui/icon.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
+import { OverlayPresence } from "#app/ui/overlay-presence.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
 import { Shell } from "#app/ui/shell.tsx";
@@ -222,7 +223,9 @@ export const WeekScreen = () => {
   return (
     <>
       {grid}
-      {picked === null ? null : <PickedSheet onClose={close} picked={picked} week={week} />}
+      <OverlayPresence value={picked}>
+        {(kept) => <PickedSheet onClose={close} picked={kept} week={week} />}
+      </OverlayPresence>
     </>
   );
 };

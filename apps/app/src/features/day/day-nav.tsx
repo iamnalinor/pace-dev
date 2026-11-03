@@ -70,8 +70,8 @@ export const DayNav = ({
         onClose={() => {
           setIsPicking(false);
         }}
+        open={isPicking}
         title={t("day.pick")}
-        visible={isPicking}
       >
         <Calendar
           labels={{ next: t("calendar.nextMonth"), previous: t("calendar.previousMonth") }}

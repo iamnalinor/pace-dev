@@ -28,3 +28,12 @@ A field that takes one entry after another (a subtask, then the next): Enter sub
 cursor stays; Escape is the field's own (it closes it) rather than the page's (a form's close).
 */
 export const entryFieldProps = webEntry as TextInputProps;
+
+/**
+A single-line field of a sheet (QA round 21 M1): Enter presses the form's action and the cursor
+stays in the field, so focus never drops to the page behind the dim (react-native-web 0.21 reads
+`blurOnSubmit`).
+*/
+const webSubmit: Pick<WebEntryProps, "blurOnSubmit"> = { blurOnSubmit: false };
+
+export const submitFieldProps = webSubmit as TextInputProps;

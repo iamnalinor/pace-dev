@@ -12,6 +12,7 @@ import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
 import { EmptyText } from "#app/ui/empty-state.tsx";
 import { IconButton } from "#app/ui/icon-button.tsx";
+import { OverlayPresence } from "#app/ui/overlay-presence.tsx";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
 import { addMinutesIso } from "@pace/core";
@@ -47,9 +48,9 @@ const UndoConfirmation = ({
       }
       name="history-undo"
       onClose={onClose}
+      open
       subtitle={subtitle}
       title={t("history.undoConfirm")}
-      visible
     >
       <Text className="pb-4 font-sans text-subhead font-normal text-label-primary">
         {t("history.undoConfirmQuestion")}
@@ -113,16 +114,18 @@ const EntryRow = ({ entry }: { readonly entry: HistoryEntry }) => {
           </Button>
         ) : null}
       </View>
-      {isConfirming && entry.revocable ? (
-        <UndoConfirmation
-          isBusy={isBusy}
-          onClose={closeConfirmation}
-          onUndo={() => {
-            void undo();
-          }}
-          subtitle={entry.taskTitle === null ? eventLabel : `${eventLabel} · ${entry.taskTitle}`}
-        />
-      ) : null}
+      <OverlayPresence value={isConfirming && entry.revocable ? true : null}>
+        {() => (
+          <UndoConfirmation
+            isBusy={isBusy}
+            onClose={closeConfirmation}
+            onUndo={() => {
+              void undo();
+            }}
+            subtitle={entry.taskTitle === null ? eventLabel : `${eventLabel} · ${entry.taskTitle}`}
+          />
+        )}
+      </OverlayPresence>
     </View>
   );
 };

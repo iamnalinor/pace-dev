@@ -1110,3 +1110,5 @@ Task 3.1 fix round 1 (2026-11-03): numbers unchanged (design values 72, bare pre
 Task 3.4 (2026-11-03, `ScreenHeader` and the shell): **70** warnings of `pace/no-raw-design-values` (down from 72): the old `ScreenHeader`'s and the deleted `BackHeader`'s `active:opacity-70` back buttons are the kit `Pressable` now. `DESIGN_VALUE_WARNINGS` = 70; bare pressables 33 and kit primitives 10 unchanged.
 
 Task 3.5 (2026-11-03, `Presence` and `Disclosure`): **68** warnings of `pace/no-raw-design-values` (down from 70): `animated-height.tsx`'s `DURATION_MS` (a `rawDuration`) went with the file, and `FoldedSection`'s `active:opacity-70` with its raw Pressable (now the kit `Disclosure`). **`BARE_PRESSABLE_WARNINGS` = 32** (down from 33: `shared/task-list.tsx` no longer imports React Native's `Pressable`). Kit primitives 10 unchanged.
+
+Task 3.6 (2026-11-03, `Sheet`, `Dialog`, `Popover`): **67** warnings of `pace/no-raw-design-values` (down from 68): the sheet's `shadow-lg` became the `shadow.overlay` token (`shadow(scheme, "overlay")`). `DESIGN_VALUE_WARNINGS` = 67; bare pressables 32 and kit primitives 10 unchanged.

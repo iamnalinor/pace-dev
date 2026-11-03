@@ -18,6 +18,7 @@ import { EmptyText, FirstSyncBody } from "#app/ui/empty-state.tsx";
 import { Icon } from "#app/ui/icon.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
 import { ROW_ENTER, ROW_EXIT, ROW_LAYOUT } from "#app/ui/motion.ts";
+import { OverlayPresence } from "#app/ui/overlay-presence.tsx";
 import { RowList } from "#app/ui/row-list.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
@@ -280,6 +281,9 @@ export const DayScreen = () => {
   const { language } = useViewer();
   const [date, setDate] = useState<null | string>(null);
   const [sheet, setSheet] = useState<null | SheetTarget>(null);
+  const closeSheet = (): void => {
+    setSheet(null);
+  };
   const day = hooks.useDay(date);
   const { now } = hooks.useClock();
   const phone = useDayPhone(day, now);
@@ -330,15 +334,9 @@ export const DayScreen = () => {
           zone={day.zone}
         />
       </FirstSyncBody>
-      {sheet === null ? null : (
-        <ActivitySheet
-          onClose={() => {
-            setSheet(null);
-          }}
-          target={sheet}
-          zone={day.zone}
-        />
-      )}
+      <OverlayPresence value={sheet}>
+        {(kept) => <ActivitySheet onClose={closeSheet} target={kept} zone={day.zone} />}
+      </OverlayPresence>
     </Screen>
   );
 };

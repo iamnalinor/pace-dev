@@ -11,6 +11,7 @@ import { usePendingActions } from "#app/shared/assistant/use-pending-actions.ts"
 import { inkClass, outlineClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { Icon, type IconName } from "#app/ui/icon.tsx";
+import { OverlayPresence } from "#app/ui/overlay-presence.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { Tooltip } from "#app/ui/tooltip.tsx";
 
@@ -298,18 +299,23 @@ export const TimeBar = () => {
           }}
         />
       </View>
-      {opened === null || openedButton === null ? null : (
-        <ChoicesSheet
-          button={openedButton}
-          calendar={opened.calendar}
-          canGoAlongside={running !== null && !openedButton.isRunning}
-          onClose={() => {
-            // A start picked here is the bar's own: closing must not fold it.
-            markUse();
-            close();
-          }}
-        />
-      )}
+      {/* Kept through its exit: the sheet leaves with what it showed (F-MOT-05). */}
+      <OverlayPresence
+        value={opened === null || openedButton === null ? null : { button: openedButton, opened }}
+      >
+        {(kept) => (
+          <ChoicesSheet
+            button={kept.button}
+            calendar={kept.opened.calendar}
+            canGoAlongside={running !== null && !kept.button.isRunning}
+            onClose={() => {
+              // A start picked here is the bar's own: closing must not fold it.
+              markUse();
+              close();
+            }}
+          />
+        )}
+      </OverlayPresence>
     </View>
   );
 };
