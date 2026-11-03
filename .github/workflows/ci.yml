@@ -78,7 +78,9 @@ jobs:
     # Only worth its minutes once the fast checks pass.
     needs: checks
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # The chromium project ran ~20 min on a runner once the overhaul's suites landed (200 tests),
+    # and the latency step runs after it on fresh servers; 20 cut the run off mid-chromium.
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup

@@ -202,3 +202,4 @@ A fix round 3: 7924533 (CI .only guard class 120; I1 wipe only when no session l
 HANDOFF rewritten for a new session (2026-11-03).
 A fix round 3 review: all addressed; ready once CI green (toast flake row lacks cause — minor). CI note: every push cancels the running CI (concurrency); runs 272–274 cancelled by checkpoint pushes. Holding pushes to A until run 276 (head 981271a) finishes.
 Owner (2026-11-03): top band — keep A (the 48 px bar on every top-level screen, Inbox and More included). Already as built; no change.
+CI run 276: checks green; e2e cancelled by the job's 20-min timeout mid-chromium (not by a push). Ruling: e2e job timeout 20→35 — the suite grew to ~200 tests + the separate latency step — cost: more rationed minutes per run. Pushed with the two docs commits.
