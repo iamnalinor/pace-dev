@@ -311,7 +311,7 @@ class ReadOutcome {
       code: isHopeless ? "llm/invalid-output" : "llm/unavailable",
       isRefused,
       limited,
-      reason: reasonOf({ hasProviders: this.hasProviders, isHopeless, retryAt }),
+      reason: reasonOf({ hasProviders: this.hasProviders, isHopeless, isRefused, retryAt }),
       retryAt,
     });
   }
