@@ -24,6 +24,9 @@ type CompleteRequest = {
   readonly headers: Readonly<Record<string, string>>;
 };
 
+/** What the API answers a revoked or expired session. */
+const ended = () => problem(401, "auth/unauthorized");
+
 const DEV_LOGIN = { "POST /api/auth/dev": () => ({ token: "tok_dev", user: fakeUser }) };
 
 const setupConsent = async (
@@ -151,8 +154,7 @@ describe("ConsentFlow", () => {
   });
 
   it("falls back to signing in when the server says the session ended, and then goes quiet", async () => {
-    const ended = () => problem(401, "auth/unauthorized");
-    const me = jest.fn(() => ({ ...fakeUser, storeId: "store-test" }));
+    const me = jest.fn((): unknown => ({ ...fakeUser, storeId: "store-test" }));
     const { complete, redirect, runtime, widget } = await setupConsent({
       complete: ended,
       me,

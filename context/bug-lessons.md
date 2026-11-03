@@ -1238,6 +1238,31 @@ The same rule applies when a previously successful channel is no longer configur
   to the gate. `login-navigation.test.ts` fails when a file outside the gate and the bare sign-in
   screens names the `/login` route; `login.e2e.ts` "a slow log-out answer…" holds the answer 2 s.
 
+### 119. A test-only sign-in path that stands in for the real one
+- **Bug.** Owner bug 2026-11-03: connecting Claude (an MCP client) failed. The consent page asked
+  for the Telegram widget even though the browser already held the person's Pace session, and on
+  the owner's network the widget's frame loaded a block page, clipped over the text below, so
+  Allow never enabled. `POST /api/oauth/complete` accepted only a widget payload or a dev id.
+- **Missed because.** Every e2e test and QA round signed in on the consent page with the dev id
+  (`EXPO_PUBLIC_DEV_LOGIN`, `DevIdentity`), so the real identity step never ran: not the widget,
+  not its frame on a network that blocks it, not the "already signed in" case. No QA round
+  connected a real MCP client end to end, and the journey "connect Claude from a browser where I
+  am signed in" was never walked (docs/design.md step 1). The decision behind it (plan.md: widget
+  on the web origin) asked how to prove identity, never whether it was already proved.
+- **Rule.** A shortcut that exists for tests (a dev id, a seeded token, a mocked widget) never
+  stands in for the real path in the one test of a journey: each journey that proves who the person
+  is gets at least one test that runs the path a real person meets, signed in and signed out, and
+  the QA round walks it with a real client once per release. Before asking a person to prove who
+  they are, ask whether they already have.
+- **Sweep and guard.** Every place that asks for a Telegram proof: the web login (redirects a
+  signed-in browser to `next`, hands its token to the app for `?return=app`), the consent page (the
+  one that asked a signed-in browser; now uses the session), the Android app's login (shown only
+  without a session), the account-deletion confirmation (a bot confirmation of a destructive
+  action by design, not a sign-in). `e2e/oauth-consent.e2e.ts`: signed in, Allow with no widget
+  (bearer, no Telegram proof); a session revoked while the page is open falls back to signing in and
+  the network goes quiet; signed out, the app's own sign-in comes back with the request intact.
+  `docs/qa.md`: connect a real MCP client end to end once per release.
+
 ## Log
 
 New bugs go here with their class; a new class gets its own section above.
@@ -1611,3 +1636,4 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-03 | PR A re-review N7: a first read every provider refused for good (`LlmError.isRefused`: a content filter, a 400) reached the app as `unreachable`, because `reasonOf` never read `isRefused`; the app offered "Read it when it's back" for a text no provider will read, the server kept it deferred, and Enter (R23-04) could ask again | 99 (a failure's reason dropped at a boundary) and 1 (across the wire: the queue counted refusals, the route's reason did not) | yes: `reasonOf` is the one place a read's failure becomes a reason (the route, the bot's preview and corrections, the deferral rule `canReadLater` all read it); the queue's own count (`blindTries`) already read `isRefused` | missed because the class 99 test drove an outage, an out-of-shape answer and a rate limit, not a refusal; `reasonOf` maps a read every provider refused for good to `unreadable` (no offer, not kept); `parse.int.test.ts` (a 400 from every provider answers `unreadable`, and a deferred one is not queued; red before: `unreachable`). Other side traced: the app's composer and preview card show `composer.aiUnreadable` / `assistant.rulesUsedUnreadable` with no offer, and `isFinalAnswer` keeps the first-read guard for `unreadable`, so Enter sends once |
 | 2026-11-03 | Full e2e of fix round 2: `sync-state.e2e.ts` "offline, Log out asks first…" at 1440 looked for "1 change has not synced yet" and found "2 changes": the test went offline before a new account's own time-zone write had been sent, and N2's press-time read counted the outbox as it really was (the read-ahead had hidden it by being stale) | 20 (a test acts before the start's own writes settle) | yes: the other e2e that reach Log out with a count (`login.e2e.ts` "a slow log-out answer…") waited for an empty outbox by hand; both now share `outboxSent` (`e2e/support/outbox.ts`); no other e2e names a count of unsynced changes | the shared helper; both tests 9/9 with `--repeat-each 3 --workers 4` |
 | 2026-11-03 | Second full e2e of fix round 2: `login.e2e.ts` "a page older than its server offers Refresh…" failed once with `apiResponse.json: Response has been disposed` (passed in the first full run and 6/6 alone after the fix): Refresh reloads the page while the test's `/api/instance` route handler is still reading a fetched answer, and the reload disposes it | 63 (a handler that outlives the page it serves, with nobody owning its end) | yes: the only other `route.fetch()` handler (`notifications.e2e.ts`, `/api/sessions`) serves a page that does not reload while it is read | the handler treats a disposed answer as a cancelled request (the reloaded page asks again, and that is the read judged) and rethrows anything else; 6/6 with `--repeat-each 6 --workers 4` |
+| 2026-11-03 | Owner bug (task A9): connecting Claude failed; the consent page asked for the Telegram widget in a browser that held the person's Pace session, the widget's frame showed a network's block page clipped over the text below, and Allow stayed disabled (`/api/oauth/complete` took only a widget payload or a dev id) | 119 (new) | yes: the web login, the Android login and the deletion confirmation do not ask a signed-in person to sign in (see the class); the consent page was the one | missed because every e2e and QA round used the dev id on the consent page, and no round connected a real client; `/api/oauth/complete` takes the session's bearer (revoked/expired 401 `auth/unauthorized`, a device token 403, off the whitelist 403, a second proof beside it 422 `auth/identity-conflict`), the page shows "Signed in as …" and allows with it, a signed-out page gives the widget its own clipped box and always shows "Can't see the Telegram button? Sign in to Pace first" (the app's sign-in, back with the query intact). Tests (red before): `oauth-session.int.test.ts` (7: the grant is the session user's), `oauth.test.tsx` (session, fallback after a 401 with one Allow and one session check, signed-out link), `sign-in-path.test.ts`, `e2e/oauth-consent.e2e.ts` (3); `docs/qa.md` line |

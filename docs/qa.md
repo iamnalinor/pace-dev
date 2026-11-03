@@ -212,6 +212,15 @@ in gets a row and a test that submits from it.
 | Projects / presets | new; edit; archive and restore; extend a preset | `projects.test.tsx`, `presets.test.tsx` |
 | Settings | each switch and time; the push picker (Auto, Google, Pace checks, Off; offline; another Firebase project) | `settings.test.tsx` |
 | Add a computer, Connect an AI app (Settings → Devices and sessions) | Settings at phone and desktop width; each OS; revoke and disconnect with the inline confirm | `features/sessions/sessions.test.tsx`, `e2e/sessions.e2e.ts` |
+| MCP consent page (`/oauth/authorize`) | a browser signed in to Pace (Allow with the session, no widget); signed out (the Telegram widget; "Sign in to Pace first", back with the request intact); a session revoked while the page is open | `features/oauth/oauth.test.tsx`, `oauth-session.int.test.ts`, `e2e/oauth-consent.e2e.ts` |
+
+**Once per release: connect a real MCP client end to end.** The e2e and the rounds sign in with
+the dev id; only a real client walks the real identity step (bug class 119). Before tagging, add
+the server's MCP URL to a real client (Claude Desktop or claude.ai's connectors, Claude Code's
+`claude mcp add --transport http`), sign in through the consent page from a browser signed in to
+Pace and from a private window (the Telegram widget, then "Sign in to Pace first" for a network
+that blocks it), call one read tool and one write tool, then revoke the app in Settings → Devices
+and sessions and check the client is refused. Write the result in the release notes' checklist.
 
 ## The design review matrix
 
