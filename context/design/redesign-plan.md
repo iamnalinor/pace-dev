@@ -995,7 +995,8 @@ rewrites that code, so no screen is fixed twice; logic and server items go to PR
 "Foundation" takes A1–A8**, one fix task per group, each test-first with a bug-lessons row and the
 other side of the contract traced. **PR B items go into their tasks**: each task named below carries
 a one-line pointer back here. Not ours: owner actions, the "Carried over" list, the next-iteration
-briefs, CI duration (a note only).
+briefs, CI duration (a note only). Accepted limit, no task: an empty account that can never sync
+keeps Settings and Presets grey (Log out stays reachable; revisit if it confuses people).
 
 **PR A "Foundation" (after the rebase):**
 - A1 Sync and first pull: QA21 M4 (a 5xx on the first pull reads "not synced yet" with Retry);
@@ -1033,15 +1034,14 @@ briefs, CI duration (a note only).
 
 ## Batch sizes (rough)
 
-| Batch | PR | Tasks | Size |
+Owner, 2026-11-02: the batches ship as three stacked PRs into main, merged (squash) by the controller
+once review, QA and CI are green.
+
+| PR | Batches | Contents | Size |
 |---|---|---|---|
-| 1 + 2 | 1/7 guard rails + tokens v2 | 1.1–1.4, 2.1–2.4 | L (codemod touches most app files) |
-| 3 | 2/7 kit | 3.1–3.10 | XL |
-| 4 | 3/7 screens | 4.1–4.13 | XL |
-| 5 | 4/7 motion | 5.1–5.4 | M |
-| 6 | 5/7 web/PWA | 6.1–6.4 | M |
-| 7 | 6/7 identity | 7.1–7.3 | S–M |
-| 8 | 7/7 close-out | 8.1–8.7 | M |
+| A "Foundation" | 1 + 2 | guard rails, tokens v2, formatters, instant response, linear rebuild; PR #48 follow-ups A1–A8 | L |
+| B "New look" | 3 + 4 + 7 | the kit, every screen and direction A's identity, screen by screen; PR #48 UI follow-ups in their tasks | XL |
+| C "Polish" | 5 + 6 + 8 | motion and the 100 ms render budget, web/PWA, close-out | M–L |
 
 ## Lint baseline
 
