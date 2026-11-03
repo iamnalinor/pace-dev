@@ -1,4 +1,4 @@
-import type { Page, WebSocketRoute } from "@playwright/test";
+import type { Locator, Page, WebSocketRoute } from "@playwright/test";
 
 import { formByHand, nowTasks, taskForm } from "./support/composer.ts";
 import { EMPTY_COPY } from "./support/first-sync.ts";
@@ -538,3 +538,53 @@ test("Day's first load asks for the day's app usage once, though two of its part
   });
   expect(repeated(asked)).toEqual([]);
 });
+
+/** A control's box on the page; a control not drawn fails the test here. */
+const boxOf = async (
+  locator: Locator,
+): Promise<{ readonly x: number; readonly y: number; readonly height: number }> => {
+  const box = await locator.boundingBox();
+  expect(box).not.toBeNull();
+  return box ?? { height: 0, x: 0, y: 0 };
+};
+
+for (const [width, height] of [
+  [390, 844],
+  [1440, 900],
+] as const) {
+  test(`offline, Log out asks first in a block of its own, Wait takes the focus, Escape gives it back, at ${String(width)} (QA round 23 R23-02, design pass M8)`, async ({
+    context,
+    page,
+  }) => {
+    await page.setViewportSize({ height, width });
+    await loginViaApi(page);
+    await page.goto("/settings");
+    await expect(page.getByRole("button", { exact: true, name: "Log out" })).toBeVisible();
+    // Offline, a setting changed here waits in the outbox.
+    await context.setOffline(true);
+    await page.getByRole("switch", { name: "Show night hours" }).click();
+    const logOut = page.getByRole("button", { exact: true, name: "Log out" });
+    await logOut.focus();
+    await page.keyboard.press("Enter");
+    const confirm = page.getByRole("group", {
+      name: "1 change has not synced yet: logging out now loses it.",
+    });
+    const wait = confirm.getByRole("button", { name: "Wait" });
+    const anyway = confirm.getByRole("button", { name: "Log out anyway" });
+    await expect(wait).toBeFocused();
+    await expectNoA11yViolations(page);
+    // A line of its own, the width of the column, under Export (beside it, its buttons sat at the
+    // far edge, 500 px from the question); each button a full target on one line.
+    const block = await boxOf(confirm);
+    const exportBox = await boxOf(page.getByRole("button", { name: "Export data" }));
+    expect(block.y).toBeGreaterThanOrEqual(exportBox.y + exportBox.height);
+    expect(Math.abs(block.x - exportBox.x)).toBeLessThan(2);
+    for (const box of [await boxOf(wait), await boxOf(anyway)]) {
+      expect(box.height).toBeGreaterThanOrEqual(44);
+      expect(box.height).toBeLessThan(56);
+    }
+    await page.keyboard.press("Escape");
+    await expect(confirm).toHaveCount(0);
+    await expect(logOut).toBeFocused();
+  });
+}
