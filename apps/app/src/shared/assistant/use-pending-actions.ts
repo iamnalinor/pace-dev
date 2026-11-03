@@ -4,13 +4,12 @@ import type {
   Action,
   DecisionResolution,
   Event,
-  MessageKey,
   ParseQuestion,
   ParseRequestBody,
 } from "@pace/core";
 
 import { usePace, useT } from "#app/app-state.tsx";
-import { readingIssue } from "#app/shared/assistant/reading-issue.ts";
+import { type ReadingIssue, readingIssue } from "#app/shared/assistant/reading-issue.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { TOAST_FIT } from "#app/ui/toast.tsx";
@@ -103,14 +102,14 @@ const revise = (
     setIssue,
   }: {
     readonly read: (text: string, thread: Thread, decisionIds: Ids) => Promise<void>;
-    readonly setIssue: (issue: MessageKey) => void;
+    readonly setIssue: (issue: ReadingIssue) => void;
   },
 ): void => {
   if (pending === null) {
     return;
   }
   if (pending.thread.length >= MAX_THREAD) {
-    setIssue("assistant.tooManyCorrections");
+    setIssue({ canReadLater: false, key: "assistant.tooManyCorrections", retryAt: null });
     return;
   }
   void read(
@@ -221,7 +220,7 @@ export const usePendingActions = (
 ) => {
   const { assistant } = usePace();
   const [pending, setPending] = useState<null | Pending>(null);
-  const [issue, setIssue] = useState<MessageKey | null>(null);
+  const [issue, setIssue] = useState<null | ReadingIssue>(null);
   const [busy, setBusy] = useState(false);
   const requestRef = useRef(0);
   const firstRead = useFirstRead();

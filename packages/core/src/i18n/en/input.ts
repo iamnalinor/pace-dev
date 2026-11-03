@@ -229,6 +229,16 @@ export const enInput = {
   "assistant.rulesUsedUnreadable":
     "The assistant couldn't read this one. These actions come from local rules; check them before approving.",
   "assistant.couldNotRead": "The assistant could not read this. Try again.",
+  "assistant.unread.limited":
+    "The assistant is out of requests until about {time}, and the rules found nothing here. Try again then.",
+  "assistant.unread.limitedSoon":
+    "The assistant is out of requests for now, and the rules found nothing here. Try again later.",
+  "assistant.unread.unreachable":
+    "The assistant could not be reached, and the rules found nothing here. Try again in a moment.",
+  "assistant.unread.unreadable":
+    "The assistant couldn't read this one, and the rules found nothing here. Rephrase it.",
+  "assistant.unread.off":
+    "This server has no assistant, and the rules found nothing here. Rephrase it.",
   "assistant.couldNotRevise":
     "The assistant could not revise these actions. Your previous preview is still here.",
   "assistant.tooManyCorrections": "That is five corrections. Approve or cancel, then start again.",

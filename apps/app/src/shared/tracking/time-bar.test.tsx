@@ -498,6 +498,45 @@ describe("TimeBar", () => {
     expect(screen.queryByText(en("assistant.couldNotRead"))).toBeNull();
   });
 
+  it.each([
+    ["limited", null, "assistant.unread.limitedSoon"],
+    ["unreachable", null, "assistant.unread.unreachable"],
+    ["unreadable", null, "assistant.unread.unreadable"],
+    ["off", null, "assistant.unread.off"],
+  ] as const)(
+    "says why no model read it when the rules found nothing either: %s (QA 21 M3, class 99)",
+    async (reason, retryAt, key) => {
+      const unread = { ...CSS_READ, actions: [], reason, retryAt, status: "unavailable" };
+      await renderScreen(
+        <TimeBar />,
+        await createTestRuntime({ routes: { "POST /api/parse": () => unread } }),
+      );
+      const field = screen.getByLabelText("What are you doing?");
+      await fireEvent.changeText(field, "Reading a book for an hour");
+      await fireEvent(field, "submitEditing");
+      expect(await screen.findByText(en(key))).toBeOnTheScreen();
+      expect(screen.queryByText(en("assistant.couldNotRead"))).toBeNull();
+    },
+  );
+
+  it("names the time the assistant is back when it is out of requests until then (QA 21 M3)", async () => {
+    const unread = {
+      ...CSS_READ,
+      actions: [],
+      reason: "limited",
+      retryAt: addMinutesIso(NOW, 90),
+      status: "unavailable",
+    };
+    await renderScreen(
+      <TimeBar />,
+      await createTestRuntime({ routes: { "POST /api/parse": () => unread } }),
+    );
+    const field = screen.getByLabelText("What are you doing?");
+    await fireEvent.changeText(field, "Reading a book for an hour");
+    await fireEvent(field, "submitEditing");
+    expect(await screen.findByText(/out of requests until about \d{1,2}:\d{2}/u)).toBeOnTheScreen();
+  });
+
   it("says the thread is full on a sixth correction instead of dropping it", async () => {
     const parse = jest.fn(() => CSS_READ);
     const runtime = await createTestRuntime({ routes: { "POST /api/parse": parse } });

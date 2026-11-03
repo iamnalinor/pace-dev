@@ -337,6 +337,28 @@ describe("Composer", () => {
     expect(screen.queryByText(en("assistant.couldNotRead"))).toBeNull();
   });
 
+  it.each([
+    ["limited", "assistant.unread.limitedSoon", true],
+    ["unreachable", "assistant.unread.unreachable", true],
+    ["unreadable", "assistant.unread.unreadable", false],
+    ["off", "assistant.unread.off", false],
+  ] as const)(
+    "says why no model read the line when the rules found nothing either: %s (QA 21 M3)",
+    async (reason, key, canReadLater) => {
+      const unread = { ...PARSED, actions: [], reason, retryAt: null, status: "unavailable" };
+      await renderComposer(
+        await createTestRuntime({ routes: { "POST /api/parse": () => unread } }),
+      );
+      await fireEvent.changeText(line(), "close task Nonexistent");
+      await enter();
+      expect(await screen.findByText(en(key))).toBeOnTheScreen();
+      expect(screen.queryByText(en("assistant.couldNotRead"))).toBeNull();
+      expect(screen.queryAllByRole("button", { name: en("composer.aiLater") }).length > 0).toBe(
+        canReadLater,
+      );
+    },
+  );
+
   it("shows no answer hint while the assistant asks nothing", async () => {
     await renderComposer(await createTestRuntime({ routes: { "POST /api/parse": () => PARSED } }));
     await fireEvent.changeText(line(), "срочно почта");

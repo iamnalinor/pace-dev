@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
 import { ActionCards } from "#app/shared/assistant/action-cards.tsx";
+import { ReadingIssueLine } from "#app/shared/assistant/reading-issue-line.tsx";
 import { AnimatedHeight } from "#app/ui/animated-height.tsx";
 import { cx } from "#app/ui/cx.ts";
 
@@ -38,6 +39,16 @@ export const ComposerFlowForm = ({ variant }: { readonly variant: FormVariant })
   );
 };
 
+/** Why the assistant's answer shows no card, with "Read it when it's back" offered once. */
+const IssueLine = ({ flow }: { readonly flow: ComposerFlow }) =>
+  flow.pending.issue === null ? null : (
+    <ReadingIssueLine
+      issue={flow.pending.issue}
+      // Offered once, as on the cards: after a press the status line says what came of it.
+      onLater={flow.ai.state.status === "idle" ? () => void flow.readLater() : undefined}
+    />
+  );
+
 /** The line and, while the assistant works on it (and no form shows its reading), its status. */
 const LineBlock = ({
   flow,
@@ -47,43 +58,36 @@ const LineBlock = ({
   readonly flow: ComposerFlow;
   readonly isFocused: boolean;
   readonly onFocusChange: (isInFocus: boolean) => void;
-}) => {
-  const t = useT();
-  return (
-    <>
-      <QuickLine
-        flow={flow}
-        isFocused={isFocused}
-        isLocked={flow.form !== null && flow.isFormInPane}
-        isReading={flow.pending.busy}
-        onFocusChange={onFocusChange}
+}) => (
+  <>
+    <QuickLine
+      flow={flow}
+      isFocused={isFocused}
+      isLocked={flow.form !== null && flow.isFormInPane}
+      isReading={flow.pending.busy}
+      onFocusChange={onFocusChange}
+    />
+    {flow.pending.pending === null ? null : (
+      <ActionCards
+        actions={flow.pending.pending.actions}
+        busy={flow.pending.busy}
+        onApprove={() => {
+          void flow.pending.approve();
+        }}
+        onCancel={flow.dismiss}
+        onFollowup={flow.pending.followup}
+        // Offered once: after a press the status line below says what came of it.
+        onLater={flow.ai.state.status === "idle" ? () => void flow.readLater() : undefined}
+        questions={flow.pending.pending.questions}
+        unread={flow.pending.pending.unread}
       />
-      {flow.pending.pending === null ? null : (
-        <ActionCards
-          actions={flow.pending.pending.actions}
-          busy={flow.pending.busy}
-          onApprove={() => {
-            void flow.pending.approve();
-          }}
-          onCancel={flow.dismiss}
-          onFollowup={flow.pending.followup}
-          // Offered once: after a press the status line below says what came of it.
-          onLater={flow.ai.state.status === "idle" ? () => void flow.readLater() : undefined}
-          questions={flow.pending.pending.questions}
-          unread={flow.pending.pending.unread}
-        />
-      )}
-      {flow.pending.issue === null ? null : (
-        <Text accessibilityRole="alert" className="font-sans text-footnote text-danger">
-          {t(flow.pending.issue)}
-        </Text>
-      )}
-      {flow.text.trim() === "" || flow.form !== null || flow.ai.state.status === "read" ? null : (
-        <Status flow={flow} />
-      )}
-    </>
-  );
-};
+    )}
+    <IssueLine flow={flow} />
+    {flow.text.trim() === "" || flow.form !== null || flow.ai.state.status === "read" ? null : (
+      <Status flow={flow} />
+    )}
+  </>
+);
 
 /**
 Now's composer, one card. The line takes a task in words: Enter (or Send) has the assistant

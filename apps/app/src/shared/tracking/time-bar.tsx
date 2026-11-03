@@ -7,6 +7,7 @@ import type { MessageKey } from "@pace/core";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { ActionCards } from "#app/shared/assistant/action-cards.tsx";
+import { ReadingIssueLine } from "#app/shared/assistant/reading-issue-line.tsx";
 import { usePendingActions } from "#app/shared/assistant/use-pending-actions.ts";
 import { inkClass, outlineClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
@@ -106,11 +107,7 @@ const TypedStart = ({ onUse }: { readonly onUse: () => void }) => {
           {t("assistant.reading")}
         </Text>
       ) : null}
-      {pending.issue === null ? null : (
-        <Text accessibilityRole="alert" className={cx(NOTE, "text-danger")}>
-          {t(pending.issue)}
-        </Text>
-      )}
+      {pending.issue === null ? null : <ReadingIssueLine issue={pending.issue} />}
       <View className="flex-row items-center gap-2">
         <TextInput
           accessibilityLabel={t("time.whatDoing")}
