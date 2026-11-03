@@ -406,19 +406,31 @@ describe("best-effort structured output (bug class 85)", () => {
     });
   });
 
-  it("refuses an answer with no actions or questions list: that is no reading, not nothing to do", async () => {
+  it("refuses an answer with no actions list: that is no reading, not nothing to do", async () => {
     const { actions: _actions, ...noActions } = echoParse("x");
+    const result = await runParse(
+      [
+        { model: fakeParseModel(() => noActions as never), name: "terse" },
+        { model: fakeParseModel(echoParse), name: "next" },
+      ],
+      prompt,
+    );
+    expect(result).toMatchObject({ ok: true, value: { provider: "next" } });
+  });
+
+  it("reads a root questions list left out as nothing to ask (round 7 review 4)", async () => {
     const { questions: _questions, ...noQuestions } = echoParse("x");
-    for (const terse of [noActions, noQuestions]) {
-      const result = await runParse(
-        [
-          { model: fakeParseModel(() => terse as never), name: "terse" },
-          { model: fakeParseModel(echoParse), name: "next" },
-        ],
-        prompt,
-      );
-      expect(result).toMatchObject({ ok: true, value: { provider: "next" } });
-    }
+    const result = await runParse(
+      [
+        { model: fakeParseModel(() => noQuestions as never), name: "terse" },
+        { model: fakeParseModel(echoParse), name: "next" },
+      ],
+      prompt,
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      value: { provider: "terse", result: { questions: [] } },
+    });
   });
 
   it("fills only an action's nullable keys, never a list it left out", async () => {
