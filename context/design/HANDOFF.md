@@ -5,6 +5,23 @@ as of the last checkpoint, every standing instruction of the owner, and the exac
 full decision log is [`overhaul-ledger.md`](overhaul-ledger.md) (a copy of the previous controller's
 working ledger; its last lines are the most recent rulings).
 
+
+## 0. Current session (2026-11-03, fork Hentrixz/pace-dev, branch `claude/vigilant-archimedes-kq5d4w`)
+- Goal: finish PR B's remaining tasks (kit 3.6–3.10 + parked minors, screens 4.1–4.13 with 7.1–7.3),
+  green locally, **no QA round**; then a PR from this fork branch into `claude/pace-design-overhaul-b`
+  of iamnalinor/pace-dev (opened by the owner via compare link — this session cannot reach the upstream
+  repo through the GitHub tools) and make it green.
+- Owner rules for this run: Sonnet for small/mechanical tasks and narrow re-reviews, Opus for kit/screens
+  tasks and the whole-branch review; checkpoint commit + push after every finished task or merged
+  implementer branch (even red), this section updated before each push; implementers push their work
+  to `wip/<task ids>` on the fork.
+- Baseline at start (a67cc50): `bun lint` clean, unit green, app 1066/1066.
+- In flight: wave 1 (kit) — three Opus implementers in worktrees: (a) parked minors + 3.6 + 3.8
+  (`wip/task-3.6-3.8`), (b) 3.7 + 3.10 (`wip/task-3.7-3.10`), (c) 3.9 (`wip/task-3.9`). Heavy commands
+  are serialized through a `flock` (e2e ports are fixed).
+- Next: merge wave 1, lint/tests, then wave 2 (screens) in parallel by feature folder, then the branch
+  review, full e2e, PR.
+
 ## 1. Owner's standing instructions (binding)
 - **Direction A · Тетрадь.** Decisions already taken are at the end of [`docs/design.md`](../../docs/design.md);
   every new or changed UI follows `docs/design.md` (comp, tokens and kit only, `pairs.ts`, worst-case
