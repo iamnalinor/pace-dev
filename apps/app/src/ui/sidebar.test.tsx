@@ -98,6 +98,27 @@ describe("Sidebar", () => {
     expect(screen.getByText("Ann")).toBeOnTheScreen();
   });
 
+  it("gives a 64-character Telegram name a line of its own, cut at its end only, never to one letter (F-LAY-06)", async () => {
+    const long = "Александр-Константин Длинноимённый Тестовый Пользователь Telegram";
+    expect(long.length).toBeGreaterThanOrEqual(64);
+    const runtime = await createTestRuntime({
+      routes: { "GET /api/me": () => ({ ...fakeMe, firstName: long, name: long }) },
+      world: "empty",
+    });
+    await runtime.auth.me();
+    await renderScreen(<Sidebar />, runtime);
+    const name = screen.getByText(long);
+    // One line ending in "…" (the whole name in its tooltip and its label), never a letter.
+    expect(name.props["numberOfLines"]).toBe(1);
+    const row = screen.getByTestId("sidebar-owner");
+    expect(within(row).queryByText(en("app.name"))).toBeNull();
+    expect(within(row).queryByLabelText(/notification/iu)).toBeNull();
+    expect(row.props["accessibilityLabel"]).toBe(en("nav.signedInAs", { name: long }));
+    // No avatar beside it repeating the initial (R22-25): the name has the row's whole width.
+    expect(within(row).queryByTestId("avatar-person")).toBeNull();
+    expect(name.props["className"]).toContain("flex-1");
+  });
+
   it("leaves the name out until the server has told it", async () => {
     await renderScreen(<Sidebar />, await createTestRuntime({ world: "empty" }));
     expect(screen.queryByText("Ann")).toBeNull();

@@ -8,6 +8,7 @@ import {
   expectStaysInside,
 } from "./support/geometry.ts";
 import { loginViaApi } from "./support/login.ts";
+import { seedLivedIn } from "./support/seed.ts";
 
 /** The main screens and the tabs, sidebar links or rows of More that reach each (no reload). */
 const PHONE_SCREENS: readonly (readonly [string, readonly string[]])[] = [
@@ -243,5 +244,82 @@ test.describe("motion and overlays at one width", () => {
       "What are you doing?",
     ]);
     expect(covered).toEqual([]);
+  });
+});
+
+/**
+Marks the tooltip bubble on show (`data-e2e-shown`): every trigger keeps its bubble in the page,
+hidden, so the shown one is told by its box.
+*/
+const hasMarkedShownTooltip = async (page: Page): Promise<boolean> =>
+  await page.evaluate(() => {
+    for (const marked of globalThis.document.querySelectorAll<HTMLElement>("[data-e2e-shown]")) {
+      delete marked.dataset["e2eShown"];
+    }
+    const shown = [...globalThis.document.querySelectorAll<HTMLElement>('[role="tooltip"]')].find(
+      (tip) => {
+        const box = tip.getBoundingClientRect();
+        return box.width > 0 && globalThis.getComputedStyle(tip).visibility !== "hidden";
+      },
+    );
+    if (shown === undefined) {
+      return false;
+    }
+    shown.dataset["e2eShown"] = "";
+    return true;
+  });
+
+/** The buttons named only by their label (an icon, digits at most): those show a tooltip. */
+const iconOnlyNames = async (page: Page): Promise<readonly string[]> =>
+  await page.evaluate(() =>
+    [...globalThis.document.querySelectorAll<HTMLElement>('[role="button"], button')]
+      .filter((button) => {
+        const box = button.getBoundingClientRect();
+        const name = button.getAttribute("aria-label") ?? "";
+        return box.width > 0 && name !== "" && !/\p{L}/u.test(button.textContent.trim());
+      })
+      .map((button) => button.getAttribute("aria-label") ?? ""),
+  );
+
+test.describe("tooltips and toasts on Now, Day and a task (Task 3.7, bug class 6)", () => {
+  test.use({ viewport: { height: 900, width: 1280 } });
+
+  test("no tooltip covers an enabled control other than the one it explains", async ({ page }) => {
+    test.setTimeout(180_000);
+    const { token } = await loginViaApi(page);
+    const seeded = await seedLivedIn(token);
+    const covered: string[] = [];
+    let swept = 0;
+    for (const url of ["/", "/day", `/task/${seeded.openTaskId}`]) {
+      await page.goto(url);
+      await expect(page.getByRole("heading").first()).toBeVisible();
+      await expect(page.getByRole("progressbar")).toHaveCount(0);
+      const names = new Set(await iconOnlyNames(page));
+      for (const name of names) {
+        await page.getByRole("button", { exact: true, name }).first().hover();
+        // The hover delay (400 ms) and a frame to place it.
+        await expect
+          .poll(async () => await hasMarkedShownTooltip(page), { timeout: 1500 })
+          .toBe(true);
+        swept += 1;
+        const under = await controlsUnder(page, "[data-e2e-shown]", [name]);
+        covered.push(...under.map((control) => `${url} "${name}": ${control}`));
+        await page.mouse.move(0, 0);
+      }
+    }
+    expect(covered).toEqual([]);
+    expect(swept).toBeGreaterThan(3);
+  });
+
+  test("a toast covers no control on a task it cannot scroll out from under", async ({ page }) => {
+    await loginViaApi(page);
+    await page.goto("/");
+    await addTask(page, "Open me after");
+    // Deleting another task leaves its toast (with Undo) up while the first one opens.
+    await raiseToast(page, "Toast on a task");
+    await nowTasks(page).getByText("Open me after").click();
+    await expect(page.getByRole("button", { name: "Delete the task" })).toBeVisible();
+    await expect(page.getByTestId("toast-card")).toBeVisible();
+    expect(await stuckUnderToast(page)).toEqual([]);
   });
 });
