@@ -179,7 +179,10 @@ export const ConsentFlow = ({
   const consent = useConsent(api, { authQuery, redirect, session: useConsentSession() });
   const { phase } = consent;
   return (
-    <View className="gap-5 rounded-xl border border-separator bg-cell px-6 py-8">
+    <View
+      className="gap-5 rounded-xl border border-separator bg-cell px-6 py-8"
+      testID="consent-card"
+    >
       <View className="flex-row items-center gap-3">
         <PaceMark size={40} />
         <Text className="font-sans text-title1 text-label-primary">{t("app.name")}</Text>

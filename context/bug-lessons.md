@@ -1296,6 +1296,25 @@ The same rule applies when a previously successful channel is no longer configur
   `scripts/no-focused-tests.test.ts` reads every test file and fails on any of those spellings
   (red before: these two lines), whatever the environment.
 
+### 121. Content we do not control laid out without a box of its own
+- **Bug.** Owner bug 2026-11-03 (the frame half; A9 review I2): the Telegram widget's frame, which
+  on the owner's network loaded a block page instead of the button, sat in a flex box sized for
+  the button with no width limit and no clip; the frame spilled past the consent card and over the
+  text below it.
+- **Missed because.** Every test ran the widget either from the real script (offline: nothing
+  loads) or not at all; nothing ever put a frame of another size where the button goes. Telegram's
+  button is small, so the box looked right in every shot.
+- **Rule.** A third-party frame, embed or injected node (a login widget, a map, a video, an ad)
+  gets a box of its own: full width of its column at most (`max-width: 100%` on what is injected),
+  clipped, in the flow, so whatever it loads pushes the page down and never draws over it. Test it
+  with a stub that loads something larger than the real thing, and assert it stays inside its card
+  and clear of the controls next to it.
+- **Sweep and guard.** The Telegram widget is the only third-party frame the app renders; the web
+  login shares the component and its box. `e2e/oauth-consent.e2e.ts` "a frame the widget loads
+  stays in its own box…" stubs `telegram-widget.js` with a 600 × 300 frame at 390 px: inside the
+  card, clear of "Can't see the Telegram button?" and its button, which still takes the click (red
+  against the old layout: the frame started 105 px left of the screen).
+
 ## Log
 
 New bugs go here with their class; a new class gets its own section above.
@@ -1674,3 +1693,4 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-03 | Fix round 2 review M7: `claimLocalCopy` wrote the owner mark straight to the store while a sign-out's clear waited in the log's write queue; a quick stale sign-out then sign-in in one tab let the new claim land first, so the queued clear was refused and the old copy stayed until the first pull's store-id check | 74 (check and act on a shared copy through two paths with no order between them) | yes: the copy's other writers (append, cursor, store id, the clear) already go through the queue; the claim was the one direct write | missed because N3's tests claimed and cleared with nothing in flight; the claim now goes through the state's queue and the log's write chain (`state.claim`, `LocalLog.claim`); `create-client.test.ts` "a claim waits for the sign-out's clear queued before it" (red before: the held write's event stayed) |
 | 2026-11-03 | Fix round 3, CI blocker: `bun test:unit` failed in CI (".only is disabled in CI environments") on `RuleTester.itOnly = it.only` in `promise-function-async.test.ts` and `no-raw-design-values.test.ts`, so CI never reached the API, app or e2e steps of PR #53 | 120 (new) | yes: no other focused test or `itOnly` in any test file | missed because local runs never set `CI`; the assignment removed (RuleTester needs `itOnly` only for a case marked `only`), `scripts/no-focused-tests.test.ts` (red before); `CI=1 bun test:unit` passes |
 | 2026-11-03 | A9 review I1: M1's fix emptied the shared copy on every own sign-out, even while another tab's newer session was still stored (tab A, hidden, logs out a session tab B had already replaced): B's unsynced events went for good, and the browser stayed signed in through B, so no privacy was bought | 117 (a destructive action that does not look at what it would destroy) | yes: the one handler of every sign-out (`dropLocalCopyOnSignOut`); the stale path already looked at the store | missed because M1's test put T2 in the shared store and expected the wipe, which was the bug; the own path now clears without the owner check only when no session is left (a store that cannot be read counts as empty) and keeps the copy while another session is stored; `app-state.test.tsx` "keeps the copy while another tab's session is still stored…" (red before), "empties the copy when no session is left, whatever mark is on it", "…when the shared store cannot be read" |
+| 2026-11-03 | A9 review I2: the frame half of the owner bug (the widget's frame loading a block page spilled past the consent card and over the text below) had no test and no class | 121 (new) | yes: the widget is the app's only third-party frame; the web login shares its box | missed because no test ever put a frame of another size where the button goes; `e2e/oauth-consent.e2e.ts` "a frame the widget loads stays in its own box…" (red against the old layout: frame x = −105 px, outside the card) |

@@ -1,4 +1,4 @@
-import type { Page, Request } from "@playwright/test";
+import type { Locator, Page, Request } from "@playwright/test";
 
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { API_URL, freshTelegramId, loginViaApi, resetAccount } from "./support/login.ts";
@@ -167,4 +167,72 @@ test("signed out, the app's own sign-in comes back to the consent page with the 
   await expect(page.getByText(`Signed in as Dev ${telegramId}`)).toBeVisible();
   await page.getByRole("button", { name: "Allow" }).click();
   await expect.poll(callback.url).toContain("code=");
+});
+
+/** Telegram's script, stubbed: it puts an oversized frame where the button goes (a block page). */
+const oversizedTelegramFrame = async (page: Page): Promise<void> => {
+  await page.route("https://telegram.org/js/telegram-widget.js*", async (route) => {
+    await route.fulfill({
+      body: `(() => {
+        const frame = document.createElement("iframe");
+        frame.src = "https://oauth.telegram.org/embed/blocked";
+        frame.width = "600";
+        frame.height = "300";
+        frame.style.border = "none";
+        document.currentScript.after(frame);
+      })();`,
+      contentType: "application/javascript",
+    });
+  });
+  await page.route("https://oauth.telegram.org/**", async (route) => {
+    await route.fulfill({
+      body: "<h1>Доступ к ресурсу заблокирован</h1><p>Сервис для звонков ограничен.</p>",
+      contentType: "text/html; charset=utf-8",
+    });
+  });
+};
+
+type Box = {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+};
+
+/** Where a locator is drawn; a missing box fails the test. */
+const boxOf = async (locator: Locator): Promise<Box> => {
+  const box = await locator.boundingBox();
+  if (box === null) {
+    throw new Error("not on the page");
+  }
+  return box;
+};
+
+const areOverlapping = (a: Box, b: Box): boolean =>
+  a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+
+test("a frame the widget loads stays in its own box: inside the card, clear of the way out (A9 review I2, class 121)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 844, width: 390 });
+  await oversizedTelegramFrame(page);
+  await page.goto(`/oauth/authorize?${await authorizationQuery()}`);
+  const frame = page.getByTestId("telegram-widget").locator("iframe");
+  await expect(frame).toBeVisible();
+  const question = page.getByText("Can't see the Telegram button?");
+  const signIn = page.getByRole("button", { name: "Sign in to Pace first" });
+  await signIn.scrollIntoViewIfNeeded();
+  const [frameBox, cardBox, questionBox, signInBox] = await Promise.all([
+    boxOf(frame),
+    boxOf(page.getByTestId("consent-card")),
+    boxOf(question),
+    boxOf(signIn),
+  ]);
+  expect(frameBox.x).toBeGreaterThanOrEqual(cardBox.x);
+  expect(frameBox.x + frameBox.width).toBeLessThanOrEqual(cardBox.x + cardBox.width);
+  expect(areOverlapping(frameBox, questionBox)).toBe(false);
+  expect(areOverlapping(frameBox, signInBox)).toBe(false);
+  // The way out still takes the click (nothing drawn over it).
+  await signIn.click();
+  await expect(page).toHaveURL(/\/login\?next=/u);
 });
