@@ -121,14 +121,22 @@ bug-lessons class 1).
 const QUIET_MS = 2000;
 
 /**
-What went out more than once in the quiet window that began at `settledAt`, once the window has
-passed (waits for what is left of it).
+The long window, once per screen (`route-sweep.e2e.ts`): a loop that repeats every 3 to 5 s (a
+retry with a backoff, a poll) fits whole in the 2 s window without repeating (round 7 review).
+Longer than the slowest timer of the app that may fire once after a screen settles.
+*/
+export const LONG_QUIET_MS = 6000;
+
+/**
+What went out more than once in the quiet window of `windowMs` that began at `settledAt`, once the
+window has passed (waits for what is left of it).
 */
 export const repeatsAfterSettle = async (
   watch: ScreenWatch,
   settledAt: number,
+  windowMs = QUIET_MS,
 ): Promise<readonly string[]> => {
-  const left = settledAt + QUIET_MS - watch.now();
+  const left = settledAt + windowMs - watch.now();
   if (left > 0) {
     // A window of time is what is measured here, not a condition to wait for.
     await new Promise((resolve) => {

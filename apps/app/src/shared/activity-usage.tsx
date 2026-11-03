@@ -6,7 +6,7 @@ import { clockTime } from "#app/format/time.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { appsDuring, type AppTime, screenTime } from "@pace/client";
 import { useSessions, useUsage } from "@pace/client/react";
-import { addDaysIn, formatDuration } from "@pace/core";
+import { formatDuration, type UsageRow } from "@pace/core";
 
 const TOP_APPS = 8;
 
@@ -101,16 +101,17 @@ export const ActivityApps = ({
 /** Day footer: all devices, then apps ordered by time in the account's local day. */
 export const ScreenTimeSection = ({
   date,
+  usage,
   zone,
 }: {
   readonly date: string;
   readonly zone: string;
+  /** The day's usage, read once by the screen (QA round 21 L5: two parts read it twice). */
+  readonly usage: readonly UsageRow[];
 }) => {
   const t = useT();
-  const { api } = usePace();
   const { language } = useViewer();
   const [isExpanded, setIsExpanded] = useState(false);
-  const usage = useUsage(api, date, addDaysIn(date, 1, zone));
   const report = screenTime(usage, date, zone);
   const shown = isExpanded ? report.apps : report.apps.slice(0, TOP_APPS);
   return (

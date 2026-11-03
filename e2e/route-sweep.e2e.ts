@@ -12,6 +12,7 @@ import {
 import {
   axeFaults,
   clippedText,
+  LONG_QUIET_MS,
   rawKeys,
   repeatsAfterSettle,
   type ScreenWatch,
@@ -61,6 +62,9 @@ const BY_DESIGN: readonly { readonly match: RegExp; readonly why: string }[] = [
 /** What is wrong with the sidebar, by whether the screen should have it. */
 const SIDEBAR_FAULT = ["shown on a bare screen", "missing"] as const;
 
+/** The one refusal a signed-out visit may meet by design: the session check's. */
+const SESSION_CHECK_REFUSED = "refused: GET /api/me 401";
+
 /** What is wrong with where a signed-out visit landed: anywhere but the login, for a guarded screen. */
 const landingFaults = (url: string, landed: string): readonly string[] => {
   const isPublic = url === "/no-such-page" || isBare(url);
@@ -95,8 +99,9 @@ test("signed out, every screen but signing in lands on the login (bug class 7)",
     watch.reset();
     await openSettled(page, url);
     const landed = new URL(page.url()).pathname;
-    // Signed out, the session check is refused by design: only errors count here.
-    const errors = watch.faults().filter((fault) => !fault.startsWith("refused: "));
+    // Signed out, the session check alone may be refused (round 7 review 5): any other refused
+    // call is a screen asking for what a signed-out visit has no right to.
+    const errors = watch.faults().filter((fault) => fault !== SESSION_CHECK_REFUSED);
     failures.push(...landingFaults(url, landed), ...errors.map((error) => `${url}: ${error}`));
   }
   watch.stop();
@@ -199,4 +204,31 @@ for (const size of SIZES) {
       });
     }
   }
+}
+
+// The matrix's 2 s window misses a loop that repeats every 3 to 5 s (round 7 review): each screen
+// once more, on each account at one size, with the long window.
+for (const account of ACCOUNTS) {
+  test(`every screen on ${account.name} sends nothing twice in ${String(LONG_QUIET_MS / 1000)} s once settled`, async ({
+    page,
+  }) => {
+    test.setTimeout(300_000);
+    const { token } = await loginViaApi(page);
+    const urls = screenUrls(await account.prepare(token));
+    await page.goto("/");
+    await expect(page.getByRole("navigation", { name: /./u }).first()).toBeVisible({
+      timeout: 20_000,
+    });
+    const failures: string[] = [];
+    const watch = watchScreen(page);
+    for (const url of urls) {
+      watch.reset();
+      await page.goto(url);
+      await settle(page);
+      const repeats = await repeatsAfterSettle(watch, watch.now(), LONG_QUIET_MS);
+      failures.push(...repeats.map((fault) => `${url}: ${fault}`));
+    }
+    watch.stop();
+    expect(failures).toEqual([]);
+  });
 }

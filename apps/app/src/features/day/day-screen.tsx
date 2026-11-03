@@ -22,6 +22,7 @@ import { RowList } from "#app/ui/row-list.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
+import { useUsage } from "@pace/client/react";
 import {
   addDaysIn,
   formatDuration,
@@ -277,14 +278,16 @@ has the time bar at its foot, where the thumb rests; another day is only looked 
 */
 export const DayScreen = () => {
   const t = useT();
-  const { hooks } = usePace();
+  const { api, hooks } = usePace();
   const { language } = useViewer();
   const [date, setDate] = useState<null | string>(null);
   const [sheet, setSheet] = useState<null | SheetTarget>(null);
   const day = hooks.useDay(date);
   const { now } = hooks.useClock();
   const phone = useDayPhone(day, now);
-  const sat = useWhereSat(day.date, addDaysIn(day.date, 1, day.zone));
+  // One read of the day's usage for every part that shows it (QA round 21 L5).
+  const usage = useUsage(api, day.date, addDaysIn(day.date, 1, day.zone));
+  const sat = useWhereSat(usage);
   const header = (
     <ScreenHeader
       eyebrow={formatEyebrow(day.date, day.zone, language)}
@@ -319,7 +322,7 @@ export const DayScreen = () => {
         {IS_PHONE ? (
           <Phone.CalendarSection entries={day.entries} phone={phone} zone={day.zone} />
         ) : null}
-        <ScreenTimeSection date={day.date} key={day.date} zone={day.zone} />
+        <ScreenTimeSection date={day.date} key={day.date} usage={usage} zone={day.zone} />
       </FirstSyncBody>
       {sheet === null ? null : (
         <ActivitySheet

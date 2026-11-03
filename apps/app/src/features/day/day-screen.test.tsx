@@ -56,6 +56,17 @@ describe("DayScreen", () => {
     expect(await screen.findByText("Laptop: code 40m")).toBeOnTheScreen();
   });
 
+  it("asks for the day's app usage once, though two parts of Day read it (QA 21 L5, class 79)", async () => {
+    const usage = jest.fn(() => ({ sessions: [] }));
+    const runtime = await createTestRuntime({ routes: { "GET /api/usage": usage } });
+    await renderScreen(<DayScreen />, runtime);
+    expect(await screen.findByText("Screen time")).toBeOnTheScreen();
+    await waitFor(() => {
+      expect(usage).toHaveBeenCalled();
+    });
+    expect(usage).toHaveBeenCalledTimes(1);
+  });
+
   it("refuses a start that is not a time, saying so under the field", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(<DayScreen />, runtime);

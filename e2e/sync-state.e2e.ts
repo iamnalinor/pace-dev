@@ -481,3 +481,27 @@ test("the first load asks for each thing once: one pull of the log, one of the p
   expect(repeated(asked)).toEqual([]);
   expect(asked.filter((call) => call.includes("since=0"))).toHaveLength(1);
 });
+
+test("Day's first load asks for the day's app usage once, though two of its parts read it (QA 21 L5)", async ({
+  page,
+}) => {
+  const { token } = await loginViaApi(page);
+  await seedLivedIn(token);
+  const asked: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname === "/api/usage") {
+      asked.push(`${url.pathname}${url.search}`);
+    }
+  });
+  await page.goto("/day");
+  await expect(page.getByRole("heading", { name: "Экранное время" })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect.poll(() => asked.length).toBeGreaterThan(0);
+  await new Promise((resolve) => {
+    // A window of time is what is measured here, not a condition to wait for.
+    setTimeout(resolve, 2000);
+  });
+  expect(repeated(asked)).toEqual([]);
+});
