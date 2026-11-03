@@ -343,12 +343,21 @@ test("a page older than its server offers Refresh, and a refresh with a fitting 
 }) => {
   const instance = { isTooNew: true };
   await page.route("**/api/instance", async (route) => {
-    const response = await route.fetch();
-    const body = (await response.json()) as Record<string, unknown>;
-    await route.fulfill({
-      json: instance.isTooNew ? { ...body, minClientProtocol: 99, protocol: 99 } : body,
-      response,
-    });
+    // Refresh reloads the page: a read of the instance still on its way then belongs to a page
+    // that is gone, and its response is disposed under the handler (a run of fix round 2). The
+    // reloaded page asks again, and that read is the one the test judges.
+    try {
+      const response = await route.fetch();
+      const body = (await response.json()) as Record<string, unknown>;
+      await route.fulfill({
+        json: instance.isTooNew ? { ...body, minClientProtocol: 99, protocol: 99 } : body,
+        response,
+      });
+    } catch (error) {
+      if (!(error instanceof Error && error.message.includes("disposed"))) {
+        throw error;
+      }
+    }
   });
   await loginViaApi(page);
   await page.goto("/");
