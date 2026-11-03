@@ -14,7 +14,7 @@ is, even without good CI"); the last line of "State" says whether the tip is gre
   - **B "New look"** = batches 3+4+7 (the kit, every screen, direction A's identity), screen by
     screen; the PR #48 UI follow-ups and QA lows go into the task that rebuilds that screen.
   - **C "Polish"** = batches 5+6+8 (motion and the 100 ms render budget, web/PWA, close-out).
-- **Release only at the very end** (after C): a full release QA round, then tag `vX.Y.Z` on main via
+- **Release only at the very end** (after C): the owner's full QA round (run by another agent), then tag `vX.Y.Z` on main via
   `.github/workflows/release.yml` (v0.11.0 is the last; it predates Phase C).
 - Report to the owner in Russian, short; options with a default.
 - Checkpoint regularly: commit + push as is, update this file.
