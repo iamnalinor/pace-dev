@@ -56,10 +56,25 @@ describe("ListRow (spec §4.1.1: slots, density, selected)", () => {
       }
       const [regular, compact] = screen.getAllByTestId("list-row-box");
       expect(minHeights(classesOfNode(regular))).toEqual(["min-h-row"]);
-      // Nothing below the 48 dp target: compact takes the control's own height.
-      expect(minHeights(classesOfNode(compact))).toEqual([]);
+      // Nothing below the 48 dp target: compact is the target itself, also without a press.
+      expect(minHeights(classesOfNode(compact))).toEqual(["min-h-hit"]);
       expect(classesOfNode(regular)).toEqual(expect.arrayContaining(["px-row-x", "py-row-y"]));
       expect(classesOfNode(regular).some((name) => name.startsWith("lg:"))).toBe(false);
+    } finally {
+      restore.restore();
+    }
+  });
+
+  it("on a phone a static compact row is still 48 dp (parked N1: no Pressable gave it the target)", async () => {
+    const restore = jest.replaceProperty(Platform, "OS", "android");
+    try {
+      await render(
+        <ThemeProvider>
+          <ListRow density="compact" title="Static compact" />
+        </ThemeProvider>,
+      );
+      const box = screen.getByTestId("list-row-box");
+      expect(minHeights(classesOfNode(box))).toEqual(["min-h-hit"]);
     } finally {
       restore.restore();
     }

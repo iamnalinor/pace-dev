@@ -589,10 +589,11 @@ toast/overlay layer.
       over the tab bar (bug-lessons 10).
 - [ ] PR #48 follow-up: the sidebar highlights Settings while New preset is open (see "PR #48 follow-ups (triage)").
       QA round 23 R23-14 is the same finding on Presets and New preset.
+- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): sidebar rows on `ListRow`/`NavItem` with the same 4 px selected bar as `ListRow`; rail haptics; the header scroll-edge fill (F-LAY-13: `bg.app` + a `separator` hairline once content scrolls under `ScreenHeader`), which no task owned.
 - [ ] Commit.
 
 ---
-- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): sidebar rows on `ListRow`/`NavItem` with the same 4 px selected bar as `ListRow`; rail haptics; the header scroll-edge fill (F-LAY-13: `bg.app` + a `separator` hairline once content scrolls under `ScreenHeader`), which no task owned.
+
 
 ## Batch 4 — Shared rows and screens (PR "Design overhaul 3/7: screens")
 

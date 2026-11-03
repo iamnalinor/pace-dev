@@ -20,11 +20,16 @@ export type PresenceProps = Pick<ViewProps, "className" | "pointerEvents" | "tes
   readonly onExited?: () => void;
 };
 
+/** Leaving, it takes no touches: a press during the exit would act on what is going away (parked N4). */
+const LEAVING = { pointerEvents: "none" } as const;
+
+const leavingProps = (isShown: boolean) => (isShown ? undefined : LEAVING);
+
 /**
 Mounts and unmounts its children with a paired preset (spec §4.1.1, §6): it enters on the enter
 curve, and keeps the children through its exit on the exit curve, letting go (and calling
-`onExited`) only when that animation reports it has finished. Nothing animates on the first
-render. Reduced motion turns every preset into a fade of `duration.sm`.
+`onExited`) only when that animation reports it has finished; while it leaves it takes no
+touches. Nothing animates on the first render. Reduced motion turns every preset into a fade of `duration.sm`.
 */
 export const Presence = ({
   children,
@@ -90,7 +95,7 @@ export const Presence = ({
       : { opacity: step, transform: [{ scale: from.scale + (1 - from.scale) * step }] };
   }, [from.scale, from.translateX, from.translateY]);
   return isMounted ? (
-    <Animated.View {...rest} style={style}>
+    <Animated.View {...rest} {...leavingProps(show)} style={style}>
       {children}
     </Animated.View>
   ) : null;

@@ -212,6 +212,26 @@ describe("Pressable on the web", () => {
       expect(onPress).not.toHaveBeenCalled();
     });
 
+    it("presses once when a caller presses on Space without preventing the default (3.1 re-review)", async () => {
+      const onPress = jest.fn();
+      const keys = {
+        onKeyDown: (event: { readonly key: string }) => {
+          if (event.key === " ") {
+            onPress();
+          }
+        },
+      };
+      await render(
+        <ThemeProvider forced="light">
+          <Pressable {...keys} onPress={onPress} role="checkbox">
+            <ReactNative.Text>Done</ReactNative.Text>
+          </Pressable>
+        </ThemeProvider>,
+      );
+      lastProps().onKeyDown?.(space() as never);
+      expect(onPress).toHaveBeenCalledTimes(1);
+    });
+
     it("presses once when a caller still spreads spacePress, and keeps the caller's other keys", async () => {
       const onPress = jest.fn();
       const onEscape = jest.fn();
