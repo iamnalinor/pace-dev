@@ -124,7 +124,6 @@ export const enTime = {
   "common.backToToday": "Back to today",
   "week.nightHours": "Night hours",
   "week.scrollHint": "Swipe to see all days",
-  "week.pickHint": "Pick an event or a block to see its details",
   "calendar.joinCall": "Join the call",
   "calendar.openLink": "Open the link",
   "calendar.openMaps": "Open in maps",

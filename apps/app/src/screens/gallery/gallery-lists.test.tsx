@@ -4,7 +4,7 @@ import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { galleryData } from "@pace/core/testing";
 
-import { ListSections } from "./gallery-lists.tsx";
+import { HeaderSections, ListSections } from "./gallery-lists.tsx";
 
 describe("the gallery's grouped list", () => {
   it("shows every worst-case project as a two-line row, the first one picked", async () => {
@@ -24,5 +24,14 @@ describe("the gallery's grouped list", () => {
     await renderScreen(<ListSections data={data} />, await createTestRuntime({ world: "empty" }));
     expect(screen.queryByTestId("list-row-selected-bar")).toBeNull();
     expect(screen.getByRole("header", { name: en("dev.gallery.section.lists") })).toBeOnTheScreen();
+  });
+
+  it("wraps the longest project name as a pushed title: a level-1 heading, never cut", async () => {
+    const data = galleryData("worst", "ru");
+    await renderScreen(<HeaderSections data={data} />, await createTestRuntime({ world: "empty" }));
+    const name = data.projects[0]?.name ?? "";
+    const title = screen.getByRole("header", { name });
+    expect(title.props["aria-level"]).toBe(1);
+    expect(title.props["numberOfLines"]).toBeUndefined();
   });
 });

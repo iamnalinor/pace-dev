@@ -114,7 +114,7 @@ export const ProjectScreen = ({ id }: { readonly id: string }) => {
   const project = view.value;
   return (
     <PushedScreen
-      right={
+      actions={
         <IconButton
           icon={"pencil"}
           label={t("project.edit")}

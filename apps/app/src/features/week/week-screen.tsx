@@ -13,8 +13,8 @@ import { Icon } from "#app/ui/icon.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
+import { Shell } from "#app/ui/shell.tsx";
 import { spacePress } from "#app/ui/space-press.ts";
-import { SplitPane } from "#app/ui/split-pane.tsx";
 import { Tooltip } from "#app/ui/tooltip.tsx";
 import { fitHourPx, gridFromHour, type WeekModel } from "@pace/client";
 import { useCalendarRange, useUsage } from "@pace/client/react";
@@ -157,9 +157,10 @@ const WeekPage = ({
       header={
         <ScreenHeader
           {...(back !== undefined && { backLabel: t("common.back"), onBack: back })}
-          eyebrow={`${monthDay(week.weekStart, week.zone, language)} – ${monthDay(lastDay, week.zone, language)}`}
-          right={<WeekNav onWeek={onWeek} week={week} />}
+          period={<WeekNav onWeek={onWeek} week={week} />}
+          subtitle={`${monthDay(week.weekStart, week.zone, language)} – ${monthDay(lastDay, week.zone, language)}`}
           title={t("nav.week")}
+          variant="top"
         />
       }
     >
@@ -206,11 +207,15 @@ export const WeekScreen = () => {
     />
   );
   if (isWide) {
+    // The inspector opens with a pick and closes without one: the grid keeps the width (F-LAY-03).
     return (
-      <SplitPane
-        main={grid}
-        side={<PickedPane onClose={close} picked={picked} week={week} />}
-        sideLabel={t("week.details")}
+      <Shell
+        content={grid}
+        inspector={
+          picked === null ? undefined : <PickedPane onClose={close} picked={picked} week={week} />
+        }
+        inspectorLabel={t("week.details")}
+        inspectorOpen={picked !== null}
       />
     );
   }

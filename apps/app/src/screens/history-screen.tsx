@@ -16,7 +16,7 @@ import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
 import { addMinutesIso } from "@pace/core";
 
-import { PushedScreen } from "./pushed-screen.tsx";
+import { DestinationScreen } from "./destination-screen.tsx";
 
 const MINUTES_PER_DAY = 1440;
 
@@ -191,7 +191,7 @@ export const HistoryScreen = () => {
       ? history.events
       : history.events.filter((entry) => Date.parse(entry.occurredAt) <= Date.parse(at));
   return (
-    <PushedScreen title={t("history.title")}>
+    <DestinationScreen title={t("history.title")}>
       <DayNav at={at} now={now} onAt={setAt} />
       <Text className="px-5 pb-1 font-sans text-caption text-label-tertiary">
         {`${t("history.boardAt")} ${when}`}
@@ -221,6 +221,6 @@ export const HistoryScreen = () => {
           <EntryRow entry={entry} key={entry.id} />
         ))}
       </View>
-    </PushedScreen>
+    </DestinationScreen>
   );
 };

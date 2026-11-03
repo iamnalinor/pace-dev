@@ -260,7 +260,7 @@ export const NotificationsScreen = () => {
   }, [feed, unread]);
   return (
     <PushedScreen
-      right={
+      actions={
         <Pressable
           accessibilityRole="link"
           className="min-h-hit-web justify-center px-2 active:opacity-70"

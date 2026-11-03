@@ -1,9 +1,9 @@
 import { Tabs } from "expo-router";
 
 import { useT } from "#app/app-state.tsx";
-import { useIsWide } from "#app/ui/layout.ts";
 import { ScreenScene } from "#app/ui/screen-scene.tsx";
 import { TabBar } from "#app/ui/tab-bar.tsx";
+import { useBreakpoint } from "#app/ui/use-breakpoint.ts";
 
 /**
 The signed-in shell. The root layout's route gate has already sent a person without a session to
@@ -11,11 +11,11 @@ the login screen, and a phone that has not seen the permissions walk-through to 
 */
 export default function TabsLayout() {
   const t = useT();
-  const isWide = useIsWide();
+  const isCompact = useBreakpoint() === "compact";
   return (
     <Tabs
       screenLayout={({ children }) => <ScreenScene>{children}</ScreenScene>}
-      screenOptions={{ headerShown: false, tabBarPosition: isWide ? "left" : "bottom" }}
+      screenOptions={{ headerShown: false, tabBarPosition: isCompact ? "bottom" : "left" }}
       tabBar={(props) => <TabBar {...props} />}
     >
       <Tabs.Screen name="index" options={{ title: t("nav.now") }} />

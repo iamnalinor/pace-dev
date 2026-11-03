@@ -20,7 +20,7 @@ import { Text } from "./text.tsx";
 import { useDockToastsHere } from "./toast.tsx";
 import { useHotkey } from "./use-hotkey.tsx";
 
-type Destination = {
+export type Destination = {
   readonly href: Href;
   readonly icon: IconName;
   readonly label: MessageKey;
@@ -30,7 +30,8 @@ type Destination = {
   readonly owns: (path: string) => boolean;
 };
 
-const DESTINATIONS: readonly Destination[] = [
+/** The eight destinations, in order: the sidebar and the rail list them all (spec §5.0.1). */
+export const DESTINATIONS: readonly Destination[] = [
   {
     href: "/",
     icon: "zap",
@@ -72,6 +73,30 @@ const DESTINATIONS: readonly Destination[] = [
   },
 ];
 
+/** A destination link of the navigation (the sidebar's row, the rail's item). */
+export type DestinationLinkProps = {
+  /** What waits behind it (the Inbox's badge); 0 for one without. */
+  readonly count: number;
+  readonly destination: Destination;
+  readonly isCurrent: boolean;
+};
+
+/**
+What every destination link says: its address, `aria-current="page"` when it is the current one,
+and its name for screen readers with what waits behind it, if anything.
+*/
+export const useDestinationLink = ({ count, destination, isCurrent }: DestinationLinkProps) => {
+  const t = useT();
+  return {
+    "aria-current": isCurrent ? ("page" as const) : undefined,
+    href: destination.href,
+    label:
+      count > 0 && destination.countedLabel !== undefined
+        ? t(destination.countedLabel, { count })
+        : t(destination.label),
+  };
+};
+
 /** The sidebar paths: on a wide window these screens are top level, with no back chevron. */
 export const isSidebarPath = (path: string): boolean =>
   DESTINATIONS.some((destination) => destination.href === path);
@@ -80,27 +105,14 @@ export const isSidebarPath = (path: string): boolean =>
 A destination: a link with its address (`<a href>` on the web, so Ctrl/⌘-click opens it in a new
 tab; F-WEB-03). It navigates rather than pushes, so a destination already open is shown again.
 */
-const SidebarLink = ({
-  count,
-  destination,
-  isCurrent,
-}: {
-  /** What waits behind this row (the Inbox's badge); 0 for a row without one. */
-  readonly count: number;
-  readonly destination: Destination;
-  readonly isCurrent: boolean;
-}) => {
+const SidebarLink = (props: DestinationLinkProps) => {
   const t = useT();
+  const { count, destination, isCurrent } = props;
+  const link = useDestinationLink(props);
   return (
     <Link
-      aria-current={isCurrent ? "page" : undefined}
+      {...link}
       className={cx("h-10 flex-row items-center gap-3 rounded-lg px-3", isCurrent && "bg-fill-3")}
-      href={destination.href}
-      label={
-        count > 0 && destination.countedLabel !== undefined
-          ? t(destination.countedLabel, { count })
-          : t(destination.label)
-      }
     >
       <Icon name={destination.icon} tone={isCurrent ? "accent" : "secondary"} />
       <NativeText
@@ -151,22 +163,31 @@ export const SidebarHeader = ({ owner }: { readonly owner: null | string }) => {
 The wide window's navigation, beside every signed-in screen (pushed ones included): it
 navigates by path, so a destination already open is shown again rather than stacked twice.
 */
-export const Sidebar = () => {
-  const t = useT();
+/**
+New task from the navigation (the sidebar's button, the rail's top button): the empty form opens
+on Now, which is brought to the front. Elsewhere than Now, N does the same (Now's composer takes N
+itself).
+*/
+export const useNewTask = (): (() => void) => {
   const router = useRouter();
   const path = usePathname();
-  const owner = useOwnerName();
-  const waiting = useWaitingCount();
-  useDockToastsHere();
-  // The empty form opens on Now (in its right pane): asked for, and Now brought to the front.
   const newTask = (): void => {
     requestNewTask();
     if (path !== "/" && path !== "/add") {
       router.navigate("/");
     }
   };
-  // Elsewhere than Now, N does the same (Now's composer takes N itself).
   useHotkey(HOTKEYS.newTask, newTask);
+  return newTask;
+};
+
+export const Sidebar = () => {
+  const t = useT();
+  const path = usePathname();
+  const owner = useOwnerName();
+  const waiting = useWaitingCount();
+  useDockToastsHere();
+  const newTask = useNewTask();
   return (
     <View
       aria-label={t("nav.main")}

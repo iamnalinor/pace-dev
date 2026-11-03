@@ -289,9 +289,10 @@ export const DayScreen = () => {
   const sat = useWhereSat(usage);
   const header = (
     <ScreenHeader
-      eyebrow={formatEyebrow(day.date, day.zone, language)}
-      right={<DayNav day={day} onDate={setDate} />}
+      period={<DayNav day={day} onDate={setDate} />}
+      subtitle={formatEyebrow(day.date, day.zone, language)}
       title={t("day.title")}
+      variant="top"
     />
   );
   return (

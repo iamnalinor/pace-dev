@@ -5,8 +5,10 @@ import type { GalleryData } from "@pace/core/testing";
 import { useT } from "#app/app-state.tsx";
 import { CountBadge } from "#app/ui/count-badge.tsx";
 import { Group } from "#app/ui/group.tsx";
+import { IconButton } from "#app/ui/icon-button.tsx";
 import { Icon } from "#app/ui/icon.tsx";
 import { ListRow } from "#app/ui/list-row.tsx";
+import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { SectionHeader } from "#app/ui/section-header.tsx";
 import { Text } from "#app/ui/text.tsx";
 import { formatDuration } from "@pace/core";
@@ -56,6 +58,57 @@ export const ListSections = ({ data }: { readonly data: GalleryData }) => {
           />
         ))}
       </Group>
+    </View>
+  );
+};
+
+/**
+The kit's `ScreenHeader` (spec §4.2.16, §5.0.2): a top-level header with a subtitle and two
+actions, and a pushed one whose title is the set's longest project name (it wraps, never cut) with
+the context and Back. A cell boxes each, so its gutter shows.
+*/
+export const HeaderSections = ({ data }: { readonly data: GalleryData }) => {
+  const t = useT();
+  const [first] = data.projects;
+  return (
+    <View className="gap-3 pb-2">
+      <SectionHeader title={t("dev.gallery.section.headers")} />
+      <View className="mx-gutter rounded-lg bg-cell">
+        <ScreenHeader
+          actions={
+            <>
+              <IconButton
+                icon="bell"
+                label={t("dev.gallery.headers.action")}
+                onPress={NOTHING}
+                variant="plain"
+              />
+              <IconButton
+                icon="search"
+                label={t("dev.gallery.headers.action")}
+                onPress={NOTHING}
+                variant="plain"
+              />
+            </>
+          }
+          subtitle={t("dev.gallery.headers.subtitle")}
+          title={t("dev.gallery.headers.top")}
+          variant="top"
+        />
+      </View>
+      <View className="mx-gutter rounded-lg bg-cell">
+        <ScreenHeader
+          backLabel={t("common.back")}
+          context={
+            <Text policy="truncate" role="callout" tone="secondary">
+              {t("dev.gallery.headers.context")}
+            </Text>
+          }
+          onBack={NOTHING}
+          title={first?.name ?? t("dev.gallery.headers.pushed")}
+          variant="pushed"
+        />
+      </View>
     </View>
   );
 };

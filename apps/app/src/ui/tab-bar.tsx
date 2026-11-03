@@ -11,8 +11,8 @@ import { useWaitingCount } from "../shared/use-waiting-count.ts";
 import { CountBadge } from "./count-badge.tsx";
 import { cx } from "./cx.ts";
 import { Icon, type IconName } from "./icon.tsx";
-import { useIsWide } from "./layout.ts";
 import { spacePress } from "./space-press.ts";
+import { useBreakpoint } from "./use-breakpoint.ts";
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>["tabBar"]>>[0];
 
@@ -124,5 +124,6 @@ const BottomTabs = ({ descriptors, navigation, state }: TabBarProps) => {
   );
 };
 
-/** Bottom tabs on a phone; a wide window has the root layout's sidebar instead. */
-export const TabBar = (props: TabBarProps) => (useIsWide() ? null : <BottomTabs {...props} />);
+/** Bottom tabs on a phone; a tablet has the shell's rail and a computer its sidebar instead. */
+export const TabBar = (props: TabBarProps) =>
+  useBreakpoint() === "compact" ? <BottomTabs {...props} /> : null;

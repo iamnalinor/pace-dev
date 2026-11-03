@@ -20,7 +20,7 @@ export const InboxScreen = () => {
   const review = hooks.useReview();
   const decisions = reviewDecisions(review);
   return (
-    <Screen header={<ScreenHeader title={t("inbox.title")} />}>
+    <Screen header={<ScreenHeader title={t("inbox.title")} variant="top" />}>
       <Text className="mx-5 mb-3 font-sans text-caption font-normal text-label-tertiary">
         {t("inbox.hint")}
       </Text>

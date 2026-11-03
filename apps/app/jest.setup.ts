@@ -1,5 +1,6 @@
 import type * as ExpoCrypto from "expo-crypto";
 import type * as NodeCrypto from "node:crypto";
+import type * as ReactNative from "react-native";
 
 import type * as RouterFake from "./src/test/router.ts";
 import type * as BackgroundFake from "./src/testing/background-task.fake.ts";
@@ -55,3 +56,10 @@ jest.mock("expo-task-manager", () =>
 jest.mock("expo-router", () =>
   jest.requireActual<typeof RouterFake>("./src/test/router.ts").routerModule(),
 );
+
+// A phone's window (390 × 844, the design's phone) unless a test says otherwise: React Native's
+// own Jest default, 750 wide, is a `medium` window (spec §3.3), with the rail instead of the tabs.
+jest.requireActual<typeof ReactNative>("react-native").Dimensions.set({
+  screen: { fontScale: 1, height: 844, scale: 3, width: 390 },
+  window: { fontScale: 1, height: 844, scale: 3, width: 390 },
+});

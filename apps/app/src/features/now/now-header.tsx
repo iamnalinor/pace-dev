@@ -5,8 +5,8 @@ import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { formatEyebrow } from "@pace/core";
 
 /**
-Date eyebrow and "Now", with the notifications bell on a phone (beside the sidebar it sits in
-the sidebar's header). The Inbox's count is on its row in the navigation, not here.
+"Now" with the date under it, and the notifications bell on a phone (beside the sidebar it sits
+in the sidebar's header). The Inbox's count is on its row in the navigation, not here.
 */
 export const NowHeader = () => {
   const t = useT();
@@ -16,9 +16,10 @@ export const NowHeader = () => {
   const isWide = useIsWide();
   return (
     <ScreenHeader
-      eyebrow={formatEyebrow(now, deviceTz, language)}
-      right={isWide ? undefined : <NotificationBell />}
+      actions={isWide ? undefined : <NotificationBell />}
+      subtitle={formatEyebrow(now, deviceTz, language)}
       title={t("nav.now")}
+      variant="top"
     />
   );
 };

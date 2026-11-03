@@ -244,26 +244,11 @@ export const PickedSheet = ({ onClose, picked, week }: PickedProps) => {
   );
 };
 
-/** A wide window's details beside the grid: the pick, or how to make one. */
-export const PickedPane = ({
-  onClose,
-  picked,
-  week,
-}: Omit<PickedProps, "picked"> & { readonly picked: null | Picked }) => {
-  const t = useT();
-  if (picked === null) {
-    return (
-      <View className="flex-1 items-center justify-center px-8">
-        <Text className="text-center font-sans text-subhead font-normal text-label-secondary">
-          {t("week.pickHint")}
-        </Text>
-      </View>
-    );
-  }
-  return <PickedPaneBody onClose={onClose} picked={picked} week={week} />;
-};
-
-const PickedPaneBody = ({ onClose, picked, week }: PickedProps) => {
+/**
+A wide window's details beside the grid, in the shell's inspector: it is there only while
+something is picked (F-LAY-03).
+*/
+export const PickedPane = ({ onClose, picked, week }: PickedProps) => {
   const t = useT();
   const { title, when } = useHeading(picked, week.zone);
   return (

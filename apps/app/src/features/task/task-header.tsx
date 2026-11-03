@@ -5,11 +5,11 @@ import type { TaskViewModel } from "@pace/client";
 import { usePace, useT } from "#app/app-state.tsx";
 import { useIsInPane, useTaskBack } from "#app/shared/task-opener.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
-import { BackHeader } from "#app/ui/back-header.tsx";
 import { inkClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { IconButton } from "#app/ui/icon-button.tsx";
 import { Icon } from "#app/ui/icon.tsx";
+import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { toastQuote, useToast } from "#app/ui/toast.tsx";
 
 /** Deletes the task at once and goes back; the toast's Undo brings it back. */
@@ -135,14 +135,16 @@ export const TaskHeader = ({
   const back = useTaskBack();
   const isInPane = useIsInPane();
   return (
-    <BackHeader
+    <ScreenHeader
+      actions={actions === undefined ? undefined : <TaskActions {...actions} />}
       // Beside the list the task is a pane: it closes, there is nothing to go back to.
-      {...(isInPane && { backIcon: "x" })}
+      backIcon={isInPane ? "x" : "chevron-left"}
       backLabel={t(isInPane ? "common.close" : "common.back")}
+      context={
+        project === undefined ? undefined : <ProjectChip onProject={onProject} project={project} />
+      }
       onBack={back}
-      right={actions === undefined ? null : <TaskActions {...actions} />}
-    >
-      {project === undefined ? null : <ProjectChip onProject={onProject} project={project} />}
-    </BackHeader>
+      variant="pushed"
+    />
   );
 };

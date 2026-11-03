@@ -70,7 +70,8 @@ const config: ExpoConfig = {
   platforms: ["android", "web"],
   // The web build is a single-page app served by the pace-web Worker (static assets).
   web: { bundler: "metro", output: "single", favicon: "./assets/favicon.png" },
-  orientation: "portrait",
+  // Turns with the device (spec Q8, F-LAY-04): a tablet or an unfolded phone shows the rail.
+  orientation: "default",
   userInterfaceStyle: "automatic",
   backgroundColor: GROUND,
   icon: "./assets/icon.png",

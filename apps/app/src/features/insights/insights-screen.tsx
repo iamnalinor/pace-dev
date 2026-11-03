@@ -101,9 +101,9 @@ export const InsightsScreen = () => {
   const week = hooks.useInsights(weekOf);
   return (
     <DestinationScreen
-      eyebrow={formatWeekRange(week.weekStart, week.zone, language)}
-      right={<WeekNav onWeek={setWeekOf} week={week} />}
+      period={<WeekNav onWeek={setWeekOf} week={week} />}
       scrollLabel={t("insights.body", { title: t("insights.title") })}
+      subtitle={formatWeekRange(week.weekStart, week.zone, language)}
       title={t("insights.title")}
     >
       <View className="gap-3 px-5">

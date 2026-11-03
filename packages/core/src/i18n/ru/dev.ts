@@ -53,4 +53,10 @@ export const ruDev: { readonly [K in keyof typeof enDev]: string } = {
   "dev.gallery.lists.static": "Строка с подписью",
   "dev.gallery.lists.subtitle": "Подпись переносится под заголовок, когда она длинная",
   "dev.gallery.lists.compact": "Компактная строка",
+  "dev.gallery.section.headers": "Заголовки экранов",
+  "dev.gallery.headers.top": "Уведомления и напоминания",
+  "dev.gallery.headers.subtitle": "вторник · 3 нояб.",
+  "dev.gallery.headers.action": "Действие",
+  "dev.gallery.headers.context": "Элемент контекста",
+  "dev.gallery.headers.pushed": "Вложенный экран",
 };

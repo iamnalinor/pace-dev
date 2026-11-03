@@ -62,7 +62,7 @@ export const MoreScreen = () => {
   const t = useT();
   const owner = useOwnerName();
   return (
-    <Screen header={<ScreenHeader title={t("nav.more")} />}>
+    <Screen header={<ScreenHeader title={t("nav.more")} variant="top" />}>
       {owner === null ? null : <Owner name={owner} />}
       <View className="border-t border-separator">
         {ROWS.map((row) => (

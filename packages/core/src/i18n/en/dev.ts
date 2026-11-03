@@ -51,4 +51,10 @@ export const enDev = {
   "dev.gallery.lists.static": "A row with a meta line",
   "dev.gallery.lists.subtitle": "The meta line wraps under the title when it is long",
   "dev.gallery.lists.compact": "Compact row",
+  "dev.gallery.section.headers": "Screen headers",
+  "dev.gallery.headers.top": "Notifications and reminders",
+  "dev.gallery.headers.subtitle": "Tuesday · Nov 3",
+  "dev.gallery.headers.action": "An action",
+  "dev.gallery.headers.context": "Context control",
+  "dev.gallery.headers.pushed": "A pushed screen",
 } as const;

@@ -125,6 +125,19 @@ thick track filled up to the thumb (`--pace-share`) and a round thumb.
 }
 
 /*
+The shell's skip link (ui/shell.web.tsx; spec §4.2.18, F-A11Y-12): out of sight until the keyboard
+reaches it, then shown where it is, the first stop of the page.
+*/
+[data-skip-link]:not(:focus-within) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/*
 The kit's state layer on the web (ui/pressable.web.tsx marks every control that has something to do
 `data-pace-press`; spec §3.7). The overlay is the control's `::after`: above its content (an opaque
 child cannot hide it), as round as the control (`border-radius: inherit`), deaf to the pointer, and
