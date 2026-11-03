@@ -4,6 +4,7 @@ import { Pressable, Text, View } from "react-native";
 import { usePace, useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
+import { Button } from "#app/ui/button.tsx";
 import { appsDuring, type AppTime, screenTime } from "@pace/client";
 import { useSessions, useUsage } from "@pace/client/react";
 import { formatDuration, type UsageRow } from "@pace/core";
@@ -98,17 +99,42 @@ export const ActivityApps = ({
   );
 };
 
-/** Day footer: all devices, then apps ordered by time in the account's local day. */
-export const ScreenTimeSection = ({
-  date,
-  usage,
-  zone,
-}: {
+/** A failed read is not "nothing recorded" (QA round 23 R23-08): no total, a way to ask again. */
+const ScreenTimeFailed = ({ onRetry }: { readonly onRetry: () => void }) => {
+  const t = useT();
+  return (
+    <View className="mx-5 mt-5 gap-3 border-t border-separator pb-8 pt-5">
+      <Text accessibilityRole="header" className="font-sans text-headline text-label-primary">
+        {t("day.screenTime")}
+      </Text>
+      <Text className="font-sans text-footnote text-label-secondary" role="status">
+        {t("day.screenTimeFailed")}
+      </Text>
+      <Button onPress={onRetry} variant="secondary">
+        {t("common.retry")}
+      </Button>
+    </View>
+  );
+};
+
+type ScreenTimeProps = {
   readonly date: string;
   readonly zone: string;
   /** The day's usage, read once by the screen (QA round 21 L5: two parts read it twice). */
   readonly usage: readonly UsageRow[];
-}) => {
+};
+
+/** Day footer: all devices, then apps ordered by time in the account's local day. */
+export const ScreenTimeSection = ({
+  onRetry = null,
+  ...report
+}: ScreenTimeProps & {
+  /** Set when the day's usage could not be read: the section says so with Try again, no zero. */
+  readonly onRetry?: (() => void) | null;
+}) =>
+  onRetry === null ? <ScreenTimeReport {...report} /> : <ScreenTimeFailed onRetry={onRetry} />;
+
+const ScreenTimeReport = ({ date, usage, zone }: ScreenTimeProps) => {
   const t = useT();
   const { language } = useViewer();
   const [isExpanded, setIsExpanded] = useState(false);

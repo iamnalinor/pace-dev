@@ -35,7 +35,7 @@ import { type WeekModel, weekModel } from "./view-models/week.ts";
 
 export { type Consent, type ConsentPhase, type Identity, useConsent } from "./react/oauth.ts";
 export { type NewAgent, type Sessions, useSessions } from "./react/sessions.ts";
-export { useCalendarRange, useUsage } from "./react/usage.ts";
+export { type RangeRead, useCalendarRange, useUsage, useUsageRead } from "./react/usage.ts";
 export { useStore } from "zustand";
 
 export type AppHooks = {

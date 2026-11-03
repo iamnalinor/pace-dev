@@ -22,7 +22,7 @@ import { RowList } from "#app/ui/row-list.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
-import { useUsage } from "@pace/client/react";
+import { useUsageRead } from "@pace/client/react";
 import {
   addDaysIn,
   formatDuration,
@@ -286,7 +286,8 @@ export const DayScreen = () => {
   const { now } = hooks.useClock();
   const phone = useDayPhone(day, now);
   // One read of the day's usage for every part that shows it (QA round 21 L5).
-  const usage = useUsage(api, day.date, addDaysIn(day.date, 1, day.zone));
+  const usageRead = useUsageRead(api, day.date, addDaysIn(day.date, 1, day.zone));
+  const usage = usageRead.rows;
   const sat = useWhereSat(usage);
   const header = (
     <ScreenHeader
@@ -322,7 +323,13 @@ export const DayScreen = () => {
         {IS_PHONE ? (
           <Phone.CalendarSection entries={day.entries} phone={phone} zone={day.zone} />
         ) : null}
-        <ScreenTimeSection date={day.date} key={day.date} usage={usage} zone={day.zone} />
+        <ScreenTimeSection
+          date={day.date}
+          key={day.date}
+          onRetry={usageRead.isFailed ? usageRead.retry : null}
+          usage={usage}
+          zone={day.zone}
+        />
       </FirstSyncBody>
       {sheet === null ? null : (
         <ActivitySheet

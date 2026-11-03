@@ -101,6 +101,7 @@ export const ruTime: { readonly [K in keyof typeof enTime]: string } = {
   "day.noDeviceData": "Пока нет данных с устройства «{device}»",
   "day.dataUpTo": "Данные с «{device}» до {time}",
   "day.screenTime": "Экранное время",
+  "day.screenTimeFailed": "Не удалось загрузить экранное время.",
   "day.deviceTime": "{device} · {duration}",
   "day.showAll": "Показать все {count}",
   "day.showLess": "Свернуть",

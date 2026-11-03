@@ -1,9 +1,10 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 
 import { controlsInsideControls } from "#app/test/nested-controls.ts";
-import { renderScreen } from "#app/test/render.tsx";
+import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { problem } from "@pace/client/testing";
 import { addMinutesIso } from "@pace/core";
 import { NOW } from "@pace/core/testing";
 
@@ -65,6 +66,35 @@ describe("DayScreen", () => {
       expect(usage).toHaveBeenCalled();
     });
     expect(usage).toHaveBeenCalledTimes(1);
+  });
+
+  it("says screen time could not load instead of a zero, and Try again reads it (QA round 23 R23-08)", async () => {
+    let isUp = false;
+    const usage = jest.fn(() =>
+      isUp
+        ? {
+            sessions: [
+              {
+                app: "code",
+                deviceId: "01LAPTOP",
+                deviceName: "Laptop",
+                endAt: addMinutesIso(NOW, -200),
+                startAt: addMinutesIso(NOW, -250),
+              },
+            ],
+          }
+        : problem(503, "offline"),
+    );
+    await renderScreen(
+      <DayScreen />,
+      await createTestRuntime({ routes: { "GET /api/usage": usage } }),
+    );
+    expect(await screen.findByText(en("day.screenTimeFailed"))).toBeOnTheScreen();
+    expect(screen.queryByText(en("day.noApps"))).toBeNull();
+    isUp = true;
+    await fireEvent.press(screen.getByRole("button", { name: en("common.retry") }));
+    expect(await screen.findByText("Laptop · 50m")).toBeOnTheScreen();
+    expect(screen.queryByText(en("day.screenTimeFailed"))).toBeNull();
   });
 
   it("refuses a start that is not a time, saying so under the field", async () => {

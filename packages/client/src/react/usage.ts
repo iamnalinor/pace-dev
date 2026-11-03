@@ -54,24 +54,58 @@ const calendarOf = shared<CalendarEvent>("calendar", async (api, range, signal) 
   return events;
 });
 
+/** A read over a range: its rows (kept as they were when a later read fails), and how it went. */
+export type RangeRead<T> = {
+  readonly rows: readonly T[];
+  /** The last read failed and no rows were ever read: a zero would be a guess (QA 23 R23-08). */
+  readonly isFailed: boolean;
+  /** Reads it again now. */
+  readonly retry: () => void;
+};
+
 /** The list over [from, to); empty until it arrives, and kept as it was when offline. */
-const useRange = <T>(fetcher: Fetcher<T>, api: ApiClient, { from, to }: Range): readonly T[] => {
-  const [rows, setRows] = useState<readonly T[]>([]);
+const useRangeRead = <T>(
+  fetcher: Fetcher<T>,
+  api: ApiClient,
+  { from, to }: Range,
+): RangeRead<T> => {
+  const [read, setRead] = useState<{ readonly rows: readonly T[]; readonly isFailed: boolean }>({
+    isFailed: false,
+    rows: [],
+  });
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let isCurrent = true;
     const load = async (): Promise<void> => {
       const fetched = await fetcher(api, { from, to });
-      if (isCurrent && fetched !== null) {
-        setRows(fetched);
+      if (!isCurrent) {
+        return;
       }
+      setRead((previous) =>
+        fetched === null
+          ? { isFailed: previous.rows.length === 0, rows: previous.rows }
+          : { isFailed: false, rows: fetched },
+      );
     };
     void load();
     return () => {
       isCurrent = false;
     };
-  }, [fetcher, api, from, to]);
-  return rows;
+  }, [fetcher, api, from, to, attempt]);
+  return {
+    ...read,
+    retry: () => {
+      setAttempt((count) => count + 1);
+    },
+  };
 };
+
+const useRange = <T>(fetcher: Fetcher<T>, api: ApiClient, range: Range): readonly T[] =>
+  useRangeRead(fetcher, api, range).rows;
+
+/** App sessions on every device overlapping [from, to), with how the read went (Day). */
+export const useUsageRead = (api: ApiClient, from: string, to: string): RangeRead<UsageRow> =>
+  useRangeRead(usageOf, api, { from, to });
 
 /** App sessions on every device overlapping [from, to) (Day, Week). */
 export const useUsage = (api: ApiClient, from: string, to: string): readonly UsageRow[] =>
