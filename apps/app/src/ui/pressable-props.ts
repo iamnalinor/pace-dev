@@ -1,4 +1,8 @@
-import type { AccessibilityRole, PressableProps as NativePressableProps } from "react-native";
+import type {
+  AccessibilityRole,
+  GestureResponderEvent,
+  PressableProps as NativePressableProps,
+} from "react-native";
 
 import { useCallback } from "react";
 
@@ -36,7 +40,8 @@ export type PressableProps = {
   /** What the press means to the hand (§3.10): `longPress` plays on the long press, the rest on the press. */
   readonly haptic?: HapticKind | undefined;
   readonly ripple?: RippleKind | undefined;
-  readonly onPress?: (() => void) | undefined;
+  /** Takes the press event: a link reads its modifier keys (Ctrl-click opens a new tab). */
+  readonly onPress?: ((event: GestureResponderEvent) => void) | undefined;
   readonly onLongPress?: (() => void) | undefined;
 } & Omit<NativePressableProps, Owned>;
 
@@ -49,7 +54,7 @@ type SharedProps = {
   readonly className: string;
   readonly disabled: boolean;
   readonly onLongPress: (() => void) | undefined;
-  readonly onPress: () => void;
+  readonly onPress: (event: GestureResponderEvent) => void;
 };
 
 /**
@@ -69,12 +74,15 @@ export const usePressableProps = ({
   selected,
   ...rest
 }: PressableProps) => {
-  const press = useCallback(() => {
-    if (haptic !== undefined && haptic !== "longPress") {
-      playHaptic(haptic);
-    }
-    onPress?.();
-  }, [haptic, onPress]);
+  const press = useCallback(
+    (event: GestureResponderEvent) => {
+      if (haptic !== undefined && haptic !== "longPress") {
+        playHaptic(haptic);
+      }
+      onPress?.(event);
+    },
+    [haptic, onPress],
+  );
   const longPress = useCallback(() => {
     if (haptic === "longPress") {
       playHaptic(haptic);

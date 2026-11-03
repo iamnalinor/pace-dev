@@ -77,6 +77,18 @@ describe("Pressable (the kit's state layer, spec §3.7)", () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
+  it("hands the press event on (a link reads its modifier keys: Ctrl-click opens a new tab)", async () => {
+    const onPress = jest.fn();
+    await renderLight(
+      <Pressable onPress={onPress} role="link">
+        <Text>Week</Text>
+      </Pressable>,
+    );
+    const event = { ctrlKey: true };
+    await fireEvent.press(screen.getByRole("link", { name: "Week" }), event);
+    expect(onPress).toHaveBeenCalledWith(expect.objectContaining(event));
+  });
+
   it("blocks presses while disabled and says so to screen readers", async () => {
     const onPress = jest.fn();
     await renderLight(
