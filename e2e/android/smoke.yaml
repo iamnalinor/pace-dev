@@ -1,0 +1,23 @@
+appId: dev.nalinor.pace.e2e
+name: Dev sign-in reaches Now
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: deny
+- extendedWaitUntil:
+    visible: "Telegram id"
+    timeout: 30000
+- tapOn: "Telegram id"
+- inputText: "${TELEGRAM_ID}"
+- hideKeyboard
+- tapOn: "Sign in as dev"
+- extendedWaitUntil:
+    visible: "Not now"
+    timeout: 30000
+- tapOn: "Not now"
+- extendedWaitUntil:
+    visible: "Nothing to do right now."
+    timeout: 30000
+- assertVisible: "Now"
+- takeScreenshot: now

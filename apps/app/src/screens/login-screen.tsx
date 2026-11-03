@@ -8,6 +8,7 @@ import { SESSION_CHANGED } from "@pace/client";
 
 import { useAuth, useT } from "../app-state.tsx";
 import { ServerLine } from "../features/server/server-line.tsx";
+import { isNativeDevLoginEnabled } from "../platform/api-base.ts";
 import { serverStore, useServerInfo } from "../platform/server-store.ts";
 import { isPresent } from "../platform/strings.ts";
 import { Button } from "../ui/button.tsx";
@@ -131,7 +132,7 @@ export const LoginScreen = () => {
       {error === undefined ? null : (
         <Text className="text-center font-sans text-footnote text-danger">{t(error)}</Text>
       )}
-      {__DEV__ && !isWaiting ? (
+      {!isWaiting && isNativeDevLoginEnabled() ? (
         <DevLoginForm
           onFailure={() => {
             setIsWebFailed(true);

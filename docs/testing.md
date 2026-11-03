@@ -12,6 +12,7 @@ action-level tests check that every enabled draft is accepted from each entry pa
 | API | Vitest + `@cloudflare/vitest-plugin` | the Worker inside workerd with real D1, KV and Durable Object bindings | `apps/api/src/**/*.test.ts`, `apps/api/tests/*.int.test.ts` | `bun test:api` |
 | App | jest-expo (Jest 29), React Native Testing Library 14 | React Native components and platform adapters | `apps/app/**/*.test.{ts,tsx}` | `bun test:app` |
 | End-to-end | Playwright + axe | the production web build against `wrangler dev` in Chromium | `e2e/*.e2e.ts` | `bun test:e2e` |
+| Android end-to-end | Maestro | a release build on an Android emulator, against a fresh local Worker | `e2e/android/` | **Android E2E** workflow or the commands below |
 | Mutation | Stryker | the core tests themselves | `packages/core` | `bun test:mutation` (on demand in CI) |
 | LLM regression | own runner | the parsing prompt against real providers | planned for stage 2 | `bun test:llm` (script exists, runner does not yet) |
 
@@ -200,3 +201,37 @@ proposals expected (kinds in order, fields of the first, the domain and how sure
 `cases.test.ts` keeps them well-formed in `bun test:unit`. The runner (`run.ts`) is still to
 come: `bun test:llm` will run them against the configured OpenAI-compatible endpoint and write
 `docs/llm.md`. `llm-regression.yml` is on demand and reads the same endpoint variables.
+
+## Android end-to-end
+
+Run **Android E2E** in GitHub Actions on the commit to check. It builds a test-only x86_64
+release APK (bundled JavaScript and R8), boots a Google APIs emulator on API 34, applies D1
+migrations to fresh local state, and waits for the Worker on the host at `127.0.0.1:8787`.
+The APK reaches it at `http://10.0.2.2:8787`. The workflow can be called by other workflows;
+it is not a release gate until it has passed on the actual emulator runner.
+
+To run locally, use JDK 17, Node 24, the repository's Bun version, Android SDK platform 36,
+build-tools 36.0.0, NDK 27.1.12297006, CMake 3.22.1, and
+[Maestro CLI 2.11.0](https://github.com/mobile-dev-inc/maestro/releases/tag/cli-2.11.0).
+Set `ANDROID_HOME` to the SDK and put `adb`, `apkanalyzer`, `maestro`, `curl`, and `jq` on `PATH`. Boot one English
+x86_64 Android emulator (API 34 Google APIs), and leave port 8787 free. Hardware acceleration
+is recommended. From the repository root:
+
+```sh
+bun install --frozen-lockfile
+EXPO_PUBLIC_API_URL=http://10.0.2.2:8787 EXPO_PUBLIC_DEV_LOGIN=1 bash scripts/android/smoke.sh build
+bash scripts/android/smoke.sh run
+```
+
+The build command replaces the generated `apps/app/android/` project. The test app uses a
+separate application id (`dev.nalinor.pace.e2e`) and the debug signing key; the release workflow still builds
+`dev.nalinor.pace` for arm64. Only the emulator host is allowed to use HTTP in the test APK.
+The run uses one fake whitelisted account, no real credentials, and clears app data before
+launch. It exercises native dev sign-in, skips the first-run permission prompts using **Not
+now**, and waits for the empty **Now** screen. It does not test real Telegram, FCM, background
+work, or usage access. Vendor battery savers and overnight Doze still need a physical device.
+
+The run prints its diagnostics directory under `.cache/android-e2e/`. It keeps migration and
+Worker logs, Maestro output and JUnit, and a screenshot of Now on success. On a failed run it
+also attempts a screenshot and logcat while the emulator is still available. CI uploads the
+directory as `android-smoke`.
