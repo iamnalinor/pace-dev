@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { FirebaseAndroidConfigSchema } from "../../firebase/config.ts";
 import { knownOrNull, knownValues } from "../tolerant.ts";
 
 /** The ways a person can sign in on this server. */
@@ -21,6 +22,8 @@ export const InstanceSchema = z.object({
   /** The web app served with this server; `null` when there is none. */
   webOrigin: knownOrNull(z.string()),
   apiOrigin: z.string(),
+  /** Public Android initialization metadata, when this server provides it. */
+  firebase: knownOrNull(FirebaseAndroidConfigSchema),
   /** A method this client does not know (a newer server's) is dropped. */
   loginMethods: knownValues(z.enum(LOGIN_METHODS)),
   /**

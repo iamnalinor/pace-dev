@@ -57,6 +57,9 @@ server at the latest release.
    - `TELEGRAM_WEBHOOK_SECRET`: any random string; Telegram echoes it on every webhook call.
    - Optional `LLM_BASE_URL_1`, `LLM_API_KEY_1`, `LLM_MODEL_1` (and `_2`… for fallbacks).
    - Optional `FIREBASE_SERVICE_ACCOUNT`: the Firebase service account's JSON key.
+   - Optional `FIREBASE_ANDROID_CONFIG`: the raw `google-services.json` from the same Firebase
+     project, with an Android app for each package you intend to support. See
+     [Notifications](#notifications) for what this enables during the rollout.
 5. **Deploy**, either way:
    - **GitHub Actions**: in your fork, set the secrets and variables `deploy.yml` reads
      (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `TELEGRAM_BOT_TOKEN`,
@@ -112,3 +115,16 @@ even with a Firebase project of its own (Settings says why). Everything else wor
 Instant push needs your own build of the app with your Firebase project
 (`GOOGLE_SERVICES_JSON`; see the README's
 [Push notifications](../README.md#push-notifications-firebase)).
+
+The server can also advertise Android initialization metadata ahead of the app rollout. To
+enable it, set `FIREBASE_ANDROID_CONFIG` on the Worker alongside `FIREBASE_SERVICE_ACCOUNT` from
+the same project. The current GitHub Actions workflow only sets the service account. The
+public `GET /api/instance` response lists the project ID, sender ID, and the package name,
+app ID and client API key for each Android app in `google-services.json`. Keep the service
+account key on the server.
+
+An existing service account alone still sends pushes as before and reports `firebase: null`.
+If the Android config is set but invalid or does not match the sender, the Worker reports
+`firebase: null` and logs a reason code without logging either binding. Server discovery,
+health checks and existing push registration keep working as before. Released APKs still
+use the Firebase project they were built with.

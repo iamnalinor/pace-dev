@@ -15,6 +15,26 @@ const answer = {
 };
 
 describe("the instance answer", () => {
+  it("reads an old response without Firebase metadata as null", () => {
+    expect(endpoints.instance.output.parse(answer).firebase).toBeNull();
+  });
+
+  it("keeps the instance readable when the Firebase field is malformed or unknown", () => {
+    const duplicate = { apiKey: "key", appId: "app", packageName: "app.example.pace" };
+    for (const firebase of [
+      null,
+      "future representation",
+      { projectId: "pace-test", senderId: "123456", apps: [] },
+      { projectId: "pace-test", senderId: "123456", apps: [{ packageName: "app.example.pace" }] },
+      { projectId: "pace-test", senderId: "123456", apps: [duplicate, duplicate] },
+    ]) {
+      expect(endpoints.instance.output.parse({ ...answer, firebase })).toMatchObject({
+        firebase: null,
+        protocol: answer.protocol,
+      });
+    }
+  });
+
   it("reads what a newer server adds without refusing the answer", () => {
     const read = endpoints.instance.output.parse({
       ...answer,
