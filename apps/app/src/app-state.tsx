@@ -14,7 +14,7 @@ import {
 } from "@pace/core";
 
 import { bootstrap } from "./bootstrap.ts";
-import { dropLocalCopyIfOwned } from "./local-copy.ts";
+import { dropLocalCopyOnSignOut, signOutCauseOf } from "./local-copy.ts";
 import { followPhoneNotices, sendPhoneData, startPhonePush } from "./phone-runtime.ts";
 import { stopBackgroundCheck } from "./platform/background-check.ts";
 import { deviceLanguage } from "./platform/device-language.ts";
@@ -122,7 +122,7 @@ const runSyncLoop = (runtime: PaceRuntime, onSynced: OnSynced): (() => void) => 
     activeSession = undefined;
     // The half-typed line was this account's: a share after the next sign-in is only the share.
     forgetLineDraft();
-    void dropLocalCopyIfOwned(runtime, leaving);
+    void dropLocalCopyOnSignOut(runtime, { cause: signOutCauseOf(current), leaving });
   });
   // The poll is a safety net while the server can say "changed" itself.
   const stopFollowingLive = runtime.live.status.subscribe(({ isConnected }, previous) => {

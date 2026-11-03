@@ -840,6 +840,46 @@ describe("a stale tab's sign-out racing another tab's sign-in (re-review N3)", (
   });
 });
 
+describe("this tab's own sign-out (fix round 2 review M1)", () => {
+  it("empties the copy on Log out even when another tab's mark is on it", async () => {
+    const shared = createMemorySessionStore();
+    const { eventStore, runtime } = await setup({}, shared);
+    await runtime.auth.loginWithDev("1");
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    await waitFor(async () => {
+      await expect(eventStore.getStoreId()).resolves.not.toBeNull();
+      await expect(eventStore.listPending()).resolves.toEqual([]);
+    });
+    await act(async () => {
+      runtime.sync.stop();
+      await runtime.state.dispatch({
+        occurredAt: "2026-10-06T10:00:00.000Z",
+        payload: { language: "ru" },
+        type: "settings.updated",
+      });
+    });
+    // A tab started later signed in with another token and claimed the copy under it.
+    await shared.set("tok_other_tab");
+    await runtime.claimLocalCopy("tok_other_tab");
+    await act(async () => {
+      await runtime.auth.logout();
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("auth")).toHaveTextContent("signed-out:-");
+    });
+    // The person left this browser: nothing of the account stays (a shared computer).
+    await waitFor(async () => {
+      await expect(eventStore.listAll()).resolves.toEqual([]);
+    });
+    await expect(eventStore.listPending()).resolves.toEqual([]);
+    await expect(eventStore.getStoreId()).resolves.toBeNull();
+  });
+});
+
 describe("a token adopted from the browser or an App Link", () => {
   it("signs the runtime in and syncs with it", async () => {
     const { api, runtime } = await setup();

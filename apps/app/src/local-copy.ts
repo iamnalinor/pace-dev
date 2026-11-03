@@ -1,14 +1,28 @@
 import type { PaceRuntime } from "./runtime.ts";
 
 /**
-The local copy (IndexedDB, shared by a browser's tabs) goes on sign-out only when no session is
-left in the shared store, and only while it is still the leaving session's: a stale tab's late
+How a tab came to be signed out: by its own hand (Log out, ending its own session, deleting the
+account: the person is leaving this browser) or stale (a 401 for a session ended elsewhere, or a
+sign-out heard from another tab).
+*/
+export type SignOutCause = "own" | "stale";
+
+/** A sign-out with a reason was heard, not done: the server or another tab ended the session. */
+export const signOutCauseOf = (state: {
+  readonly endedElsewhere?: true | undefined;
+  readonly endedInAnotherTab?: true | undefined;
+}): SignOutCause =>
+  state.endedElsewhere === true || state.endedInAnotherTab === true ? "stale" : "own";
+
+/**
+A stale tab's sign-out: the local copy (IndexedDB, shared by a browser's tabs) goes only when no
+session is left in the shared store, and only while it is still the leaving session's: a stale tab's late
 401 never wipes the copy of the tab that signed in since (round 6 I1), even when that tab signs
 in between the check and the wipe (the owner is compared in the clear's own transaction,
 re-review N3). A different account there gets a new store id, and its first pull drops the old
 copy on its own.
 */
-export const dropLocalCopyIfOwned = async (
+const dropLocalCopyIfOwned = async (
   runtime: PaceRuntime,
   leaving: string | undefined,
 ): Promise<void> => {
@@ -16,6 +30,18 @@ export const dropLocalCopyIfOwned = async (
     return;
   }
   await (leaving === undefined ? runtime.resetLocalData() : runtime.dropLocalCopyOf(leaving));
+};
+
+/**
+The local copy goes whenever this tab signs out by its own hand: the person is leaving this
+browser, and on a shared computer a copy kept under another tab's mark would keep the account's
+data (fix round 2 review M1). Only a stale tab's sign-out looks first.
+*/
+export const dropLocalCopyOnSignOut = async (
+  runtime: PaceRuntime,
+  { cause, leaving }: { readonly cause: SignOutCause; readonly leaving: string | undefined },
+): Promise<void> => {
+  await (cause === "own" ? runtime.resetLocalData() : dropLocalCopyIfOwned(runtime, leaving));
 };
 
 /**
