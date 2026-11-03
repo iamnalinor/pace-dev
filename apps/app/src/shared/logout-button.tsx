@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 
 import { useAuth, useLanguage, usePace, useT } from "#app/app-state.tsx";
@@ -9,6 +9,37 @@ import { cx } from "#app/ui/cx.ts";
 import { HOTKEYS } from "#app/ui/hotkeys.ts";
 import { useIsWide } from "#app/ui/layout.ts";
 import { plural } from "@pace/core";
+
+type Subscribable = { readonly subscribe: (listener: () => void) => () => void };
+
+/** The outbox's size, read again whenever the local log or the sync changes. */
+const useUnsyncedCount = (
+  read: () => Promise<number>,
+  log: Subscribable,
+  status: Subscribable,
+): number => {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    let isCurrent = true;
+    const refresh = (): void => {
+      void (async () => {
+        const next = await read();
+        if (isCurrent) {
+          setCount(next);
+        }
+      })();
+    };
+    refresh();
+    const stopLog = log.subscribe(refresh);
+    const stopStatus = status.subscribe(refresh);
+    return () => {
+      isCurrent = false;
+      stopLog();
+      stopStatus();
+    };
+  }, [read, log, status]);
+  return count;
+};
 
 /**
 Log out, which takes the local copy with it: when the outbox still holds changes the server has
@@ -23,25 +54,27 @@ export const LogoutButton = () => {
   const isWide = useIsWide();
   const router = useRouter();
   const { auth } = useAuth();
-  const { sync, unsyncedCount } = usePace();
+  const { state, sync, unsyncedCount } = usePace();
   const focus = useConfirmFocus();
   const [unsynced, setUnsynced] = useState(0);
+  const known = useUnsyncedCount(unsyncedCount, state.store, sync.status);
   const logout = async (): Promise<void> => {
     await auth.logout();
     router.replace("/login");
   };
-  const ask = async (): Promise<void> => {
-    const count = await unsyncedCount();
-    if (count === 0) {
-      await logout();
+  // Read ahead, so a press with nothing unsent logs out at once, with no wait before it: a pause
+  // there let a sync run start with the token the log-out then ends (the stale-tab e2e).
+  const ask = (): void => {
+    if (known === 0) {
+      void logout();
       return;
     }
     focus.toCancel();
-    setUnsynced(count);
+    setUnsynced(known);
   };
   if (unsynced === 0) {
     return (
-      <Button onPress={() => void ask()} ref={focus.openerRef()} variant="secondary">
+      <Button onPress={ask} ref={focus.openerRef()} variant="secondary">
         {t("settings.logout")}
       </Button>
     );
