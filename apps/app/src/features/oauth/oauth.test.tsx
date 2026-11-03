@@ -203,6 +203,28 @@ describe("ConsentFlow", () => {
     expect(me.mock.calls.length).toBeLessThanOrEqual(2);
   });
 
+  it.each([
+    [403, "auth/not-allowed", "login.notAllowed"],
+    [403, "auth/forbidden", "oauth.deviceToken"],
+    [422, "auth/identity-conflict", "oauth.identityConflict"],
+  ] as const)(
+    "a session refused with %i %s says why in words, once, and asks nothing more (A9 review m3)",
+    async (status, code, key) => {
+      const { complete, redirect } = await setupConsent({
+        complete: () => problem(status, code),
+        signedIn: true,
+      });
+      await screen.findByText(en("oauth.signedInAs", { name: fakeUser.name }));
+      await fireEvent.press(screen.getByRole("button", { name: en("oauth.allow") }));
+      expect(await screen.findByRole("alert")).toHaveTextContent(en(key));
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+      expect(complete).toHaveBeenCalledTimes(1);
+      expect(redirect).not.toHaveBeenCalled();
+    },
+  );
+
   it("signed out, offers the widget and a way to the app's own sign-in", async () => {
     const { signIn, widget } = await setupConsent();
     expect(await screen.findByText(en("oauth.identify"))).toBeOnTheScreen();

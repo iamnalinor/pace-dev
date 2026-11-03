@@ -85,6 +85,9 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "oauth.identify": "Войдите через Telegram, чтобы продолжить",
   "oauth.signedInAs": "Вы вошли как {name}",
   "oauth.sessionEnded": "Сеанс Pace завершён. Войдите снова, чтобы продолжить.",
+  "oauth.deviceToken":
+    "Этот вход в Pace не может подключать приложения. Выйдите из Pace в этом браузере, войдите снова и повторите.",
+  "oauth.identityConflict": "Страница отправила два входа сразу. Обновите её и разрешите снова.",
   "oauth.widgetMissing": "Не видно кнопки Telegram?",
   "oauth.signInFirst": "Сначала войдите в Pace",
   "oauth.allow": "Разрешить",

@@ -63,6 +63,15 @@ const errorKey = (error: unknown): MessageKey => {
     case "auth/unauthorized": {
       return "oauth.sessionEnded";
     }
+    // Permanent refusals of the proof, named so a new code is a choice, not the default's "try
+    // again" (A9 review m3): a device token (a computer's, only for usage) and a session sent
+    // beside a second proof. Neither is reachable from this page today.
+    case "auth/forbidden": {
+      return "oauth.deviceToken";
+    }
+    case "auth/identity-conflict": {
+      return "oauth.identityConflict";
+    }
     case "oauth/client-unverified":
     case "oauth/invalid-request": {
       return "oauth.invalidRequest";

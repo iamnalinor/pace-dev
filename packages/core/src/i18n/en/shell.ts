@@ -85,6 +85,9 @@ export const enShell = {
   "oauth.identify": "Sign in with Telegram to continue",
   "oauth.signedInAs": "Signed in as {name}",
   "oauth.sessionEnded": "Your Pace session has ended. Sign in again to continue.",
+  "oauth.deviceToken":
+    "This Pace sign-in cannot connect apps. Log out of Pace in this browser, sign in again and retry.",
+  "oauth.identityConflict": "This page sent two sign-ins at once. Reload it and allow again.",
   "oauth.widgetMissing": "Can't see the Telegram button?",
   "oauth.signInFirst": "Sign in to Pace first",
   "oauth.allow": "Allow",
