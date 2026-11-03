@@ -8,8 +8,8 @@ import { useConfirmFocus } from "#app/ui/confirm-focus.ts";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 import { IS_TOUCH_BROWSER } from "#app/ui/use-hotkey.tsx";
-import { definitionIssues, freePresetId, inheritedOf, type PresetDraft } from "@pace/client";
-import { byPresetOrder, presetById, presetLabel, resolvePreset } from "@pace/core";
+import { definitionIssues, inheritedOf, newPresetId, type PresetDraft } from "@pace/client";
+import { byPresetOrder, newId, presetById, presetLabel, resolvePreset } from "@pace/core";
 
 import { ChoiceChips } from "./choice-chips.tsx";
 import { PresetPreview } from "./preset-preview.tsx";
@@ -169,7 +169,8 @@ export const PresetForm = ({
       return;
     }
     const name = draft.name.trim();
-    const input = { ...draft, id: isNew ? freePresetId(presets, name) : draft.id, name };
+    // A fresh id's end keeps two devices that name a preset alike offline apart (pr48 follow-up).
+    const input = { ...draft, id: isNew ? newPresetId(presets, name, newId()) : draft.id, name };
     const result = isNew ? await actions.createPreset(input) : await actions.updatePreset(input);
     setIssues(
       !result.ok && result.error === "preset/invalid-definition"

@@ -44,6 +44,7 @@ export const enInput = {
   "actionError.preset/built-in":
     "A default preset keeps its id and has no parent; the inbox cannot be deleted.",
   "actionError.preset/exists": "A preset with this id already exists.",
+  "actionError.preset/name-taken": "A preset with this name already exists. Choose another name.",
   "actionError.preset/invalid-definition": "Some values are not valid.",
   "actionError.preset/no-base": "Choose what the preset extends.",
   "actionError.preset/self-extends": "A preset cannot extend itself.",

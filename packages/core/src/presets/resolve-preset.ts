@@ -3,6 +3,7 @@ import type { Task } from "../model/task.ts";
 
 import { err, ok, type Result } from "../result.ts";
 import { BASE_PRESETS, type BasePreset, isBuiltInPreset } from "./base-presets.ts";
+import { presetLabel } from "./preset-label.ts";
 import { presetById, type PresetsState } from "./preset-reducer.ts";
 import { PresetDefinitionSchema, PresetIdSchema } from "./preset-schema.ts";
 
@@ -15,6 +16,7 @@ export type PresetValidationError =
   | "preset/built-in"
   | "preset/exists"
   | "preset/invalid-definition"
+  | "preset/name-taken"
   | "preset/no-base"
   | "preset/self-extends"
   | ChainError;
@@ -187,6 +189,31 @@ const validateParent = (
   return chain.value.presets.some((preset) => preset.id === id) ? "preset/cycle" : undefined;
 };
 
+/** A name as two presets would be told apart by it: trimmed, case and width folded. */
+const nameKey = (name: string): string => name.trim().normalize("NFKC").toLocaleLowerCase();
+
+/**
+Whether another preset in use (not archived) already goes by `name`: its own name, or a default's
+label in either language (a "Work" beside the default "Work" read as two identical chips, QA round
+21 L4). A preset keeps its own name on an update.
+*/
+const validateName = (
+  state: PresetsState,
+  id: string,
+  name: string,
+): PresetValidationError | undefined => {
+  const wanted = nameKey(name);
+  const isTaken = Object.values(state.byId).some(
+    (preset) =>
+      preset.id !== id &&
+      !preset.archived &&
+      [preset.name, presetLabel(preset, "en"), presetLabel(preset, "ru")].some(
+        (taken) => nameKey(taken) === wanted,
+      ),
+  );
+  return isTaken ? "preset/name-taken" : undefined;
+};
+
 /** Everything the editor must check before emitting `preset.created` / `preset.updated`. */
 export const validatePresetInput = (
   state: PresetsState,
@@ -196,6 +223,7 @@ export const validatePresetInput = (
   const problem =
     validateId(state, input.id, mode) ??
     validateParent(state, input.id, input.extends) ??
+    validateName(state, input.id, input.name) ??
     (PresetDefinitionSchema.safeParse(input.definition).success
       ? undefined
       : "preset/invalid-definition");

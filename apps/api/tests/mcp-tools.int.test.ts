@@ -499,6 +499,17 @@ describe("presets", () => {
         name: "Dup",
       }),
     ).toContain("preset/exists");
+    // A name another preset in use goes by, a default's in either language too (QA 21 L4).
+    for (const name of ["ops", "Работа"]) {
+      expect(
+        await errorText(token, "create_preset", {
+          definition: {},
+          extends: "work",
+          id: "work.same",
+          name,
+        }),
+      ).toContain("preset/name-taken");
+    }
     expect(
       await errorText(token, "create_preset", {
         definition: { bogus: 1 },
@@ -585,7 +596,8 @@ const writeFixture = async (token: string): Promise<Fixture> => {
     definition: {},
     extends: "work",
     id: presetId,
-    name: "Contract",
+    // Each fixture its own name: names are unique among the presets in use (QA 21 L4).
+    name: `Contract ${presetId}`,
   });
   return { missedId, presetId, solveId: String(rows(marked["events"])[0]?.["id"]), taskId };
 };

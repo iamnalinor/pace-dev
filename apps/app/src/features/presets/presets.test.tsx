@@ -22,6 +22,12 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
+/** The preset named "Linear Algebra", whatever its id. */
+const linearAlgebra = (runtime: PaceRuntime) =>
+  Object.values(runtime.state.store.getState().presets.byId).find(
+    (preset) => preset.name === "Linear Algebra",
+  );
+
 const presetOf = (runtime: PaceRuntime, id: string) =>
   runtime.state.store.getState().presets.byId[id];
 
@@ -116,14 +122,13 @@ describe("PresetScreen", () => {
     await fireEvent.changeText(screen.getByLabelText(en("presets.name")), "Linear Algebra");
     await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
     await waitFor(() => {
-      expect(presetOf(runtime, "linear-algebra")).toMatchObject({
-        extends: "hw",
-        name: "Linear Algebra",
-      });
+      expect(linearAlgebra(runtime)).toMatchObject({ extends: "hw" });
     });
+    // Read from the name, with a fresh id's end (two devices naming it alike offline differ).
+    expect(linearAlgebra(runtime)?.id).toMatch(/^linear-algebra-[0-9a-z]{6}$/u);
   });
 
-  it("gives a second preset of the same name an id of its own", async () => {
+  it("refuses a second preset of the same name with a sentence, and writes nothing (QA 21 L4)", async () => {
     const runtime = await createTestRuntime({ world: "empty" });
     await runtime.actions.createPreset({
       definition: {},
@@ -131,12 +136,12 @@ describe("PresetScreen", () => {
       id: "algebra",
       name: "Алгебра",
     });
+    const before = runtime.state.store.getState().events.length;
     await renderScreen(<PresetScreen from="hw" id="new" />, runtime);
-    await fireEvent.changeText(screen.getByLabelText(en("presets.name")), "Алгебра");
+    await fireEvent.changeText(screen.getByLabelText(en("presets.name")), "алгебра ");
     await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
-    await waitFor(() => {
-      expect(presetOf(runtime, "algebra-2")).toMatchObject({ extends: "hw", name: "Алгебра" });
-    });
+    expect(await screen.findByRole("alert")).toHaveTextContent(en("actionError.preset/name-taken"));
+    expect(runtime.state.store.getState().events).toHaveLength(before);
   });
 
   it("keeps an existing preset's id and names the edit by the preset", async () => {

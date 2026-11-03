@@ -141,16 +141,16 @@ const SLUG_MAX = 56;
 /** Ids a preset may not take: the address of the new preset form. */
 const RESERVED_IDS: ReadonlySet<string> = new Set(["new"]);
 
-/**
-The id a new preset gets from its name (QA round 18 L4: nobody types an id): the name's slug, or
-`preset` for a name with no letters it can spell, numbered `-2`, `-3`… past an id already taken
-by a preset (an archived one too), a default or the new form's own address.
-*/
-export const freePresetId = (state: PresetsState, name: string): string => {
+/** The name's slug cut to `max` (never ending in a hyphen), or `preset` for one it cannot spell. */
+const slugBase = (name: string, max: number): string => {
   // A slug has single hyphens between words, so a cut leaves at most one at its end.
-  const cut = slugify(name).slice(0, SLUG_MAX);
+  const cut = slugify(name).slice(0, max);
   const slug = cut.endsWith("-") ? cut.slice(0, -1) : cut;
-  const base = slug === "" ? "preset" : slug;
+  return slug === "" ? "preset" : slug;
+};
+
+/** `base`, or `base-2`, `base-3`… past an id already taken (an archived preset too), a default or a reserved one. */
+const firstFree = (state: PresetsState, base: string): string => {
   const isFree = (id: string): boolean =>
     !RESERVED_IDS.has(id) && !isBuiltInPreset(id) && !Object.hasOwn(state.byId, id);
   const free = Array.from({ length: Object.keys(state.byId).length + 2 }, (_, step) =>
@@ -158,3 +158,26 @@ export const freePresetId = (state: PresetsState, name: string): string => {
   ).find((id) => isFree(id));
   return free ?? `${base}-${String(Object.keys(state.byId).length + 3)}`;
 };
+
+/**
+The id a preset's name reads as (QA round 18 L4: nobody types an id): the name's slug, or
+`preset` for a name with no letters it can spell, numbered `-2`, `-3`… past an id already taken
+by a preset (an archived one too), a default or the new form's own address.
+*/
+export const freePresetId = (state: PresetsState, name: string): string =>
+  firstFree(state, slugBase(name, SLUG_MAX));
+
+/** The characters of a fresh id (a ULID's random end) that set a new preset's id apart. */
+const UNIQUE_CHARS = 6;
+
+/**
+The id a new preset gets: its name's slug and the end of a fresh id (`unique`, a ULID). Two devices
+that create the same name offline otherwise both took `gym`, and the merge kept the first and
+dropped the second's `preset.created` (the reducer ignores an id it has), its tasks then read
+under the other's definition (pr48 follow-up).
+*/
+export const newPresetId = (state: PresetsState, name: string, unique: string): string =>
+  firstFree(
+    state,
+    `${slugBase(name, SLUG_MAX - UNIQUE_CHARS - 1)}-${unique.slice(-UNIQUE_CHARS).toLowerCase()}`,
+  );

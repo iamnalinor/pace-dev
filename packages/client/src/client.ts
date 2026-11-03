@@ -188,11 +188,11 @@ export { SCOPE_KEYS } from "./view-models/oauth-scopes.ts";
 export {
   definitionIssues,
   editorDraft,
-  freePresetId,
   inheritedOf,
   isOverridden,
   isSubOverridden,
   newDraft,
+  newPresetId,
   type PresetDraft,
   setSub,
   setValue,

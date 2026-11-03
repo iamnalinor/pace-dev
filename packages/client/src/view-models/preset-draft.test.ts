@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { BASE_PRESETS, INITIAL_PRESETS_STATE, PresetIdSchema } from "@pace/core";
+import { BASE_PRESETS, INITIAL_PRESETS_STATE, newId, PresetIdSchema } from "@pace/core";
 
 import {
   definitionIssues,
@@ -9,6 +9,7 @@ import {
   inheritedOf,
   isOverridden,
   newDraft,
+  newPresetId,
   setSub,
   setValue,
   slugify,
@@ -102,6 +103,23 @@ describe("freePresetId (QA round 18 L4: nobody types an id)", () => {
     const numbered = freePresetId(withPreset("a".repeat(55)), name);
     expect(numbered).toBe(`${"a".repeat(55)}-2`);
     expect(PresetIdSchema.safeParse(numbered).success).toBe(true);
+  });
+});
+
+describe("newPresetId (pr48 follow-up: two devices naming a preset alike offline)", () => {
+  it("gives two devices that create the same name offline two ids, each still read from the name", () => {
+    const one = newPresetId(INITIAL_PRESETS_STATE, "Gym", newId());
+    const other = newPresetId(INITIAL_PRESETS_STATE, "Gym", newId());
+    expect(one).not.toBe(other);
+    for (const id of [one, other]) {
+      expect(id).toMatch(/^gym-[0-9a-z]{6}$/u);
+      expect(PresetIdSchema.safeParse(id).success).toBe(true);
+    }
+  });
+
+  it("stays a valid id past the slug's cut", () => {
+    const id = newPresetId(INITIAL_PRESETS_STATE, "a".repeat(80), newId());
+    expect(PresetIdSchema.safeParse(id).success).toBe(true);
   });
 });
 

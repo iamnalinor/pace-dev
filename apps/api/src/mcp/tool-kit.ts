@@ -40,6 +40,7 @@ const CODE_MESSAGES: Readonly<Record<string, string>> = {
   "preset/exists": "A preset with this id already exists.",
   "preset/invalid-definition": "The definition has a key or value the preset schema does not know.",
   "preset/invalid-overrides": "The task's overrides are not a valid preset definition.",
+  "preset/name-taken": "Another preset in use already has this name; choose another.",
   "preset/no-base": "A preset must extend a built-in preset or another user preset.",
   "preset/self-extends": "A preset cannot extend itself.",
   "preset/unknown": "No preset with this id (see list_presets).",

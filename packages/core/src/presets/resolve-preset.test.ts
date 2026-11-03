@@ -283,6 +283,26 @@ describe("validatePresetInput", () => {
     });
   });
 
+  it("refuses a name another preset has, whatever its case, a default's in either language too (QA 21 L4)", () => {
+    const taken = { error: "preset/name-taken", ok: false };
+    expect(validatePresetInput(state, input({ name: "HW.ALGEBRA" }), "create")).toEqual(taken);
+    expect(validatePresetInput(state, input({ name: " Work " }), "create")).toEqual(taken);
+    expect(validatePresetInput(state, input({ name: "Работа" }), "create")).toEqual(taken);
+    // Renaming another preset to it too; keeping its own name is no clash.
+    expect(validatePresetInput(state, input({ id: "hw.loop", name: "work" }), "update")).toEqual(
+      taken,
+    );
+    expect(
+      validatePresetInput(state, input({ id: "hw.algebra", name: "hw.algebra" }), "update"),
+    ).toEqual({ ok: true, value: undefined });
+    // An archived preset gives its name back.
+    const archived = stateWith({ ...existing, archived: true });
+    expect(validatePresetInput(archived, input({ name: "hw.algebra" }), "create")).toEqual({
+      ok: true,
+      value: undefined,
+    });
+  });
+
   it("requires a base: extends null is rejected", () => {
     expect(validatePresetInput(state, input({ extends: null }), "create")).toEqual({
       error: "preset/no-base",

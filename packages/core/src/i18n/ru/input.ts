@@ -46,6 +46,7 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "actionError.preset/built-in":
     "У стандартного пресета нельзя поменять id и родителя; Inbox удалить нельзя.",
   "actionError.preset/exists": "Пресет с таким id уже есть.",
+  "actionError.preset/name-taken": "Пресет с таким названием уже есть. Выберите другое название.",
   "actionError.preset/invalid-definition": "Некоторые значения некорректны.",
   "actionError.preset/no-base": "Выберите, что наследует пресет.",
   "actionError.preset/self-extends": "Пресет не может наследовать сам себя.",
