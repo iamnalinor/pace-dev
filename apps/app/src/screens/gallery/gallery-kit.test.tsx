@@ -21,9 +21,19 @@ describe("the gallery's kit sections", () => {
     expect(screen.getAllByRole("link")).toHaveLength(data.link === null ? 1 : 2);
   });
 
-  it("shows nothing it has no data for", async () => {
-    const data = galleryData("empty", "en");
-    await renderScreen(<KitSections data={data} />, await createTestRuntime({ world: "empty" }));
-    expect(screen.getAllByRole("link")).toHaveLength(data.link === null ? 1 : 2);
+  it("shows nothing it has no data for: no project row, no capture, no outside link", async () => {
+    const worst = galleryData("worst", "en");
+    const empty = galleryData("empty", "en");
+    expect(empty.projects).toEqual([]);
+    expect(empty.inboxTexts).toEqual([]);
+    expect(empty.link).toBeNull();
+    await renderScreen(<KitSections data={empty} />, await createTestRuntime({ world: "empty" }));
+    for (const project of worst.projects) {
+      expect(screen.queryByText(project.name)).toBeNull();
+    }
+    expect(screen.queryByText(worst.inboxTexts[0] ?? "")).toBeNull();
+    // The one link left is the internal one, to Now.
+    expect(screen.getAllByRole("link")).toHaveLength(1);
+    expect(screen.getByRole("link", { name: en("dev.gallery.link.inside") })).toBeOnTheScreen();
   });
 });
