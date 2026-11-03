@@ -2,6 +2,7 @@ import {
   byPresetOrder,
   err,
   exampleCoursePresetEvents,
+  isExampleToSeed,
   parsePresetDefinition,
   presetById,
   type PresetInput,
@@ -116,9 +117,8 @@ export const presetActions = (deps: ActionDeps): PresetActions => ({
   createPreset: async (input) => await savePreset(deps, input, "create"),
   seedExamplePresets: async () => {
     const { presets } = deps.state.store.getState();
-    const missing = exampleCoursePresetEvents(deps.clock.now()).filter(
-      (input) =>
-        input.type === "preset.created" && presetById(presets, input.payload.id) === undefined,
+    const missing = exampleCoursePresetEvents(deps.clock.now()).filter((input) =>
+      isExampleToSeed(presets, input),
     );
     return await emit(
       deps,

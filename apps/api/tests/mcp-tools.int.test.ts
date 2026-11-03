@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { newId } from "@pace/core";
 
 import { TOOLS } from "../src/mcp/server.ts";
-import { json, loginAsDev } from "./helpers.ts";
+import { json, loginAsDev, pushEvents } from "./helpers.ts";
 import { mcpResult, obtainToken } from "./oauth-flow.ts";
 
 const byText = (a: unknown, b: unknown): number => String(a).localeCompare(String(b));
@@ -736,5 +736,42 @@ describe("search_decisions", () => {
       { arguments: { q: "digest" }, name: "search_decisions" },
     );
     expect(result.structuredContent).toEqual({ decisions: [] });
+  });
+
+  it("edits a preset that shares its name with another, and seeds around a taken name (review I1, M6)", async () => {
+    // An account of its own: the store of 1001 already holds the examples from the test above.
+    const token = (await obtainToken({ ...READ_WRITE, devTelegramId: "1002" })).tokens.access_token;
+    // Two "Gym" as an offline merge (or an older app) leaves them: written past the name rule.
+    const at = new Date().toISOString();
+    const created = (id: string) => ({
+      deviceId: "test",
+      id: newId(),
+      occurredAt: at,
+      payload: { definition: {}, extends: "hw", id, name: "Gym" },
+      precision: "exact",
+      recordedAt: at,
+      source: "app",
+      type: "preset.created",
+    });
+    await pushEvents(await loginAsDev("1002"), [
+      created("gym-aaaaaa"),
+      created("gym-bbbbbb"),
+      {
+        ...created("mine"),
+        payload: { definition: {}, extends: "hw", id: "mine", name: "Algebra HW" },
+      },
+    ]);
+    await okTool(token, "update_preset", {
+      definition: { defaultEstimateMinutes: 45 },
+      id: "gym-aaaaaa",
+    });
+    // Renaming into a name another preset goes by is still refused.
+    expect(
+      await errorText(token, "update_preset", { id: "gym-bbbbbb", name: "Algebra HW" }),
+    ).toContain("preset/name-taken");
+    expect(await okTool(token, "seed_example_presets")).toMatchObject({
+      created: ["hw.calculus", "hw.history"],
+      skipped: ["hw.algebra"],
+    });
   });
 });

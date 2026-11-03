@@ -191,6 +191,7 @@ export {
   EXAMPLE_PRESET_IDS,
   exampleCoursePresetEvents,
   type ExamplePresetId,
+  isExampleToSeed,
 } from "./presets/example-presets.ts";
 export { byPresetOrder, presetLabel } from "./presets/preset-label.ts";
 export {

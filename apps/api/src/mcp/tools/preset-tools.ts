@@ -4,6 +4,7 @@ import {
   err,
   type EventInput,
   exampleCoursePresetEvents,
+  isExampleToSeed,
   ok,
   type Preset,
   presetById,
@@ -63,8 +64,8 @@ export const seedExamplePresets = defineTool({
       build: (scope, when) => {
         const seeds = exampleCoursePresetEvents(when.at).filter((event) => isPresetCreated(event));
         for (const seed of seeds) {
-          const list =
-            presetById(scope.state.presets, seed.payload.id) === undefined ? created : skipped;
+          // Skipped: an example already there, or one whose name a preset goes by (review M6).
+          const list = isExampleToSeed(scope.state.presets, seed) ? created : skipped;
           list.push(seed.payload.id);
         }
         return ok(

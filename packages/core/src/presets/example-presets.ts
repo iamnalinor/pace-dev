@@ -1,6 +1,9 @@
 import type { EventInput } from "../events/event-schema.ts";
 import type { PresetDefinition } from "../model/preset.ts";
 
+import { presetById, type PresetsState } from "./preset-reducer.ts";
+import { isPresetNameFree } from "./resolve-preset.ts";
+
 export const EXAMPLE_PRESET_IDS = ["hw.algebra", "hw.calculus", "hw.history"] as const;
 
 export type ExamplePresetId = (typeof EXAMPLE_PRESET_IDS)[number];
@@ -56,3 +59,12 @@ export const exampleCoursePresetEvents = (now: string): readonly EventInput[] =>
     source: "web",
     payload: { id, name: EXAMPLES[id].name, extends: "hw", definition: EXAMPLES[id].definition },
   }));
+
+/**
+Whether the seed should create this example: its id is not there yet, and no preset in use goes by
+its name (a person's own "Algebra HW" would otherwise read as two identical chips, review M6).
+*/
+export const isExampleToSeed = (state: PresetsState, event: EventInput): boolean =>
+  event.type === "preset.created" &&
+  presetById(state, event.payload.id) === undefined &&
+  isPresetNameFree(state, event.payload.id, event.payload.name);

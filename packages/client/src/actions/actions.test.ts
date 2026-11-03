@@ -718,6 +718,22 @@ describe("presets", () => {
     await expect(world.actions.seedExamplePresets()).resolves.toEqual({ ok: true, value: [] });
   });
 
+  it("leaves out an example whose name a preset already goes by (review M6)", async () => {
+    const world = await setupActions([]);
+    unwrap(
+      await world.actions.createPreset({
+        definition: {},
+        extends: "hw",
+        id: "mine",
+        name: "algebra hw",
+      }),
+    );
+    const seeded = unwrap(await world.actions.seedExamplePresets());
+    expect(seeded.map((event) => event.type === "preset.created" && event.payload.id)).toEqual(
+      EXAMPLE_PRESET_IDS.filter((id) => id !== "hw.algebra"),
+    );
+  });
+
   it("moves a preset one place in the picker order, renumbering only what changed", async () => {
     const world = await setupActions([]);
     const order = () =>
