@@ -10,7 +10,15 @@ import { Icon, type IconSize, type IconTone } from "#app/ui/icon.tsx";
 import { Link } from "#app/ui/link.tsx";
 import { Pressable } from "#app/ui/pressable.tsx";
 import { Text } from "#app/ui/text.tsx";
-import { formatCount, formatDuration, isTabular, type MessageKey, TYPE_ROLES } from "@pace/core";
+import { useTheme } from "#app/ui/theme-provider.tsx";
+import {
+  formatCount,
+  formatDuration,
+  isTabular,
+  type MessageKey,
+  shadow,
+  TYPE_ROLES,
+} from "@pace/core";
 
 const NOTHING = (): void => undefined;
 
@@ -124,10 +132,12 @@ const TextIconLinkSections = ({ data }: { readonly data: GalleryData }) => {
 /**
 The kit's state layer (`ui/pressable.tsx`) in each of its states, in the gallery's language: hover,
 press and the focus ring are tried by hand on it (web), the ripple on a phone. Its labels are the
-longest a control of the kit carries here, in Russian.
+longest a control of the kit carries here, in Russian. The opaque child and the raised control are
+the break-ui cases of the overlay: it shows above the child, and the control's shadow stays.
 */
 const StateLayerSection = () => {
   const t = useT();
+  const { scheme } = useTheme();
   return (
     <View className="gap-2 px-5 pt-6">
       <Text level={2} role="headline">
@@ -142,6 +152,28 @@ const StateLayerSection = () => {
         </Pressable>
         <Pressable className={BOX} onPress={NOTHING} ripple="borderless" role="button">
           <NativeText className={LABEL}>{t("dev.gallery.pressable.borderless")}</NativeText>
+        </Pressable>
+        <Pressable checked className={BOX} onPress={NOTHING} role="checkbox">
+          <NativeText className={LABEL}>{t("dev.gallery.pressable.checked")}</NativeText>
+        </Pressable>
+      </View>
+      <View className="flex-row flex-wrap gap-2">
+        {/* An opaque child fills the control: the overlay must still show above it. */}
+        <Pressable className="min-h-12 overflow-hidden rounded-md" onPress={NOTHING} role="button">
+          <View className="min-h-12 justify-center bg-accent px-4 py-2">
+            <NativeText className="font-sans text-callout font-medium text-accent-on">
+              {t("dev.gallery.pressable.opaque")}
+            </NativeText>
+          </View>
+        </Pressable>
+        {/* A raised control keeps its own shadow while hovered and pressed. */}
+        <Pressable
+          className="min-h-12 justify-center rounded-md bg-elevated px-4 py-2"
+          onPress={NOTHING}
+          role="button"
+          style={{ boxShadow: shadow(scheme, "overlay") }}
+        >
+          <NativeText className={LABEL}>{t("dev.gallery.pressable.elevated")}</NativeText>
         </Pressable>
       </View>
       <View
