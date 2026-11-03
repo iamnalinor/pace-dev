@@ -200,3 +200,4 @@ Top band shots made (context/design/comps/top-band). Ruling pending owner, defau
 Tasks 3.3, 3.4, 3.5: complete (re-review Approved). Parked minors for next session: N1 static compact ListRow min-height native; N2 Disclosure close first frame (set height before withTiming); N3 stale spec owner text; N4 inspector pointerEvents none during exit.
 A fix round 3: 7924533 (CI .only guard class 120; I1 wipe only when no session left; I2 widget box class 121; m1–m6; latency own CI step). lint 74, CI=1 unit ok, api 608, app 910; e2e 194/195 alone (assistant toast flake, passes 21/21 repeated). Pushed. Concern: two worktrees share e2e servers via reuseExistingServer.
 HANDOFF rewritten for a new session (2026-11-03).
+A fix round 3 review: all addressed; ready once CI green (toast flake row lacks cause — minor). CI note: every push cancels the running CI (concurrency); runs 272–274 cancelled by checkpoint pushes. Holding pushes to A until run 276 (head 981271a) finishes.
