@@ -1,5 +1,13 @@
 import { describe, expect, it } from "bun:test";
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -122,15 +130,24 @@ const runSmoke = (scenario: string) => {
     for (const [name, body] of Object.entries(commands)) {
       writeFileSync(path.join(bin, name), body, { mode: 0o755 });
     }
+    // The unit suite has Bun and the basic shell utilities, regardless of what else is installed.
+    symlinkSync(process.execPath, path.join(bin, "bun"));
+    for (const tool of ["awk", "cat", "dirname", "mkdir", "mktemp", "rm", "tee", "touch", "tr"]) {
+      const executable = Bun.which(tool);
+      if (executable === null) {
+        throw new Error(`Android smoke test requires the shell utility ${tool}`);
+      }
+      symlinkSync(executable, path.join(bin, tool));
+    }
     writeFileSync(tracePath, "");
     writeFileSync(path.join(apkDir, "app-release.apk"), "");
     copyFileSync(script, path.join(scripts, "smoke.sh"));
 
-    const run = Bun.spawnSync(["bash", path.join(scripts, "smoke.sh"), "run"], {
+    const run = Bun.spawnSync(["/bin/bash", path.join(scripts, "smoke.sh"), "run"], {
       env: {
         ...process.env,
         CASE: scenario,
-        PATH: `${bin}:${process.env["PATH"] ?? ""}`,
+        PATH: bin,
         TRACE: tracePath,
       },
     });

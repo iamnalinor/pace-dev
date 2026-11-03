@@ -213,9 +213,9 @@ it is not a release gate until it has passed on the actual emulator runner.
 To run locally, use JDK 17, Node 24, the repository's Bun version, Android SDK platform 36,
 build-tools 36.0.0, NDK 27.1.12297006, CMake 3.22.1, and
 [Maestro CLI 2.11.0](https://github.com/mobile-dev-inc/maestro/releases/tag/cli-2.11.0).
-Set `ANDROID_HOME` to the SDK and put `adb`, `apkanalyzer`, `maestro`, `curl`, and `jq` on `PATH`. Boot one English
-x86_64 Android emulator (API 34 Google APIs), and leave port 8787 free. Hardware acceleration
-is recommended. From the repository root:
+Set `ANDROID_HOME` to the SDK and put `adb`, `apkanalyzer`, `maestro`, and `curl` on `PATH`.
+Boot one English x86_64 Android emulator (API 34 Google APIs) and leave port 8787 free.
+Hardware acceleration is recommended. From the repository root:
 
 ```sh
 bun install --frozen-lockfile

@@ -37,7 +37,7 @@ wait_for_worker() {
   for ((attempt = 0; attempt < 60; attempt++)); do
     kill -0 "$worker_pid" 2>/dev/null || fail "Local Worker exited during startup; see worker.log"
     if curl --disable --fail --silent --noproxy '*' --max-time 1 "$host_api/api/health" |
-      jq -e '.status == "ok"' >/dev/null 2>&1; then
+      bun --no-env-file -e 'process.exit((await Bun.stdin.json())?.status === "ok" ? 0 : 1)' 2>/dev/null; then
       return
     fi
     sleep 1
@@ -64,7 +64,7 @@ finish() {
 
 run() {
   local tool
-  for tool in adb apkanalyzer maestro curl jq; do
+  for tool in adb apkanalyzer bun curl maestro; do
     command -v "$tool" >/dev/null || fail "Android smoke requires $tool on PATH"
   done
   [[ -x "$wrangler" ]] || fail "Run bun install --frozen-lockfile before Android smoke"
@@ -74,8 +74,12 @@ run() {
   # Expo Constants reads this asset in a standalone Android app. Check what Gradle
   # actually bundled before the emulator can load the app or make any network calls.
   if ! apkanalyzer files cat --file /assets/app.config "$apk" |
-    jq -e --arg origin "$app_api" \
-      '.extra.apiUrl == $origin and .extra.webOrigin == $origin and .extra.isDevLogin == true' >/dev/null; then
+    bun --no-env-file -e '
+      const extra = (await Bun.stdin.json())?.extra;
+      const origin = process.argv[1];
+      const valid = extra?.apiUrl === origin && extra?.webOrigin === origin && extra?.isDevLogin === true;
+      process.exit(valid ? 0 : 1);
+    ' "$app_api" 2>/dev/null; then
     fail "Android smoke APK must embed the emulator API origin and dev login flag"
   fi
 
