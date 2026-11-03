@@ -829,6 +829,10 @@ The same rule applies when a previously successful channel is no longer configur
   spelt in Latin letters, numbered past a taken or reserved one) and never shown as a field; a form
   for a new thing puts the cursor in its first field where there is a keyboard (class 71). Test
   with a name in the owner's language and a second thing of the same name.
+- **Also: a proof the person already gave.** The same mistake for identity: the MCP consent page
+  asked a browser that held the person's Pace session to sign in with Telegram again (owner bug
+  2026-11-03; testing half and sweep in class 119). Before asking a person to prove who they are,
+  ask whether they already have.
 
 ### 82. A name taken from the kind of screen where the thing it shows is known
 - **Bug.** QA round 18 L8: every `/task/<id>` tab was "Task · Pace", every project "Projects ·
@@ -1254,11 +1258,18 @@ The same rule applies when a previously successful channel is no longer configur
   connected a real MCP client end to end, and the journey "connect Claude from a browser where I
   am signed in" was never walked (docs/design.md step 1). The decision behind it (plan.md: widget
   on the web origin) asked how to prove identity, never whether it was already proved.
-- **Rule.** A shortcut that exists for tests (a dev id, a seeded token, a mocked widget) never
-  stands in for the real path in the one test of a journey: each journey that proves who the person
-  is gets at least one test that runs the path a real person meets, signed in and signed out, and
-  the QA round walks it with a real client once per release. Before asking a person to prove who
-  they are, ask whether they already have.
+- **Rule (the testing class).** A shortcut that exists for tests (a dev id, a seeded token, a mocked
+  widget) never stands in for the real path in the one test of a journey: each journey that proves
+  who the person is gets at least one test that runs the path a real person meets, signed in and
+  signed out, and the release round walks it with a real client.
+- **The product half is class 81.** "Asked to sign in while already signed in" is the system asking
+  the person for what it already has (class 81: a key the system needs asked of the person); the
+  consent page's fix (use the session) is filed there in spirit, and the sweep below is its sweep.
+- **Guard: procedural first.** The real identity step cannot run in CI (Telegram's widget, a real
+  client's token exchange), so the guard for the testing half is the owner's release step in
+  `docs/qa.md` ("Release round": connect a real MCP client end to end). The e2e below pins what can
+  be pinned without Telegram: the signed-in path sends no dev id or Telegram proof. The frame half
+  of the same bug is class 121.
 - **Sweep and guard.** Every place that asks for a Telegram proof: the web login (redirects a
   signed-in browser to `next`, hands its token to the app for `?return=app`), the consent page (the
   one that asked a signed-in browser; now uses the session), the Android app's login (shown only
@@ -1266,7 +1277,7 @@ The same rule applies when a previously successful channel is no longer configur
   action by design, not a sign-in). `e2e/oauth-consent.e2e.ts`: signed in, Allow with no widget
   (bearer, no Telegram proof); a session revoked while the page is open falls back to signing in and
   the network goes quiet; signed out, the app's own sign-in comes back with the request intact.
-  `docs/qa.md`: connect a real MCP client end to end once per release.
+  `docs/qa.md`, "Release round": the owner connects a real MCP client end to end.
 
 ### 120. A runner's behaviour that only CI's environment switches on
 - **Bug.** Fix round 3 (A9 review, Recommendation 3): CI stopped at `bun test:unit` with ".only is
