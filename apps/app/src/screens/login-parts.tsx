@@ -113,7 +113,7 @@ export const Waiting = ({
           {t("login.openBotAgain")}
         </Button>
       )}
-      <Button onPress={onCancel} variant="ghost" width="fill">
+      <Button onPress={onCancel} variant="plain" width="fill">
         {t("common.cancel")}
       </Button>
     </View>

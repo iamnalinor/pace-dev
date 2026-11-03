@@ -6,7 +6,7 @@ import type { ActivityForm, ActivityRange, ActivityTarget, FormPartProps } from 
 import { useLanguage, useT } from "#app/app-state.tsx";
 import { fromWallClock, wallClock } from "#app/format/time.ts";
 import { moveFocus } from "#app/platform/move-focus.ts";
-import { ActionChip } from "#app/ui/chip.tsx";
+import { Chip } from "#app/ui/chip.tsx";
 import { RadioChips } from "#app/ui/radio-chips.tsx";
 import { formatShortDay } from "@pace/core";
 
@@ -88,14 +88,14 @@ export const DayChoices = ({
   if (!isOpen) {
     return (
       <View className="flex-row">
-        <ActionChip
+        <Chip
           onPress={() => {
             setIsOpen(true);
             setHasOpened(true);
           }}
         >
           {t("day.otherDays")}
-        </ActionChip>
+        </Chip>
       </View>
     );
   }

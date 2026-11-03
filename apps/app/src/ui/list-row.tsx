@@ -11,10 +11,18 @@ import { Icon } from "./icon.tsx";
 import { Link } from "./link.tsx";
 import { ROW_BOX } from "./list-row-density.ts";
 import { Pressable } from "./pressable.tsx";
+import { type RadioValue, useRadio } from "./radio-group.tsx";
+import { SwitchTrack } from "./switch.tsx";
 import { Text } from "./text.tsx";
 
-/** The roles a pressable row takes: a button, or a tab of a tablist (a select row is a radio: Task 3.9). */
+/** The roles a pressable row takes: a button, or a tab of a tablist (`toggle` and `select` rows have their own). */
 export type RowRole = "button" | "tab";
+
+/** A setting the whole row flips (spec §4.2.26 SwitchRow): its switch is drawn trailing. */
+export type RowToggle = {
+  readonly isOn: boolean;
+  readonly onChange: (isOn: boolean) => void;
+};
 
 type RowProps = {
   readonly title: string;
@@ -47,11 +55,31 @@ type PressProps =
       readonly href: Href;
       readonly onPress?: never;
       readonly role?: never;
+      readonly select?: never;
+      readonly toggle?: never;
     }
   | {
       readonly href?: never;
       readonly onPress?: (() => void) | undefined;
       readonly role?: RowRole | undefined;
+      readonly select?: never;
+      readonly toggle?: never;
+    }
+  | {
+      readonly href?: never;
+      readonly onPress?: never;
+      readonly role?: never;
+      /** A radio of the `RadioGroup` around it, with a trailing check once chosen. */
+      readonly select: RadioValue;
+      readonly toggle?: never;
+    }
+  | {
+      readonly href?: never;
+      readonly onPress?: never;
+      readonly role?: never;
+      readonly select?: never;
+      /** The whole row is the switch: a press anywhere on it, its label too, flips it (R23-10). */
+      readonly toggle: RowToggle;
     };
 
 export type ListRowProps = PressProps & RowProps;
@@ -120,6 +148,48 @@ type FrameProps = Pick<
   "disabled" | "haptic" | "href" | "onPress" | "role" | "selected" | "testID"
 > & { readonly children: ReactNode; readonly className: string };
 
+/** A select row's frame: a radio of its group, named by its title (the subtitle is its hint). */
+const SelectFrame = ({
+  className,
+  disabled,
+  draw,
+  hint,
+  name,
+  testID,
+  value,
+}: Pick<FrameProps, "className" | "disabled" | "testID"> & {
+  readonly draw: (isChosen: boolean) => ReactNode;
+  readonly hint: string | undefined;
+  readonly name: string;
+  readonly value: RadioValue;
+}) => {
+  const { checked, onPress, setNode, tabIndex } = useRadio(value);
+  return (
+    <Pressable
+      accessibilityHint={hint}
+      checked={checked}
+      className={className}
+      disabled={disabled}
+      label={name}
+      onPress={onPress}
+      ref={setNode}
+      role="radio"
+      tabIndex={tabIndex}
+      testID={testID}
+    >
+      {draw(checked)}
+    </Pressable>
+  );
+};
+
+/** The trailing check of the chosen select row. */
+const Check = ({ isChosen }: { readonly isChosen: boolean }) =>
+  isChosen ? (
+    <View testID="list-row-check">
+      <Icon name="check" tone="accent" />
+    </View>
+  ) : null;
+
 /** What the row is: a link (`href`), a control (`onPress`), or a static view. */
 const Frame = ({
   children,
@@ -182,26 +252,75 @@ export const ListRow = ({
   density = "regular",
   leading,
   meta,
+  select,
   subtitle,
   title,
   titleLines,
+  toggle,
   trailing,
   ...frame
 }: ListRowProps) => {
   const isSelected = frame.selected === true;
+  const body = (end: ReactNode) => (
+    <View className={cx("flex-1 flex-row items-center", ROW_BOX[density])} testID="list-row-box">
+      <Content
+        leading={leading}
+        meta={meta}
+        subtitle={subtitle}
+        title={title}
+        titleLines={titleLines}
+        trailing={end}
+      />
+    </View>
+  );
+  if (toggle !== undefined) {
+    return (
+      <Pressable
+        accessibilityHint={subtitle}
+        checked={toggle.isOn}
+        className="relative flex-row"
+        disabled={frame.disabled}
+        haptic={frame.haptic}
+        label={title}
+        onPress={() => {
+          toggle.onChange(!toggle.isOn);
+        }}
+        role="switch"
+        testID={frame.testID}
+      >
+        {body(
+          <View className="flex-row items-center gap-2">
+            {trailing}
+            <SwitchTrack disabled={frame.disabled === true} isOn={toggle.isOn} />
+          </View>,
+        )}
+      </Pressable>
+    );
+  }
+  if (select !== undefined) {
+    return (
+      <SelectFrame
+        className="relative flex-row"
+        disabled={frame.disabled}
+        draw={(isChosen) =>
+          body(
+            <View className="flex-row items-center gap-2">
+              {trailing}
+              <Check isChosen={isChosen} />
+            </View>,
+          )
+        }
+        hint={subtitle}
+        name={title}
+        testID={frame.testID}
+        value={select}
+      />
+    );
+  }
   return (
     <Frame {...frame} className={cx("relative flex-row", isSelected && "bg-fill-1")}>
       {isSelected ? <SelectedBar /> : null}
-      <View className={cx("flex-1 flex-row items-center", ROW_BOX[density])} testID="list-row-box">
-        <Content
-          leading={leading}
-          meta={meta}
-          subtitle={subtitle}
-          title={title}
-          titleLines={titleLines}
-          trailing={withChevron(trailing, frame.href !== undefined)}
-        />
-      </View>
+      {body(withChevron(trailing, frame.href !== undefined))}
     </Frame>
   );
 };

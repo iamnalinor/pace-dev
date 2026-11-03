@@ -39,7 +39,7 @@ const ICON_TONES: readonly IconTone[] = [
 ];
 
 /** One section of the kit's part of the gallery: a heading and the components it shows. */
-const Section = ({
+export const Section = ({
   children,
   title,
 }: {

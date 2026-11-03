@@ -39,9 +39,9 @@ export const SheetActions = ({
         <View className="flex-1">
           {/* Escape cancels, as it closes the sheets and the Devices confirm (QA round 18 L1). */}
           <Button
-            hotkey={HOTKEYS.escape}
             onPress={onCancel}
             ref={cancelRef}
+            shortcut={HOTKEYS.escape}
             variant="secondary"
             width="fill"
           >
@@ -53,9 +53,9 @@ export const SheetActions = ({
         <Button
           busy={isBusy}
           disabled={isDisabled}
-          hotkey={isConfirmation ? undefined : HOTKEYS.primary}
           onPress={onPrimary}
-          variant={isDestructive ? "danger" : "primary"}
+          shortcut={isConfirmation ? undefined : HOTKEYS.primary}
+          variant={isDestructive ? "destructive" : "primary"}
           width="fill"
         >
           {primaryLabel}

@@ -79,7 +79,7 @@ export const EndedAtPrompt = ({
         onPress={() => {
           void run(actions.stopActivity({ at: pickupAt }));
         }}
-        variant="ghost"
+        variant="plain"
       >
         {t("phone.endedAt", { time })}
       </Button>
@@ -92,7 +92,7 @@ export const UsageAccessHint = () => {
   const t = useT();
   return (
     <View className="mx-5 mb-3">
-      <Button onPress={openUsageAccessSettings} variant="ghost">
+      <Button onPress={openUsageAccessSettings} variant="plain">
         {t("phone.usageAsk")}
       </Button>
     </View>
@@ -173,7 +173,7 @@ const CalendarRow = ({
                       },
                 );
               }}
-              variant="ghost"
+              variant="plain"
             >
               {t("day.attended")}
             </Button>
@@ -191,7 +191,7 @@ const CalendarRow = ({
                 }
               })();
             }}
-            variant="ghost"
+            variant="plain"
           >
             {t("phone.skip")}
           </Button>

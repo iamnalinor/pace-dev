@@ -8,9 +8,9 @@ import { ProjectForm } from "#app/features/projects/project-form.tsx";
 import { FoldedSection, TaskRows } from "#app/shared/task-list.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button } from "#app/ui/button.tsx";
-import { washClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { EmptyState } from "#app/ui/empty-state.tsx";
+import { washClass } from "#app/ui/hue.ts";
 import { IconButton } from "#app/ui/icon-button.tsx";
 import { formatCount, projectById } from "@pace/core";
 
@@ -53,7 +53,7 @@ const EditProject = ({
               void run(actions.updateProject(project.id, { archived: !isArchived }));
               onDone();
             }}
-            variant="ghost"
+            variant="plain"
           >
             {t(isArchived ? "project.restore" : "project.archive")}
           </Button>
@@ -107,7 +107,7 @@ export const ProjectScreen = ({ id }: { readonly id: string }) => {
   if (!view.ok) {
     return (
       <PushedScreen title={t("nav.projects")}>
-        <EmptyState>{t("project.notFound")}</EmptyState>
+        <EmptyState title={t("project.notFound")} />
       </PushedScreen>
     );
   }
@@ -121,7 +121,6 @@ export const ProjectScreen = ({ id }: { readonly id: string }) => {
           onPress={() => {
             setIsEditing(!isEditing);
           }}
-          variant="plain"
         />
       }
       title={project.name}
@@ -141,7 +140,7 @@ export const ProjectScreen = ({ id }: { readonly id: string }) => {
       )}
       <Stats project={project} />
       {project.open.length + project.future.length + project.done.length === 0 ? (
-        <EmptyState>{t("project.empty")}</EmptyState>
+        <EmptyState title={t("project.empty")} />
       ) : null}
       <TaskRows label={t("now.tasks")} rows={project.open} withTag={false} />
       <FoldedSection count={project.future.length} title={t("now.future")}>

@@ -107,7 +107,7 @@ const EntryRow = ({ entry }: { readonly entry: HistoryEntry }) => {
             onPress={() => {
               setIsConfirming(true);
             }}
-            variant="ghost"
+            variant="plain"
           >
             {t("common.undo")}
           </Button>
@@ -157,7 +157,6 @@ const DayNav = ({
         onPress={() => {
           onAt(addMinutesIso(instant, -MINUTES_PER_DAY));
         }}
-        variant="plain"
       />
       <IconButton
         disabled={at === null}
@@ -166,7 +165,6 @@ const DayNav = ({
         onPress={() => {
           onAt(Date.parse(later) >= Date.parse(now) ? null : later);
         }}
-        variant="plain"
       />
     </View>
   );

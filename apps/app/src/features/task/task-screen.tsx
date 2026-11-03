@@ -84,7 +84,7 @@ export const TaskScreen = ({
   if (!view.ok) {
     return (
       <Screen header={<TaskHeader />}>
-        <EmptyState>{t("task.notFound")}</EmptyState>
+        <EmptyState title={t("task.notFound")} />
       </Screen>
     );
   }

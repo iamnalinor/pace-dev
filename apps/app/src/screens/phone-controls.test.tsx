@@ -50,9 +50,7 @@ jest.setTimeout(120_000);
 Controls whose result is outside the app, so nothing on the screen changes: Day's usage access
 opens Android's settings page (the screen reads the permission again on the way back).
 */
-const OUTSIDE_THE_APP = [
-  'button without a label, showing "Allow usage access to see your sleep and"',
-];
+const OUTSIDE_THE_APP = ['button "Allow usage access to see your sleep and phone time here"'];
 
 describe("every control on a phone screen does something", () => {
   it.each([

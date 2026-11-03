@@ -22,11 +22,11 @@ const FocusButton = ({ view }: { readonly view: TaskViewModel }) => {
   const isFocused = hooks.useTimeBar().focusedTaskId === view.id;
   return (
     <Button
-      hotkey={HOTKEYS.focus}
       icon={isFocused ? "square" : "timer"}
       onPress={() => {
         void run(isFocused ? actions.stopActivity() : actions.focusTask(view.id));
       }}
+      shortcut={HOTKEYS.focus}
       variant="secondary"
       // The left half of the footer's split row: it fills its half on every window.
       width="fill"
@@ -91,9 +91,9 @@ export const TaskFooter = ({
             <Tooltip label={t("task.doneHint")} showsOnTap={false}>
               <Button
                 hint={t("task.doneHint")}
-                hotkey={HOTKEYS.primary}
                 onLongPress={onClose}
                 onPress={finish}
+                shortcut={HOTKEYS.primary}
                 width="fill"
               >
                 {primary}

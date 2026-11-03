@@ -3,7 +3,7 @@ import { Text, View } from "react-native";
 import { useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { ActionChip } from "#app/ui/chip.tsx";
+import { Chip } from "#app/ui/chip.tsx";
 
 import type { ReadingIssue } from "./reading-issue.ts";
 
@@ -29,7 +29,7 @@ export const ReadingIssueLine = ({
           : t(issue.key, { time: clockTime(issue.retryAt, deviceTz) })}
       </Text>
       {onLater !== undefined && issue.canReadLater ? (
-        <ActionChip onPress={onLater}>{t("composer.aiLater")}</ActionChip>
+        <Chip onPress={onLater}>{t("composer.aiLater")}</Chip>
       ) : null}
     </View>
   );

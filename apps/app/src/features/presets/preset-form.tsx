@@ -103,7 +103,7 @@ const DeleteButton = ({
           setIsConfirming(true);
         }}
         ref={focus.openerRef()}
-        variant="ghost"
+        variant="plain"
       >
         {t("presets.archive")}
       </Button>

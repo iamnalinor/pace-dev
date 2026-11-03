@@ -5,6 +5,7 @@ import type { DeadlinePolicy } from "@pace/core";
 
 import { useT } from "#app/app-state.tsx";
 import { Chip } from "#app/ui/chip.tsx";
+import { RadioGroup } from "#app/ui/radio-group.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 
 import { DateChip, DatePanel, type Zoned } from "./date-field.tsx";
@@ -12,6 +13,11 @@ import { useOutsidePress } from "./use-outside-press.ts";
 
 type Resubmission = Extract<DeadlinePolicy, { readonly kind: "resubmission" }>;
 type FinalMode = "fixed" | "none" | "offset";
+
+/** The final deadline's modes, "not set" first while it is the one chosen. */
+const FINAL_MODES: readonly FinalMode[] = ["none", "offset", "fixed"];
+const SET_FINAL_MODES: readonly FinalMode[] = ["offset", "fixed"];
+const POLICY_KINDS: readonly DeadlinePolicy["kind"][] = ["hard", "resubmission"];
 
 const OFFSET: Resubmission = {
   finalAt: null,
@@ -108,38 +114,29 @@ const TwoStageFields = ({
       <Text className="font-sans text-caption font-normal text-label-tertiary">
         {t("form.deadlineSoftHint")}
       </Text>
-      <View className="flex-row flex-wrap gap-2">
-        {mode === "none" ? (
-          <Chip
-            onPress={() => {
-              onChange(OFFSET);
-            }}
-            selected
-          >
-            {t("form.finalNotSet")}
-          </Chip>
-        ) : null}
-        <Chip
-          onPress={() => {
+      <RadioGroup
+        className="flex-row flex-wrap gap-x-2"
+        label={t("form.deadlineSoftHint")}
+        onChange={(next: FinalMode) => {
+          if (next === "none") {
+            onChange(OFFSET);
+          } else if (next === "offset") {
             onChange({ ...OFFSET, softDays: value.softDays });
-          }}
-          selected={mode === "offset"}
-        >
-          {t("form.finalAfterDays")}
-        </Chip>
-        <Chip
-          onPress={() => {
+          } else {
             onChange({ ...value, finalMode: "fixed" });
             // No date yet: its calendar opens, so the choice is not left half made.
             if (value.finalAt === null) {
               onFinalOpenChange(true);
             }
-          }}
-          selected={mode === "fixed"}
-        >
-          {t("form.finalOnDate")}
-        </Chip>
-      </View>
+          }
+        }}
+        value={mode}
+        values={mode === "none" ? FINAL_MODES : SET_FINAL_MODES}
+      >
+        {mode === "none" ? <Chip value="none">{t("form.finalNotSet")}</Chip> : null}
+        <Chip value="offset">{t("form.finalAfterDays")}</Chip>
+        <Chip value="fixed">{t("form.finalOnDate")}</Chip>
+      </RadioGroup>
       {mode === "offset" ? (
         <TextField
           inputMode="numeric"
@@ -184,24 +181,18 @@ export const DeadlinePolicyField = ({
       <Text className="font-sans text-caption font-normal text-label-tertiary">
         {t("form.deadlinePolicy")}
       </Text>
-      <View className="flex-row flex-wrap gap-2">
-        <Chip
-          onPress={() => {
-            onChange({ kind: "hard" });
-          }}
-          selected={value.kind === "hard"}
-        >
-          {t("form.deadlineHard")}
-        </Chip>
-        <Chip
-          onPress={() => {
-            onChange(OFFSET);
-          }}
-          selected={value.kind === "resubmission"}
-        >
-          {t("form.deadlineTwoStage")}
-        </Chip>
-      </View>
+      <RadioGroup
+        className="flex-row flex-wrap gap-x-2"
+        label={t("form.deadlinePolicy")}
+        onChange={(kind: DeadlinePolicy["kind"]) => {
+          onChange(kind === "hard" ? { kind: "hard" } : OFFSET);
+        }}
+        value={value.kind}
+        values={POLICY_KINDS}
+      >
+        <Chip value="hard">{t("form.deadlineHard")}</Chip>
+        <Chip value="resubmission">{t("form.deadlineTwoStage")}</Chip>
+      </RadioGroup>
       {value.kind === "resubmission" ? (
         <TwoStageFields
           isFinalOpen={isFinalOpen}

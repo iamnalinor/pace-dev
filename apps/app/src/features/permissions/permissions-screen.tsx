@@ -52,7 +52,7 @@ const SeriesRules = () => {
                 reload();
               })();
             }}
-            variant="ghost"
+            variant="plain"
           >
             {t("permissions.rule.remove")}
           </Button>

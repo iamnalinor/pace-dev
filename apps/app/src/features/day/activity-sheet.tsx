@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Text, type TextInput, View } from "react-native";
+import { type TextInput, View } from "react-native";
 
 import { useAppState, useLanguage, usePace, useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
@@ -8,7 +8,7 @@ import { EstimateChip, EstimateOptions } from "#app/shared/task-fields/estimate-
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
-import { Chip } from "#app/ui/chip.tsx";
+import { RadioChips } from "#app/ui/radio-chips.tsx";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
@@ -55,25 +55,16 @@ const CategoryPicker = ({
 }) => {
   const t = useT();
   return (
-    <View className="gap-2">
-      <Text className="font-sans text-caption font-normal text-label-tertiary">
-        {t("editor.category")}
-      </Text>
-      <View accessibilityLabel={t("editor.category")} className="flex-row flex-wrap gap-2">
-        {ACTIVITY_CATEGORIES.map((category) => (
-          <Chip
-            color={CATEGORY_HUES[category]}
-            key={category}
-            onPress={() => {
-              onChange(category);
-            }}
-            selected={category === value}
-          >
-            {t(`category.${category}`)}
-          </Chip>
-        ))}
-      </View>
-    </View>
+    <RadioChips
+      choices={ACTIVITY_CATEGORIES.map((category) => ({
+        color: CATEGORY_HUES[category],
+        text: t(`category.${category}`),
+        value: category,
+      }))}
+      label={t("editor.category")}
+      onChange={onChange}
+      value={value}
+    />
   );
 };
 
@@ -230,7 +221,7 @@ const DeleteBlock = ({
           }
         })();
       }}
-      variant="ghost"
+      variant="plain"
     >
       {t(isArmed ? "day.deleteConfirm" : "day.delete")}
     </Button>

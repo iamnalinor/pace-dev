@@ -12,7 +12,6 @@ import { useOpenTask } from "#app/shared/task-opener.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { useWhereSat } from "#app/shared/use-where-sat.ts";
 import { WhereSatLine } from "#app/shared/where-sat-line.tsx";
-import { ColorTag } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { EmptyText, FirstSyncBody } from "#app/ui/empty-state.tsx";
 import { Icon } from "#app/ui/icon.tsx";
@@ -21,6 +20,7 @@ import { ROW_ENTER, ROW_EXIT, ROW_LAYOUT } from "#app/ui/motion.ts";
 import { RowList } from "#app/ui/row-list.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
+import { Tag } from "#app/ui/tag.tsx";
 import { Text as KitText } from "#app/ui/text.tsx";
 import { useUsageRead } from "@pace/client/react";
 import {
@@ -90,7 +90,7 @@ export const ActivityRow = ({
       <Text className={cx(TIME_COLUMN, "text-label-secondary")}>{range}</Text>
       <View className="flex-1 gap-1">
         <View className="flex-row flex-wrap items-center gap-2">
-          <ColorTag color={row.color}>{t(`category.${row.category}`)}</ColorTag>
+          <Tag hue={row.color}>{t(`category.${row.category}`)}</Tag>
           {row.showsLabel ? (
             <KitText policy="truncate" role="subhead">
               {row.label}

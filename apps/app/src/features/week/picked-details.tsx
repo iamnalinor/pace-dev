@@ -262,7 +262,7 @@ export const PickedPane = ({ onClose, picked, week }: PickedProps) => {
         </View>
         {/* The cross's middle on the title's first line, as in the sheets (QA round 16 L10). */}
         <View className="-mr-2 h-6 justify-center">
-          <IconButton icon={"x"} label={t("common.close")} onPress={onClose} variant="plain" />
+          <IconButton icon={"x"} label={t("common.close")} onPress={onClose} />
         </View>
       </View>
       <PickedFacts onLeave={onClose} picked={picked} week={week} />

@@ -1,57 +1,25 @@
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
 
 import type { TaskViewModel } from "@pace/client";
 import type { ProjectColorName } from "@pace/core";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
-import { fillClass } from "#app/ui/color.tsx";
-import { cx } from "#app/ui/cx.ts";
-import { Icon } from "#app/ui/icon.tsx";
+import { ListRow } from "#app/ui/list-row.tsx";
+import { RadioGroup } from "#app/ui/radio-group.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
-import { spacePress } from "#app/ui/space-press.ts";
-import { Text } from "#app/ui/text.tsx";
+import { Dot } from "#app/ui/tag.tsx";
 
-type Choice = {
-  readonly id: null | string;
-  readonly name: string;
-  readonly color: null | ProjectColorName;
-};
-
-const ChoiceRow = ({
-  choice,
-  isCurrent,
-  onChoose,
-}: {
-  readonly choice: Choice;
-  readonly isCurrent: boolean;
-  readonly onChoose: () => void;
-}) => {
-  return (
-    <Pressable
-      accessibilityLabel={choice.name}
-      accessibilityRole="radio"
-      aria-checked={isCurrent}
-      className={cx(
-        "min-h-12 flex-row items-center gap-3 rounded-lg border px-3 active:opacity-70",
-        isCurrent ? "border-label-primary bg-fill-3" : "border-outline",
-      )}
-      onPress={onChoose}
-      {...spacePress(onChoose)}
-    >
-      <View
-        className={cx(
-          "size-3 rounded-pill",
-          choice.color === null ? "border border-outline" : fillClass(choice.color),
-        )}
-      />
-      <Text className="flex-1" policy="truncate" role="callout">
-        {choice.name}
-      </Text>
-      {isCurrent ? <Icon name="check" tone="primary" /> : null}
-    </Pressable>
+/** A project as a value (spec §4.2.7): its dot before the name; "No project" has an empty ring. */
+const ProjectDot = ({ color }: { readonly color: null | ProjectColorName }) =>
+  color === null ? (
+    <View className="size-2 rounded-pill border border-outline" />
+  ) : (
+    <Dot hue={color} />
   );
-};
+
+/** "No project" among the project ids (a radio needs a value; no id is empty). */
+const NO_PROJECT = "";
 
 /** Moves the task to another project, or out of any. */
 export const ProjectSheet = ({
@@ -65,6 +33,12 @@ export const ProjectSheet = ({
   const { actions, hooks } = usePace();
   const run = useRunAction();
   const projects = hooks.useAppState((state) => state.projects);
+  /** A project to move to, or none. */
+  type Choice = {
+    readonly id: null | string;
+    readonly name: string;
+    readonly color: null | ProjectColorName;
+  };
   const choices: readonly Choice[] = [
     { color: null, id: null, name: t("task.noProject") },
     ...Object.values(projects.byId)
@@ -87,18 +61,24 @@ export const ProjectSheet = ({
       title={t("task.moveTitle")}
       visible
     >
-      <View accessibilityRole="radiogroup" className="gap-2">
+      <RadioGroup
+        label={t("task.moveTitle")}
+        onChange={(id: string) => {
+          void move(id === NO_PROJECT ? null : id);
+        }}
+        value={view.project?.id ?? NO_PROJECT}
+        values={choices.map((choice) => choice.id ?? NO_PROJECT)}
+      >
         {choices.map((choice) => (
-          <ChoiceRow
-            choice={choice}
-            isCurrent={(view.project?.id ?? null) === choice.id}
-            key={choice.id ?? "none"}
-            onChoose={() => {
-              void move(choice.id);
-            }}
+          <ListRow
+            key={choice.id ?? NO_PROJECT}
+            leading={<ProjectDot color={choice.color} />}
+            select={choice.id ?? NO_PROJECT}
+            title={choice.name}
+            titleLines={2}
           />
         ))}
-      </View>
+      </RadioGroup>
     </Sheet>
   );
 };

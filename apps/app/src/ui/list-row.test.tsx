@@ -3,6 +3,7 @@ import { Text as NativeText, Platform } from "react-native";
 
 import { ROW_BOX as WEB_ROW_BOX } from "./list-row-density.web.ts";
 import { ListRow } from "./list-row.tsx";
+import { RadioGroup } from "./radio-group.tsx";
 import { ThemeProvider } from "./theme-provider.tsx";
 
 const classesOf = (testID: string): readonly string[] =>
@@ -148,5 +149,54 @@ describe("ListRow (spec §4.1.1: slots, density, selected)", () => {
     expect(classesOf("list-row-content")).toContain("items-start");
     expect(classesOf("list-row-leading")).toContain("justify-center");
     expect(classesOf("list-row-trailing")).toContain("justify-center");
+  });
+});
+
+describe("ListRow toggle and select (spec §4.1.1 variants)", () => {
+  it("toggle: the whole row is one switch named by its title, and flips from the label (R23-10)", async () => {
+    const onChange = jest.fn();
+    await render(
+      <ThemeProvider>
+        <ListRow
+          subtitle="Hidden by default"
+          title="Show deleted"
+          toggle={{ isOn: false, onChange }}
+        />
+      </ThemeProvider>,
+    );
+    const row = screen.getByRole("switch", { name: "Show deleted" });
+    expect(row).not.toBeChecked();
+    // One control: the drawn switch inside is no second stop.
+    expect(screen.getAllByRole("switch")).toHaveLength(1);
+    await fireEvent.press(screen.getByText("Show deleted"));
+    expect(onChange).toHaveBeenCalledWith(true);
+    expect(screen.getByTestId("switch-track")).toBeOnTheScreen();
+  });
+
+  it("toggle: says on, and draws the accent track", async () => {
+    await render(
+      <ThemeProvider>
+        <ListRow title="Night hours" toggle={{ isOn: true, onChange: NOTHING }} />
+      </ThemeProvider>,
+    );
+    expect(screen.getByRole("switch", { name: "Night hours" })).toBeChecked();
+    expect(classesOf("switch-track")).toContain("bg-accent");
+  });
+
+  it("select: a radio of its group with a trailing check on the chosen one", async () => {
+    const onChange = jest.fn();
+    await render(
+      <ThemeProvider>
+        <RadioGroup label="Project" onChange={onChange} value="b" values={["a", "b"]}>
+          <ListRow select="a" title="Algebra" />
+          <ListRow select="b" title="Biology" />
+        </RadioGroup>
+      </ThemeProvider>,
+    );
+    expect(screen.getByRole("radio", { name: "Biology" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Algebra" })).not.toBeChecked();
+    expect(screen.getAllByTestId("list-row-check")).toHaveLength(1);
+    await fireEvent.press(screen.getByText("Algebra"));
+    expect(onChange).toHaveBeenCalledWith("a", "press");
   });
 });

@@ -73,6 +73,7 @@ export const WorkProgress = ({
         onChange={live.commit}
         onSlide={live.slide}
         value={live.step}
+        valueText={(step) => t("task.progressOf", { value: (step * 100) / MAX })}
       />
     </View>
   );

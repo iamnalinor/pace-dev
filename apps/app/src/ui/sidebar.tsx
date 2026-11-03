@@ -138,7 +138,7 @@ export const SidebarHeader = ({ owner }: { readonly owner: null | string }) => {
         <NativeText className="flex-1 font-sans text-body font-semibold text-label-primary">
           {t("app.name")}
         </NativeText>
-        <NotificationBell variant="plain" />
+        <NotificationBell place="sidebar" />
       </View>
       {/* Who is signed in, on a line of its own: beside the logo and the bell it had 23 px (QA 17 M6). */}
       {owner === null ? (

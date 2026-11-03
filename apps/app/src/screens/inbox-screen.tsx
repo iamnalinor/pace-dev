@@ -24,7 +24,7 @@ export const InboxScreen = () => {
       <Text className="mx-5 mb-3 font-sans text-caption font-normal text-label-tertiary">
         {t("inbox.hint")}
       </Text>
-      {waitingCount(inbox, review) === 0 ? <EmptyState>{t("inbox.empty")}</EmptyState> : null}
+      {waitingCount(inbox, review) === 0 ? <EmptyState title={t("inbox.empty")} /> : null}
       {decisions.length === 0 ? null : (
         <View aria-label={t("review.title")} className="mb-4 gap-3 px-4" role="list">
           <Text

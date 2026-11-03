@@ -276,10 +276,10 @@ export const NotificationsScreen = () => {
       title={t("notifications.title")}
     >
       {status === "failed" && model.items.length === 0 ? (
-        <EmptyState>{t("notifications.failed")}</EmptyState>
+        <EmptyState title={t("notifications.failed")} />
       ) : null}
       {status === "ready" && model.items.length === 0 ? (
-        <EmptyState>{t("notifications.empty")}</EmptyState>
+        <EmptyState title={t("notifications.empty")} />
       ) : null}
       {model.days.map((day) => {
         const label = formatRelativeDay(day.day, viewer.now, {

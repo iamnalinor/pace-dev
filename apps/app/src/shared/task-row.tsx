@@ -75,11 +75,15 @@ export const TaskRow = ({
       {/* The selection is the lightest fill: the whole meta line (tertiary times, danger words,
           every tag) is measured on it (`SELECTED_ROW_FILL`, bug-lessons 112). */}
       <View className={cx("flex-row gap-3 rounded-lg py-3 pl-3 pr-3", isSelected && "bg-fill-1")}>
-        <CheckCircle
-          checked={checked || isDissolving}
-          label={t("now.markDone", { title: row.title })}
-          {...(onCheck !== undefined && { onPress: onCheck })}
-        />
+        {/* The circle's 24 box in the row; its 48 / 44 target overflows it evenly into the row's
+            12 padding, as before (Task 4.1 puts the check in ListRow's leading slot). */}
+        <View className="size-6 items-center justify-center">
+          <CheckCircle
+            checked={checked || isDissolving}
+            label={t("now.markDone", { title: row.title })}
+            {...(onCheck !== undefined && { onPress: onCheck })}
+          />
+        </View>
         <Pressable
           accessibilityRole="link"
           aria-current={isSelected ? "page" : undefined}

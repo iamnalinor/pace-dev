@@ -3,10 +3,10 @@ import { Pressable, Text, View } from "react-native";
 import { usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { ColorTag, fillClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
+import { fillClass } from "#app/ui/hue.ts";
 import { Icon } from "#app/ui/icon.tsx";
-import { PulseDot } from "#app/ui/pulse-dot.tsx";
+import { Dot, Tag } from "#app/ui/tag.tsx";
 import { PACE_STATUS_TEXT, type RunningView } from "@pace/client";
 import { formatDuration } from "@pace/core";
 
@@ -18,8 +18,8 @@ const RunningMeta = ({ running }: { readonly running: RunningView }) => {
   const { language } = useViewer();
   return (
     <View className="flex-row flex-wrap items-center gap-2">
-      <PulseDot className={fillClass(running.color)} />
-      <ColorTag color={running.color}>{running.label}</ColorTag>
+      <Dot hue={running.color} />
+      <Tag hue={running.color}>{running.label}</Tag>
       <Text className="font-sans text-footnote tabular-nums text-label-primary">
         {formatDuration(running.minutes, language)}
       </Text>

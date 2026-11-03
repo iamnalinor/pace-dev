@@ -1,5 +1,3 @@
-import { Text, View } from "react-native";
-
 import {
   type HueName,
   type Importance,
@@ -8,18 +6,17 @@ import {
   type TaskStatus,
 } from "@pace/core";
 
-import { cx } from "./cx.ts";
-
 /**
 A colour a tag, chip or mark is drawn in: a hue of the family, or a project's stored colour name
 (`coral` is drawn in the red hue).
 */
 export type TagColor = HueName | ProjectColorName;
 
-const hueOf = (color: TagColor): HueName => (color === "coral" ? projectHue(color) : color);
+/** The hue a colour is drawn in: a project's stored `coral` is the red hue (bug-lessons 13). */
+export const hueOf = (color: TagColor): HueName => (color === "coral" ? projectHue(color) : color);
 
 /*
-Static class names: NativeWind only compiles the classes it can read in the source. A coloured
+The hue helpers (spec §4.2.7; `ui/tag.tsx` draws the tag and the dot with them). Static class names: NativeWind only compiles the classes it can read in the source. A coloured
 thing is a tag: the hue's tint under text in its ink, which the token contrast test keeps legible in
 both themes; lines, dots and bars use the hue's stroke (≥ 3:1 on the grounds).
 */
@@ -139,23 +136,3 @@ export const washClass = (color: null | TagColor): string =>
 /** The text colour on a wash; neutral without a colour. */
 export const inkClass = (color: null | TagColor): string =>
   color === null ? "text-label-secondary" : INK[hueOf(color)];
-
-/** A name in its colour: a project, a category, an importance. */
-export const ColorTag = ({
-  children,
-  color,
-}: {
-  readonly color: null | TagColor;
-  readonly children: string;
-}) => (
-  <View
-    className={cx(
-      "self-start rounded-sm px-1 py-0.5",
-      color === null ? "bg-fill-4" : tintClass(color),
-    )}
-  >
-    <Text className={cx("font-sans text-caption2 font-medium", inkClass(color))} numberOfLines={1}>
-      {children}
-    </Text>
-  </View>
-);

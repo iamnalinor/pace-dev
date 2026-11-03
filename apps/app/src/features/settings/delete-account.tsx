@@ -233,7 +233,7 @@ const DangerPrompt = ({ flow }: { readonly flow: ReturnType<typeof useDangerFlow
               onPress={() => {
                 void flow.cancel();
               }}
-              variant="ghost"
+              variant="plain"
             >
               {t("common.cancel")}
             </Button>

@@ -43,7 +43,7 @@ export const NowBoard = ({
       <ZoneBanner />
       <CalendarPrompt />
       <ProjectChips chips={board.projects} onSelect={setProjectId} selected={selected} />
-      {isEmpty ? <EmptyState>{t("now.empty")}</EmptyState> : null}
+      {isEmpty ? <EmptyState title={t("now.empty")} /> : null}
       <NowTaskGroups rows={rows} />
       <FoldedSection count={future.length} title={t("now.future")}>
         <TaskRows animateLayout={false} label={t("now.future")} rows={future} />

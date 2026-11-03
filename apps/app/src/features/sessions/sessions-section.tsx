@@ -31,7 +31,7 @@ const ListFailed = ({ onRetry }: { readonly onRetry: () => void }) => {
         {t("sessions.failed")}
       </Text>
       <View className="-ml-4">
-        <Button onPress={onRetry} variant="ghost">
+        <Button onPress={onRetry} variant="plain">
           {t("sessions.retry")}
         </Button>
       </View>

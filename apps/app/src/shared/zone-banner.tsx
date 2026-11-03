@@ -90,7 +90,7 @@ export const ZoneBanner = () => {
           onPress={() => {
             keep(pairOf(deviceTz, timezone));
           }}
-          variant="ghost"
+          variant="plain"
         >
           {t("zone.keep", { account: timezone })}
         </Button>

@@ -81,18 +81,8 @@ export const HeaderSections = ({ data }: { readonly data: GalleryData }) => {
         <ScreenHeader
           actions={
             <>
-              <IconButton
-                icon="bell"
-                label={t("dev.gallery.headers.action")}
-                onPress={NOTHING}
-                variant="plain"
-              />
-              <IconButton
-                icon="search"
-                label={t("dev.gallery.headers.action")}
-                onPress={NOTHING}
-                variant="plain"
-              />
+              <IconButton icon="bell" label={t("dev.gallery.headers.action")} onPress={NOTHING} />
+              <IconButton icon="search" label={t("dev.gallery.headers.action")} onPress={NOTHING} />
             </>
           }
           subtitle={t("dev.gallery.headers.subtitle")}

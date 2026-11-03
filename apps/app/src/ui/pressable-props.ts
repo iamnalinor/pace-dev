@@ -2,9 +2,10 @@ import type {
   AccessibilityRole,
   GestureResponderEvent,
   PressableProps as NativePressableProps,
+  View,
 } from "react-native";
 
-import { useCallback } from "react";
+import { type Ref, useCallback } from "react";
 
 import { type HapticKind, haptic as playHaptic } from "../platform/haptics.ts";
 import { cx } from "./cx.ts";
@@ -14,6 +15,28 @@ How far the press feedback reaches: `bounded` fills the control's own shape (but
 `borderless` spreads past it as a round wash (icon buttons).
 */
 export type RippleKind = "borderless" | "bounded";
+
+/** A control's corners, as a radius token (spec §3.4): the ripple, the overlay and the ring share them. */
+export type Shape = "lg" | "md" | "pill" | "sm" | "xl" | "xs";
+
+const SHAPE_CLASS: Readonly<Record<Shape, string>> = {
+  lg: "rounded-lg",
+  md: "rounded-md",
+  pill: "rounded-pill",
+  sm: "rounded-sm",
+  xl: "rounded-xl",
+  xs: "rounded-xs",
+};
+
+/**
+The one disabled treatment (spec §3.7, F-COL-13): a disabled control's label drops to
+`label.quaternary`, its fill to `fill.1`, its icon to the `quaternary` tone; never an opacity.
+*/
+export const DISABLED = {
+  fill: "bg-fill-1",
+  icon: "quaternary",
+  label: "text-label-quaternary",
+} as const;
 
 /** The roles ARIA lets say `aria-selected` (React Native knows `tab` of them). */
 type SelectableRole = Extract<AccessibilityRole, "gridcell" | "option" | "row" | "tab">;
@@ -70,9 +93,21 @@ export type PressableProps<R extends AccessibilityRole = AccessibilityRole> = {
   /** What the press means to the hand (§3.10): `longPress` plays on the long press, the rest on the press. */
   readonly haptic?: HapticKind | undefined;
   readonly ripple?: RippleKind | undefined;
+  /** The corners (a radius token): of the control, or of its `visual` when it has one. */
+  readonly shape?: Shape | undefined;
+  /**
+  The drawn box when it is smaller than the target (a 32 chip, a 24 check, a 36 small button): its
+  classes. The Pressable is then the target itself (48 dp / 44 px, transparent, the layout box, no
+  negative margin) and centres this box, which carries the shape, the press overlay and the focus
+  ring (the small-visual pattern; Task 3.2 re-review N1). Without it the control's own box is drawn,
+  at least as large as the target.
+  */
+  readonly visual?: string | undefined;
   /** Takes the press event: a link reads its modifier keys (Ctrl-click opens a new tab). */
   readonly onPress?: ((event: GestureResponderEvent) => void) | undefined;
   readonly onLongPress?: (() => void) | undefined;
+  /** The control itself: for focus to be moved onto it, or a group to move focus between its own. */
+  readonly ref?: Ref<View> | undefined;
 } & Omit<NativePressableProps, Owned>;
 
 type State = {
@@ -101,6 +136,25 @@ const stateOf = (
   ...(checked !== undefined && CHECKABLE.has(role) && { checked }),
 });
 
+const shapeClass = (shape: Shape | undefined): string | undefined =>
+  shape === undefined ? undefined : SHAPE_CLASS[shape];
+
+/** The drawn box of a small visual, with the corners; `undefined` without one. */
+const visualClass = (visual: string | undefined, shape: Shape | undefined): string | undefined =>
+  visual === undefined ? undefined : cx(visual, shapeClass(shape));
+
+/**
+The target's classes. Controls never shrink in a row: the text beside them yields (spec §4.1.2).
+The target of a small visual centres it; the corners go on the visual, else on the control.
+*/
+const targetClass = (
+  className: string | undefined,
+  { shape, visual }: { readonly shape: Shape | undefined; readonly visual: string | undefined },
+): string =>
+  visual === undefined
+    ? cx("shrink-0", shapeClass(shape), className)
+    : cx("shrink-0 items-center justify-center", shapeClass(shape), className);
+
 /**
 Splits the kit's props into what both platforms hand the native Pressable and the rest, which
 passes through untouched. The haptic plays with the press it belongs to, never on press-in, and
@@ -119,6 +173,8 @@ export const usePressableProps = <R extends AccessibilityRole>({
   ripple = "bounded",
   role,
   selected,
+  shape,
+  visual,
   ...rest
 }: PressableProps<R>) => {
   const press = useCallback(
@@ -158,12 +214,11 @@ export const usePressableProps = <R extends AccessibilityRole>({
     ...(state.selected !== undefined && { "aria-selected": state.selected }),
     ...(state.checked !== undefined && { "aria-checked": state.checked }),
     ...(state.expanded !== undefined && { "aria-expanded": state.expanded }),
-    // Controls never shrink in a row: the text beside them yields (spec §4.1.2).
-    className: cx("shrink-0", className),
+    className: targetClass(className, { shape, visual }),
     disabled,
     onLongPress: onLongPress === undefined ? undefined : longPress,
     onPress: onPress === undefined ? undefined : press,
   };
   const isLive = onPress !== undefined || onLongPress !== undefined;
-  return { isLive, rest, ripple, shared };
+  return { inner: visualClass(visual, shape), isLive, rest, ripple, shared };
 };

@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { TextInput, View } from "react-native";
+import { TextInput } from "react-native";
 
 import { useLanguage, useT } from "#app/app-state.tsx";
 import { Chip } from "#app/ui/chip.tsx";
 import { cx } from "#app/ui/cx.ts";
+import { RadioGroup } from "#app/ui/radio-group.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { formatDuration, typedActivity } from "@pace/core";
 
@@ -36,10 +37,10 @@ export const EstimateChip = ({
   const text = minutes === null ? none : formatDuration(minutes, language);
   return (
     <Chip
+      expanded={isOpen}
       icon="clock"
       label={`${t("composer.estimate")}: ${text}`}
       onPress={onToggle}
-      selected={isOpen}
     >
       {text}
     </Chip>
@@ -96,24 +97,23 @@ export const EstimateOptions = ({
 }) => {
   const t = useT();
   const language = useLanguage();
+  const options = ESTIMATES.filter((option) => minutes !== null || option !== fallback);
   return (
-    <View
-      aria-label={t("composer.estimate")}
-      className="flex-row flex-wrap gap-2 px-1"
-      role="radiogroup"
+    <RadioGroup
+      className="flex-row flex-wrap items-center gap-x-2 px-1"
+      label={t("composer.estimate")}
+      onChange={(option: number) => {
+        onEstimate(option);
+      }}
+      value={minutes}
+      values={options}
     >
-      {ESTIMATES.filter((option) => minutes !== null || option !== fallback).map((option) => (
-        <Chip
-          key={option}
-          onPress={() => {
-            onEstimate(option);
-          }}
-          selected={option === minutes}
-        >
+      {options.map((option) => (
+        <Chip key={option} value={option}>
           {formatDuration(option, language)}
         </Chip>
       ))}
       <TypedEstimate onEstimate={onEstimate} />
-    </View>
+    </RadioGroup>
   );
 };

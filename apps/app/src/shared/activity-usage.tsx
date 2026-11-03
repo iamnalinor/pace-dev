@@ -112,7 +112,7 @@ const ScreenTimeFailed = ({ onRetry }: { readonly onRetry: () => void }) => {
           {t("day.screenTimeFailed")}
         </Text>
         <View className="-ml-4">
-          <Button onPress={onRetry} variant="ghost">
+          <Button onPress={onRetry} variant="plain">
             {t("common.retry")}
           </Button>
         </View>

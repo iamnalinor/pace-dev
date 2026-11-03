@@ -105,6 +105,34 @@ describe("the web state layer (global.css, spec §3.7)", () => {
     );
   });
 
+  describe("a small visual inside its target (data-pace-inner)", () => {
+    const INNER = "[data-pace-inner]";
+    const VISUAL = `${INNER} > [data-pace-visual]`;
+
+    it("moves the overlay from the target onto the visual", () => {
+      expect(declarations(`${INNER}::after`, outsideForced())).toContain("display: none");
+      // The visual's overlay is the same rule as the control's (one rule, two selectors).
+      expect(CSS).toContain(`${VISUAL}::after,\n${OVERLAY} {`);
+    });
+
+    it("hovers and presses the visual, never a disabled one", () => {
+      const enabled = `${INNER}:not([aria-disabled="true"])`;
+      expect(
+        declarations(`${enabled}:hover > [data-pace-visual]::after`, mediaBlock(HOVER_MEDIA)),
+      ).toContain("background-color: var(--pace-fill-1)");
+      expect(declarations(`${enabled}:active > [data-pace-visual]::after`)).toEqual(
+        expect.arrayContaining(["background-color: var(--pace-fill-2)", "transition-duration: 0s"]),
+      );
+    });
+
+    it("rings the visual, not the transparent target, on keyboard focus", () => {
+      expect(declarations(`${INNER}:focus-visible`)).toContain("outline: none");
+      expect(declarations(`${INNER}:focus-visible > [data-pace-visual]`)).toEqual(
+        expect.arrayContaining(["outline: 2px solid var(--pace-focus)", "outline-offset: 2px"]),
+      );
+    });
+  });
+
   describe("in forced colours (F-A11Y-04)", () => {
     it("draws each control's boundary in ButtonBorder, as an outline that moves no layout", () => {
       expect(forced(MARK)).toEqual(

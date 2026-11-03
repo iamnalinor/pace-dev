@@ -5,10 +5,10 @@ import { Pressable, Text, View } from "react-native";
 import { usePace, useT } from "#app/app-state.tsx";
 import { ProjectForm } from "#app/features/projects/project-form.tsx";
 import { DestinationScreen } from "#app/screens/destination-screen.tsx";
-import { inkClass, washClass } from "#app/ui/color.tsx";
 import { useConfirmFocus } from "#app/ui/confirm-focus.ts";
 import { cx } from "#app/ui/cx.ts";
 import { EmptyState } from "#app/ui/empty-state.tsx";
+import { inkClass, washClass } from "#app/ui/hue.ts";
 import { Icon } from "#app/ui/icon.tsx";
 import { openTasksLabel } from "@pace/client";
 
@@ -73,7 +73,7 @@ export const ProjectsScreen = () => {
     <DestinationScreen title={t("nav.projects")}>
       <View className="px-4">
         <NewProject />
-        {active.length === 0 ? <EmptyState>{t("projects.empty")}</EmptyState> : null}
+        {active.length === 0 ? <EmptyState title={t("projects.empty")} /> : null}
         {active.map((project) => (
           <Pressable
             accessibilityLabel={project.name}

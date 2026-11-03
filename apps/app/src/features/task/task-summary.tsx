@@ -5,14 +5,8 @@ import type { TaskTag, TaskViewModel } from "@pace/client";
 import { useT } from "#app/app-state.tsx";
 import { zonedText } from "#app/format/time.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import {
-  IMPORTANCE_HUES,
-  inkClass,
-  STATUS_HUES,
-  type TagColor,
-  washClass,
-} from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
+import { IMPORTANCE_HUES, inkClass, STATUS_HUES, type TagColor, washClass } from "#app/ui/hue.ts";
 import { describeRepeatRule, formatDuration, presetLabel } from "@pace/core";
 
 const tagKey = (tag: TaskTag) => {

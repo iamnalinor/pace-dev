@@ -65,6 +65,75 @@ describe("Button", () => {
     expect(mockMoveFocus).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    ["primary", "bg-accent", "text-accent-on"],
+    ["secondary", "bg-fill-2", "text-label-primary"],
+    ["destructive", "bg-danger-quiet", "text-danger"],
+  ] as const)(
+    "draws %s on its fill with its label colour (spec §4.2.3)",
+    async (variant, fill, ink) => {
+      await render(
+        <ThemeProvider>
+          <Button onPress={() => undefined} variant={variant}>
+            Save
+          </Button>
+        </ThemeProvider>,
+      );
+      expect(String(screen.getByTestId("pressable-visual").props["className"])).toContain(fill);
+      expect(String(screen.getByText("Save").props["className"])).toContain(ink);
+    },
+  );
+
+  it("is fill.1 under label.quaternary when disabled, never an opacity (F-COL-13)", async () => {
+    await render(
+      <ThemeProvider>
+        <Button disabled onPress={() => undefined}>
+          Save
+        </Button>
+      </ThemeProvider>,
+    );
+    const visual = String(screen.getByTestId("pressable-visual").props["className"]);
+    expect(visual).toContain("bg-fill-1");
+    expect(visual).not.toContain("opacity");
+    expect(String(screen.getByText("Save").props["className"])).toContain("text-label-quaternary");
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+  });
+
+  it("keeps its label while busy, with the spinner in the icon's place (the width never jumps)", async () => {
+    await render(saving(true));
+    expect(screen.getByText("Save")).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Save" })).toBeBusy();
+  });
+
+  it("hugs its label with width hug, on every window (R22-10: wide buttons on a computer)", async () => {
+    await render(
+      <ThemeProvider>
+        <Button onPress={() => undefined} width="hug">
+          Accept
+        </Button>
+      </ThemeProvider>,
+    );
+    expect(screen.getByRole("button", { name: "Accept" }).props["style"]).toEqual(
+      expect.objectContaining({ alignSelf: "flex-start" }),
+    );
+  });
+
+  it("draws its visual inside the target: 48 on a phone, 40 on a desktop, 32 small (one geometry per size)", async () => {
+    await render(
+      <ThemeProvider>
+        <Button onPress={() => undefined}>Regular</Button>
+        <Button onPress={() => undefined} size="small">
+          Small
+        </Button>
+      </ThemeProvider>,
+    );
+    const [regular, small] = screen
+      .getAllByTestId("pressable-visual")
+      .map((node) => String(node.props["className"]).split(" "));
+    expect(regular).toEqual(expect.arrayContaining(["min-h-12", "lg:min-h-10", "rounded-md"]));
+    expect(small).toEqual(expect.arrayContaining(["min-h-8", "rounded-sm"]));
+  });
+
   it("leaves focus alone when it did not have it", async () => {
     const view = await render(saving(false));
     await view.rerender(saving(true));

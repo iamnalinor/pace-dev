@@ -15,6 +15,10 @@ jest.mock("react-native/Libraries/Text/Text", () => ({
   __esModule: true,
   default: jest.requireActual<{ Text: unknown }>("react-native-web").Text,
 }));
+jest.mock("react-native/Libraries/Components/View/View", () => ({
+  __esModule: true,
+  default: jest.requireActual<{ View: unknown }>("react-native-web").View,
+}));
 jest.mock("../platform/haptics.ts", () => ({ haptic: jest.fn() }));
 
 const NOTHING = (): void => undefined;
@@ -72,6 +76,16 @@ describe("Pressable's markup on the web", () => {
       expect(html).not.toContain("aria-selected");
     },
   );
+
+  it("marks a small visual so the state layer and the ring follow it, not the whole target", () => {
+    const html = markup(
+      <Pressable onPress={NOTHING} role="button" shape="pill" visual="h-8 px-4">
+        <Text>Chip</Text>
+      </Pressable>,
+    );
+    expect(html).toContain('data-pace-inner="true"');
+    expect(html).toContain("data-pace-visual");
+  });
 
   it("draws no state layer on a Pressable with nothing to do", () => {
     const html = markup(
