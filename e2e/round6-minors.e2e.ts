@@ -54,5 +54,13 @@ test.describe("on a computer", () => {
     // Nothing to type an id into; the cursor is in Name.
     await expect(page.getByRole("textbox", { name: "Идентификатор" })).toHaveCount(0);
     await expect(page.getByRole("textbox", { name: "Название" })).toBeFocused();
+    // A refused save keeps where the form came from: a reload still starts from Homework (QA 23
+    // R23-05c).
+    await page.getByRole("textbox", { name: "Название" }).fill("Работа");
+    await page.getByRole("button", { exact: true, name: "Сохранить" }).click();
+    await expect(
+      page.getByText("Пресет с таким названием уже есть.", { exact: false }),
+    ).toBeVisible();
+    await expect(page).toHaveURL(/\/presets\/new\?from=hw$/u);
   });
 });

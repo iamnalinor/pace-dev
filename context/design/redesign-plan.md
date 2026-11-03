@@ -528,6 +528,8 @@ visible hint instead).
       keep its Retry, its placement clear of the header and `offline-pill.e2e.ts`. PR #48 follow-ups:
       review #6, the pill and a toast stack instead of overlapping (+ an e2e offline + toast); QA21
       L9, the pill wraps in Russian (see "PR #48 follow-ups (triage)").
+- [ ] QA round 23 R23-13a: at 1440 the offline / not-loaded pill straddles the main column's edge
+      and covers the time bar's tray when open (see "QA round 23").
 
 ### Task 3.8: `TextField` and `TimeInput`
 
@@ -564,6 +566,9 @@ onPress>` (fills on press-in, `haptic="confirm"`, 48 dp target without negative 
       replacement.
 - [ ] PR #48 follow-up: QA21 L1 (one tab stop per chip group swept beyond the close sheet:
       `RadioChips` everywhere) and the chip rows' real 44 px press area (see "PR #48 follow-ups (triage)").
+- [ ] QA round 23: R23-10 a switch row toggles from its label too (Presets' «Показать удалённые»,
+      Settings' night hours: `SwitchRow` presses as one control); R23-13b the bell's count badge
+      sits off the glyph like the sidebar's; R23-15 is QA21 L1 above (see "QA round 23").
 - [ ] Failing tests per component (states by role); `Tag` with a 120-char name in a 200 px parent
       ellipsizes (`numberOfLines=1`, shrink) — removes the Task 1.4 `test.fail` marker for F-DAT-02
       tags; `CountBadge` 120 → "99+".
@@ -582,6 +587,7 @@ toast/overlay layer.
       64-char Telegram name is not cut to one letter (the header has two lines); `deadControls()`
       over the tab bar (bug-lessons 10).
 - [ ] PR #48 follow-up: the sidebar highlights Settings while New preset is open (see "PR #48 follow-ups (triage)").
+      QA round 23 R23-14 is the same finding on Presets and New preset.
 - [ ] Commit.
 
 ---
@@ -636,6 +642,7 @@ now-screen) (+ tests).
       (e2e). Commit.
 - [ ] PR #48 follow-up: QA21 M2, a direct load of `/add` (the manifest's share and shortcut URL)
       focuses the New task form's field on a touch phone too (see "PR #48 follow-ups (triage)").
+      QA round 23 R23-12 found it on a computer too (bare `/add` at 1440: focus on `BODY`).
 
 ### Task 4.4: Day (structure; the line signature is Task 7.1)
 
@@ -700,6 +707,10 @@ label).
       (F-CMP-16); project page = the Now task list grouped Open / In future / Done (F-LAY-07);
       presets as grouped rows; New project button hugs (F-CMP-06). Commit.
 - [ ] PR #48 follow-up (cosmetic): the Presets "Start from" chips say what they do (a verb) (see "PR #48 follow-ups (triage)").
+- [ ] QA round 23 R23-05: the preset form's name error is shown on the Name field (marked and
+      focused, as the Day sheet does), not a screen below; it clears once the name is changed to a
+      free one (with Task 3.8's `showErrorWhen`). (c) the URL losing `?from=` after a refused save
+      did not reproduce on the rebased tree and is pinned by `round6-minors.e2e.ts`; (d) is QA21 M1.
 
 ### Task 4.9: Insights
 
@@ -804,6 +815,8 @@ non-urgent subtrees), list rendering, the tab scenes kept mounted.
       370), opening the New task form on Now (`newTask`, 270), opening a time-bar picker
       (`picker`, 170). `BUDGET_MS` stays 100: each ceiling only stops a regression until the case
       is in budget, then its entry goes.
+- [ ] QA round 23 R23-03 measured the same cases again at 4× CPU (Day tab 312 ms first, filter
+      chip 160–192, open a row 160–264): no new case; this task's ceilings and budget own them.
 
 ### Task 5.4: Reduced-motion and focus sweeps
 
@@ -981,11 +994,30 @@ ceilings in `e2e/latency.e2e.ts` owned by Task 5.6.
 | R22-23 blank page until the bundle; manifest dark only | Task 6.3 (light and dark splash in the manifest) + Task 6.4 (a boot mark, skeleton heights) | |
 | R22-24 bell reachable from Now only on a phone | Task 4.12 (Notifications in More) | |
 | R22-25 cosmetics: selected row 8 px wider than the composer; Progress card wider than Start/Due; card in a card around the assistant preview; sidebar avatar repeats the initial; Inbox explanation 11 px with mixed quotes | Task 4.1 + 4.3 (row, composer card), Task 4.5 (cards), Task 3.10 (no avatar in the header, spec 5.0.1), Task 4.7 + 4.13 (Inbox copy) | |
-| R22-02 follow-up (fix review): a Log out that cannot reach the server leaves its session alive on the server (up to its 90-day expiry) and says nothing | Task 4.11 | keep the ended token aside and send the logout once the network is back (then forget it); until it went, Settings' sign-out line says the server has not confirmed it, with Devices and sessions as the remedy from another device |
+| R22-02 follow-up (fix review): a Log out that cannot reach the server leaves its session alive on the server (up to its 90-day expiry) and says nothing | Task 4.11 (the unsynced-changes half, QA round 23 R23-02, is fixed in PR A: Log out asks first; the server-session half stays here) | keep the ended token aside and send the logout once the network is back (then forget it); until it went, Settings' sign-out line says the server has not confirmed it, with Devices and sessions as the remedy from another device |
 | Fix round 2 (QA 22): the assistant's preview mounts inside the composer card while the card is still growing (`AnimatedHeight`, 220 ms, overflow hidden), so Approve is half hidden at first; a scroll-into-view or a keyboard focus on it would scroll the clipping box | Task 3.5 | `Disclosure` measures the content before it shows it and moves focus after layout with `preventScroll`; `animated-height.tsx` goes. e2e: no control of the preview is clipped once it is announced |
 | Fix round 2 (QA 22, full e2e): Settings → Devices and sessions: the skeleton is taller than the list it becomes, so Add a computer, Connect an AI app and everything below jump up (108 px at 390 with one session) when the list loads; a tap in that moment misses | Task 4.11 (+ Task 6.4 CLS) | spec 5.0.5: skeleton rows of the final heights; e2e: the buttons under the list keep their y across the load |
 | R17 L7 "Deadline type" shown with "No deadline" | Task 4.3 | still open in round 22 |
 | R17 L1 versions screen "Reload", R17 L10 time-zone card cannot be dismissed | Task 4.12 (versions screen), Task 4.3 (Now's cards) | not re-run in round 22 |
+
+### QA round 23
+
+QA round 23 (`context/qa-round-23.md`, intermediate round on PR A after A1–A8). Fixed in PR A's fix
+round 1 (each with a bug-lessons row): R23-01 (no time zone written before a first pull of the
+session succeeded), R23-02 (Log out asks before it discards unsynced changes), R23-04 (one parse per
+Enter after a paste), R23-06 (preset names in the account's language), R23-07 (History names
+presets), R23-08 (Day says screen time could not load), R23-09 (one word for retry), R23-11 and
+R23-13c (copy). The rest, each in the task that rebuilds that screen:
+
+| Finding | Owner |
+|---|---|
+| R23-03 taps over 100 ms at 4× CPU (as R22-09) | Task 5.6 |
+| R23-05 preset form: the name error away from its field and kept after a fix; (c) not reproduced, pinned | Task 4.8 + Task 3.8 |
+| R23-10 a switch's label does not toggle it | Task 3.9 |
+| R23-12 bare `/add` on a computer focuses nothing (QA21 M2) | Task 4.3 |
+| R23-13a pill placement at 1440; R23-13b the bell's badge over its glyph | Task 3.7; Task 3.9 + 3.10 |
+| R23-14 Settings highlighted on Presets | Task 3.10 |
+| R23-15 one tab stop per chip (QA21 L1) | Task 3.9 |
 
 ### PR #48 follow-ups (triage)
 
