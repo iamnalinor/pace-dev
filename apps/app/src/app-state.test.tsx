@@ -797,9 +797,9 @@ describe("a stale tab's sign-out racing another tab's sign-in (re-review N3)", (
     runtime.sync.stop();
     // The other tab logged out (the store holds no session when the stale tab looks), then signed
     // in again and wrote before the stale tab's wipe had its turn.
-    const readStored = runtime.auth.isSessionStored;
+    const isStoredInShared = runtime.auth.isSessionStored;
     jest.spyOn(runtime.auth, "isSessionStored").mockImplementation(async () => {
-      const isStored = await readStored();
+      const isStored = await isStoredInShared();
       await shared.set("tok_other_tab");
       // What the other tab's client does at its sign-in, on the store both tabs share.
       await runtime.claimLocalCopy("tok_other_tab");

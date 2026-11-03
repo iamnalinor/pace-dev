@@ -13,6 +13,7 @@ import {
   type User,
 } from "@pace/core";
 
+import { claimLocalCopy, dropLocalCopyIfOwned } from "./local-copy.ts";
 import { followPhoneNotices, sendPhoneData, startPhonePush } from "./phone-runtime.ts";
 import { startBackgroundCheck, stopBackgroundCheck } from "./platform/background-check.ts";
 import { deviceLanguage } from "./platform/device-language.ts";
@@ -20,7 +21,6 @@ import { IS_PHONE } from "./platform/device.ts";
 import { clearPresentedPoolNotifications } from "./platform/notification-cleanup.ts";
 import { useServerOrigin, watchServer } from "./platform/server-origin.ts";
 import { forgetLineDraft } from "./platform/shared-in.ts";
-import { claimLocalCopy, dropLocalCopyIfOwned } from "./local-copy.ts";
 import { type Pool, poolOf, retryOnWindowFocus } from "./runtime-pool.ts";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
 import { canStartSenders, POLL_LIVE_MS, POLL_OFFLINE_MS, startSenders } from "./senders.ts";
@@ -60,9 +60,15 @@ allowed (`createZoneStep`, run by the sync's own end), before the senders push i
 */
 const bootstrap = async (
   runtime: PaceRuntime,
-  pool: Pool,
-  zoneSettled: () => Promise<void>,
-  session: string | undefined,
+  {
+    pool,
+    session,
+    zoneSettled,
+  }: {
+    readonly pool: Pool;
+    readonly session: string | undefined;
+    readonly zoneSettled: () => Promise<void>;
+  },
 ): Promise<void> => {
   const { actions, sync } = runtime;
   // The copy is this session's before anything is written into it (re-review N3).
@@ -117,10 +123,9 @@ const runSyncLoop = (runtime: PaceRuntime, onSynced: OnSynced): (() => void) => 
   const follow = (status: AuthState["status"]): void => {
     if (status === "signed-in") {
       activeSession = runtime.api.currentSessionToken();
-      const session = activeSession;
       void (async () => {
         try {
-          await bootstrap(runtime, pool, zone.settled, session);
+          await bootstrap(runtime, { pool, session: activeSession, zoneSettled: zone.settled });
         } catch {
           // Offline mid-start: a return to the app syncs and registers again (no unhandled rejection).
         }

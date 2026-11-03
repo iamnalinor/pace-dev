@@ -25,13 +25,13 @@ the start goes on.
 */
 export const claimLocalCopy = async (
   runtime: PaceRuntime,
-  token: string | undefined,
+  session: string | undefined,
 ): Promise<void> => {
-  if (token === undefined) {
+  if (session === undefined) {
     return;
   }
   try {
-    await runtime.claimLocalCopy(token);
+    await runtime.claimLocalCopy(session);
   } catch {
     // The mark stays as it was: see above.
   }
