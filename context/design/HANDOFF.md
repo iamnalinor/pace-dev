@@ -11,10 +11,11 @@ working ledger; its last lines are the most recent rulings).
   gallery, the shot matrix phone/desktop × light/dark × EN/RU, design reviews).
 - **Three stacked PRs into `main`**, each **squash-merged by the agent** once its code review
   (`superpowers:requesting-code-review`), its one QA round and CI are green:
-  - **A "Foundation"** — batches 1+2 + PR #48 logic/server follow-ups A1–A9 — **PR #53**,
-    branch `claude/pace-design-overhaul-3p860c`, base `main`.
+  - **A "Foundation"** — batches 1+2 + PR #48 logic/server follow-ups A1–A9 — **PR #53, MERGED**
+    into main on 2026-11-03 as squash `e03360f` (its branch was deleted).
   - **B "New look"** — batches 3+4+7 (the kit, every screen, direction A's identity) — **PR #54**,
-    branch `claude/pace-design-overhaul-b`, base = A's branch (retarget to `main` after A merges).
+    branch `claude/pace-design-overhaul-b`, base `main` (GitHub retargeted it when A merged). Work
+    continues on this branch.
   - **C "Polish"** — batches 5+6+8 (motion and the 100 ms render budget, web/PWA, close-out). Not
     started; open it as a branch off B (owner allowed new branches for the stacked PRs).
 - **QA policy (owner, 2026-11-03):**
@@ -40,7 +41,7 @@ working ledger; its last lines are the most recent rulings).
   for every PR #48 / QA follow-up they own; "PR #48 follow-ups (triage)"; QA carry-over tables;
   "Lint baseline". Spec: [`redesign-spec.md`](redesign-spec.md) (§4 components, §5 screens, §6 motion,
   §11 verify-on-hardware list, §12 owner answers). Comps: `context/design/comps/`.
-- PR A records (on A's branch, `context/design/`): `pr-a-followups-report.md` / `-review.md` /
+- PR A records (now on main and this branch, `context/design/`): `pr-a-followups-report.md` / `-review.md` /
   `-rereview.md`, `pr-a-design-pass.md`, `pr-a-fix-round-2.md` / `-review.md`, `pr-a-a9-report.md`
   (A9 + fix round 3) / `pr-a-a9-review.md` / `pr-a-fix-round-3-review.md`.
 - PR B records (on B's branch, `context/design/pr-b/`): briefs, reports, reviews and re-reviews of
@@ -59,22 +60,21 @@ working ledger; its last lines are the most recent rulings).
   running e2e at once corrupt each other. Run e2e from one tree at a time, or use other ports.
 
 ## 3. State at handoff (2026-11-03)
-### PR A — #53 (draft)
-- Done: batches 1+2, rebase onto main, follow-ups A1–A8, QA round 23 fixes, A9 (owner bug: MCP consent
-  now uses the browser's Pace session; widget gets its own box and a "sign in to Pace first" link),
-  fix rounds 1–3 with reviews; CI blocker (focused tests) fixed with a guard; latency runs as its own
-  CI step (`--project latency --no-deps`), no ceiling changed.
-- Last checks (tip 7924533 + b9559fe): lint ok, `CI=1 bun test:unit` ok, api 608, app 910, full e2e
-  194/195 alone (one `assistant.e2e.ts` toast flake, then 21/21 repeated; logged, no root cause yet).
-- Open: the scoped review of fix round 3 (`pr-a-fix-round-3-review.md`) — act on its findings; CI on
-  #53 must go green; then mark ready and squash-merge. See §5 step 1.
+### PR A — #53: merged
+- Squash-merged into main as `e03360f` after CI run 41706095534 went green (lint, audit, unit, app,
+  API, e2e chromium, latency step) and the last re-review (session-check fix) had no Critical or
+  Important finding. Its records stay in `context/design/pr-a-*.md`.
+- Left from A for B (Minor): `e2e/readme-shots.e2e.ts` opens pages with `browser.newPage()` without
+  `openContext` cleanup (class 63; extend the lint selector or move it to the fixture); the
+  `assistant.e2e.ts` toast flake has no stated cause in bug-lessons (class 20 row says "none yet").
 
-### PR B — #54 (draft)
+### PR B — #54 (draft, base main)
 - Done and approved: Task 3.1 Pressable (+haptics, per-role ARIA, Space, 48/44 minimum target),
   3.2 Text/Icon/Link (+ the lucide codemod), 3.3 Group/ListRow/SectionHeader, 3.4 ScreenHeader and the
   shell (rail on medium, rotation unlocked, insets), 3.5 Presence/Disclosure (+ inspector motion).
-- In progress at handoff: merging A's fix round 3 into B and making #54's CI green
-  (`merge-a-into-b-report.md` says how it ended).
+- A merged into B (`merge-a-into-b-report.md`), then main recorded as merged (`70f6842`: main's tree
+  equals A's final tip, already in B). #54's CI was green on `420a933` (run 41678052705); the merge
+  of A's last two commits was pushed at handoff — check its CI first.
 - Parked minors from the 3.3–3.5 re-review (do first in B): N1 a static compact ListRow has no native
   min-height; N2 Disclosure close: set the height to the current measure before `withTiming` (first
   frame); N3 stale owner text in the spec (Disclosure row "4.3.7" → 4.2; ListRow "3.8/3.9" → 3.9;
@@ -99,10 +99,7 @@ working ledger; its last lines are the most recent rulings).
   line on a plain-http LAN server.
 
 ## 5. What is left, in order
-1. **PR A**: read `pr-a-fix-round-3-review.md`; fix anything above cosmetic (TDD, bug-lessons row,
-   scoped re-review); get #53's CI green (unit, app, API, e2e, the latency step); mark ready;
-   squash-merge into main. Then rebase B onto main (`git rebase --onto origin/main <A's old tip>`),
-   retarget #54 to main.
+1. **Check #54's CI** on the tip; fix anything red (TDD, bug-lessons row). Do the parked minors listed in §3.
 2. **PR B, the kit** — Tasks 3.6 Sheet/Dialog/Popover (+ QA21 M1 Enter submits a sheet's field), 3.7
    Toast/Tooltip (+ the offline pill and a toast stack, pill wraps in RU), 3.8 TextField/TimeInput,
    3.9 the controls (Button, IconButton, Chip, Tag, Segmented, Switch, Slider, CheckCircle,
@@ -143,9 +140,9 @@ nor the content, a compact ListRow stays ≥ 48 dp); reduced motion.
 - Visual choices to confirm: Week blocks as a light tint with dark ink; icon tile `#0D0F15`.
 
 ## 8. How to resume
-1. `git fetch`; check out `claude/pace-design-overhaul-3p860c` (A) and, in a second worktree,
-   `claude/pace-design-overhaul-b` (B). `bun install`, `bun lint` in each.
+1. `git fetch`; check out `claude/pace-design-overhaul-b` (PR B). `bun install`, `bun lint`. Use a
+   second worktree only for parallel screen implementers (one e2e at a time across trees).
 2. Read this file, `overhaul-ledger.md`'s last 40 lines, the plan's task list, and the newest reports
    named in §2.
-3. Check CI of #53 and #54 (GitHub MCP `pull_request_read` → `get_check_runs`).
+3. Check CI of #54 (GitHub MCP `pull_request_read` → `get_check_runs`).
 4. Continue at the first unfinished step of §5. Keep checkpointing and updating this file.
