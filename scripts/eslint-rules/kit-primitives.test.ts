@@ -44,8 +44,45 @@ tester.run("kit-primitives", kitPrimitives, {
       errors: [{ messageId: "rawLineLimit" }],
       filename: "apps/app/src/ui/sidebar.tsx",
     },
+    // Every way past the kit: a re-export, a deep import, a namespace, a dynamic import.
+    {
+      code: 'export { Clock } from "lucide-react-native";',
+      errors: [{ messageId: "rawIcon" }],
+      filename: SCREEN,
+    },
+    {
+      code: 'export * from "lucide-react-native";',
+      errors: [{ messageId: "rawIcon" }],
+      filename: SCREEN,
+    },
+    {
+      code: 'import Clock from "lucide-react-native/dist/esm/icons/clock";',
+      errors: [{ messageId: "rawIcon" }],
+      filename: SCREEN,
+    },
+    {
+      code: 'const icons = import("lucide-react-native");',
+      errors: [{ messageId: "rawIcon" }],
+      filename: SCREEN,
+    },
+    {
+      code: 'import * as RN from "react-native";\nconst a = <RN.Text numberOfLines={1}>x</RN.Text>;',
+      errors: [{ messageId: "rawLineLimit" }],
+      filename: SCREEN,
+    },
+    {
+      code: 'import RN from "react-native";\nconst a = <RN.Text numberOfLines={1}>x</RN.Text>;',
+      errors: [{ messageId: "rawLineLimit" }],
+      filename: SCREEN,
+    },
   ],
   valid: [
+    // A package that only starts with the same letters is another package.
+    { code: 'import { x } from "lucide-react-native-extra";', filename: SCREEN },
+    {
+      code: 'import * as RN from "react-native";\nconst a = <RN.TextInput numberOfLines={2} />;',
+      filename: SCREEN,
+    },
     // The kit's own files are where lucide and the line limit live.
     { code: 'import { Clock } from "lucide-react-native";', filename: "apps/app/src/ui/icon.tsx" },
     {
