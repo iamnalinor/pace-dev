@@ -51,12 +51,12 @@ const collect = (node: ImportDeclaration, into: TextNames): void => {
 };
 
 const isNativeText = (name: JsxName, { names, namespaces }: TextNames): boolean => {
-  return name.type === "JSXIdentifier" ? names.has(name.name) : (
-    name.type === "JSXMemberExpression" &&
-    name.property.name === "Text" &&
-    name.object.type === "JSXIdentifier" &&
-    namespaces.has(name.object.name)
-  );
+  return name.type === "JSXIdentifier"
+    ? names.has(name.name)
+    : name.type === "JSXMemberExpression" &&
+        name.property.name === "Text" &&
+        name.object.type === "JSXIdentifier" &&
+        namespaces.has(name.object.name);
 };
 
 export const kitPrimitives: Rule.RuleModule = {
