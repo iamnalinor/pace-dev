@@ -251,7 +251,7 @@ const useFlowState = ({
     }
   });
   const add = useAddTask(toAdd, form === "assistant", done);
-  const keptForLater = resetAndClose(pending.discard, done);
+  const keptForLater = resetAndClose(pending.keptForLater, done);
   return {
     add,
     ai,

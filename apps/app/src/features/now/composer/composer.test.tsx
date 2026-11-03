@@ -593,6 +593,34 @@ describe("Composer", () => {
     ]);
   });
 
+  it("closes the preview's decision in the log when the line is kept for later (round 7 review minor)", async () => {
+    const resolved: unknown[] = [];
+    let calls = 0;
+    const runtime = await createTestRuntime({
+      routes: {
+        "POST /api/decisions/resolve": ({ body }) => {
+          resolved.push(body);
+          return { resolved: 1 };
+        },
+        "POST /api/parse": () => {
+          calls += 1;
+          return calls === 1
+            ? { ...unavailable("unreachable"), decisionId: "d1" }
+            : { ...unavailable("unreachable"), actions: [], status: "queued" };
+        },
+      },
+    });
+    await renderComposer(runtime);
+    await fireEvent.changeText(line(), "оплатить связь");
+    await enter();
+    await fireEvent.press(await screen.findByRole("button", { name: en("composer.aiLater") }));
+    expect(await screen.findByText(en("composer.aiQueuedSoon"))).toBeOnTheScreen();
+    // A later reading of the same text takes the preview's place: not left open in /decisions.
+    await waitFor(() => {
+      expect(resolved).toEqual([{ decisions: [{ id: "d1", resolution: "corrected" }] }]);
+    });
+  });
+
   it("says it could not read this one, and offers no reading later, when every model answered out of shape", async () => {
     let calls = 0;
     const runtime = await createTestRuntime({

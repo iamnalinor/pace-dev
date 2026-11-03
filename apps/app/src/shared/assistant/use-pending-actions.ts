@@ -246,7 +246,7 @@ export const usePendingActions = (
     setBusy(false);
   };
   /** The preview goes; the log hears the outcome when the person chose one (not on an edit). */
-  const drop = (resolution: "cancelled" | "inbox" | null): void => {
+  const drop = (resolution: "cancelled" | "corrected" | "inbox" | null): void => {
     if (resolution !== null) {
       tellLog(assistant, pending, { resolution });
     }
@@ -271,6 +271,13 @@ export const usePendingActions = (
     /** The line went to the Inbox instead: the preview of it goes, and the log is told. */
     keptInInbox: (): void => {
       drop("inbox");
+    },
+    /**
+    The line was kept for the assistant to read when it is back: that later reading takes the
+    preview's place, so the log hears "corrected", not nothing (round 7 review: it stayed open).
+    */
+    keptForLater: (): void => {
+      drop("corrected");
     },
     /** Dismissed by the person (Cancel, Escape): the log is told once, and that answer stands. */
     cancel: (): void => {

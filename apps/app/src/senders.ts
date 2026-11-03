@@ -1,3 +1,5 @@
+import { AppState } from "react-native";
+
 import type { PaceRuntime } from "./runtime.ts";
 
 /**
@@ -18,12 +20,17 @@ export const canStartSenders = ({ auth }: Pick<PaceRuntime, "auth">): boolean =>
 
 /**
 The sync loop and the socket, as a signed-in start leaves them (each start is a no-op while
-running); nothing while `canStartSenders` says no.
+running); nothing while `canStartSenders` says no. The socket follows the app's visibility rule:
+a hidden tab's (or a backgrounded app's) rests and starts when it is shown (round 7 review: a
+failed revoke in a hidden tab started it). A state not known yet (a start before the platform's
+first word) counts as shown.
 */
 export const startSenders = (runtime: Pick<PaceRuntime, "auth" | "live" | "sync">): void => {
   if (!canStartSenders(runtime)) {
     return;
   }
   runtime.sync.start({ intervalMs: POLL_OFFLINE_MS });
-  runtime.live.start();
+  if (AppState.currentState !== "background" && AppState.currentState !== "inactive") {
+    runtime.live.start();
+  }
 };

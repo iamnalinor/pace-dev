@@ -157,6 +157,62 @@ describe("createPaceClient", () => {
     expect(api.pathsCalled("/api/me")).toHaveLength(2);
   });
 
+  it.each(["before", "after"] as const)(
+    'a run hung past the hold that lands %s the revoke\'s answer reads as nothing, never "ended elsewhere" (round 7 review 7)',
+    async (when) => {
+      const server = { isRevoked: false };
+      const pull = Promise.withResolvers<null>();
+      const revoked = Promise.withResolvers<null>();
+      const atServer = Promise.withResolvers<null>();
+      const { api, client } = await setup(
+        {
+          "DELETE /api/sessions/s-1": async () => {
+            server.isRevoked = true;
+            atServer.resolve(null);
+            await revoked.promise;
+            return { ok: true };
+          },
+          "GET /api/me": () => (server.isRevoked ? problem(401, "auth/unauthorized") : fakeMe),
+          "GET /api/sync/pull": async () => {
+            await pull.promise;
+            return server.isRevoked
+              ? problem(401, "auth/unauthorized")
+              : { events: [], more: false, seq: 0, storeId: "store-test" };
+          },
+        },
+        "tok",
+      );
+      await expect.poll(() => client.auth.store.getState().user).not.toBeNull();
+      // A run whose request hangs: the hold gives up waiting for it after `HOLD_WAIT_MS`.
+      const hung = client.sync.syncNow();
+      const ended = client.auth.endThisDevice(async () => {
+        await api.fetch("https://api.test/api/sessions/s-1", { method: "DELETE" });
+      });
+      if (when === "before") {
+        // The server ended the session; its answer is still on its way when the run lands.
+        await atServer.promise;
+        pull.resolve(null);
+        await hung;
+        revoked.resolve(null);
+        await ended;
+      } else {
+        revoked.resolve(null);
+        await ended;
+        pull.resolve(null);
+        await hung;
+      }
+      await expect.poll(() => client.auth.store.getState().status).toBe("signed-out");
+      expect(client.auth.store.getState().endedElsewhere).toBeUndefined();
+      // The steady state: nothing asks the server about the ended session.
+      const checks = api.pathsCalled("/api/me").length;
+      await client.sync.syncNow();
+      await new Promise((resolve) => {
+        setTimeout(resolve, 50);
+      });
+      expect(api.pathsCalled("/api/me")).toHaveLength(checks);
+    },
+  );
+
   it("signs out within seconds when its socket is refused at the door, not at the next poll (round 7 CI)", async () => {
     // The session ended while this visible tab's socket was still connecting: the refused upgrade
     // closes with no code (1006), every reconnect is refused too, and the poll is 30 s away.
