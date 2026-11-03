@@ -1,13 +1,17 @@
+import { useState } from "react";
 import { View } from "react-native";
 
 import type { GalleryData } from "@pace/core/testing";
 
 import { useT } from "#app/app-state.tsx";
+import { Button } from "#app/ui/button.tsx";
 import { CountBadge } from "#app/ui/count-badge.tsx";
+import { Disclosure } from "#app/ui/disclosure.tsx";
 import { Group } from "#app/ui/group.tsx";
 import { IconButton } from "#app/ui/icon-button.tsx";
 import { Icon } from "#app/ui/icon.tsx";
 import { ListRow } from "#app/ui/list-row.tsx";
+import { Presence } from "#app/ui/presence.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { SectionHeader } from "#app/ui/section-header.tsx";
 import { Text } from "#app/ui/text.tsx";
@@ -108,6 +112,53 @@ export const HeaderSections = ({ data }: { readonly data: GalleryData }) => {
           title={first?.name ?? t("dev.gallery.headers.pushed")}
           variant="pushed"
         />
+      </View>
+    </View>
+  );
+};
+
+/**
+The kit's motion primitives (spec §4.1.1, §6): a `Disclosure` folding the set's projects (the
+worst set's long names, the empty set's none: then no fold) and a `Presence` that rises in and
+fades out a card on demand; with reduced motion both only fade.
+*/
+export const MotionSections = ({ data }: { readonly data: GalleryData }) => {
+  const t = useT();
+  const [isFoldOpen, setIsFoldOpen] = useState(false);
+  const [isCardShown, setIsCardShown] = useState(true);
+  return (
+    <View className="gap-3 pb-6">
+      <SectionHeader title={t("dev.gallery.section.motion")} />
+      {data.projects.length === 0 ? null : (
+        <Disclosure
+          count={data.projects.length}
+          label={t("dev.gallery.motion.fold")}
+          onToggle={() => {
+            setIsFoldOpen(!isFoldOpen);
+          }}
+          open={isFoldOpen}
+        >
+          <Group>
+            {data.projects.map((project) => (
+              <ListRow key={project.id} title={project.name} titleLines={2} />
+            ))}
+          </Group>
+        </Disclosure>
+      )}
+      <View className="mx-gutter items-start gap-3">
+        <Button
+          onPress={() => {
+            setIsCardShown(!isCardShown);
+          }}
+          variant="secondary"
+        >
+          {t(isCardShown ? "dev.gallery.motion.hide" : "dev.gallery.motion.show")}
+        </Button>
+        <Presence enter="rise" exit="fade" show={isCardShown}>
+          <View className="rounded-lg bg-cell px-row-x py-row-y">
+            <Text role="body">{t("dev.gallery.motion.card")}</Text>
+          </View>
+        </Presence>
       </View>
     </View>
   );

@@ -2,7 +2,11 @@ import type { Page } from "@playwright/test";
 
 import { addTask, formByHand, nowTasks, taskForm } from "./support/composer.ts";
 import { expect, test } from "./support/fixtures.ts";
-import { CLIPPING_ANCESTOR, controlsUnder, expectStaysInside } from "./support/geometry.ts";
+import {
+  controlsUnder,
+  expectDescendantsStayInside,
+  expectStaysInside,
+} from "./support/geometry.ts";
 import { loginViaApi } from "./support/login.ts";
 
 /** The main screens and the tabs, sidebar links or rows of More that reach each (no reload). */
@@ -90,21 +94,39 @@ for (const size of SIZES) {
 }
 
 test.describe("motion and overlays at one width", () => {
-  test("the composer's form unfolds inside its card on a phone (bug class 5)", async ({ page }) => {
+  test("the composer's form unfolds inside its card on a phone: no box leaves the card in any frame (bug class 5, F-MOT-08)", async ({
+    page,
+  }) => {
     await loginViaApi(page);
     await page.setViewportSize({ height: 844, width: 390 });
     await page.goto("/");
     await page.getByRole("textbox", { name: "New task" }).pressSequentially("Pay the rent");
-    // The card grows to reveal the form: the form's foot is hidden on purpose meanwhile.
-    await expectStaysInside(page, {
-      child: '[role="form"]',
-      container: CLIPPING_ANCESTOR,
+    await expectDescendantsStayInside(page, {
+      container: '[data-testid="composer-card"]',
       during: async () => {
         await formByHand(page).click();
       },
-      sides: ["top", "left", "right"],
     });
     await expect(taskForm(page)).toBeVisible();
+  });
+
+  test("the assistant's preview shows whole inside the card in every frame (QA 22 carry-over, Task 3.5)", async ({
+    page,
+  }) => {
+    await loginViaApi(page);
+    await page.setViewportSize({ height: 844, width: 390 });
+    await page.goto("/");
+    const line = page.getByRole("textbox", { name: "New task" });
+    await line.pressSequentially("Pay the rent");
+    await expectDescendantsStayInside(page, {
+      container: '[data-testid="composer-card"]',
+      during: async () => {
+        await line.press("Enter");
+        await expect(page.getByRole("button", { name: "Approve" })).toBeVisible();
+      },
+    });
+    // Once announced, Approve is whole on screen: nothing to scroll before it can be pressed.
+    await expect(page.getByRole("button", { name: "Approve" })).toBeInViewport({ ratio: 1 });
   });
 
   test("the assistant's preview unfolds without the card scrolling under the finger (fix round 2 of QA 22)", async ({

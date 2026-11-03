@@ -37,6 +37,7 @@ type Owned =
   | "android_ripple"
   | "aria-checked"
   | "aria-disabled"
+  | "aria-expanded"
   | "aria-selected"
   | "disabled"
   | "onLongPress"
@@ -56,6 +57,8 @@ export type PressableProps<R extends AccessibilityRole = AccessibilityRole> = {
   readonly selected?: (R extends SelectableRole ? boolean : never) | undefined;
   readonly checked?: (R extends CheckableRole ? "mixed" | boolean : never) | undefined;
   readonly disabled?: boolean | undefined;
+  /** A control that shows and hides a region (a `Disclosure`'s trigger): `aria-expanded`. */
+  readonly expanded?: boolean | undefined;
   /** What the press means to the hand (§3.10): `longPress` plays on the long press, the rest on the press. */
   readonly haptic?: HapticKind | undefined;
   readonly ripple?: RippleKind | undefined;
@@ -67,6 +70,7 @@ export type PressableProps<R extends AccessibilityRole = AccessibilityRole> = {
 type State = {
   readonly checked?: "mixed" | boolean;
   readonly disabled: boolean;
+  readonly expanded?: boolean;
   readonly selected?: boolean;
 };
 
@@ -76,6 +80,7 @@ type SharedProps = {
   readonly accessibilityRole: AccessibilityRole;
   readonly accessibilityState: State;
   readonly "aria-checked"?: "mixed" | boolean;
+  readonly "aria-expanded"?: boolean;
   readonly "aria-selected"?: boolean;
   readonly className: string;
   readonly disabled: boolean;
@@ -86,6 +91,7 @@ type SharedProps = {
 /** What a caller asked the role to say, before the role is checked. */
 type AskedState = {
   readonly checked: "mixed" | boolean | undefined;
+  readonly expanded: boolean | undefined;
   readonly isDisabled: boolean;
   readonly selected: boolean | undefined;
 };
@@ -93,9 +99,10 @@ type AskedState = {
 /** The state a role may say: selected for a tab, checked for a checkable, nothing else. */
 const stateOf = (
   role: AccessibilityRole,
-  { checked, isDisabled, selected }: AskedState,
+  { checked, expanded, isDisabled, selected }: AskedState,
 ): State => ({
   disabled: isDisabled,
+  ...(expanded !== undefined && { expanded }),
   ...(selected !== undefined && SELECTABLE.has(role) && { selected }),
   ...(checked !== undefined && CHECKABLE.has(role) && { checked }),
 });
@@ -110,6 +117,7 @@ export const usePressableProps = <R extends AccessibilityRole>({
   checked,
   className,
   disabled = false,
+  expanded,
   haptic,
   label,
   onLongPress,
@@ -134,7 +142,7 @@ export const usePressableProps = <R extends AccessibilityRole>({
     }
     onLongPress?.();
   }, [haptic, onLongPress]);
-  const state = stateOf(role, { checked, isDisabled: disabled, selected });
+  const state = stateOf(role, { checked, expanded, isDisabled: disabled, selected });
   const shared: SharedProps = {
     ...(label !== undefined && { accessibilityLabel: label }),
     accessibilityRole: role,
@@ -142,6 +150,7 @@ export const usePressableProps = <R extends AccessibilityRole>({
     // react-native-web reads no accessibilityState: the browser hears the aria attributes.
     ...(state.selected !== undefined && { "aria-selected": state.selected }),
     ...(state.checked !== undefined && { "aria-checked": state.checked }),
+    ...(state.expanded !== undefined && { "aria-expanded": state.expanded }),
     // Controls never shrink in a row: the text beside them yields (spec §4.1.2).
     className: cx("shrink-0", className),
     disabled,

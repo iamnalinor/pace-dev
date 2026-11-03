@@ -57,4 +57,9 @@ export const enDev = {
   "dev.gallery.headers.action": "An action",
   "dev.gallery.headers.context": "Context control",
   "dev.gallery.headers.pushed": "A pushed screen",
+  "dev.gallery.section.motion": "Motion",
+  "dev.gallery.motion.fold": "Projects",
+  "dev.gallery.motion.show": "Show the card",
+  "dev.gallery.motion.hide": "Hide the card",
+  "dev.gallery.motion.card": "A card that rises in and fades out",
 } as const;

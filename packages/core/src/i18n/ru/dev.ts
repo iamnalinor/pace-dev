@@ -59,4 +59,9 @@ export const ruDev: { readonly [K in keyof typeof enDev]: string } = {
   "dev.gallery.headers.action": "Действие",
   "dev.gallery.headers.context": "Элемент контекста",
   "dev.gallery.headers.pushed": "Вложенный экран",
+  "dev.gallery.section.motion": "Движение",
+  "dev.gallery.motion.fold": "Проекты",
+  "dev.gallery.motion.show": "Показать карточку",
+  "dev.gallery.motion.hide": "Скрыть карточку",
+  "dev.gallery.motion.card": "Карточка, которая поднимается и тает",
 };

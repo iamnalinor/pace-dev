@@ -4,7 +4,7 @@ import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { galleryData } from "@pace/core/testing";
 
-import { HeaderSections, ListSections } from "./gallery-lists.tsx";
+import { HeaderSections, ListSections, MotionSections } from "./gallery-lists.tsx";
 
 describe("the gallery's grouped list", () => {
   it("shows every worst-case project as a two-line row, the first one picked", async () => {
@@ -33,5 +33,24 @@ describe("the gallery's grouped list", () => {
     const title = screen.getByRole("header", { name });
     expect(title.props["aria-level"]).toBe(1);
     expect(title.props["numberOfLines"]).toBeUndefined();
+  });
+
+  it("folds the worst-case projects under one disclosure, and has none for an empty set", async () => {
+    const data = galleryData("worst", "en");
+    const view = await renderScreen(
+      <MotionSections data={data} />,
+      await createTestRuntime({ world: "empty" }),
+    );
+    const fold = screen.getByRole("button", {
+      name: `${en("dev.gallery.motion.fold")} · ${String(data.projects.length)}`,
+    });
+    expect(fold).toBeCollapsed();
+    expect(screen.getByText(en("dev.gallery.motion.card"))).toBeOnTheScreen();
+    await view.unmount();
+    await renderScreen(
+      <MotionSections data={galleryData("empty", "en")} />,
+      await createTestRuntime({ world: "empty" }),
+    );
+    expect(screen.queryByText(en("dev.gallery.motion.fold"))).toBeNull();
   });
 });

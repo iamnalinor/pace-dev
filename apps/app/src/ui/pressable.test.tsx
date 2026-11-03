@@ -118,6 +118,21 @@ describe("Pressable (the kit's state layer, spec §3.7)", () => {
     expect(screen.getByRole("tab", { name: "Week" })).not.toBeSelected();
   });
 
+  it("says expanded or collapsed for a control that discloses (aria-expanded)", async () => {
+    await renderLight(
+      <>
+        <Pressable expanded onPress={jest.fn()} role="button">
+          <Text>In future</Text>
+        </Pressable>
+        <Pressable expanded={false} onPress={jest.fn()} role="button">
+          <Text>Done</Text>
+        </Pressable>
+      </>,
+    );
+    expect(screen.getByRole("button", { name: "In future" })).toBeExpanded();
+    expect(screen.getByRole("button", { name: "Done" })).toBeCollapsed();
+  });
+
   it("ripples on Android in fill.3, drawn by the platform over the content, bounded by default", async () => {
     const restore = jest.replaceProperty(Platform, "OS", "android");
     try {

@@ -31,6 +31,15 @@ describe("Pressable's markup on the web", () => {
     expect(html).toContain('aria-disabled="true"');
   });
 
+  it("says expanded as aria-expanded on a disclosing button", () => {
+    const html = markup(
+      <Pressable expanded={false} onPress={NOTHING} role="button">
+        <Text>In future</Text>
+      </Pressable>,
+    );
+    expect(html).toContain('aria-expanded="false"');
+  });
+
   it("says selected as aria-selected on a tab", () => {
     const html = markup(
       <Pressable onPress={NOTHING} role="tab" selected>

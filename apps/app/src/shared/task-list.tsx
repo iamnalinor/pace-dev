@@ -1,14 +1,12 @@
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { View } from "react-native";
 import Animated from "react-native-reanimated";
 
 import type { NowRow } from "@pace/client";
 
-import { useLanguage } from "#app/app-state.tsx";
-import { Icon } from "#app/ui/icon.tsx";
+import { Disclosure } from "#app/ui/disclosure.tsx";
 import { ROW_ENTER, ROW_EXIT, ROW_LAYOUT } from "#app/ui/motion.ts";
 import { RowList } from "#app/ui/row-list.tsx";
-import { formatCount } from "@pace/core";
 
 import { useOpenTask } from "./task-opener.tsx";
 import { TaskRow } from "./task-row.tsx";
@@ -105,8 +103,8 @@ export const TaskRows = ({
 };
 
 /**
-A section folded by default under its title and count ("In future · 3", "Done · 11"): the same
-chevron as every other disclosure.
+A section folded by default under its title and count ("In future · 3", "Done · 11"): the kit's
+`Disclosure`, the one fold of the app. Nothing to fold, no fold.
 */
 export const FoldedSection = ({
   children,
@@ -119,26 +117,22 @@ export const FoldedSection = ({
   readonly initiallyOpen?: boolean;
   readonly title: string;
 }) => {
-  const language = useLanguage();
   const [isOpen, setIsOpen] = useState(initiallyOpen);
   if (count === 0) {
     return null;
   }
-  const chevron = isOpen ? "chevron-up" : "chevron-down";
   return (
     <View className="mt-2">
-      <Pressable
-        accessibilityRole="button"
-        aria-expanded={isOpen}
-        className="mx-3 h-hit-web flex-row items-center gap-2 border-t border-separator px-2 active:opacity-70"
-        onPress={() => {
+      <Disclosure
+        count={count}
+        label={title}
+        onToggle={() => {
           setIsOpen(!isOpen);
         }}
+        open={isOpen}
       >
-        <Text className="font-sans text-footnote font-medium text-label-secondary">{`${title} · ${formatCount(count, language)}`}</Text>
-        <Icon name={chevron} size="inline" />
-      </Pressable>
-      {isOpen ? children : null}
+        {children}
+      </Disclosure>
     </View>
   );
 };

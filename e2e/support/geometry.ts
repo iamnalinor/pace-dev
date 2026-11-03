@@ -11,7 +11,7 @@ type Frame = {
 };
 
 /** The container a child is measured against: a CSS selector, or the nearest ancestor that clips. */
-export const CLIPPING_ANCESTOR = ":clipping-ancestor";
+const CLIPPING_ANCESTOR = ":clipping-ancestor";
 
 type Watch = {
   /** CSS selectors, read anew each frame; `container` may be `CLIPPING_ANCESTOR`. */
@@ -94,6 +94,68 @@ export const expectStaysInside = async (
   expect(escapes, `${child} inside ${container} in every frame`).toEqual([]);
 };
 
+/** The worst escape of any box inside a container in one frame, and whose it was. */
+type Escape = { readonly px: number; readonly what: string };
+
+/**
+Bug class 5 for a whole container (spec §6 composer unfold, F-MOT-08): samples every frame while
+`during` runs and settles, and fails when any box drawn inside the element matching `container`
+(each descendant with a size) sticks out of it by more than a pixel on any side. Where
+`expectStaysInside` follows one child against its clip, this holds every child of a card that
+changes shape: nothing may be drawn outside it or hidden by its edge while it grows.
+*/
+export const expectDescendantsStayInside = async (
+  page: Page,
+  {
+    container,
+    during,
+    forMs = 700,
+  }: { readonly container: string; readonly during: () => Promise<void>; readonly forMs?: number },
+): Promise<void> => {
+  const sampling = page.evaluate(
+    async ({ outer, span }) =>
+      await new Promise<readonly Escape[]>((resolve) => {
+        const frames: Escape[] = [];
+        const started = performance.now();
+        const bounds = { end: Infinity };
+        const frame = (now: number): void => {
+          const box = globalThis.document.querySelector(outer);
+          if (box !== null) {
+            bounds.end = Math.min(bounds.end, now + span);
+            const b = box.getBoundingClientRect();
+            const drawn = [...box.querySelectorAll("*")]
+              .map((element) => ({ a: element.getBoundingClientRect(), element }))
+              .filter(({ a }) => a.width > 0 && a.height > 0);
+            const worst = drawn
+              .map(({ a, element }) => ({
+                px: Math.max(
+                  b.top - a.top,
+                  a.right - b.right,
+                  a.bottom - b.bottom,
+                  b.left - a.left,
+                ),
+                what: element.getAttribute("aria-label") ?? element.textContent.trim().slice(0, 40),
+              }))
+              .toSorted((x, y) => y.px - x.px)[0] ?? { px: 0, what: "" };
+            frames.push(worst);
+          }
+          if (now < bounds.end && now - started < 5000) {
+            globalThis.requestAnimationFrame(frame);
+          } else {
+            resolve(frames);
+          }
+        };
+        globalThis.requestAnimationFrame(frame);
+      }),
+    { outer: container, span: forMs },
+  );
+  await during();
+  const frames = await sampling;
+  expect(frames.length, `${container} on screen while it changed`).toBeGreaterThan(3);
+  const escapes = frames.filter((frame) => frame.px > 1);
+  expect(escapes, `every box inside ${container} in every frame`).toEqual([]);
+};
+
 /** The controls an overlay may cover: enabled buttons, fields, links, tabs, switches. */
 const CONTROLS = [
   "button:not([disabled])",
@@ -156,9 +218,9 @@ const SAMPLE_MS = 30;
 
 /**
 Clicks a control once it is wholly shown and its box has held still for `SETTLED_MS` (every read
-in that window found the same box; a read that differs starts the window again). The assistant's
-preview mounts inside the composer card while the card is still growing to its height (220 ms,
-slower under load), so Approve is half clipped at first. Playwright's click scrolls a clipped
+in that window found the same box; a read that differs starts the window again). Until Task 3.5 the assistant's
+preview mounted inside the composer card while the card was still growing to its height (220 ms,
+slower under load), so Approve was half clipped at first. Playwright's click scrolls a clipped
 target into view: it scrolled the card's clipping box, pressed at that spot, and the box scrolled
 back as it grew, so the release missed (no click). Seen in the full run as an Approve that did
 nothing (fix rounds 1 and 2 of QA 22, bug-lessons class 5).

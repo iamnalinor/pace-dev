@@ -217,8 +217,7 @@ test("the form's close drops its draft: New task opens an empty form again (QA 1
 });
 
 /**
-Samples, frame by frame, where the form sits inside the card's clipping box while the card
-unfolds: the browser must not scroll the box to reveal the focused title, which would slide
+Samples, frame by frame, where the form sits inside the card while the card unfolds: the browser must not scroll the box to reveal the focused title, which would slide
 the header (and the top of Create) out of the card and back.
 */
 const sampleUnfolding = async (page: Page): Promise<readonly { top: number; scroll: number }[]> =>
@@ -229,11 +228,8 @@ const sampleUnfolding = async (page: Page): Promise<readonly { top: number; scro
         let end = Infinity;
         const frame = (now: number): void => {
           const form = globalThis.document.querySelector('[role="form"]');
-          // The nearest ancestor that clips: the box whose height grows.
-          let clip = form?.parentElement ?? null;
-          while (clip !== null && globalThis.getComputedStyle(clip).overflow !== "hidden") {
-            clip = clip.parentElement;
-          }
+          // The card that changes shape (it no longer clips: it takes the form's height at once).
+          const clip = globalThis.document.querySelector('[data-testid="composer-card"]');
           if (form !== null && clip !== null) {
             end = Math.min(end, now + 600);
             samples.push({
@@ -262,7 +258,7 @@ for (const [width, height, size] of [[390, 844, "phone"]] as const) {
     const sampling = sampleUnfolding(page);
     await formByHand(page).click();
     const samples = await sampling;
-    // The card grew over several frames, and the form stayed inside it throughout.
+    // Sampled over several frames, and the form stayed inside the card throughout.
     expect(samples.length).toBeGreaterThan(5);
     expect(Math.min(...samples.map((sample) => sample.top))).toBeGreaterThanOrEqual(0);
     expect(Math.max(...samples.map((sample) => sample.scroll))).toBe(0);

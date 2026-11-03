@@ -4,8 +4,8 @@ import { View } from "react-native";
 import { useT } from "#app/app-state.tsx";
 import { ActionCards } from "#app/shared/assistant/action-cards.tsx";
 import { ReadingIssueLine } from "#app/shared/assistant/reading-issue-line.tsx";
-import { AnimatedHeight } from "#app/ui/animated-height.tsx";
 import { cx } from "#app/ui/cx.ts";
+import { Presence } from "#app/ui/presence.tsx";
 
 import { AiStatus } from "./ai-status.tsx";
 import { type ComposerFlow, useComposerFlow } from "./composer-flow.tsx";
@@ -68,19 +68,23 @@ const LineBlock = ({
       onFocusChange={onFocusChange}
     />
     {flow.pending.pending === null ? null : (
-      <ActionCards
-        actions={flow.pending.pending.actions}
-        busy={flow.pending.busy}
-        onApprove={() => {
-          void flow.pending.approve();
-        }}
-        onCancel={flow.dismiss}
-        onFollowup={flow.pending.followup}
-        // Offered once: after a press the status line below says what came of it.
-        onLater={flow.ai.state.status === "idle" ? () => void flow.readLater() : undefined}
-        questions={flow.pending.pending.questions}
-        unread={flow.pending.pending.unread}
-      />
+      // The preview fades in where it lands (spec §6 "assistant preview appears"): the card takes
+      // its height at once, so Approve is never clipped while it grows (QA 22, bug-lessons 5).
+      <Presence initial show>
+        <ActionCards
+          actions={flow.pending.pending.actions}
+          busy={flow.pending.busy}
+          onApprove={() => {
+            void flow.pending.approve();
+          }}
+          onCancel={flow.dismiss}
+          onFollowup={flow.pending.followup}
+          // Offered once: after a press the status line below says what came of it.
+          onLater={flow.ai.state.status === "idle" ? () => void flow.readLater() : undefined}
+          questions={flow.pending.pending.questions}
+          unread={flow.pending.pending.unread}
+        />
+      </Presence>
     )}
     <IssueLine flow={flow} />
     {flow.text.trim() === "" || flow.form !== null || flow.ai.state.status === "read" ? null : (
@@ -100,25 +104,34 @@ export const Composer = ({ isFocused = false }: { readonly isFocused?: boolean }
   const flow = useComposerFlow();
   const [isLineInFocus, setIsLineInFocus] = useState(false);
   const isFormHere = flow.form !== null && !flow.isFormInPane;
+  const shape = isFormHere ? "form" : "line";
+  // The line on arrival is simply there (F-MOT-07); a swap to the form and back fades in.
+  const [swap, setSwap] = useState({ hasSwapped: false, shape });
+  if (swap.shape !== shape) {
+    setSwap({ hasSwapped: true, shape });
+  }
   return (
-    // One card that changes shape: its height follows the line or the form, and the focused
-    // line rings it in the quiet accent.
+    // One card that changes shape: its height is the line's or the form's, and the focused line
+    // rings it in the quiet accent.
     <View
       className={cx(
         "mx-4 mb-3 rounded-xl border bg-cell px-1 py-1",
         isLineInFocus && !isFormHere ? "border-accent" : "border-outline",
       )}
+      testID="composer-card"
     >
-      <AnimatedHeight>
-        {/* No entering animation here: it would keep the field from taking the cursor. */}
-        <View key={isFormHere ? "form" : "line"}>
-          {isFormHere ? (
-            <ComposerFlowForm variant="card" />
-          ) : (
-            <LineBlock flow={flow} isFocused={isFocused} onFocusChange={setIsLineInFocus} />
-          )}
-        </View>
-      </AnimatedHeight>
+      {/*
+      The card takes the new shape's height in the swap frame and the new content fades in
+      (spec §6 composer unfold): nothing is ever clipped or drawn outside the card while it grows
+      (F-MOT-08, bug-lessons 5). An opacity fade leaves the field in place to take the cursor.
+      */}
+      <Presence initial={swap.hasSwapped} key={shape} show>
+        {isFormHere ? (
+          <ComposerFlowForm variant="card" />
+        ) : (
+          <LineBlock flow={flow} isFocused={isFocused} onFocusChange={setIsLineInFocus} />
+        )}
+      </Presence>
     </View>
   );
 };
