@@ -142,3 +142,28 @@ describe("a bare pressable (bug-lessons F-CMP-01)", () => {
     LINT_APP_FILE_MS,
   );
 });
+
+/** The `pace/kit-primitives` severity for one file (bug-lessons 109: icons and line limits from the kit). */
+const kitPrimitives = async (file: string): Promise<unknown> => {
+  const config = (await eslint.calculateConfigForFile(path.join(ROOT, file))) as {
+    readonly rules?: Readonly<Record<string, unknown>>;
+  };
+  const setting: unknown = config.rules?.["pace/kit-primitives"];
+  return Array.isArray(setting) ? setting[0] : setting;
+};
+
+describe("icons and line limits from the kit (bug-lessons 109)", () => {
+  it.each([
+    "apps/app/src/features/day/day-screen.tsx",
+    "apps/app/src/shared/meta-line.tsx",
+    "apps/app/src/screens/more-screen.tsx",
+    "apps/app/src/ui/sidebar.tsx",
+    "apps/app/app/(tabs)/index.tsx",
+  ])("are checked in %s", async (file) => {
+    expect(await kitPrimitives(file)).toBe(1);
+  });
+
+  it("leave tests alone", async () => {
+    expect(await kitPrimitives("apps/app/src/ui/icon.test.tsx")).toBeUndefined();
+  });
+});

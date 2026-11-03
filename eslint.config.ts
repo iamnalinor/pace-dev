@@ -519,6 +519,15 @@ export default defineConfig([
     plugins: { pace },
     rules: { "pace/no-raw-design-values": ["warn", { allowedClasses: GENERATED_CLASSES }] },
   },
+  // Icons and line limits come from the kit's Icon and Text (spec §4.1.1, §4.1.2 rule 9; bug-lessons
+  // 109). A warning counted by its own exact ratchet (KIT_PRIMITIVE_WARNINGS in
+  // scripts/eslint-all.ts) while the screens migrate in their tasks; then it becomes an error.
+  {
+    files: APP,
+    ignores: TESTS,
+    plugins: { pace },
+    rules: { "pace/kit-primitives": "warn" },
+  },
   // Features and shared rows press through the kit's Pressable, which draws the state layer
   // (bug-lessons F-CMP-01). A warning counted by its own exact ratchet (BARE_PRESSABLE_WARNINGS in
   // scripts/eslint-all.ts) while the kit tasks migrate the callers; then it becomes an error.

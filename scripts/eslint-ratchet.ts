@@ -7,6 +7,12 @@ imported by feature or shared code instead of the kit's `#app/ui/pressable`.
 */
 export const BARE_PRESSABLE_RULE = "no-restricted-imports";
 
+/**
+The kit-primitive backlog (bug-lessons 109, spec §4.1.2 rule 9): a lucide icon imported outside the
+kit's `Icon`, or `numberOfLines` on React Native's `Text` outside the kit's `Text`.
+*/
+export const KIT_PRIMITIVE_RULE = "pace/kit-primitives";
+
 /** One backlog counted down: its rule, and the constant in `eslint-all.ts` that holds its number. */
 export type Ratchet = {
   readonly allowance: number;
@@ -24,7 +30,7 @@ type Summary = { counts: Readonly<Record<string, number>>; problem: string | und
 /** What one ratchet says about its count, if anything is wrong. */
 const ratchetProblem = ({ allowance, constant, rule }: Ratchet, count: number) => {
   if (count > allowance) {
-    return `${count} ${rule} warnings, ${allowance} allowed (${constant}): the backlog grew; fix the new ones (design values: use the tokens; pressables: use the kit's).`;
+    return `${count} ${rule} warnings, ${allowance} allowed (${constant}): the backlog grew; fix the new ones (design values: use the tokens; pressables, icons and line limits: use the kit's).`;
   }
   return count < allowance
     ? `${count} ${rule} warnings, ${allowance} allowed: lower ${constant} to ${count} in scripts/eslint-all.ts (and update the plan's "Lint baseline").`
