@@ -83,6 +83,43 @@ describe("createPaceClient", () => {
     await expect(client.unsyncedCount()).resolves.toBe(0);
   });
 
+  it("a stale tab's sign-out keeps the shared copy another tab claimed since (re-review N3)", async () => {
+    // Two tabs of one browser profile: one store, each tab its own client.
+    const store = createMemoryEventStore();
+    const tab = async (token: string): Promise<PaceClient> => {
+      const session = createMemorySessionStore();
+      await session.set(token);
+      const api = createFakeFetch({ ...emptySyncRoutes, "GET /api/me": () => fakeMe });
+      const client = createPaceClient({
+        baseUrl: "https://api.test",
+        deviceId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+        fetch: api.fetch,
+        now: () => "2026-10-06T12:00:00.000Z",
+        session,
+        source: "web",
+        store,
+      });
+      await client.auth.ready;
+      await client.state.ready;
+      return client;
+    };
+    const stale = await tab("tok_old");
+    await stale.claimLocalCopy("tok_old");
+    // The other tab logged out and in again before the stale tab heard: its copy, its change.
+    const fresh = await tab("tok_new");
+    await fresh.claimLocalCopy("tok_new");
+    await fresh.actions.setLanguage("ru");
+    await stale.dropLocalCopyOf("tok_old");
+    await expect(store.listPending()).resolves.toHaveLength(1);
+    // The copy's own session leaving drops it.
+    await fresh.dropLocalCopyOf("tok_new");
+    await expect(store.listPending()).resolves.toHaveLength(0);
+    // A copy nobody claimed (made before owners) goes too.
+    await fresh.actions.setNightHours(true);
+    await stale.dropLocalCopyOf("tok_old");
+    await expect(store.listPending()).resolves.toHaveLength(0);
+  });
+
   it("signs out when the server closes the live socket because the session ended", async () => {
     const socket = oneSocket();
     const me = { isRevoked: false };

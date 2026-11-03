@@ -776,6 +776,70 @@ describe("a stale tab of a browser signed in again elsewhere (round 6 I1)", () =
   });
 });
 
+describe("a stale tab's sign-out racing another tab's sign-in (re-review N3)", () => {
+  it("keeps the copy another tab claimed between the stale tab's check and its wipe", async () => {
+    const shared = createMemorySessionStore();
+    const server = { isOldEnded: false };
+    const { eventStore, runtime } = await setup(
+      { "GET /api/me": () => (server.isOldEnded ? problem(401, "auth/unauthorized") : fakeMe) },
+      shared,
+    );
+    await runtime.auth.loginWithDev("1");
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    await waitFor(async () => {
+      await expect(eventStore.getStoreId()).resolves.not.toBeNull();
+      await expect(eventStore.listPending()).resolves.toEqual([]);
+    });
+    runtime.sync.stop();
+    // The other tab logged out (the store holds no session when the stale tab looks), then signed
+    // in again and wrote before the stale tab's wipe had its turn.
+    const readStored = runtime.auth.isSessionStored;
+    jest.spyOn(runtime.auth, "isSessionStored").mockImplementation(async () => {
+      const isStored = await readStored();
+      await shared.set("tok_other_tab");
+      // What the other tab's client does at its sign-in, on the store both tabs share.
+      await runtime.claimLocalCopy("tok_other_tab");
+      await eventStore.append([
+        {
+          deviceId: "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+          id: "01JOTHERTAB0000000000000000",
+          occurredAt: "2026-10-06T10:00:00.000Z",
+          payload: { language: "ru" },
+          precision: "exact",
+          recordedAt: "2026-10-06T10:00:00.000Z",
+          source: "web",
+          type: "settings.updated",
+        },
+      ]);
+      return isStored;
+    });
+    const before = runtime.state.copy();
+    server.isOldEnded = true;
+    await shared.clear();
+    await act(async () => {
+      await runtime.auth.me();
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("auth")).toHaveTextContent("signed-out:-");
+    });
+    // The stale tab's clear was asked for (its state is emptied) and had its turn in the queue.
+    await waitFor(() => {
+      expect(runtime.state.copy()).toBeGreaterThan(before);
+    });
+    await act(async () => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 50);
+      });
+    });
+    await expect(eventStore.listPending()).resolves.toHaveLength(1);
+    await expect(eventStore.getStoreId()).resolves.not.toBeNull();
+  });
+});
+
 describe("a token adopted from the browser or an App Link", () => {
   it("signs the runtime in and syncs with it", async () => {
     const { api, runtime } = await setup();

@@ -108,9 +108,10 @@ export type AppStateHandle = {
   readonly adoptPeerChange: (change: StoreChange) => Promise<void>;
   /**
   Drops the local copy: the log, its outbox, the cursor and the store id go, through the write
-  queue (a write still waiting is never made), and the state is empty.
+  queue (a write still waiting is never made), and the state is empty. With `ifOwner`, the store
+  keeps a copy another session of a shared store claimed since (`EventStore.clear`).
   */
-  readonly clear: () => Promise<void>;
+  readonly clear: (ifOwner?: string) => Promise<void>;
   /**
   Which local copy is current, bumped the moment `clear` is called (before its turn in the
   queue): a server page asked for one copy is never written into the next (fix round 1 of QA 22).
@@ -338,9 +339,11 @@ export const createAppState = (options: Options): AppStateHandle => {
 
   return {
     ...externalChanges(log, enqueue, options.onStored),
-    clear: async () => {
+    clear: async (ifOwner) => {
       copies += 1;
-      await enqueue(log.clear);
+      await enqueue(async () => {
+        await log.clear(ifOwner);
+      });
       // The other tabs share the store that was just emptied: they read it again.
       options.onStored?.({ kind: "reload" });
     },

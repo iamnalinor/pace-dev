@@ -20,6 +20,7 @@ import { IS_PHONE } from "./platform/device.ts";
 import { clearPresentedPoolNotifications } from "./platform/notification-cleanup.ts";
 import { useServerOrigin, watchServer } from "./platform/server-origin.ts";
 import { forgetLineDraft } from "./platform/shared-in.ts";
+import { claimLocalCopy, dropLocalCopyIfOwned } from "./local-copy.ts";
 import { type Pool, poolOf, retryOnWindowFocus } from "./runtime-pool.ts";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
 import { canStartSenders, POLL_LIVE_MS, POLL_OFFLINE_MS, startSenders } from "./senders.ts";
@@ -54,15 +55,18 @@ const SyncedContext = createContext<SyncedSessions>(NO_SYNCED_SESSION);
 export const LanguageOverrideContext = createContext<Language | null>(null);
 
 /**
-A signed-in start: this week's homework instances, a first sync, then the time zone that sync
+A signed-in start: the local copy claimed, this week's homework instances, a first sync, then the time zone that sync
 allowed (`createZoneStep`, run by the sync's own end), before the senders push it.
 */
 const bootstrap = async (
   runtime: PaceRuntime,
   pool: Pool,
   zoneSettled: () => Promise<void>,
+  session: string | undefined,
 ): Promise<void> => {
   const { actions, sync } = runtime;
+  // The copy is this session's before anything is written into it (re-review N3).
+  await claimLocalCopy(runtime, session);
   if (IS_PHONE) {
     // Every signed-in phone, before any network step (one failing must not skip it): it polls
     // when its method is `poll`, and always uploads its usage.
@@ -103,18 +107,6 @@ const followSyncedLanguage = (runtime: PaceRuntime, onSynced: OnSynced): (() => 
   });
 };
 
-/**
-The local copy (IndexedDB, shared by a browser's tabs) goes on sign-out only when no session is
-left in the shared store: a stale tab's late 401 never wipes the copy of the tab that signed in
-since (round 6 I1). A different account there gets a new store id, and its first pull drops the
-old copy on its own.
-*/
-const dropLocalCopyIfOwned = async (runtime: PaceRuntime): Promise<void> => {
-  if (!(await runtime.auth.isSessionStored())) {
-    await runtime.resetLocalData();
-  }
-};
-
 /** Starts/stops the sync loop with the auth status; a foreground return syncs at once. */
 const runSyncLoop = (runtime: PaceRuntime, onSynced: OnSynced): (() => void) => {
   const { actions, auth, sync } = runtime;
@@ -125,9 +117,10 @@ const runSyncLoop = (runtime: PaceRuntime, onSynced: OnSynced): (() => void) => 
   const follow = (status: AuthState["status"]): void => {
     if (status === "signed-in") {
       activeSession = runtime.api.currentSessionToken();
+      const session = activeSession;
       void (async () => {
         try {
-          await bootstrap(runtime, pool, zone.settled);
+          await bootstrap(runtime, pool, zone.settled, session);
         } catch {
           // Offline mid-start: a return to the app syncs and registers again (no unhandled rejection).
         }
@@ -154,10 +147,11 @@ const runSyncLoop = (runtime: PaceRuntime, onSynced: OnSynced): (() => void) => 
     if (activeSession !== undefined) {
       void clearPresentedPoolNotifications(activeSession);
     }
+    const leaving = activeSession;
     activeSession = undefined;
     // The half-typed line was this account's: a share after the next sign-in is only the share.
     forgetLineDraft();
-    void dropLocalCopyIfOwned(runtime);
+    void dropLocalCopyIfOwned(runtime, leaving);
   });
   // The poll is a safety net while the server can say "changed" itself.
   const stopFollowingLive = runtime.live.status.subscribe(({ isConnected }, previous) => {

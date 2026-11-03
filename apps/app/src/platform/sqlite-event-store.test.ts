@@ -98,6 +98,20 @@ describe("createSqliteEventStore", () => {
     await expect(store.getStoreId()).resolves.toBeNull();
   });
 
+  it("keeps a copy another session claimed when asked to clear only its own (re-review N3)", async () => {
+    const store = createSqliteEventStore();
+    await store.setOwner("ended:new");
+    await store.append([a]);
+    await store.clear("ended:old");
+    await expect(store.listAll()).resolves.toHaveLength(1);
+    await store.clear("ended:new");
+    await expect(store.listAll()).resolves.toEqual([]);
+    // Unclaimed (cleared, or from before owners): any session's clear drops it.
+    await store.append([a]);
+    await store.clear("ended:old");
+    await expect(store.listAll()).resolves.toEqual([]);
+  });
+
   it("opens the database once for every operation", async () => {
     const store = createSqliteEventStore();
     await Promise.all([store.getCursor(), store.listAll(), store.listPending()]);

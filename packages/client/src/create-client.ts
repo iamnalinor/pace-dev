@@ -1,7 +1,6 @@
 import { endpoints, type EndpointShape, type LiveNotice } from "@pace/core";
 
 import type { EventStore } from "./event-store.ts";
-import type { SessionStore, SignOutNotes } from "./session.ts";
 
 import { type Actions, createActions } from "./actions/actions.ts";
 import { type ApiClient, createApiClient } from "./api-client.ts";
@@ -16,6 +15,7 @@ import {
 } from "./live.ts";
 import { createNotificationFeed, type NotificationFeed, parseLiveNotice } from "./notifications.ts";
 import { parseStoreChange, type PeerTabs } from "./peer-tabs.ts";
+import { noteMark, type SessionStore, type SignOutNotes } from "./session.ts";
 import { type AppStateHandle, createAppState } from "./state.ts";
 import { createSyncClient, type SyncClient } from "./sync-client.ts";
 import {
@@ -45,6 +45,17 @@ export type PaceClient = {
   discards them with the local copy (QA round 23 R23-02).
   */
   readonly unsyncedCount: () => Promise<number>;
+  /**
+  Marks the local copy as the session of `token` (by a mark, never the token): at sign-in, before
+  the sync writes into it, so a stale tab of the same browser can tell it is no longer its own.
+  */
+  readonly claimLocalCopy: (token: string) => Promise<void>;
+  /**
+  Drops the local copy on sign-out unless another session claimed it since: the check and the
+  clear are one transaction of the store, so a stale tab's late 401 never wipes what a tab that
+  signed in meanwhile wrote (round 6 I1, re-review N3). The state is emptied either way.
+  */
+  readonly dropLocalCopyOf: (token: string) => Promise<void>;
   /**
   Lets go of what would outlive a client nobody uses any more (a runtime replaced for another
   server, React's second effect run in development): the line to the other tabs. The sync loop
@@ -341,6 +352,12 @@ export const createPaceClient = (options: PaceClientOptions): PaceClient => {
     unsyncedCount: async () => {
       const pending = await options.store.listPending();
       return pending.length;
+    },
+    claimLocalCopy: async (token) => {
+      await options.store.setOwner(noteMark(token));
+    },
+    dropLocalCopyOf: async (token) => {
+      await state.clear(noteMark(token));
     },
   };
 };
