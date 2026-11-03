@@ -11,9 +11,13 @@ import { Text } from "./text.tsx";
 /** The part of the `main` element the skip link moves the keyboard to. */
 type Focusable = { readonly focus?: (options?: { readonly preventScroll?: boolean }) => void };
 
+/** The id of the `main` element, the skip link's address. */
+const MAIN_ID = "pace-main";
+
 /**
-The keyboard's first stop on every page (F-A11Y-12): "Skip to content" moves focus past the
-navigation into `main`. Out of sight until focused (`global.css`, `[data-skip-link]`).
+The keyboard's first stop on every page (F-A11Y-12): "Skip to content", an `<a href="#pace-main">`
+(Enter follows it as a browser does), which moves focus past the navigation into `main` without
+changing the address. Out of sight until focused (`global.css`, `[data-skip-link]`).
 */
 const SkipLink = ({ onSkip }: { readonly onSkip: () => void }) => {
   const t = useT();
@@ -25,8 +29,13 @@ const SkipLink = ({ onSkip }: { readonly onSkip: () => void }) => {
     >
       <Pressable
         className="justify-center rounded-md bg-elevated px-4"
-        onPress={onSkip}
+        onPress={(event) => {
+          // The address stays as it is: the router must not see a hash.
+          event.preventDefault();
+          onSkip();
+        }}
         role="link"
+        {...({ href: `#${MAIN_ID}` } as object)}
       >
         <Text role="callout">{t("nav.skipToContent")}</Text>
       </Pressable>
@@ -55,6 +64,7 @@ export const Shell = ({ content, navigation, ...inspector }: ShellProps) => {
         className="min-w-0 flex-1"
         ref={mainRef}
         testID="shell-content"
+        {...(isTopLevel && { nativeID: MAIN_ID })}
         {...(isTopLevel && ({ role: "main", tabIndex: -1 } as object))}
       >
         {content}

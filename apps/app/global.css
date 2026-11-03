@@ -125,16 +125,12 @@ thick track filled up to the thumb (`--pace-share`) and a round thumb.
 }
 
 /*
-The shell's skip link (ui/shell.web.tsx; spec §4.2.18, F-A11Y-12): out of sight until the keyboard
-reaches it, then shown where it is, the first stop of the page.
+The shell's skip link (ui/shell.web.tsx; spec §4.2.18, F-A11Y-12): above the top edge of the page,
+whole (nothing clipped, nothing under the pointer), until the keyboard reaches it; then it comes
+down to where it sits, the first stop of the page.
 */
 [data-skip-link]:not(:focus-within) {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
+  transform: translateY(-200%);
 }
 
 /*

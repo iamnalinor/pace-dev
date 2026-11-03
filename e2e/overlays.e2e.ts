@@ -49,13 +49,32 @@ const raiseToast = async (page: Page, title: string): Promise<void> => {
   await expect(page.getByRole("alert")).toBeVisible();
 };
 
+/**
+The controls under the toast that stay under it once the content is scrolled by the toast's
+height: a row of a long list may pass under the toast (spec §4.1.4 rule 3) but must scroll out
+from under it; chrome (the time bar, the tab bar) never scrolls, so it stays found.
+*/
+const stuckUnderToast = async (page: Page): Promise<readonly string[]> => {
+  const under = await controlsUnder(page, '[role="alert"]');
+  if (under.length === 0) {
+    return [];
+  }
+  const toast = await page.getByRole("alert").boundingBox();
+  await page.mouse.move(8, (toast?.y ?? 0) - 40);
+  await page.mouse.wheel(0, (toast?.height ?? 0) + 120);
+  const still = await controlsUnder(page, '[role="alert"]');
+  return under.filter((control) => still.includes(control));
+};
+
 const SHEET = '[data-pace-surface="sheet"]';
 
 for (const size of SIZES) {
   test.describe(`overlays and motion, ${size.name}`, () => {
     test.use({ viewport: { height: size.height, width: size.width } });
 
-    test("a toast covers no control on any main screen (bug class 6)", async ({ page }) => {
+    test("a toast covers no control on any main screen, or one that cannot scroll out from under it (bug class 6)", async ({
+      page,
+    }) => {
       test.setTimeout(180_000);
       await loginViaApi(page);
       const covered: string[] = [];
@@ -65,8 +84,8 @@ for (const size of SIZES) {
           await tap(page, step);
         }
         await expect(page.getByRole("alert")).toBeVisible();
-        const under = await controlsUnder(page, '[role="alert"]');
-        covered.push(...under.map((control) => `${screen}: ${control}`));
+        const stuck = await stuckUnderToast(page);
+        covered.push(...stuck.map((control) => `${screen}: ${control}`));
       }
       expect(covered).toEqual([]);
     });
