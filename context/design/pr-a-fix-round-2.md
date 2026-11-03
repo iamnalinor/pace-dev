@@ -200,6 +200,46 @@ Written down as an accepted residual in class 18:
 The I1/M6 MCP test moved, unchanged, from `describe("search_decisions")` to
 `describe("presets")`. It passes (23/23 in the file).
 
-## Step 3: verification
+### Found by the full e2e of this round
 
-(filled in below)
+1. **The offline Log out confirm at 1440 counted 2 changes, not 1 (965b734).**
+   - With N2's press-time read, the confirm also counted a new account's time-zone write, which had
+     not been sent yet. The count is right; the test went offline too early.
+   - Fix: both Log out e2e wait for an empty outbox first, through the shared `outboxSent` in
+     `e2e/support/outbox.ts`. 9/9 with `--repeat-each 3`.
+   - bug-lessons row, class 20.
+2. **The versions test failed once with `Response has been disposed` (b9f152e).**
+   - `login.e2e.ts` "a page older than its server offers Refresh…": Refresh reloads the page while
+     the test's own `/api/instance` route handler is still reading a fetched answer.
+   - Fix: the handler treats a disposed answer as the cancelled request it is, and rethrows anything
+     else. 6/6 with `--repeat-each 6`.
+   - bug-lessons row, class 63.
+
+## Step 3: verification (final tree b9f152e)
+
+- `bun lint`: exit 0. 74 warnings, 0 errors (the ratchet is unchanged). knip, jscpd,
+  dependency-cruiser, workflows and migrations are clean. The pre-commit hook ran `bun lint` on
+  every commit of the round.
+- `bun test:unit`: core 878/878 (83 files), client 516/516 (46 files).
+- `bun test:api`: 601/601 (63 files).
+- `bun test:app`: 896/896 (119 suites).
+- `bun test:e2e`: 200/200 (24 files, 4 workers, fresh servers on :8787/:4173, 16.8 min).
+  - The two runs before it found the two test issues above: 189 passed and 1 failed, both times.
+  - unit/api/app ran on 7f6ce8b. The two commits after it change e2e files and bug-lessons only.
+
+## Concerns
+
+- **N4's new Connect an AI app line was not shot.** It is one kit `Text` with existing tokens in an
+  existing sheet. The phone/desktop × theme × EN/RU matrix and the design-skill review for it are
+  still owed (PR B's batch, or the next QA round).
+- **L5 is left to Task 4.11.** The open Log out confirm keeps its count while changes sync.
+- **`features.mcp` defaults to true when a server does not say.** This is a named exception to
+  class 13, chosen so that older servers keep their Connect URL.
+- **N3's claim can fail.** If a claim write fails while other writes succeed, the copy keeps its
+  previous mark. That mark is normally none after a sign-out, because the clear removes it. Accepted
+  and commented in `local-copy.ts`.
+- **The re-review's nits on M4 (timeout scope) and `storedPresetName` casing were not taken**, as
+  the re-review itself left them.
+- **No code review of this round has run yet.** CLAUDE.md wants
+  `superpowers:requesting-code-review`; the controller dispatches it, since this implementer was told
+  not to dispatch agents.
