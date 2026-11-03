@@ -22,6 +22,7 @@ describe("no-raw-design-values", () => {
     ).toEqual([
       "arbitraryClass",
       "offScaleClass",
+      "pressedClass",
       "rawColor",
       "rawDuration",
       "rawFontMetric",
@@ -153,8 +154,27 @@ tester.run("no-raw-design-values", noRawDesignValues, {
     // Class strings outside a className: constants, maps, class-helper arguments.
     {
       code: 'const ROW = "flex-row p-5 active:opacity-70";',
-      errors: [{ data: { name: "active:opacity-70" }, messageId: "offScaleClass" }],
+      errors: [{ data: { name: "active:opacity-70" }, messageId: "pressedClass" }],
       options: [ALLOWED],
+    },
+    // Press feedback is the kit's state layer, never a NativeWind `active:` class (F-CMP-01):
+    // reported once, as pressedClass, whether or not the class is on the scale.
+    {
+      code: 'const a = <View className="p-5 active:opacity-80" />;',
+      errors: [{ data: { name: "active:opacity-80" }, messageId: "pressedClass" }],
+      options: [ALLOWED],
+    },
+    {
+      code: 'const a = <View className="p-5 active:bg-bg-cell dark:active:p-5" />;',
+      errors: [
+        { data: { name: "active:bg-bg-cell" }, messageId: "pressedClass" },
+        { data: { name: "dark:active:p-5" }, messageId: "pressedClass" },
+      ],
+      options: [ALLOWED],
+    },
+    {
+      code: 'const a = <View className="active:p-[3px]" />;',
+      errors: [{ messageId: "pressedClass" }],
     },
     {
       code: 'const LOOK = { danger: "text-body bg-warn", plain: "p-5" };',
@@ -247,6 +267,14 @@ tester.run("no-raw-design-values", noRawDesignValues, {
       code: 'const a = <View className="p-[3px]" />; const b = "#fff";',
       filename: "apps/app/src/ui/example.test.tsx",
     },
+    {
+      // The state layer itself is the one place a pressed class may live.
+      code: 'const a = <View className="p-5 active:bg-bg-cell" />;',
+      filename: "apps/app/src/ui/pressable.tsx",
+      options: [ALLOWED],
+    },
+    // Words that only contain "active" are not the variant.
+    { code: 'const a = <View className="p-5 inactive:p-5" />;', options: [ALLOWED] },
   ].map((c) =>
     typeof c === "string" ? { code: c, filename: APP_FILE } : { filename: APP_FILE, ...c },
   ),

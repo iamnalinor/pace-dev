@@ -13,7 +13,9 @@ reanimated, `*_MS`/`*DURATION`/`*DELAY` constants, spring physics) and Tailwind 
 must come from the design tokens (`@pace/core` design package, the generated Tailwind scale).
 Spec §9.3.
 
-Message ids: rawColor, rawRadius, rawFontMetric, rawDuration, arbitraryClass, offScaleClass.
+Message ids: rawColor, rawRadius, rawFontMetric, rawDuration, arbitraryClass, offScaleClass,
+pressedClass. `pressedClass`: a NativeWind `active:` class outside `ui/pressable.tsx`; press feedback
+is the kit's state layer (a native ripple, a CSS overlay), never a React render late (F-CMP-01).
 `offScaleClass` needs the generated class list (option `allowedClasses`); without it only the
 arbitrary-value (`[...]`) and raw-literal checks run.
 
@@ -31,6 +33,8 @@ const FONT_KEYS: ReadonlySet<string> = new Set(["fontSize", "letterSpacing", "li
 // The design package owns the raw values; tests and fakes assert on literals.
 const DESIGN_PACKAGE = /(?:^|\/)packages\/core\/src\/design\//;
 const TEST_FILE = /\.(?:test|fake)\.[cm]?[jt]sx?$/;
+// The kit's state layer: press feedback lives there and nowhere else (F-CMP-01).
+const STATE_LAYER = /(?:^|\/)apps\/app\/src\/ui\/pressable\.tsx$/;
 
 /** The slice of ESTree-JSX the rule reads (estree's types do not cover JSX). */
 type JsxAttribute = {
@@ -107,7 +111,11 @@ export const noRawDesignValues: Rule.RuleModule = {
     const motion = createMotionCallChecks(context);
     // Parents are visited before their strings: a className's pieces are marked before the
     // loose-string check reaches them.
-    const scope: ClassScope = { allowed, seen: new WeakSet() };
+    const scope: ClassScope = {
+      allowed,
+      isStateLayer: STATE_LAYER.test(filename),
+      seen: new WeakSet(),
+    };
 
     return {
       CallExpression: motion.call,
@@ -146,6 +154,8 @@ export const noRawDesignValues: Rule.RuleModule = {
       arbitraryClass:
         "Arbitrary Tailwind value `{{name}}`: use a design token class from the scale.",
       offScaleClass: "`{{name}}` is not in the generated design scale: use a token class.",
+      pressedClass:
+        "`{{name}}`: press feedback is the kit's state layer, not an `active:` class: use `Pressable` from `#app/ui/pressable`.",
       rawColor: "Raw colour `{{value}}`: use a colour token (`useTheme()` or a token class).",
       rawDuration: "Raw duration in `{{name}}`: use a `motion` token from `@pace/core`.",
       rawFontMetric: "Raw `{{name}}`: use a `type` role token (a `text-*` class or `typeStyle`).",

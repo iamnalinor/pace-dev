@@ -81,3 +81,64 @@ describe("an action's answer in the app", () => {
     LINT_APP_FILE_MS,
   );
 });
+
+/** The `no-restricted-imports` setting for one file: its severity and options, or `undefined`. */
+const restrictedImports = async (file: string): Promise<unknown> => {
+  const config = (await eslint.calculateConfigForFile(path.join(ROOT, file))) as {
+    readonly rules?: Readonly<Record<string, unknown>>;
+  };
+  return config.rules?.["no-restricted-imports"];
+};
+
+/** The names a `no-restricted-imports` setting bans from `react-native`. */
+const bannedFromReactNative = (setting: unknown): readonly string[] => {
+  if (!Array.isArray(setting) || setting[0] === 0 || setting[0] === "off") {
+    return [];
+  }
+  return setting.slice(1).flatMap((option: unknown) => {
+    const paths =
+      typeof option === "object" && option !== null && "paths" in option
+        ? (option.paths as readonly {
+            readonly importNames?: readonly string[];
+            readonly name: string;
+          }[])
+        : [];
+    return paths
+      .filter(({ name }) => name === "react-native")
+      .flatMap(({ importNames }) => importNames ?? []);
+  });
+};
+
+describe("a bare pressable (bug-lessons F-CMP-01)", () => {
+  it.each(["apps/app/src/features/week/week-screen.tsx", "apps/app/src/shared/task-row.tsx"])(
+    "is banned from react-native in %s: the kit's Pressable draws the state layer",
+    async (file) => {
+      const banned = bannedFromReactNative(await restrictedImports(file));
+      expect(banned).toContain("Pressable");
+      expect(banned).toContain("TouchableOpacity");
+    },
+  );
+
+  it.each(["apps/app/src/ui/pressable.tsx", "apps/app/src/features/week/week-screen.test.tsx"])(
+    "is allowed in %s (the kit itself, or a test)",
+    async (file) => {
+      expect(bannedFromReactNative(await restrictedImports(file))).toEqual([]);
+    },
+  );
+
+  it(
+    "is reported with the way to the kit",
+    async () => {
+      const [result] = await eslint.lintText(
+        'import { Pressable, Text } from "react-native";\nexport const a = [Pressable, Text];\n',
+        { filePath: path.join(ROOT, "apps/app/src/features/week/week-screen.tsx") },
+      );
+      const flagged = (result?.messages ?? []).filter(
+        (message) => message.ruleId === "no-restricted-imports",
+      );
+      expect(flagged).toHaveLength(1);
+      expect(flagged[0]?.message).toContain("#app/ui/pressable");
+    },
+    LINT_APP_FILE_MS,
+  );
+});

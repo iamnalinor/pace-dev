@@ -519,6 +519,34 @@ export default defineConfig([
     plugins: { pace },
     rules: { "pace/no-raw-design-values": ["warn", { allowedClasses: GENERATED_CLASSES }] },
   },
+  // Features and shared rows press through the kit's Pressable, which draws the state layer
+  // (bug-lessons F-CMP-01). A warning counted by its own exact ratchet (BARE_PRESSABLE_WARNINGS in
+  // scripts/eslint-all.ts) while the kit tasks migrate the callers; then it becomes an error.
+  {
+    files: ["apps/app/src/features/**/*.{ts,tsx}", "apps/app/src/shared/**/*.{ts,tsx}"],
+    ignores: TESTS,
+    rules: {
+      "no-restricted-imports": [
+        "warn",
+        {
+          paths: [
+            {
+              importNames: [
+                "Pressable",
+                "TouchableHighlight",
+                "TouchableNativeFeedback",
+                "TouchableOpacity",
+                "TouchableWithoutFeedback",
+              ],
+              message:
+                "A bare pressable has no state layer (no ripple, hover or focus ring): use Pressable from #app/ui/pressable.",
+              name: "react-native",
+            },
+          ],
+        },
+      ],
+    },
+  },
   {
     // Plain scripts the web page loads before the app (no bundler, no types): checked as browser JS.
     files: ["apps/app/public/*.js"],
