@@ -14,12 +14,15 @@ RuleTester.itOnly = it.only;
 const tester = new RuleTester({
   languageOptions: {
     parser,
-    parserOptions: {
-      projectService: { allowDefaultProject: ["*.ts"] },
-      tsconfigRootDir: import.meta.dirname,
-    },
+    parserOptions: { projectService: true, tsconfigRootDir: path.join(import.meta.dir, "../..") },
   },
 });
+
+/**
+Each case is linted as if it were this file: a path the root project includes and that exists on
+disk, so the project service types it (a made-up name is "not found" once the service is warm).
+*/
+const FILE = import.meta.filename;
 
 const DECLARE = "declare let p: Promise<number>; declare let maybe: Promise<number> | undefined;";
 
@@ -29,6 +32,7 @@ tester.run("promise-function-async", promiseFunctionAsync, {
     {
       code: `${DECLARE} export const f = (): Promise<number> => p;`,
       errors: [{ messageId: "missingAsync" }],
+      filename: FILE,
       output: `${DECLARE} export const f = async (): Promise<number> => p;`,
     },
     // A getter of "a promise or nothing": `async` would turn its `undefined` into a promise that
@@ -37,13 +41,17 @@ tester.run("promise-function-async", promiseFunctionAsync, {
     {
       code: `${DECLARE} export const g = { get: () => maybe };`,
       errors: [{ messageId: "missingAsyncHybridReturn" }],
+      filename: FILE,
       output: null,
     },
   ],
   valid: [
-    `${DECLARE} export const f = async (): Promise<number> => await p;`,
+    { code: `${DECLARE} export const f = async (): Promise<number> => await p;`, filename: FILE },
     // The way out the message names: an explicit union return type.
-    `${DECLARE} export const g = { get: (): Promise<number> | undefined => maybe };`,
+    {
+      code: `${DECLARE} export const g = { get: (): Promise<number> | undefined => maybe };`,
+      filename: FILE,
+    },
   ],
 });
 

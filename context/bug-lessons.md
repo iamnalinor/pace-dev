@@ -1182,6 +1182,19 @@ The same rule applies when a previously successful channel is no longer configur
   (`ids-no-prng`, `numbers`, `initials`); `scripts/fresh-import-timeout.test.ts` fails a new one
   without a `timeout:`.
 
+### 116. A test green alone, red in its suite
+- **Bug.** A8's RuleTester (`promise-function-async.test.ts`) passed when run by itself and failed
+  inside `bun test:unit`. The type-aware cases had no `filename`, so typescript-eslint linted them
+  as `estree.ts`, a path that does not exist on disk. In the full suite the shared project service
+  had already been warmed by the other rule tests and answered that path "not found by the project
+  service".
+- **Missed because.** The red/green cycle ran the one file only; the suite's entry point
+  (`bun test:unit`, one Bun process over `scripts`) ran later.
+- **Rule.** Before committing, a new test passes the way CI runs it (the package's script), not
+  only alone. A type-aware lint test names a real file the project includes (`filename`).
+- **Sweep and guard.** The other RuleTester (`no-raw-design-values.test.ts`) is not type-aware and
+  names its files. `verification-before-completion` runs the suite scripts, not the single file.
+
 ## Log
 
 New bugs go here with their class; a new class gets its own section above.
@@ -1527,3 +1540,4 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-03 | QA round 21 L6: the line under Connect an AI app's URL said "This server's public address differs from the one this device uses.", naming neither address nor what to do | 99 (a failure's reason dropped at a boundary: the two addresses were known and not said) | yes: the other place the two addresses meet (Add a computer's `--api`, the reached one by design, class 83) needs no line; `docs/self-hosting.md` now says which address each one is | `sessions.test.tsx` (the line names the device's address, that AI apps need the one above, and the `API_ORIGIN` remedy; EN and RU) |
 | 2026-11-03 | pr48 follow-up (tooling): lint autofix turned `() => inFlight` into `async () => await inFlight`, and the drain over it never ended (`sync.hold` hung; the tests caught it) | 114 (new) | yes: `return-await` alone only adds `await` where the function is already `async`; the hybrid-return fix of `promise-function-async` was the one that changes meaning | `pace/promise-function-async` replaces the upstream rule (report kept, fix dropped for `missingAsyncHybridReturn`); `promise-function-async.test.ts` (RuleTester red before: the output had `async`; the resolved config runs `pace/` and not upstream) |
 | 2026-11-03 | pr48 follow-up (tooling): `ids-no-prng.test.ts` timed out once under load (5 s default) | 115 (new) | yes: every file that calls `vi.resetModules()` and imports afresh (`numbers.test.ts` had no timeout either; `initials.test.ts` had one) | both get `FRESH_IMPORT_MS` (30 s); `scripts/fresh-import-timeout.test.ts` (red before: both files listed) |
+| 2026-11-03 | Final verification of A1–A8: `bun test:unit` failed the four cases of A8's new `promise-function-async.test.ts` (green alone): no `filename`, so the cases were linted as a missing `estree.ts`, which the project service, warmed by the other files, refused | 116 (new) | yes: the only other RuleTester is untyped and names its files | the cases are linted as the test file itself (`filename: import.meta.filename`, root project, on disk); `bun test scripts` 125/125, the wrapper's fix-drop still red when removed |
