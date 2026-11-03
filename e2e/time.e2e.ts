@@ -216,7 +216,7 @@ for (const size of SIZES) {
     await addTask(page, `Toast ${size.name}`);
     await nowTasks(page).getByText(`Toast ${size.name}`).click();
     await page.getByRole("button", { name: "Delete the task" }).click();
-    const toast = page.getByRole("alert");
+    const toast = page.getByTestId("toast-card");
     await expect(toast).toBeVisible();
     // In the app, not a reload: a reload would drop the toast.
     await page
@@ -226,8 +226,8 @@ for (const size of SIZES) {
     const bar = timeBar(page);
     await expect(bar).toBeVisible();
     await expect(toast).toBeVisible();
-    // Above the bar on a phone, at the sidebar's foot on a computer: over none of its buttons.
-    expect(await controlsUnder(page, '[role="alert"]')).toEqual([]);
+    // Above the bar on a phone and on a computer alike: over none of its buttons.
+    expect(await controlsUnder(page, '[data-testid="toast-card"]')).toEqual([]);
   });
 }
 
@@ -241,7 +241,7 @@ test("the greyed Calendar button says why the moment the pointer is over it", as
   const tooltip = page.getByRole("tooltip");
   // No toast and no delay: the bubble is there at once, right above the button.
   await expect(tooltip).toBeVisible({ timeout: 300 });
-  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(page.getByTestId("toast-card")).toHaveCount(0);
   const gap = await gapAbove(tooltip, calendar);
   expect(gap).toBeGreaterThanOrEqual(0);
   expect(gap).toBeLessThan(16);

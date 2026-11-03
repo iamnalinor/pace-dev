@@ -1,13 +1,22 @@
 import { type ReactNode, useState } from "react";
-import { ScrollView, View } from "react-native";
+import { type NativeScrollEvent, type NativeSyntheticEvent, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { space } from "@pace/core";
+
 import { cx } from "./cx.ts";
+import { useFloatPlace, useLiftToastAbove } from "./float-layer.ts";
 import { useIsScreenActive } from "./screen-active.ts";
-import { useLiftToastAbove } from "./toast.tsx";
 
 /** The readable column every part of a screen keeps to on a wide window (spec §4.2.18). */
 const COLUMN = "w-full max-w-content-wide self-center";
+
+/** The room a list keeps under its last row (64), when nothing floats over its foot. */
+const FOOT_ROOM = space["11"];
+
+/** Whether the body has scrolled at all: content is then under the header's edge. */
+const isUnder = (event: NativeSyntheticEvent<NativeScrollEvent>): boolean =>
+  event.nativeEvent.contentOffset.y > 0;
 
 /**
 A full screen on the app background below the status bar (spec §4.2.18). `header` stays put; the
@@ -40,16 +49,40 @@ export const Screen = ({
   // A toast floats above the footer (the time bar) instead of covering its buttons.
   const [footerHeight, setFooterHeight] = useState(0);
   useLiftToastAbove(footer === undefined ? 0 : footerHeight, useIsScreenActive());
+  // While a toast or the offline pill floats over the list's foot, the list scrolls that much further.
+  const { inset } = useFloatPlace();
+  const [isScrolled, setIsScrolled] = useState(false);
   return (
     <View className="flex-1 bg-app" style={{ paddingTop: insets.top }}>
-      <View className={COLUMN}>{header}</View>
+      {/*
+      The scroll edge (F-LAY-13): once the content scrolls under the header, the header keeps
+      the page's ground and a hairline marks its edge; at rest the line is there, unseen, so
+      nothing moves when it shows.
+      */}
+      {header === undefined ? null : (
+        <View
+          className={cx("border-b bg-app", isScrolled ? "border-separator" : "border-transparent")}
+          testID="screen-header-edge"
+        >
+          <View className={COLUMN}>{header}</View>
+        </View>
+      )}
       {fills ? (
         <View className={cx(COLUMN, "flex-1")}>{children}</View>
       ) : (
         <ScrollView
           className="flex-1"
-          contentContainerClassName={cx(COLUMN, "pb-16")}
+          contentContainerClassName={COLUMN}
+          contentContainerStyle={{ paddingBottom: Math.max(FOOT_ROOM, inset) }}
           keyboardShouldPersistTaps="handled"
+          onScroll={(event) => {
+            const isNowUnder = isUnder(event);
+            if (isNowUnder !== isScrolled) {
+              setIsScrolled(isNowUnder);
+            }
+          }}
+          scrollEventThrottle={16}
+          testID="screen-body"
           {...(scrollLabel !== undefined && {
             "aria-label": scrollLabel,
             role: "region",

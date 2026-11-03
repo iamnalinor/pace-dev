@@ -40,7 +40,7 @@ const ReviewButton = ({
 }) => {
   const t = useT();
   return (
-    <Tooltip label={t("assistant.review")} showsOnTap={false}>
+    <Tooltip label={t("assistant.review")}>
       <Pressable
         accessibilityLabel={t("assistant.review")}
         accessibilityRole="button"
@@ -181,7 +181,7 @@ const BarButton = ({ button, onTap, unavailable }: ButtonProps) => {
   return (
     <View className="flex-1">
       {/* Greyed, it says why the moment the pointer is over it; a tap opens the picker, which says it too. */}
-      <Tooltip label={unavailable} showsOnTap={false}>
+      <Tooltip isImmediate label={unavailable}>
         <Pressable
           accessibilityHint={unavailable ?? t(look.hintKey)}
           accessibilityLabel={button.isRunning ? t("time.buttonRunning", { label }) : label}

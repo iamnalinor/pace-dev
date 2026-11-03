@@ -5,7 +5,7 @@ import { z } from "@pace/core";
 
 import { useT } from "../app-state.tsx";
 import { Pressable } from "./pressable.tsx";
-import { Inspector, type ShellProps, useShellInsets } from "./shell-regions.tsx";
+import { Inspector, type ShellProps, useRegionLayout, useShellInsets } from "./shell-regions.tsx";
 import { Text } from "./text.tsx";
 
 /** The id of the `main` element, the skip link's address. */
@@ -48,6 +48,7 @@ export const Shell = ({ content, navigation, ...inspector }: ShellProps) => {
   const mainRef = useRef<View>(null);
   const insets = useShellInsets();
   const isTopLevel = navigation !== undefined;
+  const region = useRegionLayout(isTopLevel);
   return (
     <View className="flex-1 flex-row bg-app" style={insets} testID="shell">
       {isTopLevel ? (
@@ -66,6 +67,7 @@ export const Shell = ({ content, navigation, ...inspector }: ShellProps) => {
         className="min-w-0 flex-1"
         ref={mainRef}
         testID="shell-content"
+        {...region}
         {...(isTopLevel && { nativeID: MAIN_ID })}
         {...(isTopLevel && ({ role: "main", tabIndex: -1 } as object))}
       >

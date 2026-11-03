@@ -26,7 +26,7 @@ export const NotificationBell = ({
       ? t("notifications.openUnread", { count: model.unread })
       : t("notifications.open");
   return (
-    <Tooltip label={label} showsOnTap={false}>
+    <Tooltip label={label}>
       <Pressable
         accessibilityLabel={label}
         accessibilityRole="button"

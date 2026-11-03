@@ -25,7 +25,7 @@ export const IconButton = ({
   readonly variant?: "plain" | "raised" | "surface";
 }) => {
   return (
-    <Tooltip label={label} showsOnTap={false}>
+    <Tooltip label={label}>
       <Pressable
         accessibilityHint={hint}
         accessibilityLabel={label}

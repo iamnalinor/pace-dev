@@ -17,7 +17,6 @@ import { Link } from "./link.tsx";
 import { PaceMark } from "./logo.tsx";
 import { Pressable } from "./pressable.tsx";
 import { Text } from "./text.tsx";
-import { useDockToastsHere } from "./toast.tsx";
 import { useHotkey } from "./use-hotkey.tsx";
 
 export type Destination = {
@@ -186,7 +185,6 @@ export const Sidebar = () => {
   const path = usePathname();
   const owner = useOwnerName();
   const waiting = useWaitingCount();
-  useDockToastsHere();
   const newTask = useNewTask();
   return (
     <View

@@ -4,61 +4,38 @@ import { Pressable, Text, View } from "react-native";
 import { renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 
-import { TAP_TOOLTIP_MS } from "./tooltip-place.ts";
 import { Tooltip } from "./tooltip.tsx";
 
-const LABEL = "No calendar events around now";
+const LABEL = "Night hours";
 
-const Trigger = ({ label, onPress }: { readonly label?: string; readonly onPress: () => void }) => (
-  <View>
-    <Tooltip label={label}>
-      <Pressable accessibilityLabel="Calendar" accessibilityRole="button" onPress={onPress}>
-        <Text>Calendar</Text>
-      </Pressable>
-    </Tooltip>
-    <Text>Elsewhere</Text>
-  </View>
-);
-
-/** A finger on the trigger: the touch ends (the tooltip's cue), then the press runs. */
-const tap = async (): Promise<void> => {
-  const button = screen.getByRole("button", { name: "Calendar" });
-  await fireEvent(button, "touchEnd");
-  await fireEvent.press(button);
-};
-
-describe("Tooltip on a phone", () => {
+describe("Tooltip on a phone (spec §4.2.31)", () => {
   afterEach(() => {
     jest.useRealTimers();
   });
 
-  it("shows at once on a tap of its trigger, whose own press still runs, and goes after a while", async () => {
+  it("shows nothing on a tap: the tap runs the control, whose name stays its own", async () => {
     const onPress = jest.fn();
-    await renderScreen(<Trigger label={LABEL} onPress={onPress} />, await createTestRuntime());
+    await renderScreen(
+      <View>
+        <Tooltip label={LABEL}>
+          <Pressable accessibilityLabel={LABEL} accessibilityRole="switch" onPress={onPress}>
+            <Text>Moon</Text>
+          </Pressable>
+        </Tooltip>
+      </View>,
+      await createTestRuntime(),
+    );
     jest.useFakeTimers();
-    expect(screen.queryByText(LABEL)).toBeNull();
-    await tap();
-    expect(screen.getByText(LABEL)).toBeOnTheScreen();
-    expect(onPress).toHaveBeenCalledTimes(1);
+    const trigger = screen.getByRole("switch", { name: LABEL });
+    await fireEvent(trigger, "touchEnd");
+    await fireEvent.press(trigger);
+    await fireEvent(trigger, "longPress");
     await act(() => {
-      jest.advanceTimersByTime(TAP_TOOLTIP_MS);
+      jest.advanceTimersByTime(1000);
     });
-    expect(screen.queryByText(LABEL)).toBeNull();
-  });
-
-  it("goes on the next tap anywhere", async () => {
-    await renderScreen(<Trigger label={LABEL} onPress={jest.fn()} />, await createTestRuntime());
-    await tap();
-    expect(screen.getByText(LABEL)).toBeOnTheScreen();
-    await fireEvent(screen.getByText("Elsewhere"), "touchStart");
-    expect(screen.queryByText(LABEL)).toBeNull();
-  });
-
-  it("shows nothing without a label", async () => {
-    const onPress = jest.fn();
-    await renderScreen(<Trigger onPress={onPress} />, await createTestRuntime());
-    await tap();
     expect(onPress).toHaveBeenCalledTimes(1);
+    // Only the control's own name: no bubble came up.
+    expect(screen.getAllByLabelText(LABEL)).toHaveLength(1);
     expect(screen.queryByText(LABEL)).toBeNull();
   });
 });

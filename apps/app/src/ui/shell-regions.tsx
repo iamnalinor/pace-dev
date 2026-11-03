@@ -2,6 +2,7 @@ import { type ReactNode, useState } from "react";
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useContentRegionLayout } from "./float-layer.ts";
 import { useIsWide } from "./layout.ts";
 import { Presence } from "./presence.tsx";
 
@@ -53,6 +54,16 @@ export const Inspector = ({
       </View>
     </Presence>
   ) : null;
+};
+
+/**
+The content region's `onLayout` for the shell beside the navigation: it tells the toast layer
+where the region is, so the toast and the offline pill float in it, never across the sidebar or
+the rail (R23-13a). A shell without the navigation (Week's own) leaves the root's word standing.
+*/
+export const useRegionLayout = (hasNavigation: boolean) => {
+  const onLayout = useContentRegionLayout(hasNavigation);
+  return hasNavigation ? { onLayout } : {};
 };
 
 /** The shell's outer frame: the side insets keep the rail and the content off the cutout. */

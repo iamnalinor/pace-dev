@@ -88,7 +88,7 @@ export const TaskFooter = ({
             focus and describes Done by it (react-native-web drops `hint`); the phone's tooltip
             does not show on a tap here, so its screen reader gets the hint. It says what Done
             does; the long press is a shortcut to the button beside it, never taught (QA 20 L3). */}
-            <Tooltip label={t("task.doneHint")} showsOnTap={false}>
+            <Tooltip label={t("task.doneHint")}>
               <Button
                 hint={t("task.doneHint")}
                 hotkey={HOTKEYS.primary}

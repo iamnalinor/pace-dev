@@ -46,7 +46,7 @@ const raiseToast = async (page: Page, title: string): Promise<void> => {
   await addTask(page, title);
   await nowTasks(page).getByText(title).click();
   await page.getByRole("button", { name: "Delete the task" }).click();
-  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(page.getByTestId("toast-card")).toBeVisible();
 };
 
 /** How long the page must go without a scroll event before a wheel's scroll counts as done. */
@@ -95,14 +95,14 @@ height: a row of a long list may pass under the toast (spec §4.1.4 rule 3) but 
 from under it; chrome (the time bar, the tab bar) never scrolls, so it stays found.
 */
 const stuckUnderToast = async (page: Page): Promise<readonly string[]> => {
-  const under = await controlsUnder(page, '[role="alert"]');
+  const under = await controlsUnder(page, '[data-testid="toast-card"]');
   if (under.length === 0) {
     return [];
   }
-  const toast = await page.getByRole("alert").boundingBox();
+  const toast = await page.getByTestId("toast-card").boundingBox();
   await page.mouse.move(8, (toast?.y ?? 0) - 40);
   await wheelAndSettle(page, (toast?.height ?? 0) + 120);
-  const still = await controlsUnder(page, '[role="alert"]');
+  const still = await controlsUnder(page, '[data-testid="toast-card"]');
   return under.filter((control) => still.includes(control));
 };
 
@@ -123,7 +123,7 @@ for (const size of SIZES) {
         for (const step of steps) {
           await tap(page, step);
         }
-        await expect(page.getByRole("alert")).toBeVisible();
+        await expect(page.getByTestId("toast-card")).toBeVisible();
         const stuck = await stuckUnderToast(page);
         covered.push(...stuck.map((control) => `${screen}: ${control}`));
       }

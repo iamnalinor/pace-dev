@@ -118,7 +118,7 @@ const LineButton = ({
   const { palette } = useTheme();
   const iconColor = isAccent ? palette["accent.on"] : palette["label.secondary"];
   return (
-    <Tooltip label={labelWithHotkey(label, hotkey, KEYBOARD)} showsOnTap={false}>
+    <Tooltip label={labelWithHotkey(label, hotkey, KEYBOARD)}>
       <Pressable
         accessibilityLabel={label}
         accessibilityRole="button"

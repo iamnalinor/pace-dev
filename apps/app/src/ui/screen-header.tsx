@@ -40,7 +40,7 @@ export type ScreenHeaderProps = BackProps & {
 /** Back (or Close), its glyph at `icon.bar`, at the full target; the glyph lines up with the gutter. */
 const Back = ({ backIcon = "chevron-left", backLabel, onBack }: BackProps) =>
   onBack === undefined ? null : (
-    <Tooltip label={backLabel} showsOnTap={false}>
+    <Tooltip label={backLabel}>
       <Pressable
         className="-ml-3 items-center justify-center rounded-pill"
         label={backLabel}
