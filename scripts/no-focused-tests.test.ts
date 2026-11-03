@@ -24,10 +24,7 @@ const testFiles = (): readonly string[] =>
 
 /** Where a source focuses a test, as `line: text` (this file is left out of the sweep). */
 const focusedLines = (source: string): readonly string[] => {
-  const focus = new RegExp(
-    String.raw`\b(?:it|test|describe|context)\s*\.\s*only\b|\bitOnly\b|\bonly\s*:\s*true\b`,
-    "u",
-  );
+  const focus = /\b(?:it|test|describe|context)\s*\.\s*only\b|\bitOnly\b|\bonly\s*:\s*true\b/u;
   return source
     .split("\n")
     .map((line, index) => ({ line, number: index + 1 }))
