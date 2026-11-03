@@ -2,15 +2,16 @@ import type { ReactNode } from "react";
 
 import { Text, View } from "react-native";
 
-import { useIsAccountUnknown, useIsFirstSync, useT } from "#app/app-state.tsx";
+import { useIsAccountUnknown, useT } from "#app/app-state.tsx";
 
 import { Skeleton } from "./skeleton.tsx";
 
 /**
-Centered hint for screens with nothing to show yet. While the first sync of an empty copy is still
-under way (the cover has given the app back after its bound) nothing is known to be empty: grey
-rows stand in, never the final copy (QA round 18 M5: "Nothing to do right now" showed, in the
-device's language, before the account's tasks came).
+Centered hint for screens with nothing to show yet. Until a sync of this session has succeeded on
+an empty copy nothing is known to be empty: grey rows stand in, never the final copy (QA round 18
+M5: "Nothing to do right now" showed, in the device's language, before the account's tasks came).
+A failed first sync keeps them too (QA round 21 M4: a pull answered 500 drew "Nothing to do" for an
+account with seven tasks); the sync frame's line says it has not loaded and offers Retry.
 */
 export const EmptyState = ({
   children,
@@ -20,8 +21,8 @@ export const EmptyState = ({
   readonly icon?: ReactNode;
 }) => {
   const t = useT();
-  const isFirstSync = useIsFirstSync();
-  return isFirstSync ? (
+  const isUnknown = useIsAccountUnknown();
+  return isUnknown ? (
     <View className="w-full px-4">
       <Skeleton label={t("sync.loadingData")} />
     </View>
@@ -37,7 +38,7 @@ export const EmptyState = ({
 
 /**
 A screen's inline "nothing here" line (Day, Insights, History), with the same rule: grey rows,
-never the final words, while the first sync of an empty copy is under way.
+never the final words, until a sync of this session has succeeded on an empty copy.
 */
 export const EmptyText = ({
   children,
@@ -47,8 +48,8 @@ export const EmptyText = ({
   readonly className: string;
 }) => {
   const t = useT();
-  const isFirstSync = useIsFirstSync();
-  return isFirstSync ? (
+  const isUnknown = useIsAccountUnknown();
+  return isUnknown ? (
     <Skeleton label={t("sync.loadingData")} rows={1} />
   ) : (
     <Text className={className}>{children}</Text>
@@ -57,27 +58,21 @@ export const EmptyText = ({
 
 /**
 A screen's figures and lists (Day's totals, timeline and screen time, Week's grid, the Assistant
-log) while the first sync of an empty copy runs: grey rows stand in for all of them, so no total
-reads 0 and no list says it is empty before the account's data came (QA round 19 M1). `isWaiting`:
+log, the presets) until a sync of this session has succeeded on an empty copy: grey rows stand in
+for all of them, so no total reads 0 and no list says it is empty before the account's data came
+(QA round 19 M1), a failed first sync included (round 7 review 12, QA round 21 M4). `isWaiting`:
 the screen is still loading its own answer from the server too.
 */
 export const FirstSyncBody = ({
   children,
-  isAccountBound = false,
   isWaiting = false,
 }: {
   readonly children: ReactNode;
-  /**
-  What it shows can change the account (the presets and their actions): it waits until a sync of
-  this session has succeeded, a failed one included (`KnownAfterSync`, round 7 review 12).
-  */
-  readonly isAccountBound?: boolean;
   readonly isWaiting?: boolean;
 }) => {
   const t = useT();
-  const isFirstSync = useIsFirstSync();
   const isUnknown = useIsAccountUnknown();
-  if (!isWaiting && !(isAccountBound ? isUnknown : isFirstSync)) {
+  if (!isWaiting && !isUnknown) {
     return <>{children}</>;
   }
   return (

@@ -194,6 +194,7 @@ export const enShell = {
   "sync.stillSyncing": "Still syncing your data…",
   "sync.firstSyncLine": "Syncing your data…",
   "sync.loadingData": "Loading your data…",
+  "sync.notSyncedYet": "Your data has not loaded yet. Trying again…",
   "errors.llmUnavailable": "The assistant is unavailable right now. Try again in a moment.",
   "errors.notFound": "Not found.",
   "errors.pageNotFound": "Page not found",

@@ -95,6 +95,54 @@ test("a first sync that outlasts the cover shows no final empty copy in either l
   expect(seen.filter((text) => EMPTY_COPY.test(text))).toEqual([]);
 });
 
+// Now, Day and Projects each said their final empty words in QA 21 (M4).
+for (const url of ["/", "/day", "/projects"]) {
+  test(`${url} after a first pull answered with HTTP 500 shows no final empty copy, and a line with Retry says it has not loaded (QA 21 M4)`, async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+    const { token } = await loginViaApi(page);
+    await seedLivedIn(token);
+    const server = { isFailing: true };
+    // A failing deploy answers the socket no better than the pull.
+    await page.routeWebSocket(/\/api\/sync\/live/u, async (socket) => {
+      await (server.isFailing ? socket.close() : Promise.resolve(socket.connectToServer()));
+    });
+    await page.route("**/api/sync/pull**", async (route) => {
+      await (server.isFailing
+        ? route.fulfill({ body: '{"code":"internal"}', status: 500 })
+        : route.fallback());
+    });
+    await page.addInitScript(() => {
+      const seen: string[] = [];
+      Object.assign(globalThis, { seenTexts: seen });
+      new MutationObserver(() => {
+        const body = document.querySelector("body");
+        // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- innerText leaves out what is not drawn (the covered app); textContent keeps it
+        seen.push(body === null ? "" : body.innerText);
+      }).observe(document, { characterData: true, childList: true, subtree: true });
+    });
+    await page.goto(url);
+    const line = page.getByRole("status").filter({ hasText: "Your data has not loaded yet" });
+    await expect(line).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page.getByRole("progressbar", { name: "Loading your data…" }).first(),
+    ).toBeVisible();
+    await expectNoA11yViolations(page);
+    // What the page said while the pull failed is judged (the loaded account may be empty).
+    const seen = await page.evaluate(
+      () => (globalThis as unknown as { seenTexts: string[] }).seenTexts,
+    );
+    expect(seen.filter((text) => EMPTY_COPY.test(text))).toEqual([]);
+    // The server is back: Retry loads the account at once and the line goes.
+    server.isFailing = false;
+    await line.getByRole("button", { name: "Retry" }).click();
+    // The account's language came with its data.
+    await expect(page.getByRole("link", { name: "Сейчас" })).toBeVisible({ timeout: 10_000 });
+    await expect(line).toHaveCount(0);
+  });
+}
+
 /** The first sync's cover lasts this long at most (`FIRST_SYNC_COVER_MS` in the app's sync frame). */
 const COVER_MS = 10_000;
 
@@ -137,8 +185,9 @@ const NOT_ACCOUNT_VALUES: readonly { readonly match: RegExp; readonly why: strin
     why: "the theme is this device's own choice, kept on the device, not in the account",
   },
   {
-    match: /^\/add radio:/u,
-    why: "open (round 6-D, for the owner): a share opens New task's form at once, its presets and projects the built-in ones until the log arrives",
+    match:
+      /^\/add radio:(?:Start: |Due: |Estimate: No estimate$|Does not repeat$|Every |Weekdays$)/u,
+    why: "the new task's own start, due, estimate and repeat: nothing the account holds (its categories, importance and projects wait, pr48 follow-up A1)",
   },
 ];
 

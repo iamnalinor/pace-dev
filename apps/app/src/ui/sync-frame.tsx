@@ -6,7 +6,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { PaceRuntime } from "#app/runtime.ts";
 import type { MessageKey } from "@pace/core";
 
-import { useAuth, useIsFirstSync, useIsOffline, usePace, useT } from "#app/app-state.tsx";
+import {
+  useAuth,
+  useIsAccountUnknown,
+  useIsFirstSync,
+  useIsOffline,
+  usePace,
+  useT,
+} from "#app/app-state.tsx";
 import { useIsDeviceOffline } from "#app/platform/device-offline.ts";
 import { canStartSenders } from "#app/senders.ts";
 
@@ -22,8 +29,9 @@ export const FIRST_SYNC_COVER_MS = 10_000;
 
 /**
 A pill floating low over the page: offline while the last sync could not reach the server (what
-is written stays on the device and goes out on reconnect, QA round 17 M5), or still syncing once
-the first sync outlasts its cover. It floats over the page rather than sitting in the layout, so
+is written stays on the device and goes out on reconnect, QA round 17 M5), not loaded yet while a
+first sync reached the server and failed (QA round 21 M4: an HTTP 500 said nothing), or still
+syncing once the first sync outlasts its cover. The first two offer Retry. It floats over the page rather than sitting in the layout, so
 the page never moves under the person as it comes and goes (QA round 18 L11: a line in the layout
 pushed everything down 37 px mid-typing), and sits where the toast does, clear of the tab bar and
 the screen's footer: at the top it lay over the header's Back, bell and task actions (round 7
@@ -34,6 +42,7 @@ const SyncStrip = ({ message }: { readonly message: MessageKey }) => {
   const { palette } = useTheme();
   const bottom = useFloatBottom();
   const Icon = message === "errors.offline" ? CloudOff : RefreshCw;
+  const canRetry = message === "errors.offline" || message === "sync.notSyncedYet";
   return (
     <View
       className="absolute left-0 right-0 items-center px-4"
@@ -48,7 +57,7 @@ const SyncStrip = ({ message }: { readonly message: MessageKey }) => {
       >
         <Icon aria-hidden color={palette["status.warn"]} size={16} strokeWidth={2} />
         <Text className="shrink py-2 font-sans text-footnote text-label-primary">{t(message)}</Text>
-        {message === "errors.offline" ? <RetryNow /> : null}
+        {canRetry ? <RetryNow /> : null}
       </View>
     </View>
   );
@@ -99,16 +108,21 @@ const useHasLasted = (isActive: boolean, ms: number): boolean => {
   return isActive && lasted === stretch.count;
 };
 
-/** What the line across the top says, if anything: offline comes first. */
+/** What the pill says, if anything: offline comes first, then a first sync that failed. */
 const stripMessage = ({
+  hasFirstSyncFailed,
   isOffline,
   isOverdue,
 }: {
+  readonly hasFirstSyncFailed: boolean;
   readonly isOffline: boolean;
   readonly isOverdue: boolean;
 }): MessageKey | null => {
   if (isOffline) {
     return "errors.offline";
+  }
+  if (hasFirstSyncFailed) {
+    return "sync.notSyncedYet";
   }
   return isOverdue ? "sync.stillSyncing" : null;
 };
@@ -171,6 +185,8 @@ The app under the sync line, and covered while it waits for its first sync.
   line, usable, until that sync ends (review I2).
 - The offline line while the last sync could not reach the server or the device says it has no
   network.
+- The not-loaded line, with Retry, while a first sync on an empty copy ended without success
+  (QA round 21 M4); the screens keep their grey rows meanwhile.
 */
 export const SyncFrame = ({
   children,
@@ -184,9 +200,11 @@ export const SyncFrame = ({
   const isDeviceOffline = useIsDeviceOfflineWithReconnect();
   const isOffline = useIsOffline() || (status === "signed-in" && isDeviceOffline);
   const isFirstSync = useIsFirstSync() && !isBare;
+  // A run of this session ended and none has succeeded: the screens keep grey rows (M4).
+  const hasFirstSyncFailed = useIsAccountUnknown() && !isBare && !isFirstSync;
   const isOverdue = useHasLasted(isFirstSync, FIRST_SYNC_COVER_MS);
   const isCovered = isFirstSync && !isOverdue;
-  const message = stripMessage({ isOffline, isOverdue });
+  const message = stripMessage({ hasFirstSyncFailed, isOffline, isOverdue });
   return (
     <View className="flex-1 bg-app">
       {/* Out of the page while covered (not drawn, not read), yet mounted. */}

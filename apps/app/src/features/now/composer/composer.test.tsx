@@ -7,6 +7,7 @@ import { requestNewTask } from "#app/shared/new-task-request.ts";
 import { classLinePx, classPx } from "#app/test/class-px.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { FAKE_STORE_ID, fakeUser } from "@pace/client/testing";
 import { HW_ID, WORK_ID } from "@pace/core/testing";
 
 import { ComposerProvider } from "./composer-flow.tsx";
@@ -396,6 +397,33 @@ describe("Composer", () => {
       requestNewTask();
     });
     expect(formTitle()).toBeOnTheScreen();
+  });
+
+  it("draws no built-in category, importance or project as the account's before a sync of this session succeeded (pr48 follow-up A1, class 62)", async () => {
+    const pull = Promise.withResolvers<unknown>();
+    const runtime = await createTestRuntime({
+      routes: {
+        "GET /api/sync/pull": async () => await pull.promise,
+        "POST /api/auth/dev": () => ({ token: "tok_dev", user: fakeUser }),
+      },
+      world: "empty",
+    });
+    await runtime.auth.loginWithDev("1");
+    // A share or the shortcut opens /add's form during a fresh browser's first sync.
+    await renderComposer(runtime);
+    await fireEvent.press(button("nav.newTask"));
+    expect(title()).toBeOnTheScreen();
+    for (const key of ["composer.category", "edit.importance", "composer.project"] as const) {
+      expect(screen.queryByText(en(key))).toBeNull();
+    }
+    expect(screen.getByRole("progressbar", { name: en("sync.loadingData") })).toBeOnTheScreen();
+    await act(async () => {
+      pull.resolve({ events: [], more: false, seq: 0, storeId: FAKE_STORE_ID });
+      await Promise.resolve();
+    });
+    expect(await screen.findByText(en("composer.category"))).toBeOnTheScreen();
+    expect(screen.getByText(en("edit.importance"))).toBeOnTheScreen();
+    expect(screen.getByText(en("composer.project"))).toBeOnTheScreen();
   });
 
   it("reads the line on Enter into a preview; a second Enter approves it", async () => {

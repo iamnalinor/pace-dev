@@ -15,7 +15,7 @@ export const PresetsScreen = () => {
       </Text>
       {/* The account's presets, and what may be added to them, wait for a sync of this session to
       succeed (QA 20 M1, round 7 review 12). */}
-      <FirstSyncBody isAccountBound>
+      <FirstSyncBody>
         <PresetsList />
       </FirstSyncBody>
     </PushedScreen>
