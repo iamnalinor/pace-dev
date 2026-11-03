@@ -252,9 +252,45 @@ finishes it.
 | m3 | b978b23 | **Mapping.** `errorKey` names `auth/forbidden` (`oauth.deviceToken`) and `auth/identity-conflict` (`oauth.identityConflict`), with real sentences in EN and RU. **Test.** `oauth.test.tsx` runs 3 cases (403 `auth/not-allowed`, 403 `auth/forbidden`, 422 `auth/identity-conflict`). Each shows its line, sends one `complete` and no redirect; the two new cases were red before. Bug-lessons row (class 99). |
 | m4 | 4450f2b | `docs/qa.md` "Release round" now carries "The owner's step, once per release: connect a real MCP client end to end", with numbered steps and the `curl -sI …/oauth/authorize` header check. The old line under "Every form" is gone. |
 | m5 | 242e2b8 | Class 119 now holds only the testing rule, and says plainly that its guard is procedural (the owner's release step), with the e2e pinning what can run without Telegram. The product half ("ask whether they already proved it") is filed under class 81, which has a new line pointing back. |
+| e2e flake found in verification | b9559fe | **What failed.** `login.e2e.ts` "a page older than its server…" ended while its route handler still awaited `route.fetch()`. Playwright threw "Test ended" outside any test, which failed the run and left the latency project unrun. **Fix.** The shared `test` in `e2e/support/fixtures.ts` unroutes every page's handlers (`ignoreErrors`) when its test ends. Bug-lessons row (class 63). |
 | m6 | da8e859 | **Log row.** The latency failure: 296 ms against 240, in the full run after ~200 tests, versus the ceilings' method of running the project alone on fresh servers (classes 115 and 116). **CI.** `ci.yml` runs `playwright test --project chromium`, then `playwright test --project latency --no-deps` as a step of its own. Playwright starts a fresh Worker (fresh state), and with `E2E_REUSE_WEB_BUILD=1` it serves the same build without rebuilding. That is one extra server start, no new job, and no ceiling changed. Next, for Task 5.6: collect three CI runs' p75 annotations. |
 
 ### Verification (fix round 3)
 
-VERIFY3_PLACEHOLDER
+All runs are on b9559fe. The later checkpoint commits only add docs and comps.
+
+**Lint and the unit, API and app suites:**
+
+| Command | Result |
+|---|---|
+| `bun lint` | 0 errors; the design-value ratchet stays at 74 warnings |
+| `CI=1 bun test:unit` | passes: scripts 130/130 (with the new guard and the header test), core 878, client 517, `pace-agent` 54 |
+| `bun test:api` | 608 passed |
+| `bun test:app` | 910 passed |
+
+**Full `bun test:e2e`: three runs, none fully green.**
+1. **First run: 190 passed, 5 failed** (assistant, composer). The worktree in `/home/user/pace-dev-b`
+   started its own e2e during this run. With `reuseExistingServer`, it reused this run's servers and
+   reset the same test accounts. The failing pages show "You were signed out: this session was ended
+   on another device", and that worktree's run failed at the same minutes.
+2. **Second run, alone: 194 passed, 0 failed, 11 not run.** The stray "Test ended" error (fixed in
+   b9559fe) stopped the run before the latency project.
+3. **Third run, alone, after the fix: 194 passed, 1 failed, 10 not run.** The failure was
+   `assistant.e2e.ts` "the assistant reads a line…": the toast did not show within 5 s. The latency
+   project depends on the chromium project, so it did not run. Afterwards, `assistant.e2e.ts` passed
+   21/21 with `--repeat-each 3`. This is logged in bug-lessons and not traced.
+
+**The latency step, as CI now runs it** (`--project latency --no-deps` with
+`E2E_REUSE_WEB_BUILD=1`, on freshly started servers): 10/10 passed.
+
+**The consent e2e** (5 cases, including the I2 frame case) passed in every run.
+
+**Concerns:**
+- No full e2e run was green end to end. Each failure was either interference from the other worktree
+  or a flake that passed on repeat. The flake is logged, not traced.
+- Two worktrees running e2e on the same ports corrupt each other through `reuseExistingServer`.
+  Running them one after the other needs coordination: this run spent 2 h waiting for the ports to
+  free.
+- The `superpowers:requesting-code-review` review of this round is still owed: the brief forbids
+  subagents.
 
