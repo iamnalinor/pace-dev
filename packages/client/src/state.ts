@@ -112,6 +112,8 @@ export type AppStateHandle = {
   keeps a copy another session of a shared store claimed since (`EventStore.clear`).
   */
   readonly clear: (ifOwner?: string) => Promise<void>;
+  /** Marks the copy as a session's, in the write queue after any clear asked for before it. */
+  readonly claim: (mark: string) => Promise<void>;
   /**
   Which local copy is current, bumped the moment `clear` is called (before its turn in the
   queue): a server page asked for one copy is never written into the next (fix round 1 of QA 22).
@@ -346,6 +348,11 @@ export const createAppState = (options: Options): AppStateHandle => {
       });
       // The other tabs share the store that was just emptied: they read it again.
       options.onStored?.({ kind: "reload" });
+    },
+    claim: async (mark) => {
+      await enqueue(async () => {
+        await log.claim(mark);
+      });
     },
     copy: () => copies,
     dispatch,

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { endpoints, LIVE_SESSION_ENDED, ParseResponseSchema } from "@pace/core";
 
@@ -14,6 +14,7 @@ import {
   fakeUser,
   problem,
 } from "./fake-fetch.fake.ts";
+import { createHeldEventStore } from "./held-event-store.fake.ts";
 import { createMemorySessionStore } from "./session.ts";
 
 const setup = async (
@@ -118,6 +119,39 @@ describe("createPaceClient", () => {
     await fresh.actions.setNightHours(true);
     await stale.dropLocalCopyOf("tok_old");
     await expect(store.listPending()).resolves.toHaveLength(0);
+  });
+
+  it("a claim waits for the sign-out's clear queued before it (fix round 2 review M7)", async () => {
+    const held = createHeldEventStore();
+    const session = createMemorySessionStore();
+    await session.set("tok_old");
+    const api = createFakeFetch({ ...emptySyncRoutes, "GET /api/me": () => fakeMe });
+    const client = createPaceClient({
+      baseUrl: "https://api.test",
+      deviceId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+      fetch: api.fetch,
+      now: () => "2026-10-06T12:00:00.000Z",
+      session,
+      source: "web",
+      store: held.store,
+    });
+    await client.auth.ready;
+    await client.state.ready;
+    await client.claimLocalCopy("tok_old");
+    // A write in flight holds the queue; the old session's clear waits behind it, then the next
+    // sign-in of the same tab claims the copy at once.
+    held.hold();
+    const written = client.actions.setLanguage("ru");
+    const dropped = client.dropLocalCopyOf("tok_old");
+    const claimed = client.claimLocalCopy("tok_new");
+    await vi.waitFor(() => {
+      expect(held.writes).toHaveLength(1);
+    });
+    await held.writes[0]?.resolve();
+    await Promise.all([written, dropped, claimed]);
+    // The clear had its turn first (the copy was still the old session's): nothing stays.
+    await expect(held.store.listAll()).resolves.toEqual([]);
+    await expect(held.store.listPending()).resolves.toEqual([]);
   });
 
   it("signs out when the server closes the live socket because the session ended", async () => {

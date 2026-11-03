@@ -46,6 +46,11 @@ export type LocalLog = {
   (`EventStore.clear`); the state is emptied either way.
   */
   readonly clear: (ifOwner?: string) => Promise<void>;
+  /**
+  Marks the copy as a session's (`EventStore.setOwner`) through the same write chain as `clear`,
+  so a sign-out's clear queued before it has its turn first (fix round 2 review M7).
+  */
+  readonly claim: (mark: string) => Promise<void>;
 };
 
 const settled = async (promise: Promise<unknown>): Promise<void> => {
@@ -274,6 +279,11 @@ export const createLocalLog = <S>(
       memory.replace([]);
       await write(async () => {
         await eventStore.clear(ifOwner);
+      });
+    },
+    claim: async (mark) => {
+      await write(async () => {
+        await eventStore.setOwner(mark);
       });
     },
     has: (id) => memory.known.has(id),

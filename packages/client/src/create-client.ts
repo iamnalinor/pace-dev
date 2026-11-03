@@ -354,7 +354,7 @@ export const createPaceClient = (options: PaceClientOptions): PaceClient => {
       return pending.length;
     },
     claimLocalCopy: async (token) => {
-      await options.store.setOwner(noteMark(token));
+      await state.claim(noteMark(token));
     },
     dropLocalCopyOf: async (token) => {
       await state.clear(noteMark(token));
