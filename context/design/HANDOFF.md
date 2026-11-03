@@ -24,10 +24,10 @@ is, even without good CI"); the last line of "State" says whether the tip is gre
   git worktrees, split by feature folder (Now/Day/Week · task/Inbox/projects · settings/insights/
   history); reviews pipelined (task N+1 starts while N is reviewed); targeted tests per task, the full
   e2e before every QA round and every merge; small same-shape tasks batched, reviewer model by size.
-- QA rounds (intermediate unless noted), each with a parallel code review, fixes then another round
-  until only cosmetics: **A** round 24 after the current fix round → merge. **B** after the kit; after
-  screen wave 1 (Now, Day, Week, task); at the end of B → merge. **C** after motion + latency; after
-  web/PWA + close-out → merge. **Release**: the full release round.
+- QA (owner, 2026-11-03): **one light intermediate round before each merge**, scoped to what the PR
+  changed and fixed, with a parallel code review; fixes, then a short re-check of the fixes, until only
+  cosmetics. A: round 24 → merge. B: one round at its end → merge. C: one round at its end → merge.
+  **No full release round by us**: the owner hands it to another agent; the release follows that.
 
 ## Where things are
 - Branch `claude/pace-design-overhaul-3p860c` (rebased onto main 7bf2815 on 2026-11-02).
@@ -60,7 +60,7 @@ is, even without good CI"); the last line of "State" says whether the tip is gre
    gallery, matrix shots, design reviews), TDD, per-task review; batch checklist; QA round; PR; merge.
 3. PR C "Polish": Tasks 5.1–5.4 + 5.6 (every latency case ≤ 100 ms), 6.1–6.4, 8.1–8.7 (lint rule to
    error, goldens, README shots, DESIGN.md from code, final QA).
-4. Release: full release QA round, fixes to cosmetics, tag via `release.yml`.
+4. Release: after the owner's separate full QA round (another agent), tag via `release.yml`.
 
 ## Open items for the owner
 - Tap latency 120–300 ms at 4× CPU (Task 5.6 owns it; per-case ceilings in `e2e/latency.e2e.ts`).
