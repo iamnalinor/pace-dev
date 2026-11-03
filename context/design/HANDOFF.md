@@ -62,10 +62,42 @@ is, even without good CI"); the last line of "State" says whether the tip is gre
   R23-03 (latency) belongs to Task 5.6.
 - **Tip: work in progress, the full check run for this fix round has not finished.**
 
+
+## Owner bug 2026-11-03: connecting an MCP client (Claude) fails — task A9, PR A, before merge
+Screenshot: the consent page ("Connecting an app", Claude, six scopes) asks to "Sign in with Telegram
+to continue"; inside the widget's frame a foreign page shows, clipped (Russian text "…заблокирован…
+Сервис для звонков" — most likely a network block page for Telegram's widget domain), Allow stays
+disabled.
+1. **Why Telegram at all when the person is signed in.** `/authorize` → web `/oauth/authorize`
+   (`oauth-screen.web.tsx`, `consent-flow.tsx`); `POST /api/oauth/complete` accepts only a Telegram
+   widget payload or a dev id (`oauth-routes.ts` → `resolveTelegramIdentity`). The web origin
+   already holds the person's Pace session, but the consent flow never reads it. Root: plan.md's
+   OAuth decision (widget on the web origin, because of the bot's one widget domain) designed the
+   proof of identity as "always the widget" and never asked "already signed in?".
+   Fix: when the page has a session, show "Signed in as <name>" and complete with that session
+   (bearer, so no CSRF), server-side resolve the user from the session (revoked/expired → fall
+   back to sign-in); keep the widget only for a signed-out browser, plus a link to the app's own
+   sign-in that returns to the consent page. Trace both sides; test: signed-in consent completes
+   with no widget; revoked session falls back; the grant belongs to the session's user.
+2. **The sign-in frame is too small.** The widget host is a flex box sized for Telegram's button;
+   any other content of the frame (a block page, Telegram's error) is clipped and overlaps the
+   text below. Fix: with (1) the signed-in case shows no frame; for the signed-out case give the
+   frame its own space (no overlap), and a fallback line when the widget fails or is blocked
+   (the widget's `failed`/`slow` states exist but a loaded block page counts as "ready").
+3. **Why we did not catch it** (bug-lessons row with the fix): every e2e test and QA round signs
+   in with the dev id (`EXPO_PUBLIC_DEV_LOGIN`, `DevIdentity` on the consent page), so the real
+   identity step — the Telegram widget, its frame, a network that blocks it, and the "already
+   signed in" case — never ran; no QA round connected a real MCP client end to end; the user
+   journey "connect Claude from a browser where I am signed in" was never walked (docs/design.md
+   step 1). Class: a test-only sign-in path that stands in for the real one hides the real one's
+   UX (new class). Guard: an e2e that opens the consent page signed in and allows with no widget;
+   a QA checklist line "connect a real MCP client once per release"; the sweep of other places
+   that ask for a Telegram proof while a session exists.
+
 ## What is left, in order
 1. PR A: finish the fix round (full `bun lint`, `test:unit`, `test:api`, `test:app`, full
    `test:e2e`); a scoped re-review of fix round 1 (`review-followups-a` findings + R23 fixes);
-   CI green on #53; mark ready; squash-merge. No QA round 24 (the re-check is carried to B).
+   then task A9 (owner bug above); CI green on #53; mark ready; squash-merge. No QA round 24 (the re-check is carried to B).
 2. PR B "New look": rebase onto main after A's squash; Tasks 3.1–3.10, 4.1–4.13, 7.1–7.3 screen by
    screen (kit first per screen), each through the method in `docs/design.md` (comp, tokens, pairs,
    gallery, matrix shots, design reviews), TDD, per-task review; batch checklist; one QA round (with
