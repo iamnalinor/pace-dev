@@ -13,17 +13,18 @@ import {
   type User,
 } from "@pace/core";
 
-import { claimLocalCopy, dropLocalCopyIfOwned } from "./local-copy.ts";
+import { bootstrap } from "./bootstrap.ts";
+import { dropLocalCopyIfOwned } from "./local-copy.ts";
 import { followPhoneNotices, sendPhoneData, startPhonePush } from "./phone-runtime.ts";
-import { startBackgroundCheck, stopBackgroundCheck } from "./platform/background-check.ts";
+import { stopBackgroundCheck } from "./platform/background-check.ts";
 import { deviceLanguage } from "./platform/device-language.ts";
 import { IS_PHONE } from "./platform/device.ts";
 import { clearPresentedPoolNotifications } from "./platform/notification-cleanup.ts";
 import { useServerOrigin, watchServer } from "./platform/server-origin.ts";
 import { forgetLineDraft } from "./platform/shared-in.ts";
-import { type Pool, poolOf, retryOnWindowFocus } from "./runtime-pool.ts";
+import { poolOf, retryOnWindowFocus } from "./runtime-pool.ts";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
-import { canStartSenders, POLL_LIVE_MS, POLL_OFFLINE_MS, startSenders } from "./senders.ts";
+import { canStartSenders, POLL_LIVE_MS, POLL_OFFLINE_MS } from "./senders.ts";
 import { createZoneStep } from "./zone-after-sync.ts";
 
 const RuntimeContext = createContext<null | PaceRuntime>(null);
@@ -53,41 +54,6 @@ const SyncedContext = createContext<SyncedSessions>(NO_SYNCED_SESSION);
 
 /** The dev gallery shows a subtree in the language its URL names, whatever the account says. */
 export const LanguageOverrideContext = createContext<Language | null>(null);
-
-/**
-A signed-in start: the local copy claimed, this week's homework instances, a first sync, then the time zone that sync
-allowed (`createZoneStep`, run by the sync's own end), before the senders push it.
-*/
-const bootstrap = async (
-  runtime: PaceRuntime,
-  {
-    pool,
-    session,
-    zoneSettled,
-  }: {
-    readonly pool: Pool;
-    readonly session: string | undefined;
-    readonly zoneSettled: () => Promise<void>;
-  },
-): Promise<void> => {
-  const { actions, sync } = runtime;
-  // The copy is this session's before anything is written into it (re-review N3).
-  await claimLocalCopy(runtime, session);
-  if (IS_PHONE) {
-    // Every signed-in phone, before any network step (one failing must not skip it): it polls
-    // when its method is `poll`, and always uploads its usage.
-    void startBackgroundCheck();
-  }
-  await actions.ensureInstances();
-  await sync.syncNow();
-  await zoneSettled();
-  await pool.refresh();
-  await sendPhoneData(runtime);
-  await startPhonePush(runtime);
-  // Signed out meanwhile, or ending this device's session: no loop, no socket. Otherwise its
-  // first tick pushes what the bootstrap added.
-  startSenders(runtime);
-};
 
 /**
 A finished sync is told for the session that started it: a successful one makes the account's
