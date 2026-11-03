@@ -19,6 +19,16 @@ is, even without good CI"); the last line of "State" says whether the tip is gre
 - Report to the owner in Russian, short; options with a default.
 - Checkpoint regularly: commit + push as is, update this file.
 
+## Speed and QA schedule (owner chose option "а", 2026-11-03)
+- PR B: the kit (batch 3) by one implementer first; then the screens by 2–3 implementers in parallel
+  git worktrees, split by feature folder (Now/Day/Week · task/Inbox/projects · settings/insights/
+  history); reviews pipelined (task N+1 starts while N is reviewed); targeted tests per task, the full
+  e2e before every QA round and every merge; small same-shape tasks batched, reviewer model by size.
+- QA rounds (intermediate unless noted), each with a parallel code review, fixes then another round
+  until only cosmetics: **A** round 24 after the current fix round → merge. **B** after the kit; after
+  screen wave 1 (Now, Day, Week, task); at the end of B → merge. **C** after motion + latency; after
+  web/PWA + close-out → merge. **Release**: the full release round.
+
 ## Where things are
 - Branch `claude/pace-design-overhaul-3p860c` (rebased onto main 7bf2815 on 2026-11-02).
 - Plan: [`redesign-plan.md`](redesign-plan.md) (tasks, batch checklist, "PR #48 follow-ups
