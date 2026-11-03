@@ -197,6 +197,16 @@ describe("Pressable (the kit's state layer, spec §3.7)", () => {
     expect(classes.split(" ")).toEqual(expect.arrayContaining(["shrink-0", "rounded-md"]));
   });
 
+  it("is at least the 48 dp target on a phone (size.hit), whatever it draws", async () => {
+    await renderLight(
+      <Pressable className="h-10" onPress={jest.fn()} role="link">
+        <Text>Week</Text>
+      </Pressable>,
+    );
+    const classes = String(screen.getByRole("link", { name: "Week" }).props["className"]);
+    expect(classes.split(" ")).toEqual(expect.arrayContaining(["min-h-hit", "min-w-hit", "h-10"]));
+  });
+
   it("says checked to screen readers on a checkbox, a radio and a switch, never selected", async () => {
     await renderLight(
       <>

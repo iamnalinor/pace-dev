@@ -102,6 +102,20 @@ describe("Pressable on the web", () => {
     expect(classes.split(" ")).toEqual(expect.arrayContaining(["shrink-0", "rounded-md"]));
   });
 
+  it("is at least the 44 px target on the web (size.hitWeb), whatever it draws", async () => {
+    await render(
+      <ThemeProvider forced="light">
+        <Pressable className="h-10" onPress={jest.fn()} role="link">
+          <ReactNative.Text>Week</ReactNative.Text>
+        </Pressable>
+      </ThemeProvider>,
+    );
+    const classes = String(screen.getByRole("link", { name: "Week" }).props["className"]);
+    expect(classes.split(" ")).toEqual(
+      expect.arrayContaining(["min-h-hit-web", "min-w-hit-web", "h-10"]),
+    );
+  });
+
   it("keeps the press, disabled and selected behaviour of the phone", async () => {
     const onPress = jest.fn();
     await render(

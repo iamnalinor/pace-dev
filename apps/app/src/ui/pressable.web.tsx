@@ -6,10 +6,14 @@ import {
 
 import type { SpacePress } from "./space-press.ts";
 
+import { cx } from "./cx.ts";
 import { type PressableProps, SPACE_ROLES, usePressableProps } from "./pressable-props.ts";
 import { spacePress } from "./space-press.web.ts";
 
 export type { PressableProps } from "./pressable-props.ts";
+
+/** The web's target (spec §3.7, `size.hitWeb`): a control is never smaller, whatever it draws. */
+const TARGET = "min-h-hit-web min-w-hit-web";
 
 type PressHandler = ((event: GestureResponderEvent) => void) | undefined;
 
@@ -66,6 +70,7 @@ export const Pressable = <R extends AccessibilityRole>(props: PressableProps<R>)
     <NativePressable
       {...others}
       {...shared}
+      className={cx(TARGET, shared.className)}
       // react-native-web's props React Native's types do not know: `dataSet` becomes a `data-*`
       // attribute, `delayPressIn` its press-in delay (50 ms unless told), `onKeyDown` a key handler.
       {...({
