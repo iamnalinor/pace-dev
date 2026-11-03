@@ -254,6 +254,14 @@ The classes so far are below. Each has its standing rule, and new code is writte
 
 The same rule applies when a previously successful channel is no longer configured: a delivered Telegram copy cannot be deleted without a bot transport. Record `dismissal-unavailable` with `dismissedAt` still null and stop the minute retry alarm, as for a missing FCM transport.
 
+- **Accepted residual (re-review N8 of PR A).** A 400 every provider answers because of our own
+  configuration (a bad parameter after an SDK change, a model renamed) reads as a refusal for good:
+  each text then queued goes to the Inbox after three drains (about 15 minutes), and a first read
+  answers `unreadable` (N7). Accepted: the Inbox keeps the person's words, nothing is lost, and the
+  warning log names the provider and why for every refusal (`noteFailure`), so a config
+  mistake shows as a wall of 400s there. Telling "this request" from "every request" would need a
+  second, known-good probe per refusal, which costs a model call for every refused text.
+
 ### 19. Progress saved for one session reused in another
 - **Bug.** The phone stored one push poll cursor for all accounts. After account A reached sequence 100, account B's first poll sent `after=100`; the server discarded B's earlier pending entries. The phone usage upload cursor likewise skipped history when the account changed.
 - **Missed because.** Tests only repeated polling or uploading within one signed-in session. They never switched sessions while keeping the phone's secure storage, and the fake server did not make one account's cursor larger than another's queue. Later tests delayed only the response, missing a switch between the last local read and the API call; they also made only one poll at a time. The platform tests filled SecureStore directly, while the app-state test used an injected memory session store, exposing an accidental dependence on the storage adapter.
