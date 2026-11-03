@@ -95,6 +95,9 @@ test("a first sync that outlasts the cover shows no final empty copy in either l
   expect(seen.filter((text) => EMPTY_COPY.test(text))).toEqual([]);
 });
 
+/** How long the failing first pull is watched for its backoff (review M2). */
+const QUIET_FAILING_MS = 6000;
+
 // Now, Day and Projects each said their final empty words in QA 21 (M4).
 for (const url of ["/", "/day", "/projects"]) {
   test(`${url} after a first pull answered with HTTP 500 shows no final empty copy, and a line with Retry says it has not loaded (QA 21 M4)`, async ({
@@ -108,7 +111,11 @@ for (const url of ["/", "/day", "/projects"]) {
     await page.routeWebSocket(/\/api\/sync\/live/u, async (socket) => {
       await (server.isFailing ? socket.close() : Promise.resolve(socket.connectToServer()));
     });
+    const failedPulls: number[] = [];
     await page.route("**/api/sync/pull**", async (route) => {
+      if (server.isFailing) {
+        failedPulls.push(Date.now());
+      }
       await (server.isFailing
         ? route.fulfill({ body: '{"code":"internal"}', status: 500 })
         : route.fallback());
@@ -134,6 +141,15 @@ for (const url of ["/", "/day", "/projects"]) {
       () => (globalThis as unknown as { seenTexts: string[] }).seenTexts,
     );
     expect(seen.filter((text) => EMPTY_COPY.test(text))).toEqual([]);
+    // The failing pull backs off (1 s doubling to 60 s), never hammers the server (review M2): in
+    // 6 s of watching, a few tries at most (a loop without backoff sends dozens).
+    const watchedFrom = Date.now();
+    // A window of time is what is measured here, not a condition to wait for.
+    await new Promise((resolve) => {
+      setTimeout(resolve, QUIET_FAILING_MS);
+    });
+    const watched = failedPulls.filter((at) => at >= watchedFrom);
+    expect(watched.length).toBeLessThanOrEqual(4);
     // The server is back: Retry loads the account at once and the line goes.
     server.isFailing = false;
     await line.getByRole("button", { name: "Retry" }).click();

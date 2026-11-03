@@ -207,28 +207,36 @@ for (const size of SIZES) {
 }
 
 // The matrix's 2 s window misses a loop that repeats every 3 to 5 s (round 7 review): each screen
-// once more, on each account at one size, with the long window.
+// once more, on each account at one size, with the long window (11 s: twice the longest period, so
+// such a loop sends twice in it whatever its phase, review I4). The screens are split into a few
+// tests so the parallel workers share the time.
+const LONG_WINDOW_PARTS = 3;
+
 for (const account of ACCOUNTS) {
-  test(`every screen on ${account.name} sends nothing twice in ${String(LONG_QUIET_MS / 1000)} s once settled`, async ({
-    page,
-  }) => {
-    test.setTimeout(300_000);
-    const { token } = await loginViaApi(page);
-    const urls = screenUrls(await account.prepare(token));
-    await page.goto("/");
-    await expect(page.getByRole("navigation", { name: /./u }).first()).toBeVisible({
-      timeout: 20_000,
+  for (let part = 0; part < LONG_WINDOW_PARTS; part += 1) {
+    test(`every screen on ${account.name} sends nothing twice in ${String(LONG_QUIET_MS / 1000)} s once settled (part ${String(part + 1)} of ${String(LONG_WINDOW_PARTS)})`, async ({
+      page,
+    }) => {
+      test.setTimeout(300_000);
+      const { token } = await loginViaApi(page);
+      const urls = screenUrls(await account.prepare(token)).filter(
+        (_, index) => index % LONG_WINDOW_PARTS === part,
+      );
+      await page.goto("/");
+      await expect(page.getByRole("navigation", { name: /./u }).first()).toBeVisible({
+        timeout: 20_000,
+      });
+      const failures: string[] = [];
+      const watch = watchScreen(page);
+      for (const url of urls) {
+        watch.reset();
+        await page.goto(url);
+        await settle(page);
+        const repeats = await repeatsAfterSettle(watch, watch.now(), LONG_QUIET_MS);
+        failures.push(...repeats.map((fault) => `${url}: ${fault}`));
+      }
+      watch.stop();
+      expect(failures).toEqual([]);
     });
-    const failures: string[] = [];
-    const watch = watchScreen(page);
-    for (const url of urls) {
-      watch.reset();
-      await page.goto(url);
-      await settle(page);
-      const repeats = await repeatsAfterSettle(watch, watch.now(), LONG_QUIET_MS);
-      failures.push(...repeats.map((fault) => `${url}: ${fault}`));
-    }
-    watch.stop();
-    expect(failures).toEqual([]);
-  });
+  }
 }

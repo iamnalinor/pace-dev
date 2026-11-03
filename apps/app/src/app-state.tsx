@@ -340,7 +340,9 @@ export const useIsFirstSync = (): boolean => {
 Whether the account's own values (its settings) are still unknown on an empty copy: until a run
 of this session has succeeded. Unlike `useIsFirstSync`, a failed first sync does not end it, or
 the defaults would show as the account's with live controls that write over them (round 7 review
-12, class 22); the rest of the app shows its real empty state meanwhile.
+12, class 22). Every placeholder waits on it too (`EmptyState`, `EmptyText`, `FirstSyncBody`,
+`KnownAfterSync`), so a failed first sync keeps grey rows rather than a final empty copy (QA round 21
+M4); `useIsFirstSync` is left to the cover and the share focus.
 */
 export const useIsAccountUnknown = (): boolean => {
   const { api } = usePace();

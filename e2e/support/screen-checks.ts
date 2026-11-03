@@ -121,11 +121,17 @@ bug-lessons class 1).
 const QUIET_MS = 2000;
 
 /**
-The long window, once per screen (`route-sweep.e2e.ts`): a loop that repeats every 3 to 5 s (a
-retry with a backoff, a poll) fits whole in the 2 s window without repeating (round 7 review).
-Longer than the slowest timer of the app that may fire once after a screen settles.
+The longest period of a loop the long window must catch: a retry with a backoff or a poll that
+repeats every 3 to 5 s fits whole in the 2 s window without repeating (round 7 review).
 */
-export const LONG_QUIET_MS = 6000;
+const LONGEST_LOOP_MS = 5000;
+
+/**
+The long window, once per screen (`route-sweep.e2e.ts`). A loop of period P sends twice in a window
+W whatever its phase only when W ≥ 2P (review I4: a 6 s window caught a 5 s loop in one run of
+five), so it is twice the longest period, plus a second of slack for the send itself.
+*/
+export const LONG_QUIET_MS = 2 * LONGEST_LOOP_MS + 1000;
 
 /**
 What went out more than once in the quiet window of `windowMs` that began at `settledAt`, once the
