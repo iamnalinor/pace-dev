@@ -73,6 +73,13 @@ const ELEMENT_DEEP_EQUAL = {
     "CallExpression[callee.property.name=/^(toEqual|toStrictEqual)$/][callee.object.callee.name='expect'][callee.object.arguments.0.callee.property.name=/^(getAll|queryAll|findAll)/], CallExpression[callee.property.name=/^(toEqual|toStrictEqual)$/][callee.object.callee.name='expect'][callee.object.arguments.0.callee.name=/^(listsNamed|picker)$/]",
 };
 
+/** A test's own browser context, released whether it passed or failed (bug-lessons class 63). */
+const OWN_CONTEXT = {
+  message:
+    "A context opened here outlives a failed test with its route handlers (bug-lessons 63): use the `openContext` fixture from e2e/support/fixtures.ts.",
+  selector: "CallExpression[callee.property.name='newContext']",
+};
+
 /** Text the person reads is written by core's formatters (bug-lessons classes 110 and 111). */
 const DISPLAY_TEXT_SYNTAX = [
   {
@@ -643,6 +650,10 @@ export default defineConfig([
   {
     ...playwright.configs["flat/recommended"],
     files: ["e2e/**/*.ts"],
+  },
+  {
+    files: ["e2e/**/*.e2e.ts"],
+    rules: { "no-restricted-syntax": ["error", ...RESTRICTED_SYNTAX, OWN_CONTEXT] },
   },
 
   // ── Declaration files: ambient/global augmentation needs `interface` and `import()` types

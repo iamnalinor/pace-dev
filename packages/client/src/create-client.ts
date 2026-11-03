@@ -1,4 +1,4 @@
-import { endpoints, type EndpointShape, type LiveNotice } from "@pace/core";
+import type { EndpointShape, LiveNotice } from "@pace/core";
 
 import type { EventStore } from "./event-store.ts";
 
@@ -15,6 +15,7 @@ import {
 } from "./live.ts";
 import { createNotificationFeed, type NotificationFeed, parseLiveNotice } from "./notifications.ts";
 import { parseStoreChange, type PeerTabs } from "./peer-tabs.ts";
+import { type SessionChecks, sessionChecks } from "./session-checks.ts";
 import { noteMark, type SessionStore, type SignOutNotes } from "./session.ts";
 import { type AppStateHandle, createAppState } from "./state.ts";
 import { createSyncClient, type SyncClient } from "./sync-client.ts";
@@ -142,6 +143,7 @@ const liveChannelOf = (
     readonly onEvents: (page: LiveEventsPage) => void;
     readonly onMessage: (message: unknown) => void;
     readonly onSessionEnded: () => void;
+    readonly sessionCheck: () => Promise<unknown> | undefined;
     readonly token: () => string | undefined;
   },
 ): LiveChannel =>
@@ -155,6 +157,7 @@ const liveChannelOf = (
     onFailedToOpen: wiring.onFailedToOpen,
     onMessage: wiring.onMessage,
     onSessionEnded: wiring.onSessionEnded,
+    sessionCheck: wiring.sessionCheck,
     token: wiring.token,
   });
 
@@ -197,6 +200,7 @@ const liveAndSync = (
   deps: {
     readonly api: ApiClient;
     readonly auth: Auth;
+    readonly checks: SessionChecks;
     readonly now: () => string;
     readonly onMessage: (message: unknown) => void;
   },
@@ -235,12 +239,14 @@ const liveAndSync = (
         return;
       }
       void (async (): Promise<void> => {
-        const checked = await auth.me();
+        // The same check a call's 401 starts: what else would send the session waits for it.
+        const checked = await deps.checks.check();
         if (checked.ok) {
           live.start();
         }
       })();
     },
+    sessionCheck: (): Promise<unknown> | undefined => deps.checks.pending(),
     token: auth.token,
   });
   const transport = preferSocket(socketTransport(live), httpTransport(api));
@@ -250,46 +256,17 @@ const liveAndSync = (
 };
 
 /**
-Any call's 401 for the session in use asks `me` once whether it ended (`me` signs out on its own
-401). The live socket's close says so too, but a tab whose socket was not open when the session
-ended (hidden, still starting) is refused at the door on every reconnect and would stay signed in
-on a dead session (fix round 5 V1). `me`'s and the log-out's own 401s are their callers' to read.
-*/
-const sessionCheck = (
-  auth: Auth,
-  api: ApiClient,
-): ((credential: string, endpoint: EndpointShape) => void) => {
-  let checking: Promise<unknown> | undefined;
-  return (credential, endpoint) => {
-    if (
-      checking !== undefined ||
-      endpoint === endpoints.me ||
-      endpoint === endpoints.auth.logout ||
-      !api.isCurrentSession(credential)
-    ) {
-      return;
-    }
-    checking = (async () => {
-      try {
-        await auth.me();
-      } finally {
-        checking = undefined;
-      }
-    })();
-  };
-};
-
-/**
 The API client and the auth it reads: the token (synchronously, on every request) and whether this
-device's session has ended; each 401 of it checks the session.
+device's session has ended; each 401 of it checks the session, and a call waits for a check under way.
 */
 const apiAndAuth = (
   options: PaceClientOptions,
-): { readonly api: ApiClient; readonly auth: Auth } => {
+): { readonly api: ApiClient; readonly auth: Auth; readonly checks: SessionChecks } => {
   // The API client reads the token synchronously, so it is wired before auth exists.
   const wiring = {
     hasEnded: (): boolean => false,
     heard: (_credential: string, _endpoint: EndpointShape): void => undefined,
+    pending: (_endpoint: EndpointShape): Promise<unknown> | undefined => undefined,
     token: (): string | undefined => undefined,
   };
   const api = createApiClient({
@@ -298,14 +275,17 @@ const apiAndAuth = (
     onUnauthorized: (credential, endpoint) => {
       wiring.heard(credential, endpoint);
     },
+    sessionCheck: (endpoint): Promise<unknown> | undefined => wiring.pending(endpoint),
     sessionEnded: () => wiring.hasEnded(),
     token: () => wiring.token(),
   });
   const auth = createAuth({ api, notes: options.signOutNotes, session: options.session });
+  const checks = sessionChecks(auth, api);
   wiring.token = auth.token;
   wiring.hasEnded = auth.hasEnded;
-  wiring.heard = sessionCheck(auth, api);
-  return { api, auth };
+  wiring.heard = checks.heard;
+  wiring.pending = checks.pending;
+  return { api, auth, checks };
 };
 
 /**
@@ -318,11 +298,12 @@ export const createPaceClient = (options: PaceClientOptions): PaceClient => {
   // `now` may be overridden on its own (the sync loop takes it too), so the clock follows it.
   const clock: Clock = { deviceTz: base.deviceTz, now: options.now ?? base.now };
   const { now } = clock;
-  const { api, auth } = apiAndAuth(options);
+  const { api, auth, checks } = apiAndAuth(options);
   const notices = noticeRouter(createNotificationFeed({ api, source: options.source }));
   const { closePeers, live, state, sync } = liveAndSync(options, {
     api,
     auth,
+    checks,
     now,
     onMessage: notices.onMessage,
   });
@@ -331,7 +312,9 @@ export const createPaceClient = (options: PaceClientOptions): PaceClient => {
   void (async (): Promise<void> => {
     await auth.ready;
     if (auth.store.getState().status === "signed-in") {
-      await auth.me();
+      // The start's `me` is the check a 401 meanwhile joins (holding from then on); alone it
+      // holds nothing, so the first sync and the socket start at once (CI fix review m3).
+      await checks.check({ holds: false });
     }
   })();
 

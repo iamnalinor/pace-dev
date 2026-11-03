@@ -1,4 +1,4 @@
-import type { Browser, BrowserContext, Locator, Page } from "@playwright/test";
+import type { BrowserContext, Locator, Page } from "@playwright/test";
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -7,7 +7,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { en } from "@pace/core/i18n/en";
 import { ru } from "@pace/core/i18n/ru";
 
-import { expect, test } from "./support/fixtures.ts";
+import { expect, type OpenContext, releaseContext, test } from "./support/fixtures.ts";
 import { createDevSession, resetAccount } from "./support/login.ts";
 import { type LivedIn, pushAsClient, seedLivedIn, ulid } from "./support/seed.ts";
 
@@ -120,11 +120,11 @@ const livedAccount = async (
 };
 
 const newContext = async (
-  browser: Browser,
+  openContext: OpenContext,
   { lang, size, theme }: Combo,
   token: string | undefined,
 ): Promise<BrowserContext> => {
-  const context = await browser.newContext({
+  const context = await openContext({
     colorScheme: theme,
     hasTouch: size.name === "phone",
     isMobile: size.name === "phone",
@@ -713,7 +713,7 @@ const FOCUS_STOPS = [1, 3, 6, 10, 16] as const;
 
 /** Everything one combo's run needs. */
 type Run = {
-  readonly browser: Browser;
+  readonly openContext: OpenContext;
   readonly combo: Combo;
   readonly recorder: Recorder;
   readonly L: Ctx["L"];
@@ -724,15 +724,15 @@ type Run = {
 
 /** A page in a context of the combo (signed in as `token`, or signed out), closed afterwards. */
 const withPage = async (
-  { browser, combo }: Run,
+  { combo, openContext }: Run,
   token: string | undefined,
   body: (page: Page) => Promise<void>,
 ): Promise<void> => {
-  const context = await newContext(browser, combo, token);
+  const context = await newContext(openContext, combo, token);
   try {
     await body(await context.newPage());
   } finally {
-    await context.close();
+    await releaseContext(context);
   }
 };
 
@@ -889,17 +889,17 @@ if (SHOT_DIR !== undefined) {
   for (const [index, combo] of COMBOS.entries()) {
     const name = `${combo.size.name}-${combo.theme}-${combo.lang}`;
 
-    test(`design shots ${name}`, async ({ browser }) => {
+    test(`design shots ${name}`, async ({ openContext }) => {
       test.setTimeout(30 * 60_000);
       const recorder = createRecorder(root, name);
       const lived = await livedAccount(ID_BASE + index * 2, combo.lang);
       const fresh = await freshAccount(ID_BASE + index * 2 + 1, combo.lang);
       const run: Run = {
-        browser,
         combo,
         fresh,
         L: (text, options) => label(combo.lang, text, options),
         lived: lived.token,
+        openContext,
         recorder,
         seeded: lived.seeded,
       };

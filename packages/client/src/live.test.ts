@@ -60,6 +60,67 @@ describe("createLiveChannel", () => {
     expect(socket?.closed).toBe(true);
   });
 
+  it("opens no socket with the session while a check of it is under way, and one after a check that kept it (CI run 41668309388)", async () => {
+    const sockets = fakeSockets();
+    const check = { pending: Promise.withResolvers<null>() as null | PromiseWithResolvers<null> };
+    let token: string | undefined = "tok";
+    const live = createLiveChannel({
+      baseUrl: "https://api.test",
+      createSocket: sockets.create,
+      deviceId: "dev-1",
+      onChange: vi.fn(),
+      sessionCheck: (): Promise<null> | undefined => check.pending?.promise,
+      token: () => token,
+    });
+    live.start();
+    // Started again while it waits: still one socket once the check is answered.
+    live.stop();
+    live.start();
+    expect(sockets.made).toHaveLength(0);
+    const kept = check.pending;
+    check.pending = null;
+    kept?.resolve(null);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(sockets.made).toHaveLength(1);
+    expect(sockets.made[0]?.protocols).toContain("pace.auth.tok");
+    live.stop();
+    // A check that ended the session: no socket after it.
+    check.pending = Promise.withResolvers<null>();
+    live.start();
+    token = undefined;
+    const ended = check.pending;
+    check.pending = null;
+    ended.resolve(null);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(sockets.made).toHaveLength(1);
+    live.stop();
+  });
+
+  it("a stopped channel leaves no waiter behind for a check under way (CI fix review m5)", async () => {
+    const first = Promise.withResolvers<null>();
+    const second = Promise.withResolvers<null>();
+    const check: { pending: Promise<null> | undefined } = { pending: first.promise };
+    const sessionCheck = vi.fn((): Promise<null> | undefined => check.pending);
+    const live = createLiveChannel({
+      baseUrl: "https://api.test",
+      createSocket: fakeSockets().create,
+      deviceId: "dev-1",
+      onChange: vi.fn(),
+      sessionCheck,
+      token: () => "tok",
+    });
+    live.start();
+    live.stop();
+    // The first check is answered while a second is under way: the stopped channel waits on neither.
+    check.pending = second.promise;
+    first.resolve(null);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(sessionCheck).toHaveBeenCalledTimes(1);
+    second.resolve(null);
+  });
+
   it("hands every other message (the notification pool's) to onMessage, parsed", () => {
     const sockets = fakeSockets();
     const onChange = vi.fn();

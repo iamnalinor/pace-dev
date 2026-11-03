@@ -100,8 +100,8 @@ export type Auth = {
     id: string,
   ) => Promise<Result<AccountConfirmationStatus, string>>;
   readonly finishAccountDeletion: () => Promise<void>;
-  /** Fetches the signed-in user; a 401 signs out locally. */
-  readonly me: () => Promise<Result<User, string>>;
+  /** Fetches the signed-in user; a 401 signs out locally. `signal` gives up on it (signs nothing out). */
+  readonly me: (signal?: AbortSignal) => Promise<Result<User, string>>;
   /**
   Signs in with a token minted outside these flows (a browser fallback, an App Link) by
   loading the user behind it; a token the server rejects leaves the device signed out.
@@ -249,37 +249,41 @@ request carried and only while it is still the one in use: a 401 for a token thi
 forgotten or replaced meanwhile (it ended its own session) says nothing about the session in use
 (fix round 1).
 */
-const meOf = (api: ApiClient, session: Session) => async (): Promise<Result<User, string>> => {
-  const sent = session.token();
-  try {
-    // The answer carries the store id too; the sync confirms that on its own pulls.
-    const user = UserSchema.parse(await api.call(endpoints.me, {}));
-    // An answer for a token this device dropped or replaced meanwhile (a Log out while the check
-    // was on its way) writes nothing: it would sign a wiped device back in (fix round 1 of QA 22).
-    if (session.token() !== sent) {
-      return err(SESSION_CHANGED);
-    }
-    session.store.setState({ status: "signed-in", user });
-    return ok(user);
-  } catch (error) {
-    if (
-      sent !== undefined &&
-      error instanceof ApiError &&
-      error.status === 401 &&
-      session.token() === sent &&
-      session.ending() !== sent
-    ) {
-      // "Another tab" only on its note: a store found empty proves nothing (another tab heard
-      // the same 401 first, blocked storage, a log-out whose answer is still on its way).
-      await session.signOut(
-        (await session.isLoggedOutInAnotherTab(sent))
-          ? { endedInAnotherTab: true }
-          : { endedElsewhere: true },
+const meOf =
+  (api: ApiClient, session: Session) =>
+  async (signal?: AbortSignal): Promise<Result<User, string>> => {
+    const sent = session.token();
+    try {
+      // The answer carries the store id too; the sync confirms that on its own pulls.
+      const user = UserSchema.parse(
+        await api.call(endpoints.me, {}, signal === undefined ? {} : { signal }),
       );
+      // An answer for a token this device dropped or replaced meanwhile (a Log out while the check
+      // was on its way) writes nothing: it would sign a wiped device back in (fix round 1 of QA 22).
+      if (session.token() !== sent) {
+        return err(SESSION_CHANGED);
+      }
+      session.store.setState({ status: "signed-in", user });
+      return ok(user);
+    } catch (error) {
+      if (
+        sent !== undefined &&
+        error instanceof ApiError &&
+        error.status === 401 &&
+        session.token() === sent &&
+        session.ending() !== sent
+      ) {
+        // "Another tab" only on its note: a store found empty proves nothing (another tab heard
+        // the same 401 first, blocked storage, a log-out whose answer is still on its way).
+        await session.signOut(
+          (await session.isLoggedOutInAnotherTab(sent))
+            ? { endedInAnotherTab: true }
+            : { endedElsewhere: true },
+        );
+      }
+      return err(errorCode(error));
     }
-    return err(errorCode(error));
-  }
-};
+  };
 
 export const createAuth = (options: {
   readonly api: ApiClient;
