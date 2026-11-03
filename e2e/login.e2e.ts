@@ -2,6 +2,7 @@ import type { Request } from "@playwright/test";
 
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { DEV_TELEGRAM_ID, freshTelegramId, loginViaApi, resetAccount } from "./support/login.ts";
+import { outboxSent } from "./support/outbox.ts";
 import { pushAsClient, seedLivedIn, ulid } from "./support/seed.ts";
 import { documentGround, rgb } from "./support/theme-colors.ts";
 
@@ -176,31 +177,7 @@ test("a slow log-out answer leaves the login form as the person is filling it in
   await page.goto("/settings");
   await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
   // The start's own write (the time zone) sent, so Log out has nothing to ask about.
-  await expect
-    .poll(
-      async () =>
-        await page.evaluate(
-          async () =>
-            await new Promise<number>((resolve, reject) => {
-              const opened = globalThis.indexedDB.open("pace");
-              opened.addEventListener("error", () => {
-                reject(new Error("no local copy"));
-              });
-              opened.addEventListener("success", () => {
-                const count = opened.result
-                  .transaction("pending", "readonly")
-                  .objectStore("pending")
-                  .count();
-                count.addEventListener("success", () => {
-                  resolve(count.result);
-                  opened.result.close();
-                });
-              });
-            }),
-        ),
-      { timeout: 15_000 },
-    )
-    .toBe(0);
+  await outboxSent(page);
   const answered = page.waitForResponse("**/api/auth/logout");
   await page.getByRole("button", { exact: true, name: "Log out" }).click();
   // Signed out on the device at once: the login screen is there before the server answers.

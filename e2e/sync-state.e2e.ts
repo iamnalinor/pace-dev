@@ -4,6 +4,7 @@ import { formByHand, nowTasks, taskForm } from "./support/composer.ts";
 import { EMPTY_COPY } from "./support/first-sync.ts";
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { API_URL, loginViaApi } from "./support/login.ts";
+import { outboxSent } from "./support/outbox.ts";
 import { isBare, screenUrls, STAND_IN_IDS } from "./support/routes.ts";
 import { settle } from "./support/screen-checks.ts";
 import { type LivedIn, pullAll, seedLivedIn } from "./support/seed.ts";
@@ -568,6 +569,9 @@ for (const [width, height] of [
     await loginViaApi(page);
     await page.goto("/settings");
     await expect(page.getByRole("button", { exact: true, name: "Log out" })).toBeVisible();
+    // The start's own write (a new account's time zone) sent first: the press counts the outbox
+    // as it is, so only the change made below is in it.
+    await outboxSent(page);
     // Offline, a setting changed here waits in the outbox.
     await context.setOffline(true);
     await page.getByRole("switch", { name: "Show night hours" }).click();
