@@ -24,6 +24,7 @@ export const enSessions = {
   "connectAi.intro":
     "Pace works as an MCP server. Add this URL to an AI app that supports MCP: it opens Pace to sign in with Telegram, and you choose what it may see and change.",
   "connectAi.url": "Server URL",
+  "connectAi.unavailable": "AI apps cannot connect to this server: they need an https address.",
   "connectAi.otherAddress":
     "AI apps must use the address above, not the one this device uses ({used}).",
   "connectAi.copy": "Copy the URL",

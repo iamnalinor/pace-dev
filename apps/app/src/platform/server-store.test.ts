@@ -5,7 +5,7 @@ import { serverInfoOf } from "./server-store.ts";
 const instance = (apiOrigin: string): Instance => ({
   apiOrigin,
   botUsername: "PaceTestBot",
-  features: { assistant: false, push: false },
+  features: { assistant: false, mcp: true, push: false },
   loginMethods: ["telegram-deeplink"],
   minClientProtocol: 1,
   name: "Pace",
@@ -84,5 +84,16 @@ describe("the MCP URL the screens hand out (round 7 review 1)", () => {
     });
     expect(unknown.mcpUrl).toBe("https://pace.example.org/mcp");
     expect(unknown.isPublicOriginOther).toBe(false);
+  });
+
+  it("hands out no MCP URL when the server says it has no MCP (re-review N4)", () => {
+    const lan = instance("https://pace.lan:8443");
+    const info = serverInfoOf({
+      instance: { ...lan, features: { ...lan.features, mcp: false } },
+      origin: "https://pace.lan:8443",
+      reason: null,
+      status: "ok",
+    });
+    expect(info.mcpUrl).toBeNull();
   });
 });

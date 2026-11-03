@@ -21,7 +21,7 @@ describe("GET /api/instance", () => {
       apiOrigin: env.API_ORIGIN,
       botUsername: env.TELEGRAM_BOT_USERNAME,
       // The test Worker answers from its built-in fake model (LLM_PROVIDER=fake).
-      features: { assistant: true, push: false },
+      features: { assistant: true, mcp: true, push: false },
       loginMethods: ["telegram-widget", "telegram-deeplink"],
       minClientProtocol: MIN_CLIENT_PROTOCOL,
       name: "Pace",

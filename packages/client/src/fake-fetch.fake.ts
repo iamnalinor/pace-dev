@@ -92,7 +92,7 @@ export const fakeMe: Me = { ...fakeUser, storeId: FAKE_STORE_ID };
 export const fakeInstance = {
   apiOrigin: "https://api.test",
   botUsername: "PaceTestBot",
-  features: { assistant: true, push: true },
+  features: { assistant: true, mcp: true, push: true },
   loginMethods: ["telegram-widget", "telegram-deeplink"],
   minClientProtocol: 1,
   name: "Pace",

@@ -777,6 +777,28 @@ describe("Settings → Devices and sessions", () => {
     });
   });
 
+  it("says AI apps cannot connect, with no URL to copy, on a server without MCP (re-review N4)", async () => {
+    const usedApi = serverStore.getState().origin;
+    await renderSettings({
+      "GET /api/instance": () => ({
+        ...fakeInstance,
+        apiOrigin: usedApi,
+        features: { ...fakeInstance.features, mcp: false },
+      }),
+      "GET /api/sessions": () => SessionsOutputSchema.parse({ sessions: [] }),
+    });
+    await waitFor(() => {
+      expect(serverStore.getState().instance?.features.mcp).toBe(false);
+    });
+    await fireEvent.press(await screen.findByRole("button", { name: "Connect an AI app" }));
+    expect(
+      await screen.findByText("AI apps cannot connect to this server: they need an https address."),
+    ).toBeOnTheScreen();
+    expect(screen.queryByText(`${usedApi}/mcp`)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Send the URL" })).toBeNull();
+    expect(screen.queryByText("Claude")).toBeNull();
+  });
+
   it("says nothing about the address when the server's public API is the one in use", async () => {
     const usedApi = serverStore.getState().origin;
     await renderSettings({
