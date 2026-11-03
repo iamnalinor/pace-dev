@@ -2,10 +2,18 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 // eslint-disable-next-line security/detect-non-literal-fs-filename -- a fixed path: this app's own stylesheet
-const CSS = readFileSync(path.join(__dirname, "../../global.css"), "utf8")
+const SHEET = readFileSync(path.join(__dirname, "../../global.css"), "utf8")
   .split("*/")
   .map((part) => part.slice(0, part.includes("/*") ? part.indexOf("/*") : part.length))
   .join("");
+
+/*
+Forced colours hand every colour to the system (ButtonBorder, Highlight): that block is the one
+place a ring is not in the focus role, and `state-layer.test.ts` checks it. It is the last block
+of the sheet, so everything from it on is left out here.
+*/
+const FORCED = SHEET.indexOf("@media (forced-colors: active)");
+const CSS = FORCED === -1 ? SHEET : SHEET.slice(0, FORCED);
 
 type Outline = { readonly selector: string; readonly value: string };
 
@@ -41,5 +49,11 @@ describe("the focus ring", () => {
     expect(inputs.filter(({ selector }) => !selector.includes(":not([data-pace-slider])"))).toEqual(
       [],
     );
+  });
+
+  it("keeps the forced-colours block last, so the reading above sees every other rule", () => {
+    expect(FORCED).toBeGreaterThan(-1);
+    const after = SHEET.slice(FORCED);
+    expect(after.match(/@media/g)).toHaveLength(1);
   });
 });

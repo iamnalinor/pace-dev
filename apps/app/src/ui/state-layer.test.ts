@@ -9,13 +9,13 @@ const CSS = readFileSync(path.join(__dirname, "../../global.css"), "utf8").repla
   "",
 );
 
-/** The declarations of the first rule whose selector is exactly `selector`, inside any block. */
-const declarations = (selector: string): readonly string[] => {
-  const start = CSS.indexOf(`${selector} {`);
+/** The declarations of the first rule whose selector is exactly `selector`, in `css`. */
+const declarations = (selector: string, css: string = CSS): readonly string[] => {
+  const start = css.indexOf(`${selector} {`);
   if (start === -1) {
     return [];
   }
-  const body = CSS.slice(CSS.indexOf("{", start) + 1, CSS.indexOf("}", start));
+  const body = css.slice(css.indexOf("{", start) + 1, css.indexOf("}", start));
   return body
     .split(";")
     .map((declaration) => declaration.trim().replaceAll(/\s+/g, " "))
@@ -44,29 +44,59 @@ const mediaBlock = (query: string): string => {
 
 const MARK = "[data-pace-press]";
 const ENABLED = `${MARK}:not([aria-disabled="true"])`;
+const OVERLAY = `${MARK}::after`;
+const HOVER_MEDIA = "(hover: hover) and (pointer: fine)";
+const FORCED_MEDIA = "(forced-colors: active)";
 const bezier = (points: readonly number[]): string => `cubic-bezier(${points.join(", ")})`;
 
+/** The declarations of a rule inside the forced-colours block. */
+const forced = (selector: string): readonly string[] =>
+  declarations(selector, mediaBlock(FORCED_MEDIA));
+
+/** The stylesheet without the forced-colours block, where the overlay is switched off. */
+const outsideForced = (): string => CSS.replace(mediaBlock(FORCED_MEDIA), "");
+
 describe("the web state layer (global.css, spec §3.7)", () => {
+  it("is an overlay above the content: an opaque child cannot hide it, a click passes through", () => {
+    expect(declarations(OVERLAY, outsideForced())).toEqual(
+      expect.arrayContaining([
+        'content: ""',
+        "position: absolute",
+        "inset: 0",
+        "border-radius: inherit",
+        "pointer-events: none",
+      ]),
+    );
+  });
+
+  it("leaves the control's own shadow and transition alone (it draws on the overlay only)", () => {
+    const own = declarations(MARK);
+    expect(
+      own.filter((declaration) => /^(?:box-shadow|transition|background)/.test(declaration)),
+    ).toEqual([]);
+    expect(CSS).not.toContain("box-shadow: inset");
+  });
+
   it("goes out in duration.xs on easing.exit, from the motion tokens", () => {
-    expect(declarations(MARK)).toContain(
-      `transition: box-shadow ${motion.duration.xs}ms ${bezier(motion.easing.exit)}`,
+    expect(declarations(OVERLAY, outsideForced())).toContain(
+      `transition: background-color ${motion.duration.xs}ms ${bezier(motion.easing.exit)}`,
     );
   });
 
   it("comes in at once when pressed, in fill.2, and never on a disabled control", () => {
-    const pressed = declarations(`${ENABLED}:active`);
+    const pressed = declarations(`${ENABLED}:active::after`);
     expect(pressed).toContain("transition-duration: 0s");
-    expect(pressed).toContain("box-shadow: inset 0 0 0 100vmax var(--pace-fill-2)");
+    expect(pressed).toContain("background-color: var(--pace-fill-2)");
   });
 
   it("hovers in fill.1 only for a pointer that hovers (a tap never leaves it stuck)", () => {
-    const hoverRule = `${ENABLED}:hover`;
-    expect(mediaBlock("(hover: hover) and (pointer: fine)")).toContain(hoverRule);
+    const hoverRule = `${ENABLED}:hover::after`;
+    expect(mediaBlock(HOVER_MEDIA)).toContain(hoverRule);
     // Outside that block the selector must not appear.
-    expect(CSS.replace(mediaBlock("(hover: hover) and (pointer: fine)"), "")).not.toContain(
-      ":hover",
+    expect(CSS.replace(mediaBlock(HOVER_MEDIA), "")).not.toContain(":hover");
+    expect(declarations(hoverRule, mediaBlock(HOVER_MEDIA))).toContain(
+      "background-color: var(--pace-fill-1)",
     );
-    expect(declarations(hoverRule)).toContain("box-shadow: inset 0 0 0 100vmax var(--pace-fill-1)");
   });
 
   it("selects no text and opens no callout on a long press (F-WEB-10)", () => {
@@ -75,10 +105,28 @@ describe("the web state layer (global.css, spec §3.7)", () => {
     );
   });
 
-  it("maps the ring, the selected state and the boundary to system colours in forced colours", () => {
-    const forced = mediaBlock("(forced-colors: active)");
-    expect(forced).toContain("ButtonBorder");
-    expect(forced).toContain("Highlight");
-    expect(forced).toContain("HighlightText");
+  describe("in forced colours (F-A11Y-04)", () => {
+    it("draws each control's boundary in ButtonBorder, as an outline that moves no layout", () => {
+      expect(forced(MARK)).toEqual(
+        expect.arrayContaining(["outline: 1px solid ButtonBorder", "outline-offset: -1px"]),
+      );
+    });
+
+    it("draws the keyboard ring in Highlight", () => {
+      expect(forced(`${MARK}:focus-visible`)).toEqual(
+        expect.arrayContaining(["outline: 2px solid Highlight", "outline-offset: 2px"]),
+      );
+    });
+
+    it("marks selected and checked in Highlight / HighlightText", () => {
+      const marked = forced(`${MARK}:is([aria-selected="true"], [aria-checked="true"])`);
+      expect(marked).toEqual(
+        expect.arrayContaining(["background-color: Highlight", "color: HighlightText"]),
+      );
+    });
+
+    it("drops the tinted overlay, which the system would repaint opaque over the label", () => {
+      expect(forced(OVERLAY)).toContain("display: none");
+    });
   });
 });

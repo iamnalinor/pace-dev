@@ -196,4 +196,72 @@ describe("Pressable (the kit's state layer, spec §3.7)", () => {
     const classes = String(screen.getByRole("button", { name: "Save" }).props["className"]);
     expect(classes.split(" ")).toEqual(expect.arrayContaining(["shrink-0", "rounded-md"]));
   });
+
+  it("says checked to screen readers on a checkbox, a radio and a switch, never selected", async () => {
+    await renderLight(
+      <>
+        <Pressable checked onPress={jest.fn()} role="checkbox">
+          <Text>Done</Text>
+        </Pressable>
+        <Pressable checked={false} onPress={jest.fn()} role="radio">
+          <Text>Other</Text>
+        </Pressable>
+        <Pressable checked onPress={jest.fn()} role="switch">
+          <Text>Night</Text>
+        </Pressable>
+      </>,
+    );
+    const done = screen.getByRole("checkbox", { name: "Done" });
+    expect(done).toBeChecked();
+    expect(done).not.toBeSelected();
+    expect(done.props["aria-selected"]).toBeUndefined();
+    expect(screen.getByRole("radio", { name: "Other" })).not.toBeChecked();
+    expect(screen.getByRole("switch", { name: "Night" })).toBeChecked();
+  });
+
+  it("drops selected on a role it does not belong to, even past the type", async () => {
+    const loose = { role: "checkbox", selected: true } as unknown as {
+      role: "tab";
+      selected: boolean;
+    };
+    await renderLight(
+      <Pressable {...loose} onPress={jest.fn()}>
+        <Text>Done</Text>
+      </Pressable>,
+    );
+    const done = screen.getByRole("checkbox", { name: "Done" });
+    expect(done).not.toBeSelected();
+    expect(done.props["aria-selected"]).toBeUndefined();
+  });
+
+  it("types selected for tabs and checked for checkables only", () => {
+    const typed = [
+      <Pressable key="tab" role="tab" selected />,
+      <Pressable checked key="checkbox" role="checkbox" />,
+      // @ts-expect-error -- a button is neither selected nor checked
+      <Pressable key="button" role="button" selected />,
+      // @ts-expect-error -- a checkbox is checked, not selected
+      <Pressable key="checkbox-selected" role="checkbox" selected />,
+      // @ts-expect-error -- a tab is selected, not checked
+      <Pressable checked key="tab-checked" role="tab" />,
+    ];
+    expect(typed).toHaveLength(5);
+  });
+
+  it("ripples and plays nothing when it has nothing to do", async () => {
+    const restore = jest.replaceProperty(Platform, "OS", "android");
+    try {
+      await renderLight(
+        <Pressable haptic="confirm" role="button">
+          <Text>Idle</Text>
+        </Pressable>,
+      );
+      const idle = screen.getByRole("button", { name: "Idle" });
+      expect(idle.props["nativeForegroundAndroid"]).toBeUndefined();
+      await fireEvent.press(idle);
+      expect(playHaptic).not.toHaveBeenCalled();
+    } finally {
+      restore.restore();
+    }
+  });
 });

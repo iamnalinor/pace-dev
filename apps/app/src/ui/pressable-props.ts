@@ -15,11 +15,27 @@ How far the press feedback reaches: `bounded` fills the control's own shape (but
 */
 export type RippleKind = "borderless" | "bounded";
 
+/** The roles ARIA lets say `aria-selected` (React Native knows `tab` of them). */
+type SelectableRole = Extract<AccessibilityRole, "gridcell" | "option" | "row" | "tab">;
+
+/** The roles that are checked rather than selected (`aria-checked`). */
+type CheckableRole = Extract<AccessibilityRole, "checkbox" | "radio" | "switch">;
+
+const SELECTABLE: ReadonlySet<string> = new Set(["gridcell", "option", "row", "tab"]);
+const CHECKABLE: ReadonlySet<string> = new Set(["checkbox", "radio", "switch"]);
+
+/**
+The roles a Space press is owed on the web: react-native-web presses only `button` on Space
+(bug-lessons class 113), and a button must not get a second one.
+*/
+export const SPACE_ROLES: ReadonlySet<string> = new Set(["checkbox", "radio", "switch", "tab"]);
+
 /** The props the native Pressable takes from the kit's, never from a caller. */
 type Owned =
   | "accessibilityRole"
   | "accessibilityState"
   | "android_ripple"
+  | "aria-checked"
   | "aria-disabled"
   | "aria-selected"
   | "disabled"
@@ -30,12 +46,15 @@ type Owned =
 /**
 The kit's Pressable (spec §4.1.1): React Native's, with the state layer (§3.7) drawn once for
 every control. Everything React Native's takes passes through, except what the state layer owns.
+`selected` belongs to a tab (and ARIA's option, row, gridcell); `checked` to a checkbox, a radio
+or a switch: the type refuses either on another role, and the markup drops it.
 */
-export type PressableProps = {
-  readonly role: AccessibilityRole;
+export type PressableProps<R extends AccessibilityRole = AccessibilityRole> = {
+  readonly role: R;
   /** The name said for it; required when it has no text child (an icon). */
   readonly label?: string | undefined;
-  readonly selected?: boolean | undefined;
+  readonly selected?: (R extends SelectableRole ? boolean : never) | undefined;
+  readonly checked?: (R extends CheckableRole ? "mixed" | boolean : never) | undefined;
   readonly disabled?: boolean | undefined;
   /** What the press means to the hand (§3.10): `longPress` plays on the long press, the rest on the press. */
   readonly haptic?: HapticKind | undefined;
@@ -45,24 +64,50 @@ export type PressableProps = {
   readonly onLongPress?: (() => void) | undefined;
 } & Omit<NativePressableProps, Owned>;
 
+type State = {
+  readonly checked?: "mixed" | boolean;
+  readonly disabled: boolean;
+  readonly selected?: boolean;
+};
+
 /** What the state layer sets on the native Pressable on both platforms. */
 type SharedProps = {
   readonly accessibilityLabel?: string;
   readonly accessibilityRole: AccessibilityRole;
-  readonly accessibilityState: { readonly disabled: boolean; readonly selected?: boolean };
+  readonly accessibilityState: State;
+  readonly "aria-checked"?: "mixed" | boolean;
   readonly "aria-selected"?: boolean;
   readonly className: string;
   readonly disabled: boolean;
   readonly onLongPress: (() => void) | undefined;
-  readonly onPress: (event: GestureResponderEvent) => void;
+  readonly onPress: ((event: GestureResponderEvent) => void) | undefined;
 };
+
+/** What a caller asked the role to say, before the role is checked. */
+type AskedState = {
+  readonly checked: "mixed" | boolean | undefined;
+  readonly isDisabled: boolean;
+  readonly selected: boolean | undefined;
+};
+
+/** The state a role may say: selected for a tab, checked for a checkable, nothing else. */
+const stateOf = (
+  role: AccessibilityRole,
+  { checked, isDisabled, selected }: AskedState,
+): State => ({
+  disabled: isDisabled,
+  ...(selected !== undefined && SELECTABLE.has(role) && { selected }),
+  ...(checked !== undefined && CHECKABLE.has(role) && { checked }),
+});
 
 /**
 Splits the kit's props into what both platforms hand the native Pressable and the rest, which
 passes through untouched. The haptic plays with the press it belongs to, never on press-in, and
-never while disabled (the native Pressable fires no press then).
+never while disabled (the native Pressable fires no press then). A Pressable with no press and no
+long press is not a control: it gets no press, no state layer and no haptic (`isLive`).
 */
-export const usePressableProps = ({
+export const usePressableProps = <R extends AccessibilityRole>({
+  checked,
   className,
   disabled = false,
   haptic,
@@ -73,7 +118,7 @@ export const usePressableProps = ({
   role,
   selected,
   ...rest
-}: PressableProps) => {
+}: PressableProps<R>) => {
   const press = useCallback(
     (event: GestureResponderEvent) => {
       if (haptic !== undefined && haptic !== "longPress") {
@@ -89,17 +134,20 @@ export const usePressableProps = ({
     }
     onLongPress?.();
   }, [haptic, onLongPress]);
+  const state = stateOf(role, { checked, isDisabled: disabled, selected });
   const shared: SharedProps = {
     ...(label !== undefined && { accessibilityLabel: label }),
     accessibilityRole: role,
-    accessibilityState: { disabled, ...(selected !== undefined && { selected }) },
-    // react-native-web reads no accessibilityState: the browser hears `aria-selected`.
-    ...(selected !== undefined && { "aria-selected": selected }),
+    accessibilityState: state,
+    // react-native-web reads no accessibilityState: the browser hears the aria attributes.
+    ...(state.selected !== undefined && { "aria-selected": state.selected }),
+    ...(state.checked !== undefined && { "aria-checked": state.checked }),
     // Controls never shrink in a row: the text beside them yields (spec §4.1.2).
     className: cx("shrink-0", className),
     disabled,
     onLongPress: onLongPress === undefined ? undefined : longPress,
-    onPress: press,
+    onPress: onPress === undefined ? undefined : press,
   };
-  return { rest, ripple, shared };
+  const isLive = onPress !== undefined || onLongPress !== undefined;
+  return { isLive, rest, ripple, shared };
 };
