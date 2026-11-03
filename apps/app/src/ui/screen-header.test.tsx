@@ -46,8 +46,18 @@ describe("ScreenHeader (spec §4.2.16, §5.0.2)", () => {
         <ScreenHeader actions={<NativeText>bell</NativeText>} title="Now" variant="top" />,
       );
       const bar = screen.getByTestId("screen-header-bar");
-      expect(classesOf(bar)).toContain("h-hit");
+      // At least the target, never a fixed height: a labelled action at 200 % text grows it (F-AND-05).
+      expect(classesOf(bar).split(" ")).toContain("min-h-hit");
+      expect(classesOf(bar).split(" ")).not.toContain("h-hit");
       expect(within(bar).getByText("bell")).toBeOnTheScreen();
+    });
+
+    it("keeps the gutter: 16 on a phone, 24 on a tablet, 32 on a computer", async () => {
+      await renderHeader(<ScreenHeader title="Inbox" variant="top" />);
+      const header = screen.getByTestId("screen-header");
+      expect(classesOf(header).split(" ")).toEqual(
+        expect.arrayContaining(["px-gutter", "md:px-gutter-pane", "lg:px-gutter-lg"]),
+      );
     });
 
     it("on a phone has the bar even with nothing in it", async () => {

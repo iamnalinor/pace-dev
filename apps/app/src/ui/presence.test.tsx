@@ -103,6 +103,11 @@ describe("Presence (spec §4.1.1, §6)", () => {
     expect(presenceFrom("scale", false)).toEqual({ opacity: 0, scale: 0.96 });
     expect(presenceTiming("rise", true)).toEqual({ enter: 160, exit: 160 });
     expect(presenceTiming("rise", false)).toEqual({ enter: 220, exit: 160 });
+    expect(presenceFrom("lift", false)).toEqual({ opacity: 0, translateY: 4 });
+    expect(presenceTiming("lift", false)).toEqual({ enter: 160, exit: 110 });
+    expect(presenceFrom("slide", false)).toEqual({ opacity: 0, translateX: 16 });
+    expect(presenceFrom("slide", true)).toEqual({ opacity: 0 });
+    expect(presenceTiming("slide", false)).toEqual({ enter: 220, exit: 160 });
   });
 
   it("with reduced motion, the drawn start frame has no travel", async () => {

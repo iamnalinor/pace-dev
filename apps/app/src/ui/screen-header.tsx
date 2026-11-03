@@ -59,7 +59,7 @@ const Bar = ({
   context,
   ...back
 }: BackProps & Pick<ScreenHeaderProps, "actions" | "context">) => (
-  <View className="h-hit flex-row items-center gap-2" testID="screen-header-bar">
+  <View className="min-h-hit flex-row items-center gap-2" testID="screen-header-bar">
     <Back {...back} />
     <View className="min-w-0 flex-1 flex-row items-center">{context}</View>
     {actions === undefined ? null : <View className="flex-row items-center gap-2">{actions}</View>}
@@ -124,9 +124,10 @@ export const ScreenHeader = ({
   return (
     <View
       className={cx(
-        "px-gutter pb-header-bottom lg:px-gutter-lg lg:pb-header-bottom-lg",
+        "px-gutter pb-header-bottom md:px-gutter-pane lg:px-gutter-lg lg:pb-header-bottom-lg",
         isTopOnDesktop && "pt-header-top-lg",
       )}
+      testID="screen-header"
     >
       {isTopOnDesktop ? null : <Bar actions={actions} context={context} {...back} />}
       {title === undefined ? null : (

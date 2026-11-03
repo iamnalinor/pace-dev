@@ -78,13 +78,17 @@ export const Presence = ({
   const from = presenceFrom(show ? enter : exit, isReduced);
   const style = useAnimatedStyle(() => {
     const step = progress.get();
+    const away = 1 - step;
+    if (from.translateX !== undefined) {
+      return { opacity: step, transform: [{ translateX: away * from.translateX }] };
+    }
     if (from.translateY !== undefined) {
-      return { opacity: step, transform: [{ translateY: (1 - step) * from.translateY }] };
+      return { opacity: step, transform: [{ translateY: away * from.translateY }] };
     }
     return from.scale === undefined
       ? { opacity: step }
       : { opacity: step, transform: [{ scale: from.scale + (1 - from.scale) * step }] };
-  }, [from.scale, from.translateY]);
+  }, [from.scale, from.translateX, from.translateY]);
   return isMounted ? (
     <Animated.View {...rest} style={style}>
       {children}

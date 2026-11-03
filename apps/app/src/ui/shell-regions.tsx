@@ -1,8 +1,9 @@
-import type { ReactNode } from "react";
-
+import { type ReactNode, useState } from "react";
 import { View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useIsWide } from "./layout.ts";
+import { Presence } from "./presence.tsx";
 
 export type ShellProps = {
   /** The navigation region (`Navigation`: sidebar, rail or nothing); left out by a nested shell. */
@@ -17,9 +18,11 @@ export type ShellProps = {
 };
 
 /**
-The inspector region (spec §4.2.25): at the trailing edge at `inspector.width` (360–480), a
-`separator` on its leading edge, a labelled region. Only on an `expanded` window and only while
-something is selected; elsewhere the selection opens in a sheet, so nothing is drawn.
+The inspector region (spec §4.2.25, §6 row → inspector): at the trailing edge at
+`inspector.width` (360–480), a `separator` on its leading edge, a labelled region. Only on an
+`expanded` window: it slides 16 in from the trailing edge with a fade when something is picked
+and back out when nothing is (220 / 160), keeping what it last showed through the exit; elsewhere
+the selection opens in a sheet, so nothing is drawn.
 */
 export const Inspector = ({
   inspector,
@@ -27,13 +30,33 @@ export const Inspector = ({
   inspectorOpen = false,
 }: Pick<ShellProps, "inspector" | "inspectorLabel" | "inspectorOpen">) => {
   const isWide = useIsWide();
-  return inspectorOpen && inspector !== undefined && isWide ? (
-    <View
-      accessibilityLabel={inspectorLabel}
-      className="w-inspector min-w-inspector-min max-w-inspector-max border-l border-separator bg-app"
-      role="region"
+  // What the pane last showed: it stays through the exit, after the screen has let go of it.
+  const [kept, setKept] = useState<ReactNode>(inspector);
+  if (inspector !== undefined && inspector !== kept) {
+    setKept(inspector);
+  }
+  const isShown = inspectorOpen && inspector !== undefined;
+  return isWide ? (
+    <Presence
+      enter="slide"
+      onExited={() => {
+        setKept(undefined);
+      }}
+      show={isShown}
     >
-      {inspector}
-    </View>
+      <View
+        accessibilityLabel={inspectorLabel}
+        className="h-full w-inspector min-w-inspector-min max-w-inspector-max border-l border-separator bg-app"
+        role="region"
+      >
+        {kept}
+      </View>
+    </Presence>
   ) : null;
+};
+
+/** The shell's outer frame: the side insets keep the rail and the content off the cutout. */
+export const useShellInsets = () => {
+  const insets = useSafeAreaInsets();
+  return { paddingLeft: insets.left, paddingRight: insets.right };
 };

@@ -217,8 +217,10 @@ test("the form's close drops its draft: New task opens an empty form again (QA 1
 });
 
 /**
-Samples, frame by frame, where the form sits inside the card while the card unfolds: the browser must not scroll the box to reveal the focused title, which would slide
-the header (and the top of Create) out of the card and back.
+Samples, frame by frame, where the form sits inside the card while the card unfolds, and how far
+the screen's scroller has moved: the browser must not scroll to reveal the focused title, which
+would slide the header (and the top of Create) away and back. The card itself no longer scrolls
+or clips, so the scroller measured is the nearest ancestor that scrolls.
 */
 const sampleUnfolding = async (page: Page): Promise<readonly { top: number; scroll: number }[]> =>
   await page.evaluate(
@@ -230,10 +232,17 @@ const sampleUnfolding = async (page: Page): Promise<readonly { top: number; scro
           const form = globalThis.document.querySelector('[role="form"]');
           // The card that changes shape (it no longer clips: it takes the form's height at once).
           const clip = globalThis.document.querySelector('[data-testid="composer-card"]');
+          let scroller = clip?.parentElement ?? null;
+          while (
+            scroller !== null &&
+            !/auto|scroll/u.test(globalThis.getComputedStyle(scroller).overflowY)
+          ) {
+            scroller = scroller.parentElement;
+          }
           if (form !== null && clip !== null) {
             end = Math.min(end, now + 600);
             samples.push({
-              scroll: clip.scrollTop,
+              scroll: scroller?.scrollTop ?? globalThis.scrollY,
               top: form.getBoundingClientRect().top - clip.getBoundingClientRect().top,
             });
           }

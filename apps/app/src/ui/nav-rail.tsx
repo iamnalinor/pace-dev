@@ -1,5 +1,5 @@
 import { usePathname } from "expo-router";
-import { View } from "react-native";
+import { ScrollView, View } from "react-native";
 
 import { useT } from "../app-state.tsx";
 import { useWaitingCount } from "../shared/use-waiting-count.ts";
@@ -59,7 +59,7 @@ export const NavRail = () => {
   return (
     <View
       aria-label={t("nav.main")}
-      className="w-rail items-center gap-2 border-r border-separator bg-sidebar px-1 pb-4 pt-5"
+      className="w-rail items-center gap-2 border-r border-separator bg-sidebar px-1 pt-5"
       role="navigation"
       testID="nav-rail"
     >
@@ -71,14 +71,22 @@ export const NavRail = () => {
       >
         <Icon name="plus" size="bar" tone="primary" />
       </Pressable>
-      {DESTINATIONS.map((destination) => (
-        <RailLink
-          count={destination.countedLabel === undefined ? 0 : waiting}
-          destination={destination}
-          isCurrent={destination.owns(path)}
-          key={destination.label}
-        />
-      ))}
+      {/* A short window (a phone turned sideways, 360–410 high) scrolls the destinations. */}
+      <ScrollView
+        className="w-full"
+        contentContainerClassName="items-center gap-2 pb-4"
+        showsVerticalScrollIndicator={false}
+        testID="nav-rail-scroll"
+      >
+        {DESTINATIONS.map((destination) => (
+          <RailLink
+            count={destination.countedLabel === undefined ? 0 : waiting}
+            destination={destination}
+            isCurrent={destination.owns(path)}
+            key={destination.label}
+          />
+        ))}
+      </ScrollView>
     </View>
   );
 };

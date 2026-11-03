@@ -5,7 +5,7 @@ import { z } from "@pace/core";
 
 import { useT } from "../app-state.tsx";
 import { Pressable } from "./pressable.tsx";
-import { Inspector, type ShellProps } from "./shell-regions.tsx";
+import { Inspector, type ShellProps, useShellInsets } from "./shell-regions.tsx";
 import { Text } from "./text.tsx";
 
 /** The part of the `main` element the skip link moves the keyboard to. */
@@ -49,9 +49,10 @@ also makes the content the page's `main` landmark, with the skip link before eve
 */
 export const Shell = ({ content, navigation, ...inspector }: ShellProps) => {
   const mainRef = useRef<View>(null);
+  const insets = useShellInsets();
   const isTopLevel = navigation !== undefined;
   return (
-    <View className="flex-1 flex-row bg-app">
+    <View className="flex-1 flex-row bg-app" style={insets} testID="shell">
       {isTopLevel ? (
         <SkipLink
           onSkip={() => {

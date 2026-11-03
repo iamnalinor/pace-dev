@@ -49,6 +49,46 @@ const IssueLine = ({ flow }: { readonly flow: ComposerFlow }) =>
     />
   );
 
+/**
+The assistant's preview (spec §6 "assistant preview appears"): it lifts 4 px in with a fade where it
+lands (160) and fades out (110) keeping what it showed, deaf to touches while it goes. The card
+takes its height at once, so Approve is never clipped while it grows (QA 22, bug-lessons 5).
+*/
+const Preview = ({ flow }: { readonly flow: ComposerFlow }) => {
+  const { pending } = flow.pending;
+  // What the preview last showed: it stays through the fade out, after the answer is gone.
+  const [kept, setKept] = useState(pending);
+  if (pending !== null && pending !== kept) {
+    setKept(pending);
+  }
+  return kept === null ? null : (
+    <Presence
+      enter="lift"
+      exit="fade"
+      initial
+      onExited={() => {
+        setKept(null);
+      }}
+      pointerEvents={pending === null ? "none" : "auto"}
+      show={pending !== null}
+    >
+      <ActionCards
+        actions={kept.actions}
+        busy={flow.pending.busy}
+        onApprove={() => {
+          void flow.pending.approve();
+        }}
+        onCancel={flow.dismiss}
+        onFollowup={flow.pending.followup}
+        // Offered once: after a press the status line below says what came of it.
+        onLater={flow.ai.state.status === "idle" ? () => void flow.readLater() : undefined}
+        questions={kept.questions}
+        unread={kept.unread}
+      />
+    </Presence>
+  );
+};
+
 /** The line and, while the assistant works on it (and no form shows its reading), its status. */
 const LineBlock = ({
   flow,
@@ -67,25 +107,7 @@ const LineBlock = ({
       isReading={flow.pending.busy}
       onFocusChange={onFocusChange}
     />
-    {flow.pending.pending === null ? null : (
-      // The preview fades in where it lands (spec §6 "assistant preview appears"): the card takes
-      // its height at once, so Approve is never clipped while it grows (QA 22, bug-lessons 5).
-      <Presence initial show>
-        <ActionCards
-          actions={flow.pending.pending.actions}
-          busy={flow.pending.busy}
-          onApprove={() => {
-            void flow.pending.approve();
-          }}
-          onCancel={flow.dismiss}
-          onFollowup={flow.pending.followup}
-          // Offered once: after a press the status line below says what came of it.
-          onLater={flow.ai.state.status === "idle" ? () => void flow.readLater() : undefined}
-          questions={flow.pending.pending.questions}
-          unread={flow.pending.pending.unread}
-        />
-      </Presence>
-    )}
+    <Preview flow={flow} />
     <IssueLine flow={flow} />
     {flow.text.trim() === "" || flow.form !== null || flow.ai.state.status === "read" ? null : (
       <Status flow={flow} />

@@ -82,3 +82,42 @@ test("the skip link is the first stop and moves the keyboard into main (F-A11Y-1
   await page.keyboard.press("Enter");
   await expect(page.getByRole("main")).toBeFocused();
 });
+
+test("a phone turned sideways (844 × 390) reaches every rail destination by scrolling the rail", async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 390, width: 844 });
+  await loginViaApi(page);
+  await page.goto("/");
+  const links = page.getByRole("navigation", { name: "Main" }).getByRole("link");
+  await expect(links).toHaveCount(8);
+  const all = await links.all();
+  for (const link of all) {
+    await link.scrollIntoViewIfNeeded();
+    await expect(link).toBeInViewport({ ratio: 1 });
+  }
+  // The last one is really pressable from there.
+  await links.last().click();
+  await expect(page).toHaveURL(/\/settings$/u);
+});
+
+test("at 1440 the wheel over the gutter scrolls a long screen (F-WEB-05, the region scroller)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 900, width: 1440 });
+  await loginViaApi(page);
+  await page.goto("/settings");
+  const title = page.getByRole("heading", { level: 1, name: "Settings" });
+  await expect(title).toBeVisible();
+  const scrolled = async (): Promise<number> =>
+    await page.evaluate(() =>
+      Math.max(
+        ...[...globalThis.document.querySelectorAll("*")].map((element) => element.scrollTop),
+      ),
+    );
+  expect(await scrolled()).toBe(0);
+  // The right gutter, past the column: no control there, only the region's scroller.
+  await page.mouse.move(1440 - 40, 600);
+  await page.mouse.wheel(0, 400);
+  await expect.poll(scrolled).toBeGreaterThan(0);
+});

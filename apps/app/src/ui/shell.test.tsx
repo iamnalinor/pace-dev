@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react-native";
+import { screen, within } from "@testing-library/react-native";
 import { Text } from "react-native";
 
 import { en, renderScreen } from "#app/test/render.tsx";
@@ -52,7 +52,8 @@ describe("Shell (spec §3.3, §5.0.1: navigation · content · inspector)", () =
     it("renders the navigation rail, with every destination as a link", async () => {
       await renderShell(false);
       expect(screen.getByTestId("nav-rail")).toBeOnTheScreen();
-      expect(screen.getAllByRole("link")).toHaveLength(8);
+      // The destinations scroll: a phone turned sideways (about 390 high) cannot show all eight.
+      expect(within(screen.getByTestId("nav-rail-scroll")).getAllByRole("link")).toHaveLength(8);
     });
 
     it("has no inspector region: a selection opens a sheet instead", async () => {
