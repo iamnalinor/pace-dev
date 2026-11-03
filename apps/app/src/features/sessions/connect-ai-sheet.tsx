@@ -33,7 +33,7 @@ export const ConnectAiSheet = ({
 }) => {
   const t = useT();
   // The server's public API, its OAuth resource (round 7 review 1), not the address in use.
-  const { isPublicOriginOther, mcpUrl: url } = useServerInfo();
+  const { apiOrigin: usedOrigin, isPublicOriginOther, mcpUrl: url } = useServerInfo();
   const [isCopied, setIsCopied] = useState(false);
   return (
     <Sheet
@@ -53,7 +53,7 @@ export const ConnectAiSheet = ({
         <CodeText>{url}</CodeText>
         {isPublicOriginOther ? (
           <Text className="font-sans text-caption font-normal text-label-tertiary">
-            {t("connectAi.otherAddress")}
+            {t("connectAi.otherAddress", { used: usedOrigin })}
           </Text>
         ) : null}
         <Button

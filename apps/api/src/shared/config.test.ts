@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { loadConfig } from "./config.ts";
+import { loadConfig, ownOrigin } from "./config.ts";
 
 const base = {
   ALLOWED_TELEGRAM_IDS: " 1001, 1002 ,,",
@@ -137,6 +137,14 @@ describe("loadConfig", () => {
     expect(configured({ API_ORIGIN: " https://api.pace.test " })?.apiOrigin).toBe(
       "https://api.pace.test",
     );
+  });
+
+  it("names the Worker by the configured origin, or the one a request reached when it is unusable", () => {
+    const url = "https://pace.lan:8443/api/instance";
+    expect(ownOrigin("https://api.pace.test", url)).toBe("https://api.pace.test");
+    for (const value of [undefined, "", "  ", "not a url"]) {
+      expect(ownOrigin(value, url)).toBe("https://pace.lan:8443");
+    }
   });
 
   it("parses BOT_INFO as JSON when present", () => {

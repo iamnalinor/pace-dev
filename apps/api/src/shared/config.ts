@@ -187,6 +187,14 @@ const apiOriginOf = (value: string | undefined): string | undefined => {
   return origin;
 };
 
+/**
+The Worker's own origin for a request: the configured `API_ORIGIN` when it is a usable URL, else
+the origin the request arrived at. The one rule for every caller that names the Worker (the OAuth
+provider's issuer and resource, `/api/instance`, the MCP challenge), so they never disagree.
+*/
+export const ownOrigin = (configured: string | undefined, requestUrl: string): string =>
+  apiOriginOf(configured) ?? new URL(requestUrl).origin;
+
 /** The version of a build no deploy named (`PACE_VERSION` unset or blank). */
 export const UNNAMED_VERSION = "dev";
 

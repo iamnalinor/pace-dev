@@ -753,8 +753,11 @@ describe("Settings → Devices and sessions", () => {
     await fireEvent.press(await screen.findByRole("button", { name: "Connect an AI app" }));
     expect(await screen.findByText(`${serverApi}/mcp`)).toBeOnTheScreen();
     expect(screen.queryByText(`${usedApi}/mcp`)).toBeNull();
+    // The line names both addresses and what to do (QA round 21 L6).
     expect(
-      screen.getByText("This server's public address differs from the one this device uses."),
+      screen.getByText(
+        `This device reaches the server at ${usedApi}, but AI apps must use the address above: Pace's sign-in for them works only there. If they can't reach it, whoever runs this server sets API_ORIGIN to an address they can.`,
+      ),
     ).toBeOnTheScreen();
     // A phone has no clipboard module: the URL goes on through the share sheet.
     expect(screen.getByRole("button", { name: "Send the URL" })).toBeOnTheScreen();
@@ -783,7 +786,7 @@ describe("Settings → Devices and sessions", () => {
     });
     await fireEvent.press(await screen.findByRole("button", { name: "Connect an AI app" }));
     expect(await screen.findByText(`${usedApi}/mcp`)).toBeOnTheScreen();
-    expect(screen.queryByText(/public address differs/u)).toBeNull();
+    expect(screen.queryByText(/AI apps must use the address above/u)).toBeNull();
   });
 });
 

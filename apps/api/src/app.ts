@@ -17,7 +17,7 @@ import { mountCloudRoutes } from "./cloud/cloud-routes.ts";
 import { mountLinkRoutes } from "./links/link-routes.ts";
 import { mountNotifyRoutes } from "./notify/notify-routes.ts";
 import { mountParseRoutes } from "./parse/parse-routes.ts";
-import { type Config, loadConfig } from "./shared/config.ts";
+import { type Config, loadConfig, ownOrigin } from "./shared/config.ts";
 import { parseProviders } from "./shared/llm/providers.ts";
 import { createLogger } from "./shared/logger.ts";
 import { mount } from "./shared/mount.ts";
@@ -68,7 +68,7 @@ const mountPublicRoutes = (app: Hono<AppEnv>, deps: AppDeps): void => {
     const config = c.get("config");
     const push = await pushMethodsOf(c.env.DB, pushConfigOf(c.env), Date.now());
     return ok({
-      apiOrigin: config.apiOrigin ?? new URL(c.req.url).origin,
+      apiOrigin: ownOrigin(config.apiOrigin, c.req.url),
       botUsername: config.telegramBotUsername,
       features: {
         // The skipped slots were already logged by the calls that use the models; not again here.

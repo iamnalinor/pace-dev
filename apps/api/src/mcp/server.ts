@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 
-import { loadConfig } from "../shared/config.ts";
+import { loadConfig, ownOrigin } from "../shared/config.ts";
 import { createLogger } from "../shared/logger.ts";
 import { isAllowed } from "../shared/telegram-identity.ts";
 import { telegramIdOf } from "../shared/user-lookup.ts";
@@ -97,6 +97,9 @@ export const createMcpServer = (ctx: ToolContext): McpServer => {
   return server;
 };
 
+/** Where the MCP resource's RFC 9728 metadata lives, under the Worker's own origin. */
+export const MCP_RESOURCE_METADATA_PATH = "/.well-known/oauth-protected-resource/mcp";
+
 const oauthError = (status: number, error: string, description: string): Response =>
   Response.json({ error, error_description: description }, { status });
 
@@ -104,9 +107,10 @@ const oauthError = (status: number, error: string, description: string): Respons
 A token that no longer stands for anyone: `401 invalid_token` with the Bearer challenge the
 OAuth provider itself sends, so the client drops the token and connects again.
 */
-const invalidToken = (request: Request, description: string): Response => {
+const invalidToken = (origin: string, description: string): Response => {
   const response = oauthError(401, "invalid_token", description);
-  const metadata = new URL("/.well-known/oauth-protected-resource/mcp", request.url).href;
+  // The canonical resource's metadata (class 102), wherever this request reached the Worker.
+  const metadata = `${origin}${MCP_RESOURCE_METADATA_PATH}`;
   response.headers.set(
     "WWW-Authenticate",
     `Bearer realm="OAuth", error="invalid_token", error_description="${description}", resource_metadata="${metadata}"`,
@@ -124,13 +128,13 @@ const refusal = async (access: {
   readonly allowed: readonly string[];
   readonly db: D1Database;
   readonly grant: McpGrant;
-  readonly request: Request;
+  readonly origin: string;
 }): Promise<null | Response> => {
   if (!isAllowed(access.grant.telegramId, access.allowed)) {
     return oauthError(403, "access_denied", "This Telegram account is not allowed to use Pace");
   }
   return (await telegramIdOf(access.db, access.grant.userId)) === undefined
-    ? invalidToken(access.request, "The account behind this token no longer exists; reconnect Pace")
+    ? invalidToken(access.origin, "The account behind this token no longer exists; reconnect Pace")
     : null;
 };
 
@@ -146,7 +150,10 @@ export const mcpHandler = async (
 ): Promise<Response> => {
   const grant = readGrant(ctx);
   if (!grant.ok) {
-    return invalidToken(request, "The token carries no usable grant; reconnect Pace");
+    return invalidToken(
+      ownOrigin(env.API_ORIGIN, request.url),
+      "The token carries no usable grant; reconnect Pace",
+    );
   }
   const config = loadConfig(env);
   if (!config.ok) {
@@ -157,7 +164,7 @@ export const mcpHandler = async (
     allowed: config.value.allowedTelegramIds,
     db: env.DB,
     grant: grant.value,
-    request,
+    origin: ownOrigin(config.value.apiOrigin, request.url),
   });
   if (refused !== null) {
     return refused;

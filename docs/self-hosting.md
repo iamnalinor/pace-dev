@@ -43,7 +43,10 @@ server at the latest release.
      API's CORS admits.
    - `API_ORIGIN`: your API's own origin (`https://pace-api.example.dev`): the OAuth issuer and the
      MCP resource. A blank or malformed value is ignored (and logged): the origin requests arrive
-     at is used instead.
+     at is used instead. AI apps must reach the MCP endpoint at exactly `<API_ORIGIN>/mcp` (their
+     tokens are bound to it, and Settings → Connect an AI app shows that URL), so set it to the
+     address those apps can reach. The computer agent's `--api` uses bearer tokens and works at any
+     address the Worker answers on, so "Add a computer" gives the address the device uses.
 
    For the web app, change the custom domain in `apps/app/wrangler.web.jsonc` too.
 4. **Secrets** (in `apps/api`, `bunx wrangler secret put <NAME>`):
