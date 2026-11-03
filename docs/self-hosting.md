@@ -128,3 +128,45 @@ If the Android config is set but invalid or does not match the sender, the Worke
 `firebase: null` and logs a reason code without logging either binding. Server discovery,
 health checks and existing push registration keep working as before. Released APKs still
 use the Firebase project they were built with.
+
+#### Check the Firebase pair before rollout
+
+From the repository root, run `bun run check:config` with the two Firebase values supplied
+through the process environment. `FIREBASE_ANDROID_CONFIG` takes the raw contents of
+`google-services.json` (called `GOOGLE_SERVICES_JSON` in release CI);
+`FIREBASE_SERVICE_ACCOUNT` takes the raw service account JSON. Never put either value in a
+command argument.
+
+By default Bun's package runner can load dotenv files and echo the command. In CI or when
+you need only the verdict in the output, disable dotenv loading and silence the runner.
+Pass the intended state explicitly:
+
+```sh
+bun --no-env-file --silent run check:config --expect=configured
+bun --no-env-file --silent run check:config --expect=disabled
+```
+
+With no expectation, either a complete, matching pair or two absent bindings passes. Empty
+strings count as absent. The command prints `configured` or `disabled` on success. It exits
+with status 1 and a fixed reason code on stderr for invalid input:
+`missing-android-config`, `missing-service-account`, `android-config-not-json`,
+`android-config-invalid`, `no-android-clients`, `duplicate-android-package`,
+`invalid-service-account`, `project-mismatch`, `invalid-arguments`,
+`expected-configured`, or `expected-disabled`. The preflight checks the supplied JSON and
+project match; it does not authenticate to Google or verify push delivery. A local
+`disabled` verdict only describes the inputs to this invocation. An existing Worker can
+have a pair stored only in its own secrets.
+
+The current Worker behavior stays additive, including for hosts with only a service account.
+To prepare for future strict enforcement, validate both values before configuring or rotating
+them together. If the pair is managed on the Worker, verify its effective state on the
+deployed version before inheriting it. Omitting local values does not remove deployed
+secrets. To disable deliberately, stage removal of both values in one inactive version.
+
+Before enabling strict enforcement, rehearse the rollout on a nonproduction Worker. The
+staged path must verify the exact inactive candidate through a protected Version URL, checking
+its identity and effective Firebase state before promoting that verified version. Record the
+previous compatible version for rollback, then verify production health, instance discovery and
+push delivery before removing APK-baked config. See the
+[rollout design](../context/technical-execution/firebase-rollout-design.md) for the staging
+procedure, including fresh Workers and Workers with pending Durable Object migrations.
