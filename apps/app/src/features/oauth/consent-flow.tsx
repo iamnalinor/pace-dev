@@ -17,16 +17,14 @@ export type RenderWidget = (onAuth: (payload: TelegramLogin) => void) => React.R
 
 type Translate = ReturnType<typeof useT>;
 
-/** "Signed in as …": the session's or the proved name; a session whose name is not known yet. */
+/** "Signed in as …": the session's or the proved name. */
 const identityLine = (t: Translate, identity: Identity): string => {
   switch (identity.kind) {
     case "dev": {
       return t("oauth.signedInAs", { name: `dev ${identity.telegramId}` });
     }
     case "session": {
-      return identity.name === null
-        ? t("oauth.signedIn")
-        : t("oauth.signedInAs", { name: identity.name });
+      return t("oauth.signedInAs", { name: identity.name });
     }
     case "telegram": {
       return t("oauth.signedInAs", { name: identity.name });
@@ -41,8 +39,11 @@ const useConsentSession = (): ConsentSession => {
     case "loading": {
       return { kind: "loading" };
     }
+    // Signed in, but whose session it is comes only when `me` answers (a stored session after a
+    // reload): until then nothing is shown and Allow waits, so the grant never goes to an
+    // account the page did not name (A9 review m1).
     case "signed-in": {
-      return { kind: "signed-in", name: user?.name ?? null };
+      return user === null ? { kind: "loading" } : { kind: "signed-in", name: user.name };
     }
     case "signed-out": {
       return { kind: "signed-out" };

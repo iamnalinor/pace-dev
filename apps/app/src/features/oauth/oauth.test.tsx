@@ -32,6 +32,8 @@ const DEV_LOGIN = { "POST /api/auth/dev": () => ({ token: "tok_dev", user: fakeU
 const setupConsent = async (
   options: {
     readonly signedIn?: boolean;
+    /** A stored session read at start: signed in at once, the name only once `me` answers. */
+    readonly stored?: boolean;
     readonly complete?: (request: CompleteRequest) => unknown;
     readonly me?: () => unknown;
   } = {},
@@ -53,6 +55,9 @@ const setupConsent = async (
   });
   if (options.signedIn === true) {
     await runtime.auth.loginWithDev("1");
+  }
+  if (options.stored === true) {
+    void runtime.auth.adoptToken("tok_stored");
   }
   const redirect = jest.fn<undefined, [string]>();
   const signIn = jest.fn<undefined, []>();
@@ -153,6 +158,24 @@ describe("ConsentFlow", () => {
     const request = complete.mock.calls[0]?.[0];
     expect(request?.body).toEqual({ authQuery: AUTH_QUERY, scopes: ["tasks:read", "tasks:write"] });
     expect(request?.headers["authorization"]).toBe("Bearer tok_dev");
+  });
+
+  it("keeps Allow disabled until it knows whose session it is (A9 review m1)", async () => {
+    const held = Promise.withResolvers<unknown>();
+    // A reload: the stored session is read at once, the name only when `me` answers.
+    const { complete } = await setupConsent({ me: async () => await held.promise, stored: true });
+    expect(await screen.findByText("Claude")).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: en("oauth.allow") })).toBeDisabled();
+    expect(screen.queryByText(/^Signed in/u)).toBeNull();
+    expect(screen.queryByText(en("oauth.identify"))).toBeNull();
+    await act(async () => {
+      held.resolve({ ...fakeUser, storeId: "store-test" });
+    });
+    expect(
+      await screen.findByText(en("oauth.signedInAs", { name: fakeUser.name })),
+    ).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: en("oauth.allow") })).toBeEnabled();
+    expect(complete).not.toHaveBeenCalled();
   });
 
   it("falls back to signing in when the server says the session ended, and then goes quiet", async () => {

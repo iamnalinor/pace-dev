@@ -18,16 +18,16 @@ widget payload or a dev id (local and e2e builds only).
 */
 export type Identity =
   | { readonly kind: "dev"; readonly telegramId: string }
-  | { readonly kind: "session"; readonly name: null | string }
+  | { readonly kind: "session"; readonly name: string }
   | { readonly kind: "telegram"; readonly name: string; readonly payload: TelegramLogin };
 
 /**
-The browser's Pace session as the consent page needs it: still being read, none, or one (with
-the person's name once the server has told it).
+The browser's Pace session as the consent page needs it: still being read (a stored session whose
+person the server has not named yet counts as that), none, or one with the person's name.
 */
 export type ConsentSession =
   | { readonly kind: "loading" }
-  | { readonly kind: "signed-in"; readonly name: null | string }
+  | { readonly kind: "signed-in"; readonly name: string }
   | { readonly kind: "signed-out" };
 
 export type ConsentPhase =

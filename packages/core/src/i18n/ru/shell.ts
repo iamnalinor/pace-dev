@@ -84,7 +84,6 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "oauth.scope.offlineAccess": "Оставаться подключённым без повторных запросов",
   "oauth.identify": "Войдите через Telegram, чтобы продолжить",
   "oauth.signedInAs": "Вы вошли как {name}",
-  "oauth.signedIn": "Вы вошли в Pace",
   "oauth.sessionEnded": "Сеанс Pace завершён. Войдите снова, чтобы продолжить.",
   "oauth.widgetMissing": "Не видно кнопки Telegram?",
   "oauth.signInFirst": "Сначала войдите в Pace",

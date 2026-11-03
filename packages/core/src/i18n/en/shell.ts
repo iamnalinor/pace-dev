@@ -84,7 +84,6 @@ export const enShell = {
   "oauth.scope.offlineAccess": "Stay connected without asking again",
   "oauth.identify": "Sign in with Telegram to continue",
   "oauth.signedInAs": "Signed in as {name}",
-  "oauth.signedIn": "Signed in to Pace",
   "oauth.sessionEnded": "Your Pace session has ended. Sign in again to continue.",
   "oauth.widgetMissing": "Can't see the Telegram button?",
   "oauth.signInFirst": "Sign in to Pace first",
