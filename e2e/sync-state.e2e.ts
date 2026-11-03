@@ -6,7 +6,7 @@ import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { API_URL, loginViaApi } from "./support/login.ts";
 import { isBare, screenUrls, STAND_IN_IDS } from "./support/routes.ts";
 import { settle } from "./support/screen-checks.ts";
-import { type LivedIn, seedLivedIn } from "./support/seed.ts";
+import { type LivedIn, pullAll, seedLivedIn } from "./support/seed.ts";
 import { hasPulledAfterPush, recordSyncTraffic, repeated } from "./support/sync-traffic.ts";
 
 /** The titles of the tasks created in the server's log of the account behind `token`. */
@@ -172,6 +172,14 @@ test.describe("a first pull answered with HTTP 500", () => {
         setTimeout(resolve, QUIET_FAILING_MS);
       });
       expect(pushed.filter((body) => body.includes('"timezone"'))).toEqual([]);
+      // Whichever channel carried it: the push after the recovery can go over the live socket,
+      // which `page.on("request")` does not see (re-review N5). The log the server keeps holds
+      // no zone of this device's.
+      const zones = (await pullAll(token)).filter(
+        (event) =>
+          event.type === "settings.updated" && JSON.stringify(event.payload).includes("Asia/Tokyo"),
+      );
+      expect(zones).toEqual([]);
     });
   }
 });
