@@ -193,7 +193,12 @@ The classes so far are below. Each has its standing rule, and new code is writte
   `loosen`. `loosen` and the sweep walk records as well.
 - **And what an older server leaves out.** A field added to an answer is absent from an older
   server's (a self-hosted one, a stale deploy): it is read with `knownOrNull` (absent reads as
-  `null`) or as optional, never as required (stage 8 sweep: `fcmProject`).
+  `null`) or as optional, never as required (stage 8 sweep: `fcmProject`). An added capability
+  flag defaults to what older servers actually did; name the flag and the reason in this class:
+  `features.mcp` (`packages/core/src/api/schemas/instance.ts`) defaults to true, because every
+  server served MCP before one could be without it (an older http server failed then as it does
+  now), and false would hide a working Connect URL on every older https server (PR A fix round 2
+  N4; review M3 accepted the default).
 
 ### 14. A control inside a control
 - **Bug.** Day's block row is one button (it opens the edit sheet); a block on a task carried the
