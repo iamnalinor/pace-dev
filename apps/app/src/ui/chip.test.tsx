@@ -1,12 +1,20 @@
 import { screen, within } from "@testing-library/react-native";
-import { View } from "react-native";
 
 import { renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { HUE_NAMES } from "@pace/core";
 
 import { Chip } from "./chip.tsx";
-import { useTheme } from "./theme-provider.tsx";
+
+/** The icons the chip asked the kit for. */
+const mockIcons: unknown[] = [];
+
+jest.mock("./icon.tsx", () => ({
+  Icon: (props: unknown) => {
+    mockIcons.push(props);
+    return null;
+  },
+}));
 
 /** The classes of the chip's pill, the view that carries the fill and the ring. */
 const classOf = (name: string): string =>
@@ -48,35 +56,22 @@ describe("Chip", () => {
     expect(screen.getByRole("radio", { name: "Chosen" })).toBeChecked();
   });
 
-  it("draws a leading icon in the colour of its chip: accent.on on the accent fill, secondary off it", async () => {
-    const seen: string[] = [];
-    const Probe = ({ color }: { readonly color: string }) => {
-      seen.push(color);
-      return <View />;
-    };
-    const Palette = ({ onRead }: { readonly onRead: (colors: Record<string, string>) => void }) => {
-      onRead(useTheme().palette);
-      return null;
-    };
-    let palette: Record<string, string> = {};
+  it("draws its inline icon in the colour of the chip: onAccent on the accent fill, secondary off it", async () => {
     await renderScreen(
       <>
-        <Palette
-          onRead={(colors) => {
-            palette = colors;
-          }}
-        />
-        <Chip leading={(color) => <Probe color={color} />} onPress={() => undefined} selected>
+        <Chip icon="clock" onPress={() => undefined} selected>
           On
         </Chip>
-        <Chip leading={(color) => <Probe color={color} />} onPress={() => undefined}>
+        <Chip icon="clock" onPress={() => undefined}>
           Off
         </Chip>
       </>,
       await createTestRuntime({ world: "empty" }),
     );
-    expect(seen[0]).toBe(palette["accent.on"]);
-    expect(seen.at(-1)).toBe(palette["label.secondary"]);
+    expect(mockIcons).toEqual([
+      { name: "clock", size: "inline", tone: "onAccent" },
+      { name: "clock", size: "inline", tone: "secondary" },
+    ]);
   });
 
   it("is a 48 target around the 32 pill, with no extra room in the layout", async () => {

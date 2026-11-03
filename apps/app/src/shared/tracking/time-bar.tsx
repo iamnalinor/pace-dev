@@ -1,4 +1,3 @@
-import { CalendarDays, Coffee, House, type LucideIcon, Play, Timer } from "lucide-react-native";
 import { useRef, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
@@ -11,6 +10,7 @@ import { ReadingIssueLine } from "#app/shared/assistant/reading-issue-line.tsx";
 import { usePendingActions } from "#app/shared/assistant/use-pending-actions.ts";
 import { inkClass, outlineClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
+import { Icon, type IconName } from "#app/ui/icon.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { Tooltip } from "#app/ui/tooltip.tsx";
 
@@ -21,11 +21,11 @@ import { RunningRow } from "./running-row.tsx";
 import { FoldToggle, HIDDEN, useFold } from "./time-bar-fold.tsx";
 import { useCalendarButton } from "./use-calendar-button.ts";
 
-const ICONS: Readonly<Record<TimeButtonView["id"], LucideIcon>> = {
-  calendar: CalendarDays,
-  chores: House,
-  rest: Coffee,
-  task: Timer,
+const ICONS: Readonly<Record<TimeButtonView["id"], IconName>> = {
+  calendar: "calendar-days",
+  chores: "house",
+  rest: "coffee",
+  task: "timer",
 };
 
 /** The line's start: the assistant reads it first, so it is named "see the actions" (an icon only). */
@@ -39,7 +39,6 @@ const ReviewButton = ({
   readonly onPress: () => void;
 }) => {
   const t = useT();
-  const { palette } = useTheme();
   return (
     <Tooltip label={t("assistant.review")} showsOnTap={false}>
       <Pressable
@@ -53,7 +52,7 @@ const ReviewButton = ({
         disabled={isDisabled}
         onPress={onPress}
       >
-        <Play color={palette["accent.on"]} fill={palette["accent.on"]} size={16} />
+        <Icon filled name="play" size="inline" tone="onAccent" />
       </Pressable>
     </Tooltip>
   );
@@ -176,12 +175,9 @@ accent while its activity runs (a state, said in its name too). A tap always ope
 */
 const BarButton = ({ button, onTap, unavailable }: ButtonProps) => {
   const t = useT();
-  const { palette } = useTheme();
   const label = t(button.labelKey);
-  const Icon = ICONS[button.id];
   const look = buttonLook(button, unavailable !== undefined);
-  const restingColor =
-    unavailable === undefined ? palette["label.secondary"] : palette["label.tertiary"];
+  const restingTone = unavailable === undefined ? "secondary" : "tertiary";
   return (
     <View className="flex-1">
       {/* Greyed, it says why the moment the pointer is over it; a tap opens the picker, which says it too. */}
@@ -198,7 +194,7 @@ const BarButton = ({ button, onTap, unavailable }: ButtonProps) => {
             onTap(button);
           }}
         >
-          <Icon color={button.isRunning ? palette["accent.text"] : restingColor} size={18} />
+          <Icon name={ICONS[button.id]} tone={button.isRunning ? "accent" : restingTone} />
           <Text
             className={cx("text-center font-sans text-caption font-normal", look.ink)}
             numberOfLines={1}

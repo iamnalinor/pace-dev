@@ -1,9 +1,7 @@
-import type { LucideIcon } from "lucide-react-native";
-
 import { Pressable } from "react-native";
 
 import { cx } from "./cx.ts";
-import { useTheme } from "./theme-provider.tsx";
+import { Icon, type IconName } from "./icon.tsx";
 import { Tooltip } from "./tooltip.tsx";
 
 /**
@@ -14,19 +12,18 @@ it names itself in a tooltip on hover and keyboard focus (QA round 17 M7).
 export const IconButton = ({
   disabled = false,
   hint,
-  icon: Icon,
+  icon,
   label,
   onPress,
   variant = "surface",
 }: {
   readonly disabled?: boolean;
   readonly hint?: string;
-  readonly icon: LucideIcon;
+  readonly icon: IconName;
   readonly label: string;
   readonly onPress: () => void;
   readonly variant?: "plain" | "raised" | "surface";
 }) => {
-  const { palette } = useTheme();
   return (
     <Tooltip label={label} showsOnTap={false}>
       <Pressable
@@ -43,11 +40,7 @@ export const IconButton = ({
         disabled={disabled}
         onPress={onPress}
       >
-        <Icon
-          color={variant === "plain" ? palette["label.secondary"] : palette["label.primary"]}
-          size={18}
-          strokeWidth={1.75}
-        />
+        <Icon name={icon} tone={variant === "plain" ? "secondary" : "primary"} />
       </Pressable>
     </Tooltip>
   );

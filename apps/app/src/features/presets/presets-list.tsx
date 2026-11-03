@@ -1,5 +1,4 @@
 import { useRouter } from "expo-router";
-import { ChevronDown, ChevronRight, ChevronUp } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
@@ -10,8 +9,8 @@ import { ActionChip } from "#app/ui/chip.tsx";
 import { ColorTag } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { IconButton } from "#app/ui/icon-button.tsx";
+import { Icon } from "#app/ui/icon.tsx";
 import { SwitchRow } from "#app/ui/switch-row.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
 import {
   byPresetOrder,
   EXAMPLE_PRESET_IDS,
@@ -51,7 +50,6 @@ const PresetRow = ({
   const t = useT();
   const language = useLanguage();
   const router = useRouter();
-  const { palette } = useTheme();
   const { actions } = usePace();
   const run = useRunAction();
   const presets = useAppState((state) => state.presets);
@@ -71,18 +69,18 @@ const PresetRow = ({
         </View>
         {preset.archived ? <Badge isQuiet>{t("presets.archivedBadge")}</Badge> : null}
         <Badge>{t(preset.builtIn ? "presets.builtIn" : "presets.yours")}</Badge>
-        <ChevronRight color={palette["label.tertiary"]} size={16} strokeWidth={1.75} />
+        <Icon name="chevron-right" size="inline" tone="tertiary" />
       </Pressable>
       <IconButton
         disabled={isFirst}
-        icon={ChevronUp}
+        icon={"chevron-up"}
         label={t("presets.moveUp", { name })}
         onPress={() => void run(actions.movePreset(preset.id, -1))}
         variant="plain"
       />
       <IconButton
         disabled={isLast}
-        icon={ChevronDown}
+        icon={"chevron-down"}
         label={t("presets.moveDown", { name })}
         onPress={() => void run(actions.movePreset(preset.id, 1))}
         variant="plain"

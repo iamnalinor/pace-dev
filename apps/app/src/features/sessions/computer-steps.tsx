@@ -1,4 +1,3 @@
-import { TriangleAlert } from "lucide-react-native";
 import { useRef, useState } from "react";
 import { Text, View } from "react-native";
 
@@ -10,7 +9,7 @@ import { moveFocus } from "#app/platform/move-focus.ts";
 import { useServerInfo } from "#app/platform/server-store.ts";
 import { SHARE_LABEL_KEY, shareText } from "#app/platform/share-text.ts";
 import { Button } from "#app/ui/button.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
+import { Icon } from "#app/ui/icon.tsx";
 import { agentCommand, agentLogsCommand, type ComputerOs, LINUX_PACKAGES } from "@pace/client";
 
 import { CodeText } from "./code-text.tsx";
@@ -32,11 +31,10 @@ paragraph of alarm red (QA round 15 L7).
 */
 const TokenOnce = () => {
   const t = useT();
-  const { palette } = useTheme();
   return (
     <View className="flex-row gap-2">
       <View className="pt-0.5">
-        <TriangleAlert aria-hidden color={palette["status.warn"]} size={16} strokeWidth={2} />
+        <Icon name="triangle-alert" size="inline" tone="warn" />
       </View>
       <Text className="min-w-0 flex-1 font-sans text-footnote text-label-secondary">
         {t("devices.tokenOnce")}

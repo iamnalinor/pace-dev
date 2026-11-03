@@ -1,4 +1,3 @@
-import { Ban, ChevronDown, Pause, Pencil, Play, Trash2, X } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 
 import type { TaskViewModel } from "@pace/client";
@@ -10,7 +9,7 @@ import { BackHeader } from "#app/ui/back-header.tsx";
 import { inkClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { IconButton } from "#app/ui/icon-button.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
+import { Icon } from "#app/ui/icon.tsx";
 import { toastQuote, useToast } from "#app/ui/toast.tsx";
 
 /** Deletes the task at once and goes back; the toast's Undo brings it back. */
@@ -63,10 +62,10 @@ const TaskActions = ({
   const remove = useDeleteTask(view);
   return (
     <View className="flex-row">
-      <IconButton icon={Pencil} label={t("task.edit")} onPress={onEdit} variant="plain" />
+      <IconButton icon={"pencil"} label={t("task.edit")} onPress={onEdit} variant="plain" />
       {isOpen ? (
         <IconButton
-          icon={isPaused ? Play : Pause}
+          icon={isPaused ? "play" : "pause"}
           label={t(isPaused ? "task.resume" : "task.pause")}
           onPress={() => {
             void run(actions.setStatus(view.id, isPaused ? "in_progress" : "paused"));
@@ -75,9 +74,9 @@ const TaskActions = ({
         />
       ) : null}
       {isOpen ? (
-        <IconButton icon={Ban} label={t("task.giveUp")} onPress={onGiveUp} variant="plain" />
+        <IconButton icon={"ban"} label={t("task.giveUp")} onPress={onGiveUp} variant="plain" />
       ) : null}
-      <IconButton icon={Trash2} label={t("task.delete")} onPress={remove} variant="plain" />
+      <IconButton icon={"trash-2"} label={t("task.delete")} onPress={remove} variant="plain" />
     </View>
   );
 };
@@ -97,7 +96,6 @@ const ProjectChip = ({
   readonly project: TaskViewModel["project"];
 }) => {
   const t = useT();
-  const { palette } = useTheme();
   const name = project?.name ?? t("task.noProject");
   return (
     <Pressable
@@ -116,9 +114,7 @@ const ProjectChip = ({
       >
         {name}
       </Text>
-      {onProject === undefined ? null : (
-        <ChevronDown color={palette["label.secondary"]} size={16} strokeWidth={2} />
-      )}
+      {onProject === undefined ? null : <Icon name="chevron-down" size="inline" />}
     </Pressable>
   );
 };
@@ -141,7 +137,7 @@ export const TaskHeader = ({
   return (
     <BackHeader
       // Beside the list the task is a pane: it closes, there is nothing to go back to.
-      {...(isInPane && { backIcon: X })}
+      {...(isInPane && { backIcon: "x" })}
       backLabel={t(isInPane ? "common.close" : "common.back")}
       onBack={back}
       right={actions === undefined ? null : <TaskActions {...actions} />}

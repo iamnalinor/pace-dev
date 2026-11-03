@@ -3,6 +3,7 @@ import { Image, Text, View } from "react-native";
 import type { OAuthClientInfo } from "@pace/core";
 
 import { useT } from "#app/app-state.tsx";
+import { Text as KitText } from "#app/ui/text.tsx";
 
 /**
 Who is asking and where the access goes. Every string here came from the client (its
@@ -24,9 +25,9 @@ export const ClientCard = ({ info }: { readonly info: OAuthClientInfo }) => {
           />
         )}
         <View className="min-w-0 flex-1">
-          <Text className="font-sans text-headline text-label-primary" numberOfLines={1}>
+          <KitText policy="truncate" role="headline">
             {info.clientName}
-          </Text>
+          </KitText>
           <Text className="font-sans text-caption font-normal text-label-tertiary">
             {info.clientDomain === null
               ? t("oauth.unverified")

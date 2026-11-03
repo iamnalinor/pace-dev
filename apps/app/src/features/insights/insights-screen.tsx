@@ -9,6 +9,7 @@ import { useViewer } from "#app/shared/use-viewer.ts";
 import { WeekArrows } from "#app/shared/week-arrows.tsx";
 import { fillClass } from "#app/ui/color.tsx";
 import { EmptyText } from "#app/ui/empty-state.tsx";
+import { Text as KitText } from "#app/ui/text.tsx";
 import { formatDuration, formatWeekRange } from "@pace/core";
 
 import { Card } from "./card.tsx";
@@ -45,12 +46,9 @@ const Bars = ({
             key={bar.key ?? "none"}
             role="group"
           >
-            <Text
-              className="w-24 font-sans text-caption font-normal text-label-secondary"
-              numberOfLines={1}
-            >
+            <KitText className="w-24 font-normal" policy="truncate" role="caption" tone="secondary">
               {name}
-            </Text>
+            </KitText>
             <View className="h-3 flex-1 overflow-hidden rounded-r-xs bg-fill-4">
               <View
                 className={`h-full rounded-r-xs ${bar.color === null ? "bg-hue-slate-stroke" : fillClass(bar.color)}`}
@@ -70,12 +68,9 @@ const Bars = ({
 
 const Row = ({ name, value }: { readonly name: string; readonly value: string }) => (
   <View className="flex-row justify-between gap-3">
-    <Text
-      className="flex-1 font-sans text-caption font-normal text-label-secondary"
-      numberOfLines={1}
-    >
+    <KitText className="flex-1 font-normal" policy="truncate" role="caption" tone="secondary">
       {name}
-    </Text>
+    </KitText>
     <Text className="font-sans text-caption font-normal tabular-nums text-label-primary">
       {value}
     </Text>

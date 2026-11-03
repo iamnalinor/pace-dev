@@ -1,4 +1,3 @@
-import { Pencil } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
@@ -6,8 +5,8 @@ import type { TaskViewModel } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
+import { Icon } from "#app/ui/icon.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
 
 const DescriptionEditor = ({
   draft,
@@ -63,7 +62,6 @@ export const TaskDescription = ({ view }: { readonly view: TaskViewModel }) => {
   const t = useT();
   const { actions } = usePace();
   const run = useRunAction();
-  const { palette } = useTheme();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [draft, setDraft] = useState("");
@@ -121,7 +119,7 @@ export const TaskDescription = ({ view }: { readonly view: TaskViewModel }) => {
       >
         {hasDescription ? view.description : t("task.addDescription")}
       </Text>
-      <Pencil color={palette["label.secondary"]} size={15} strokeWidth={1.8} />
+      <Icon name="pencil" size="inline" />
     </Pressable>
   );
 };

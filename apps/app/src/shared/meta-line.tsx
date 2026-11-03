@@ -1,4 +1,3 @@
-import { Repeat } from "lucide-react-native";
 import { Fragment } from "react";
 import { Text, View } from "react-native";
 
@@ -7,7 +6,7 @@ import type { MetaPart, NowRow } from "@pace/client";
 import { useT } from "#app/app-state.tsx";
 import { metaTexts, type MetaTone } from "#app/format/meta.ts";
 import { ColorTag, IMPORTANCE_HUES } from "#app/ui/color.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
+import { Icon } from "#app/ui/icon.tsx";
 import { type Language, presetLabel } from "@pace/core";
 
 import { useViewer } from "./use-viewer.ts";
@@ -25,10 +24,9 @@ const rowTagLabel = (tag: NowRow["tag"], language: Language): string =>
 /** A small repeat mark: the row is one of a series (or a weekly homework). */
 const RepeatMark = () => {
   const t = useT();
-  const { palette } = useTheme();
   return (
     <View accessibilityLabel={t("meta.repeats")} accessible role="img">
-      <Repeat color={palette["label.secondary"]} size={13} strokeWidth={2.25} />
+      <Icon name="repeat" size="inline" />
     </View>
   );
 };

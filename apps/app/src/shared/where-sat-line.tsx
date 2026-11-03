@@ -1,8 +1,7 @@
-import { Text } from "react-native";
-
 import { useT } from "#app/app-state.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { cx } from "#app/ui/cx.ts";
+import { Text } from "#app/ui/text.tsx";
 import { formatDuration, type SatRow } from "@pace/core";
 
 /** Apps per device shown under a block. */
@@ -24,9 +23,12 @@ export const WhereSatLine = ({
   const devices = Object.entries(Object.groupBy(rows, (row) => row.deviceName));
   return devices.map(([device, apps = []]) => (
     <Text
-      className={cx("font-sans text-caption font-normal text-label-tertiary", !compact && "pb-2")}
+      className={cx("font-normal", !compact && "pb-2")}
       key={device}
-      numberOfLines={compact ? 1 : 2}
+      lines={compact ? 1 : 2}
+      policy="clamp"
+      role="caption"
+      tone="tertiary"
     >
       {t("day.sat", {
         apps: apps

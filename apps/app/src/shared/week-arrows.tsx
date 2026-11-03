@@ -1,5 +1,3 @@
-import { ChevronLeft, ChevronRight } from "lucide-react-native";
-
 import { useT } from "#app/app-state.tsx";
 import { IconButton } from "#app/ui/icon-button.tsx";
 
@@ -17,7 +15,7 @@ export const WeekArrows = ({
   return (
     <>
       <IconButton
-        icon={ChevronLeft}
+        icon={"chevron-left"}
         label={t("insights.previous")}
         onPress={() => {
           onWeek(previous);
@@ -26,7 +24,7 @@ export const WeekArrows = ({
       />
       <IconButton
         disabled={next === null}
-        icon={ChevronRight}
+        icon={"chevron-right"}
         label={t("insights.next")}
         onPress={() => {
           onWeek(next);

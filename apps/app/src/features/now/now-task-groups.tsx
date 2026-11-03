@@ -1,10 +1,9 @@
-import { ChevronDown, ChevronUp } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import { useLanguage, useT } from "#app/app-state.tsx";
 import { TaskRows } from "#app/shared/task-list.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
+import { Icon } from "#app/ui/icon.tsx";
 import { groupNowRows, type NowRow } from "@pace/client";
 import { formatCount } from "@pace/core";
 
@@ -20,7 +19,6 @@ const TaskGroup = ({
 }) => {
   const t = useT();
   const language = useLanguage();
-  const { palette } = useTheme();
   const [isExpanded, setIsExpanded] = useState(false);
   const canExpand = rows.length > PREVIEW_COUNT;
   const shown = isExpanded ? rows : rows.slice(0, PREVIEW_COUNT);
@@ -48,9 +46,9 @@ const TaskGroup = ({
                 {t(isExpanded ? "now.collapse" : "now.expand")}
               </Text>
               {isExpanded ? (
-                <ChevronUp color={palette["label.secondary"]} size={15} />
+                <Icon name="chevron-up" size="inline" />
               ) : (
-                <ChevronDown color={palette["label.secondary"]} size={15} />
+                <Icon name="chevron-down" size="inline" />
               )}
             </Pressable>
           ) : null}

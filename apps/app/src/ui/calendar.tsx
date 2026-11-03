@@ -1,4 +1,3 @@
-import { ChevronLeft, ChevronRight } from "lucide-react-native";
 import { type Ref, useEffect, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
@@ -126,7 +125,7 @@ const MonthHeader = ({
 }) => (
   <View className="flex-row items-center">
     <IconButton
-      icon={ChevronLeft}
+      icon={"chevron-left"}
       label={labels.previous}
       onPress={() => {
         onMonth(shiftMonth(month, -1));
@@ -141,7 +140,7 @@ const MonthHeader = ({
     </Text>
     <IconButton
       disabled={max !== undefined && shiftMonth(month, 1) > monthOf(max)}
-      icon={ChevronRight}
+      icon={"chevron-right"}
       label={labels.next}
       onPress={() => {
         onMonth(shiftMonth(month, 1));

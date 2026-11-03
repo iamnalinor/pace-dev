@@ -1,11 +1,10 @@
 import { type Href, useRouter } from "expo-router";
-import { ChevronRight } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 
 import type { MessageKey } from "@pace/core";
 
 import { useT } from "#app/app-state.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
+import { Icon } from "#app/ui/icon.tsx";
 
 type Entry = {
   readonly to: Href;
@@ -16,7 +15,6 @@ type Entry = {
 const LinkRow = ({ hintKey, titleKey, to }: Entry) => {
   const t = useT();
   const router = useRouter();
-  const { palette } = useTheme();
   return (
     <Pressable
       accessibilityRole="link"
@@ -29,7 +27,7 @@ const LinkRow = ({ hintKey, titleKey, to }: Entry) => {
         <Text className="font-sans text-callout text-label-primary">{t(titleKey)}</Text>
         <Text className="font-sans text-caption font-normal text-label-tertiary">{t(hintKey)}</Text>
       </View>
-      <ChevronRight color={palette["label.tertiary"]} size={16} strokeWidth={1.75} />
+      <Icon name="chevron-right" size="inline" tone="tertiary" />
     </Pressable>
   );
 };

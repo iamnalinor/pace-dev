@@ -1,4 +1,3 @@
-import { Search, Square } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
@@ -6,6 +5,7 @@ import { usePace, useT } from "#app/app-state.tsx";
 import { MetaLine } from "#app/shared/meta-line.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
+import { Icon } from "#app/ui/icon.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
 import { Sheet } from "#app/ui/sheet.tsx";
 import { SwitchRow } from "#app/ui/switch-row.tsx";
@@ -107,7 +107,7 @@ const TaskSearch = ({
   const isTypedInAtOnce = useIsWide() && !IS_TOUCH_BROWSER;
   return (
     <View className="h-hit-web flex-row items-center gap-2 rounded-lg border border-outline bg-app px-3">
-      <Search color={palette["label.secondary"]} size={16} />
+      <Icon name="search" size="inline" />
       <TextInput
         accessibilityLabel={t("time.taskSearch")}
         autoFocus={isTypedInAtOnce}
@@ -128,7 +128,6 @@ without an outline, it reads as an action, not as one more thing to start.
 */
 const StopRow = ({ onStop }: { readonly onStop: () => void }) => {
   const t = useT();
-  const { palette } = useTheme();
   return (
     <Pressable
       accessibilityLabel={t("time.stop")}
@@ -136,7 +135,7 @@ const StopRow = ({ onStop }: { readonly onStop: () => void }) => {
       className="min-h-12 flex-row items-center justify-center gap-2 rounded-lg bg-fill-4 px-4 active:opacity-70"
       onPress={onStop}
     >
-      <Square color={palette["label.primary"]} size={14} />
+      <Icon name="square" size="inline" tone="primary" />
       <Text className="font-sans text-callout font-medium text-label-primary">
         {t("time.stop")}
       </Text>

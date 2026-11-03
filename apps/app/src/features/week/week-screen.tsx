@@ -1,4 +1,3 @@
-import { Moon } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 
@@ -10,12 +9,12 @@ import { useViewer } from "#app/shared/use-viewer.ts";
 import { WeekArrows } from "#app/shared/week-arrows.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { FirstSyncBody } from "#app/ui/empty-state.tsx";
+import { Icon } from "#app/ui/icon.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
 import { spacePress } from "#app/ui/space-press.ts";
 import { SplitPane } from "#app/ui/split-pane.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
 import { Tooltip } from "#app/ui/tooltip.tsx";
 import { fitHourPx, gridFromHour, type WeekModel } from "@pace/client";
 import { useCalendarRange, useUsage } from "@pace/client/react";
@@ -46,7 +45,6 @@ const NightHoursToggle = () => {
   const { actions } = usePace();
   const { nightHours } = useSettings();
   const run = useRunAction();
-  const { palette } = useTheme();
   // Until a sync of this session succeeded, a failed first pull included (round 7 review 12).
   const isUnknown = useIsAccountUnknown();
   if (isUnknown) {
@@ -69,11 +67,7 @@ const NightHoursToggle = () => {
         onPress={toggle}
         {...spacePress(toggle)}
       >
-        <Moon
-          color={nightHours ? palette["accent.text"] : palette["label.secondary"]}
-          size={18}
-          strokeWidth={1.75}
-        />
+        <Icon name="moon" tone={nightHours ? "accent" : "secondary"} />
       </Pressable>
     </Tooltip>
   );

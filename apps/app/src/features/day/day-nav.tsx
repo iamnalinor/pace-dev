@@ -1,4 +1,3 @@
-import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import { View } from "react-native";
 
@@ -41,7 +40,7 @@ export const DayNav = ({
         }}
       />
       <IconButton
-        icon={ChevronLeft}
+        icon={"chevron-left"}
         label={t("day.previous")}
         onPress={() => {
           onDate(day.previous);
@@ -49,7 +48,7 @@ export const DayNav = ({
         variant="plain"
       />
       <IconButton
-        icon={CalendarDays}
+        icon={"calendar-days"}
         label={t("day.pick")}
         onPress={() => {
           setIsPicking(true);
@@ -58,7 +57,7 @@ export const DayNav = ({
       />
       <IconButton
         disabled={day.next === null}
-        icon={ChevronRight}
+        icon={"chevron-right"}
         label={t("day.next")}
         onPress={() => {
           onDate(day.next);

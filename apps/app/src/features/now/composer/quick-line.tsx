@@ -1,4 +1,3 @@
-import { ArrowUp, Inbox, type LucideIcon, Plus } from "lucide-react-native";
 import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -12,6 +11,7 @@ import { useIsFirstSync, useT } from "#app/app-state.tsx";
 import { lineEnterProps } from "#app/platform/enter-key.ts";
 import { cx } from "#app/ui/cx.ts";
 import { type Hotkey, HOTKEYS, labelWithHotkey } from "#app/ui/hotkeys.ts";
+import { Icon, type IconName, type IconTone } from "#app/ui/icon.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { Tooltip } from "#app/ui/tooltip.tsx";
 import { KEYBOARD } from "#app/ui/use-hotkey.tsx";
@@ -89,10 +89,18 @@ const onEnter =
 A round icon button inside the line. Its name and its key show in a tooltip with a mouse; on a
 touch screen its tap acts at once (the screen changes, there is nothing to wait for).
 */
+/** The line button's icon: on the accent when it is the ready action, quaternary when disabled. */
+const iconTone = (isDisabled: boolean, isAccent: boolean): IconTone => {
+  if (isDisabled) {
+    return "quaternary";
+  }
+  return isAccent ? "onAccent" : "secondary";
+};
+
 const LineButton = ({
   disabled = false,
   hotkey,
-  icon: Icon,
+  icon,
   isBusy = false,
   isAccent = false,
   label,
@@ -100,7 +108,7 @@ const LineButton = ({
 }: {
   readonly disabled?: boolean;
   readonly hotkey: Hotkey;
-  readonly icon: LucideIcon;
+  readonly icon: IconName;
   readonly isBusy?: boolean;
   /** The important action, ready: on the accent. */
   readonly isAccent?: boolean;
@@ -133,11 +141,7 @@ const LineButton = ({
           {isBusy ? (
             <ActivityIndicator color={iconColor} size="small" />
           ) : (
-            <Icon
-              color={disabled ? palette["label.quaternary"] : iconColor}
-              size={18}
-              strokeWidth={isAccent ? 2.25 : 1.75}
-            />
+            <Icon name={icon} tone={iconTone(disabled, isAccent)} />
           )}
         </View>
       </Pressable>
@@ -277,7 +281,7 @@ export const QuickLine = ({
         <LineButton
           disabled={isLocked}
           hotkey={HOTKEYS.newTask}
-          icon={Plus}
+          icon={"plus"}
           label={t("nav.newTask")}
           onPress={flow.expand}
         />
@@ -292,14 +296,14 @@ export const QuickLine = ({
         <LineButton
           disabled={isIdle}
           hotkey={HOTKEYS.toInbox}
-          icon={Inbox}
+          icon={"inbox"}
           label={t("composer.toInbox")}
           onPress={() => void flow.toInbox()}
         />
         <LineButton
           disabled={isIdle}
           hotkey={HOTKEYS.enter}
-          icon={ArrowUp}
+          icon={"arrow-up"}
           isAccent={!isIdle}
           isBusy={isReading}
           label={t("composer.send")}

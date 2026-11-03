@@ -1,4 +1,3 @@
-import { Clock } from "lucide-react-native";
 import { useState } from "react";
 import { TextInput, View } from "react-native";
 
@@ -37,8 +36,8 @@ export const EstimateChip = ({
   const text = minutes === null ? none : formatDuration(minutes, language);
   return (
     <Chip
+      icon="clock"
       label={`${t("composer.estimate")}: ${text}`}
-      leading={(color) => <Clock color={color} size={14} strokeWidth={1.75} />}
       onPress={onToggle}
       selected={isOpen}
     >

@@ -1,10 +1,9 @@
 import type { ReactNode } from "react";
 
-import { ChevronLeft } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 
 import { cx } from "./cx.ts";
-import { useTheme } from "./theme-provider.tsx";
+import { Icon } from "./icon.tsx";
 
 /**
 The header from the Main artboard: a mono eyebrow, a 30px title and an optional action. On a
@@ -25,7 +24,6 @@ export const ScreenHeader = ({
   readonly right?: ReactNode;
   readonly title: string;
 }) => {
-  const { palette } = useTheme();
   return (
     <View
       className={cx(
@@ -41,7 +39,7 @@ export const ScreenHeader = ({
             className="h-hit-web w-hit-web items-center justify-center active:opacity-70"
             onPress={onBack}
           >
-            <ChevronLeft color={palette["label.secondary"]} size={20} strokeWidth={1.75} />
+            <Icon name="chevron-left" />
           </Pressable>
         )}
         <View>

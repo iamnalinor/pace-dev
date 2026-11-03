@@ -1,14 +1,12 @@
-import { ChevronDown, ChevronUp } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
+import { Icon } from "#app/ui/icon.tsx";
 
 /** The text the task came from, shown verbatim on request. */
 export const SourceText = ({ text }: { readonly text: null | string }) => {
   const t = useT();
-  const { palette } = useTheme();
   const [isShown, setIsShown] = useState(false);
   if (text === null) {
     return null;
@@ -25,9 +23,9 @@ export const SourceText = ({ text }: { readonly text: null | string }) => {
       >
         <Text className="font-sans text-footnote text-label-secondary">{t("task.source")}</Text>
         {isShown ? (
-          <ChevronUp color={palette["label.secondary"]} size={16} strokeWidth={2} />
+          <Icon name="chevron-up" size="inline" />
         ) : (
-          <ChevronDown color={palette["label.secondary"]} size={16} strokeWidth={2} />
+          <Icon name="chevron-down" size="inline" />
         )}
       </Pressable>
       {isShown ? (

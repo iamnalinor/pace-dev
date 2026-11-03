@@ -1,4 +1,3 @@
-import { ChevronDown, ChevronUp } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
@@ -6,9 +5,9 @@ import Animated from "react-native-reanimated";
 import type { NowRow } from "@pace/client";
 
 import { useLanguage } from "#app/app-state.tsx";
+import { Icon } from "#app/ui/icon.tsx";
 import { ROW_ENTER, ROW_EXIT, ROW_LAYOUT } from "#app/ui/motion.ts";
 import { RowList } from "#app/ui/row-list.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
 import { formatCount } from "@pace/core";
 
 import { useOpenTask } from "./task-opener.tsx";
@@ -120,13 +119,12 @@ export const FoldedSection = ({
   readonly initiallyOpen?: boolean;
   readonly title: string;
 }) => {
-  const { palette } = useTheme();
   const language = useLanguage();
   const [isOpen, setIsOpen] = useState(initiallyOpen);
   if (count === 0) {
     return null;
   }
-  const Icon = isOpen ? ChevronUp : ChevronDown;
+  const chevron = isOpen ? "chevron-up" : "chevron-down";
   return (
     <View className="mt-2">
       <Pressable
@@ -138,7 +136,7 @@ export const FoldedSection = ({
         }}
       >
         <Text className="font-sans text-footnote font-medium text-label-secondary">{`${title} · ${formatCount(count, language)}`}</Text>
-        <Icon color={palette["label.secondary"]} size={16} strokeWidth={2} />
+        <Icon name={chevron} size="inline" />
       </Pressable>
       {isOpen ? children : null}
     </View>

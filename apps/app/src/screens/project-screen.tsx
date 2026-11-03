@@ -1,4 +1,3 @@
-import { Pencil } from "lucide-react-native";
 import { useState } from "react";
 import { Text, View } from "react-native";
 
@@ -117,7 +116,7 @@ export const ProjectScreen = ({ id }: { readonly id: string }) => {
     <PushedScreen
       right={
         <IconButton
-          icon={Pencil}
+          icon={"pencil"}
           label={t("project.edit")}
           onPress={() => {
             setIsEditing(!isEditing);

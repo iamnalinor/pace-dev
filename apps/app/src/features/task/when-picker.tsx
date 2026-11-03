@@ -1,4 +1,3 @@
-import { CalendarDays } from "lucide-react-native";
 import { Text, View } from "react-native";
 
 import type { QuickTime } from "@pace/client";
@@ -76,7 +75,7 @@ export const WhenPicker = ({
             value: quick.key,
           })),
           {
-            leading: (color: string) => <CalendarDays color={color} size={16} />,
+            icon: "calendar-days",
             // Said as it is shown: the chip that opens the date and time (QA round 20 L5).
             text: t("close.pickExact"),
             value: "custom",

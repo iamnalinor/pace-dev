@@ -1,11 +1,10 @@
 import { useRouter } from "expo-router";
-import { Bell } from "lucide-react-native";
 import { Pressable, View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
 import { CountBadge } from "#app/ui/count-badge.tsx";
 import { cx } from "#app/ui/cx.ts";
-import { useTheme } from "#app/ui/theme-provider.tsx";
+import { Icon } from "#app/ui/icon.tsx";
 import { Tooltip } from "#app/ui/tooltip.tsx";
 
 import { useFeed } from "./use-feed.ts";
@@ -21,7 +20,6 @@ export const NotificationBell = ({
 }) => {
   const t = useT();
   const router = useRouter();
-  const { palette } = useTheme();
   const { model } = useFeed();
   const label =
     model.unread > 0
@@ -40,7 +38,7 @@ export const NotificationBell = ({
           router.push("/notifications");
         }}
       >
-        <Bell color={palette["label.secondary"]} size={18} strokeWidth={1.75} />
+        <Icon name="bell" />
         <View className="absolute right-0.5 top-0.5">
           <CountBadge count={model.unread} tone="neutral" />
         </View>

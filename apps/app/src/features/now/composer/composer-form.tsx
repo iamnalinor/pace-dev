@@ -1,4 +1,3 @@
-import { ChevronUp, X } from "lucide-react-native";
 import { type ReactNode, useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
 
@@ -9,9 +8,9 @@ import { TaskFields, type TaskFormValues } from "#app/shared/task-fields/task-fi
 import { Button } from "#app/ui/button.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { HOTKEYS, labelWithHotkey } from "#app/ui/hotkeys.ts";
+import { Icon } from "#app/ui/icon.tsx";
 import { RadioChips } from "#app/ui/radio-chips.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
 import { Tooltip } from "#app/ui/tooltip.tsx";
 import { HotkeyLayer, KEYBOARD, useHotkey } from "#app/ui/use-hotkey.tsx";
 import { type ComposerEdits, type ComposerModel, taskFormOptions } from "@pace/client";
@@ -104,12 +103,11 @@ const FormHeader = ({
   readonly variant: FormVariant;
 }) => {
   const t = useT();
-  const { palette } = useTheme();
   useHotkey(HOTKEYS.escape, onClose);
   // The second Enter, wherever the focus is outside a field or a button; ⌘↵ from anywhere.
   useHotkey(HOTKEYS.enter, onAdd);
   useHotkey(HOTKEYS.primary, onAdd);
-  const CloseIcon = variant === "pane" ? X : ChevronUp;
+  const closeIcon = variant === "pane" ? "x" : "chevron-up";
   return (
     <View className="flex-row items-center gap-2">
       <Text
@@ -136,7 +134,7 @@ const FormHeader = ({
           className="h-hit-web w-hit-web items-center justify-center rounded-md active:opacity-70"
           onPress={onClose}
         >
-          <CloseIcon color={palette["label.secondary"]} size={20} strokeWidth={1.75} />
+          <Icon name={closeIcon} />
         </Pressable>
       </Tooltip>
     </View>

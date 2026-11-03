@@ -1,15 +1,18 @@
-import { User } from "lucide-react-native";
 import { useState } from "react";
 import { Image, Text, View } from "react-native";
 
 import { useAuth, useLanguage } from "#app/app-state.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
+import { Icon, type IconSize } from "#app/ui/icon.tsx";
 import { initials } from "@pace/core";
 
 /** Telegram photo cached at Pace, with the owner's initials (the person icon when the name has none) when no photo is available. */
+/** From this size (the default 44) the person glyph is a control icon; smaller, an inline one. */
+const LARGE_AVATAR = 32;
+
+const glyphSize = (avatar: number): IconSize => (avatar >= LARGE_AVATAR ? "control" : "inline");
+
 export const UserAvatar = ({ size = 44 }: { readonly size?: number }) => {
   const { user } = useAuth();
-  const { palette } = useTheme();
   const language = useLanguage();
   const [failedUrl, setFailedUrl] = useState<null | string>(null);
   const photoUrl = user?.photoUrl ?? null;
@@ -30,7 +33,7 @@ export const UserAvatar = ({ size = 44 }: { readonly size?: number }) => {
     >
       {letters === "" ? (
         <View testID="avatar-person">
-          <User color={palette["accent.text"]} size={size * 0.5} strokeWidth={2} />
+          <Icon name="user" size={glyphSize(size)} tone="accent" />
         </View>
       ) : (
         <Text

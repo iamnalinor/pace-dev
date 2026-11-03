@@ -1,4 +1,3 @@
-import { ChevronRight } from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
@@ -8,6 +7,7 @@ import { useOpenTask } from "#app/shared/task-opener.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
 import { FirstSyncBody } from "#app/ui/empty-state.tsx";
+import { Icon } from "#app/ui/icon.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { type DecisionView, decisionViews } from "@pace/client";
 import { useDecisions } from "@pace/client/react";
@@ -63,7 +63,6 @@ const RowBody = ({ view }: { readonly view: DecisionView }) => {
 const DecisionRow = ({ view }: { readonly view: DecisionView }) => {
   const t = useT();
   const openTask = useOpenTask();
-  const { palette } = useTheme();
   const { taskId } = view;
   return taskId === null ? (
     <View className="gap-0.5 border-t border-separator py-3">
@@ -81,7 +80,7 @@ const DecisionRow = ({ view }: { readonly view: DecisionView }) => {
       <View className="flex-1 gap-0.5">
         <RowBody view={view} />
       </View>
-      <ChevronRight color={palette["label.tertiary"]} size={16} strokeWidth={1.75} />
+      <Icon name="chevron-right" size="inline" tone="tertiary" />
     </Pressable>
   );
 };

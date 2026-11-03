@@ -1,7 +1,8 @@
-import { type ReactNode, useRef } from "react";
+import { useRef } from "react";
 import { Text, View } from "react-native";
 
 import type { TagColor } from "./color.tsx";
+import type { IconName } from "./icon.tsx";
 
 import { Chip } from "./chip.tsx";
 
@@ -11,8 +12,8 @@ export type RadioChoice<T extends string> = {
   readonly text: string;
   /** Spoken instead of the text when the text alone is ambiguous (or empty). */
   readonly label?: string;
-  /** An icon, drawn in the colour the chip gives it (`accent.on` once chosen). */
-  readonly leading?: (color: string) => ReactNode;
+  /** An inline icon, in the tone the chip gives it (`onAccent` once chosen). */
+  readonly icon?: IconName;
   /** The chip's colour mark (a preset's, a project's, an importance's). */
   readonly color?: null | TagColor;
 };
@@ -87,7 +88,7 @@ export const RadioChips = <T extends string>({
           <Chip
             key={choice.value}
             {...(choice.color !== undefined && { color: choice.color })}
-            {...(choice.leading !== undefined && { leading: choice.leading })}
+            {...(choice.icon !== undefined && { icon: choice.icon })}
             onPress={() => {
               onChange(choice.value, "press");
             }}

@@ -1,12 +1,11 @@
-import { Check } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 
 import type { OAuthScope } from "@pace/core";
 
 import { useT } from "#app/app-state.tsx";
 import { cx } from "#app/ui/cx.ts";
+import { Icon } from "#app/ui/icon.tsx";
 import { spacePress } from "#app/ui/space-press.ts";
-import { useTheme } from "#app/ui/theme-provider.tsx";
 import { SCOPE_KEYS } from "@pace/client";
 
 /** The requested scopes as plain-language checkboxes, all ticked until the person unticks one. */
@@ -20,7 +19,6 @@ export const ScopeList = ({
   readonly onToggle: (scope: OAuthScope) => void;
 }) => {
   const t = useT();
-  const { palette } = useTheme();
   return (
     <View accessibilityLabel={t("oauth.scopesTitle")} className="gap-2" role="group">
       <Text className="mb-1 font-sans text-caption2 font-normal uppercase tabular-nums text-label-tertiary">
@@ -47,9 +45,7 @@ export const ScopeList = ({
                 isChecked ? "border-accent bg-accent-quiet" : "border-outline",
               )}
             >
-              {isChecked ? (
-                <Check color={palette["accent.text"]} size={12} strokeWidth={3} />
-              ) : null}
+              {isChecked ? <Icon name="check" size="inline" tone="accent" /> : null}
             </View>
             <Text className="flex-1 font-sans text-subhead font-normal text-label-primary">
               {t(SCOPE_KEYS[scope])}

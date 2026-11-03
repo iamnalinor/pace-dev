@@ -5,6 +5,7 @@ import { usePace, useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
+import { Text as KitText } from "#app/ui/text.tsx";
 import { appsDuring, type AppTime, screenTime } from "@pace/client";
 import { useSessions, useUsage } from "@pace/client/react";
 import { formatDuration, type UsageRow } from "@pace/core";
@@ -18,15 +19,12 @@ const AppRow = ({ app, max }: { readonly app: AppTime; readonly max: number }) =
   return (
     <View className="gap-2 py-2">
       <View className="flex-row items-baseline gap-2">
-        <Text
-          className="min-w-0 flex-1 font-sans text-footnote text-label-primary"
-          numberOfLines={1}
-        >
+        <KitText className="flex-1" policy="truncate" role="footnote">
           {app.app}
-        </Text>
-        <Text className="font-sans text-caption2 font-normal text-label-tertiary" numberOfLines={1}>
+        </KitText>
+        <KitText className="font-normal" policy="truncate" role="caption2" tone="tertiary">
           {app.deviceNames.join(", ")}
-        </Text>
+        </KitText>
         <Text className="font-sans text-caption font-normal tabular-nums text-label-secondary">
           {formatDuration(app.minutes, language)}
         </Text>

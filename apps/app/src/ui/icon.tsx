@@ -43,6 +43,7 @@ import {
   User,
   Users,
   Video,
+  X,
   Zap,
 } from "lucide-react-native";
 
@@ -99,6 +100,7 @@ const ICONS = {
   user: User,
   users: Users,
   video: Video,
+  x: X,
   zap: Zap,
 } as const;
 
@@ -113,13 +115,16 @@ export type IconSize = keyof typeof SIZE.icon;
 
 /**
 An icon's colour by its job (spec §3.6): `secondary` by default, `primary` when it is a control's
-only label, `accent` only for the primary action, `onAccent` on an accent fill, and the statuses.
+only label, `accent` only for the primary action, `onAccent` on an accent fill, `quaternary` for a disabled control's
+icon, `inverse` (the page's ground) on a filled mark (a ticked check), and the statuses.
 */
 export type IconTone =
   | "accent"
   | "danger"
+  | "inverse"
   | "onAccent"
   | "primary"
+  | "quaternary"
   | "secondary"
   | "tertiary"
   | "warn";
@@ -127,8 +132,10 @@ export type IconTone =
 const TONE_ROLE: Readonly<Record<IconTone, ColorRole>> = {
   accent: "accent.text",
   danger: "status.danger",
+  inverse: "bg.app",
   onAccent: "accent.on",
   primary: "label.primary",
+  quaternary: "label.quaternary",
   secondary: "label.secondary",
   tertiary: "label.tertiary",
   warn: "status.warn",

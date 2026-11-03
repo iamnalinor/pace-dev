@@ -1,9 +1,8 @@
-import { Check } from "lucide-react-native";
 import { Pressable, View } from "react-native";
 
 import { cx } from "./cx.ts";
+import { Icon } from "./icon.tsx";
 import { spacePress } from "./space-press.ts";
-import { useTheme } from "./theme-provider.tsx";
 
 /** The round check of a task row: an outlined circle, filled once checked. */
 export const CheckCircle = ({
@@ -17,7 +16,6 @@ export const CheckCircle = ({
   readonly label: string;
   readonly onPress?: () => void;
 }) => {
-  const { palette } = useTheme();
   return (
     // A 48 target around the 24 circle (hitSlop does nothing on the web); the negative margin
     // keeps the row's layout as if only the circle were there.
@@ -38,7 +36,7 @@ export const CheckCircle = ({
           dashed && "border-dashed",
         )}
       >
-        {checked ? <Check color={palette["bg.app"]} size={14} strokeWidth={2.5} /> : null}
+        {checked ? <Icon name="check" size="inline" tone="inverse" /> : null}
       </View>
     </Pressable>
   );

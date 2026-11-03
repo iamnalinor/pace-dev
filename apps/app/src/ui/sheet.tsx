@@ -1,4 +1,3 @@
-import { X } from "lucide-react-native";
 import { type ReactNode, useId } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
@@ -108,7 +107,7 @@ const SheetTitle = ({
       // The cross's middle on the title's first line (QA round 16 L10: it sat about 4 px low): a
       // box as tall as the title's line (`text-title2` is 24 from `lg`, where this shows) centres it.
       <View className="-mr-2 h-6 justify-center">
-        <IconButton icon={X} label={closeLabel} onPress={onClose} variant="plain" />
+        <IconButton icon={"x"} label={closeLabel} onPress={onClose} variant="plain" />
       </View>
     ) : null}
   </View>

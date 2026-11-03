@@ -1,42 +1,33 @@
 import { type Href, useRouter } from "expo-router";
-import {
-  CalendarRange,
-  ChartColumn,
-  ChevronRight,
-  Folder,
-  History,
-  type LucideIcon,
-  Settings,
-} from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 
 import type { MessageKey } from "@pace/core";
 
 import { useOwnerName, useT } from "#app/app-state.tsx";
 import { UserAvatar } from "#app/shared/user-avatar.tsx";
+import { Icon, type IconName } from "#app/ui/icon.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
+import { Text as KitText } from "#app/ui/text.tsx";
 
 type Row = {
   readonly href: Href;
-  readonly icon: LucideIcon;
+  readonly icon: IconName;
   readonly label: MessageKey;
 };
 
 /** What a phone keeps behind More: the sidebar's other destinations, Week first. */
 const ROWS: readonly Row[] = [
-  { href: "/week", icon: CalendarRange, label: "nav.week" },
-  { href: "/projects", icon: Folder, label: "nav.projects" },
-  { href: "/insights", icon: ChartColumn, label: "nav.insights" },
-  { href: "/history", icon: History, label: "nav.history" },
-  { href: "/settings", icon: Settings, label: "nav.settings" },
+  { href: "/week", icon: "calendar-range", label: "nav.week" },
+  { href: "/projects", icon: "folder", label: "nav.projects" },
+  { href: "/insights", icon: "chart-column", label: "nav.insights" },
+  { href: "/history", icon: "history", label: "nav.history" },
+  { href: "/settings", icon: "settings", label: "nav.settings" },
 ];
 
-const MoreRow = ({ href, icon: Icon, label }: Row) => {
+const MoreRow = ({ href, icon, label }: Row) => {
   const t = useT();
   const router = useRouter();
-  const { palette } = useTheme();
   return (
     <Pressable
       accessibilityLabel={t(label)}
@@ -46,9 +37,9 @@ const MoreRow = ({ href, icon: Icon, label }: Row) => {
         router.push(href);
       }}
     >
-      <Icon color={palette["label.secondary"]} size={20} strokeWidth={1.75} />
+      <Icon name={icon} />
       <Text className="flex-1 font-sans text-body text-label-primary">{t(label)}</Text>
-      <ChevronRight color={palette["label.tertiary"]} size={16} strokeWidth={1.75} />
+      <Icon name="chevron-right" size="inline" tone="tertiary" />
     </Pressable>
   );
 };
@@ -57,12 +48,9 @@ const MoreRow = ({ href, icon: Icon, label }: Row) => {
 const Owner = ({ name }: { readonly name: string }) => (
   <View className="mx-5 mb-3 flex-row items-center gap-3">
     <UserAvatar />
-    <Text
-      className="min-w-0 flex-1 font-sans text-headline font-medium text-label-primary"
-      numberOfLines={1}
-    >
+    <KitText className="flex-1 font-medium" policy="truncate" role="headline">
       {name}
-    </Text>
+    </KitText>
   </View>
 );
 

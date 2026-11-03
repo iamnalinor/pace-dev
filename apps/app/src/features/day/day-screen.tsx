@@ -1,4 +1,3 @@
-import { Pencil, Plus } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
@@ -16,12 +15,13 @@ import { WhereSatLine } from "#app/shared/where-sat-line.tsx";
 import { ColorTag } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { EmptyText, FirstSyncBody } from "#app/ui/empty-state.tsx";
+import { Icon } from "#app/ui/icon.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
 import { ROW_ENTER, ROW_EXIT, ROW_LAYOUT } from "#app/ui/motion.ts";
 import { RowList } from "#app/ui/row-list.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
+import { Text as KitText } from "#app/ui/text.tsx";
 import { useUsageRead } from "@pace/client/react";
 import {
   addDaysIn,
@@ -73,7 +73,6 @@ export const ActivityRow = ({
 }: DayRowProps & { readonly satRows: readonly SatRow[] }) => {
   const t = useT();
   const { language } = useViewer();
-  const { palette } = useTheme();
   const isWide = useIsWide();
   const range = rangeText(
     row.startAt,
@@ -93,9 +92,9 @@ export const ActivityRow = ({
         <View className="flex-row flex-wrap items-center gap-2">
           <ColorTag color={row.color}>{t(`category.${row.category}`)}</ColorTag>
           {row.showsLabel ? (
-            <Text className="font-sans text-subhead text-label-primary" numberOfLines={1}>
+            <KitText policy="truncate" role="subhead">
               {row.label}
-            </Text>
+            </KitText>
           ) : null}
           {isWide ? <WhereSatLine compact rows={satRows} /> : null}
         </View>
@@ -113,7 +112,7 @@ export const ActivityRow = ({
           <Text className="font-sans text-caption2 font-normal text-label-tertiary">{target}</Text>
         )}
       </View>
-      <Pencil color={palette["label.secondary"]} size={16} strokeWidth={1.75} />
+      <Icon name="pencil" size="inline" />
     </Pressable>
   );
 };
@@ -189,7 +188,6 @@ const LogPastRow = ({
   readonly onPress: () => void;
 }) => {
   const t = useT();
-  const { palette } = useTheme();
   return (
     <View className="px-5">
       <Pressable
@@ -197,7 +195,7 @@ const LogPastRow = ({
         className={cx(ROW, hasDivider && "border-t border-separator")}
         onPress={onPress}
       >
-        <Plus color={palette["label.secondary"]} size={16} strokeWidth={1.75} />
+        <Icon name="plus" size="inline" />
         <Text className={cx(LINE, "text-label-secondary")}>{t("day.logPast")}</Text>
       </Pressable>
     </View>

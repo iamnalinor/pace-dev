@@ -1,10 +1,10 @@
-import { Plus, X } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
 import { entryFieldProps } from "#app/platform/enter-key.ts";
 import { cx } from "#app/ui/cx.ts";
+import { Icon } from "#app/ui/icon.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { KEYBOARD } from "#app/ui/use-hotkey.tsx";
 
@@ -37,7 +37,6 @@ const Row = ({
   readonly onRemove?: (() => void) | undefined;
 }) => {
   const t = useT();
-  const { palette } = useTheme();
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const isShowsRemove = KEYBOARD === null || isHovered || isFocused;
@@ -80,7 +79,7 @@ const Row = ({
           onPress={onRemove}
           style={{ opacity: isShowsRemove ? 1 : 0 }}
         >
-          <X color={palette["label.secondary"]} size={16} strokeWidth={2} />
+          <Icon name="x" size="inline" />
         </Pressable>
       )}
     </View>
@@ -116,7 +115,7 @@ const AddSubtask = ({
           setIsOpenByPress(true);
         }}
       >
-        <Plus color={palette["label.secondary"]} size={16} strokeWidth={2} />
+        <Icon name="plus" size="inline" />
         <Text className="font-sans text-subhead font-normal text-label-secondary">
           {t("form.addSubtask")}
         </Text>

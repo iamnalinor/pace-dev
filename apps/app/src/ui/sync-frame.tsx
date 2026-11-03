@@ -1,4 +1,3 @@
-import { CloudOff, RefreshCw } from "lucide-react-native";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { AppState, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -17,8 +16,8 @@ import {
 import { useIsDeviceOffline } from "#app/platform/device-offline.ts";
 import { canStartSenders } from "#app/senders.ts";
 
+import { Icon } from "./icon.tsx";
 import { Skeleton } from "./skeleton.tsx";
-import { useTheme } from "./theme-provider.tsx";
 import { useFloatBottom } from "./toast.tsx";
 
 /**
@@ -39,9 +38,8 @@ review 3). A press goes through around it.
 */
 const SyncStrip = ({ message }: { readonly message: MessageKey }) => {
   const t = useT();
-  const { palette } = useTheme();
   const bottom = useFloatBottom();
-  const Icon = message === "errors.offline" ? CloudOff : RefreshCw;
+  const icon = message === "errors.offline" ? "cloud-off" : "refresh-cw";
   const canRetry = message === "errors.offline" || message === "sync.notSyncedYet";
   return (
     <View
@@ -55,7 +53,7 @@ const SyncStrip = ({ message }: { readonly message: MessageKey }) => {
         role="status"
         testID="sync-strip"
       >
-        <Icon aria-hidden color={palette["status.warn"]} size={16} strokeWidth={2} />
+        <Icon name={icon} size="inline" tone="warn" />
         <Text className="shrink py-2 font-sans text-footnote text-label-primary">{t(message)}</Text>
         {canRetry ? <RetryNow /> : null}
       </View>

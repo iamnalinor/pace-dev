@@ -1,13 +1,13 @@
-import { ChevronDown } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import type { Task } from "@pace/core";
 
 import { useAppState, useT } from "#app/app-state.tsx";
+import { Icon } from "#app/ui/icon.tsx";
 import { spacePress } from "#app/ui/space-press.ts";
 import { TextField } from "#app/ui/text-field.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
+import { Text as KitText } from "#app/ui/text.tsx";
 
 const MAX_RESULTS = 8;
 
@@ -27,7 +27,6 @@ export const ActivityTaskField = ({
   readonly onChange: (taskId: null | string) => void;
 }) => {
   const t = useT();
-  const { palette } = useTheme();
   const tasks = useAppState((state) => state.tasks.byId);
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -56,13 +55,10 @@ export const ActivityTaskField = ({
           setIsOpen((current) => !current);
         }}
       >
-        <Text
-          className="min-w-0 flex-1 font-sans text-subhead font-normal text-label-primary"
-          numberOfLines={1}
-        >
+        <KitText className="flex-1 font-normal" policy="truncate" role="subhead">
           {label}
-        </Text>
-        <ChevronDown color={palette["label.secondary"]} size={16} />
+        </KitText>
+        <Icon name="chevron-down" size="inline" />
       </Pressable>
       {isOpen ? (
         <View accessibilityLabel={t("day.taskLink")} className="gap-1" role="radiogroup">

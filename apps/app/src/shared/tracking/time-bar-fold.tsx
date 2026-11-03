@@ -1,10 +1,9 @@
-import { ChevronDown, ChevronUp } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { Pressable, Text } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
+import { Icon } from "#app/ui/icon.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
-import { useTheme } from "#app/ui/theme-provider.tsx";
 
 /** A start this soon after the bar was used came from it: the bar stays as the finger left it. */
 const BAR_USE_MS = 5000;
@@ -52,8 +51,7 @@ export const FoldToggle = ({
   readonly onToggle: () => void;
 }) => {
   const t = useT();
-  const { palette } = useTheme();
-  const Chevron = isOpen ? ChevronDown : ChevronUp;
+  const chevron = isOpen ? "chevron-down" : "chevron-up";
   return (
     <Pressable
       accessibilityRole="button"
@@ -62,7 +60,7 @@ export const FoldToggle = ({
       onPress={onToggle}
     >
       <Text className="font-sans text-footnote text-label-secondary">{t("time.startOther")}</Text>
-      <Chevron color={palette["label.secondary"]} size={16} />
+      <Icon name={chevron} size="inline" />
     </Pressable>
   );
 };

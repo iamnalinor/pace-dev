@@ -1,4 +1,3 @@
-import { Check } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 
 import type { SubtaskRow, TaskViewModel } from "@pace/client";
@@ -7,14 +6,13 @@ import { usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { cx } from "#app/ui/cx.ts";
+import { Icon } from "#app/ui/icon.tsx";
 import { spacePress } from "#app/ui/space-press.ts";
-import { useTheme } from "#app/ui/theme-provider.tsx";
 
 const weekday = (atIso: string, tz: string, language: string): string =>
   new Intl.DateTimeFormat(language, { timeZone: tz, weekday: "short" }).format(new Date(atIso));
 
 const Mark = ({ state }: { readonly state: SubtaskRow["state"] }) => {
-  const { palette } = useTheme();
   return (
     <View
       className={cx(
@@ -23,7 +21,7 @@ const Mark = ({ state }: { readonly state: SubtaskRow["state"] }) => {
         state === "submitted" && "opacity-50",
       )}
     >
-      {state === "pending" ? null : <Check color={palette["bg.app"]} size={14} strokeWidth={2.5} />}
+      {state === "pending" ? null : <Icon name="check" size="inline" tone="inverse" />}
     </View>
   );
 };

@@ -1,4 +1,3 @@
-import { Square } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 
 import { usePace, useT } from "#app/app-state.tsx";
@@ -6,8 +5,8 @@ import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { ColorTag, fillClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
+import { Icon } from "#app/ui/icon.tsx";
 import { PulseDot } from "#app/ui/pulse-dot.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
 import { PACE_STATUS_TEXT, type RunningView } from "@pace/client";
 import { formatDuration } from "@pace/core";
 
@@ -83,7 +82,6 @@ export const RunningRow = ({ running }: { readonly running: RunningView }) => {
 const StopButton = ({ running }: { readonly running: RunningView }) => {
   const t = useT();
   const { actions } = usePace();
-  const { palette } = useTheme();
   const run = useRunAction();
   return (
     <Pressable
@@ -95,7 +93,7 @@ const StopButton = ({ running }: { readonly running: RunningView }) => {
         void run(actions.stopActivity({ activityId: running.activityId }));
       }}
     >
-      <Square color={palette["label.primary"]} size={14} />
+      <Icon name="square" size="inline" tone="primary" />
       <Text className="font-sans text-footnote text-label-primary">{t("time.stop")}</Text>
     </Pressable>
   );

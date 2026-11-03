@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
 
-import { Check } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 
 import type { ActionResult, StartOptions, TimeButtonView } from "@pace/client";
 
 import { useT } from "#app/app-state.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
+import { Icon } from "#app/ui/icon.tsx";
+import { Text as KitText } from "#app/ui/text.tsx";
 
 import type { CalendarToday } from "./calendar-today.ts";
 
@@ -35,7 +35,6 @@ export const ChoiceRow = ({
   readonly children?: ReactNode;
   readonly onPress: () => void;
 }) => {
-  const { palette } = useTheme();
   const t = useT();
   return (
     <Pressable
@@ -46,15 +45,15 @@ export const ChoiceRow = ({
       onPress={onPress}
     >
       <View className="flex-1 gap-1">
-        <Text className="font-sans text-callout text-label-primary" numberOfLines={2}>
+        <KitText lines={2} policy="clamp" role="callout">
           {label}
-        </Text>
+        </KitText>
         {children}
       </View>
       {aside === null ? null : (
         <Text className="font-sans text-footnote tabular-nums text-label-secondary">{aside}</Text>
       )}
-      {isRunning ? <Check color={palette["label.primary"]} size={16} /> : null}
+      {isRunning ? <Icon name="check" size="inline" tone="primary" /> : null}
     </Pressable>
   );
 };

@@ -1,4 +1,3 @@
-import { ChevronLeft, ChevronRight } from "lucide-react-native";
 import { useState } from "react";
 import { Text, View } from "react-native";
 
@@ -152,7 +151,7 @@ const DayNav = ({
         {t("history.now")}
       </Button>
       <IconButton
-        icon={ChevronLeft}
+        icon={"chevron-left"}
         label={t("history.dayBack")}
         onPress={() => {
           onAt(addMinutesIso(instant, -MINUTES_PER_DAY));
@@ -161,7 +160,7 @@ const DayNav = ({
       />
       <IconButton
         disabled={at === null}
-        icon={ChevronRight}
+        icon={"chevron-right"}
         label={t("history.dayForward")}
         onPress={() => {
           onAt(Date.parse(later) >= Date.parse(now) ? null : later);

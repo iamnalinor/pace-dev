@@ -1,13 +1,11 @@
-import type { LucideIcon } from "lucide-react-native";
-
 import { createContext, type Ref, use, useCallback, useLayoutEffect, useRef } from "react";
 import { ActivityIndicator, Pressable, Text, type View } from "react-native";
 
 import { isFocusLost, moveFocus } from "../platform/move-focus.ts";
 import { cx } from "./cx.ts";
 import { ariaHotkey, formatHotkey, type Hotkey } from "./hotkeys.ts";
+import { Icon, type IconName, type IconTone } from "./icon.tsx";
 import { useIsWide } from "./layout.ts";
-import { useTheme } from "./theme-provider.tsx";
 import { KEYBOARD, useHotkey } from "./use-hotkey.tsx";
 
 /** `danger`: a step that cannot be undone (wipe, delete): the warning colour, outlined. */
@@ -56,11 +54,11 @@ const useWidthStyle = (width: ButtonWidth | undefined): typeof AT_TEXT_WIDTH | u
 };
 
 /** The icon in the label's colour. */
-const iconColor = (variant: ButtonVariant, palette: ReturnType<typeof useTheme>["palette"]) => {
-  if (variant === "primary") {
-    return palette["accent.on"];
-  }
-  return variant === "danger" ? palette["status.danger"] : palette["label.primary"];
+const ICON_TONE: Readonly<Record<ButtonVariant, IconTone>> = {
+  danger: "danger",
+  ghost: "primary",
+  primary: "onAccent",
+  secondary: "primary",
 };
 
 /** The shortcut after the label, the way this computer names it; nothing without a keyboard. */
@@ -84,20 +82,17 @@ export const KeyHint = ({
 const Label = ({
   children,
   hotkey,
-  icon: Icon,
+  icon,
   variant,
 }: {
   readonly children: string;
   readonly hotkey: Hotkey | undefined;
-  readonly icon: LucideIcon | undefined;
+  readonly icon: IconName | undefined;
   readonly variant: ButtonVariant;
 }) => {
-  const { palette } = useTheme();
   return (
     <>
-      {Icon === undefined ? null : (
-        <Icon color={iconColor(variant, palette)} size={18} strokeWidth={1.75} />
-      )}
+      {icon === undefined ? null : <Icon name={icon} tone={ICON_TONE[variant]} />}
       <Text className={cx("shrink text-center font-sans text-callout font-medium", LABEL[variant])}>
         {children}
       </Text>
@@ -164,7 +159,7 @@ export const Button = ({
   hint,
   hotkey,
   hotkeyMode = "global",
-  icon: Icon,
+  icon,
   label,
   onLongPress,
   onPress,
@@ -177,7 +172,7 @@ export const Button = ({
   readonly disabled?: boolean;
   /** What a press does beyond the label (a long press, say), for screen readers. */
   readonly hint?: string;
-  readonly icon?: LucideIcon;
+  readonly icon?: IconName;
   /** The name said for it when the visible text is a short form of it (it must start with it). */
   readonly label?: string;
   readonly hotkey?: Hotkey | undefined;
@@ -219,7 +214,7 @@ export const Button = ({
       {busy ? (
         <ActivityIndicator accessibilityLabel={children} />
       ) : (
-        <Label hotkey={hotkey} icon={Icon} variant={variant}>
+        <Label hotkey={hotkey} icon={icon} variant={variant}>
           {children}
         </Label>
       )}

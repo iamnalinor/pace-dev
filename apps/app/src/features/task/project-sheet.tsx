@@ -1,5 +1,4 @@
-import { Check } from "lucide-react-native";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
 
 import type { TaskViewModel } from "@pace/client";
 import type { ProjectColorName } from "@pace/core";
@@ -8,9 +7,10 @@ import { usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { fillClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
+import { Icon } from "#app/ui/icon.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
 import { spacePress } from "#app/ui/space-press.ts";
-import { useTheme } from "#app/ui/theme-provider.tsx";
+import { Text } from "#app/ui/text.tsx";
 
 type Choice = {
   readonly id: null | string;
@@ -27,7 +27,6 @@ const ChoiceRow = ({
   readonly isCurrent: boolean;
   readonly onChoose: () => void;
 }) => {
-  const { palette } = useTheme();
   return (
     <Pressable
       accessibilityLabel={choice.name}
@@ -46,10 +45,10 @@ const ChoiceRow = ({
           choice.color === null ? "border border-outline" : fillClass(choice.color),
         )}
       />
-      <Text className="flex-1 font-sans text-callout text-label-primary" numberOfLines={1}>
+      <Text className="flex-1" policy="truncate" role="callout">
         {choice.name}
       </Text>
-      {isCurrent ? <Check color={palette["label.primary"]} size={18} /> : null}
+      {isCurrent ? <Icon name="check" tone="primary" /> : null}
     </Pressable>
   );
 };

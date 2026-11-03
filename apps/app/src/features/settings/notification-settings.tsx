@@ -1,4 +1,3 @@
-import { X } from "lucide-react-native";
 import { useEffect } from "react";
 import { Text, View } from "react-native";
 import { useStore } from "zustand";
@@ -211,7 +210,7 @@ export const DigestWindows = () => {
             value={time}
           />
           <IconButton
-            icon={X}
+            icon={"x"}
             label={t("settings.digestWindows.remove", { time })}
             onPress={() => {
               save(digestWindows.filter((_, position) => position !== index));

@@ -1,4 +1,3 @@
-import { CalendarClock, Square, Timer } from "lucide-react-native";
 import { Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -24,7 +23,7 @@ const FocusButton = ({ view }: { readonly view: TaskViewModel }) => {
   return (
     <Button
       hotkey={HOTKEYS.focus}
-      icon={isFocused ? Square : Timer}
+      icon={isFocused ? "square" : "timer"}
       onPress={() => {
         void run(isFocused ? actions.stopActivity() : actions.focusTask(view.id));
       }}
@@ -104,7 +103,7 @@ export const TaskFooter = ({
           {/* Said in words where there is room (a bare glyph read as "more", QA round 20 L3). */}
           {isWide ? (
             <Button
-              icon={CalendarClock}
+              icon={"calendar-clock"}
               label={t("task.doneOther")}
               onPress={onClose}
               variant="secondary"
@@ -112,7 +111,7 @@ export const TaskFooter = ({
               {t("task.doneOtherShort")}
             </Button>
           ) : (
-            <IconButton icon={CalendarClock} label={t("task.doneOther")} onPress={onClose} />
+            <IconButton icon={"calendar-clock"} label={t("task.doneOther")} onPress={onClose} />
           )}
         </>
       )}

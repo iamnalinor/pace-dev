@@ -1,11 +1,11 @@
-import type { ReactNode, Ref } from "react";
+import type { Ref } from "react";
 
 import { Pressable, Text, View } from "react-native";
 
 import { inkClass, outlineClass, type TagColor } from "./color.tsx";
 import { cx } from "./cx.ts";
+import { Icon, type IconName } from "./icon.tsx";
 import { spacePress } from "./space-press.ts";
-import { useTheme } from "./theme-provider.tsx";
 
 /**
 Unselected: the cell inside a 2px outline (in the chip's hue, else the control outline). Selected: the
@@ -38,7 +38,7 @@ export const Chip = ({
   children,
   color = null,
   label,
-  leading,
+  icon,
   onPress,
   ref,
   selected = false,
@@ -50,8 +50,8 @@ export const Chip = ({
   readonly color?: null | TagColor;
   /** Spoken instead of the visible text when the text alone is ambiguous. */
   readonly label?: string;
-  /** An icon drawn in the colour it is given: `accent.on` on a chosen chip, secondary off it. */
-  readonly leading?: (color: string) => ReactNode;
+  /** An inline icon before the text: `onAccent` on a chosen chip, secondary off it. */
+  readonly icon?: IconName | undefined;
   readonly onPress: () => void;
   /** The pressable itself: for a group that moves focus between its chips, or for focus to be
   moved onto it when the control that held it goes away. */
@@ -62,7 +62,6 @@ export const Chip = ({
   /** 40px: the time pills of the close sheet. */
   readonly tall?: boolean;
 }) => {
-  const { palette } = useTheme();
   return (
     <Pressable
       accessibilityLabel={label ?? children}
@@ -82,7 +81,9 @@ export const Chip = ({
         )}
         testID="chip-pill"
       >
-        {leading?.(palette[selected ? "accent.on" : "label.secondary"])}
+        {icon === undefined ? null : (
+          <Icon name={icon} size="inline" tone={selected ? "onAccent" : "secondary"} />
+        )}
         <Text className={cx("font-sans text-caption font-normal", chipText(color, selected))}>
           {children}
         </Text>

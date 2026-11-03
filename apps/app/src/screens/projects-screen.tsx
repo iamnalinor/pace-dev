@@ -1,5 +1,4 @@
 import { useRouter } from "expo-router";
-import { Plus } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
@@ -10,7 +9,7 @@ import { inkClass, washClass } from "#app/ui/color.tsx";
 import { useConfirmFocus } from "#app/ui/confirm-focus.ts";
 import { cx } from "#app/ui/cx.ts";
 import { EmptyState } from "#app/ui/empty-state.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
+import { Icon } from "#app/ui/icon.tsx";
 import { openTasksLabel } from "@pace/client";
 
 /**
@@ -21,7 +20,6 @@ when it closes (cancelled or created) focus goes back to the button, not to the 
 const NewProject = () => {
   const t = useT();
   const { actions } = usePace();
-  const { palette } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   const focus = useConfirmFocus();
   if (!isOpen) {
@@ -34,7 +32,7 @@ const NewProject = () => {
         }}
         ref={focus.openerRef()}
       >
-        <Plus color={palette["label.primary"]} size={16} />
+        <Icon name="plus" size="inline" tone="primary" />
         <Text className="font-sans text-subhead font-normal text-label-primary">
           {t("projects.new")}
         </Text>
