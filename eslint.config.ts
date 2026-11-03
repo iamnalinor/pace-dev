@@ -27,6 +27,7 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import tseslint from "typescript-eslint";
 
 import { GENERATED_CLASSES } from "./scripts/design/generate-design.ts";
+import { BARE_PRESSABLE_MARKER } from "./scripts/eslint-ratchet.ts";
 import { plugin as pace } from "./scripts/eslint-rules/index.ts";
 
 /** Fails loudly if a plugin stops shipping a config we rely on (instead of silently linting less). */
@@ -98,6 +99,15 @@ const ACTION_ANSWER_SYNTAX = [
     selector:
       "UnaryExpression[operator='void'] > CallExpression[callee.object.name='actions'][callee.property.name!='ensureInstances'], UnaryExpression[operator='void'] > CallExpression[callee.object.property.name='actions']",
   },
+];
+
+/** React Native's (and gesture-handler's) pressables with no state layer (bug-lessons 118). */
+const BARE_PRESSABLES = [
+  "Pressable",
+  "TouchableHighlight",
+  "TouchableNativeFeedback",
+  "TouchableOpacity",
+  "TouchableWithoutFeedback",
 ];
 
 const TESTS = [
@@ -539,17 +549,11 @@ export default defineConfig([
         "warn",
         {
           paths: [
+            { importNames: BARE_PRESSABLES, message: BARE_PRESSABLE_MARKER, name: "react-native" },
             {
-              importNames: [
-                "Pressable",
-                "TouchableHighlight",
-                "TouchableNativeFeedback",
-                "TouchableOpacity",
-                "TouchableWithoutFeedback",
-              ],
-              message:
-                "A bare pressable has no state layer (no ripple, hover or focus ring): use Pressable from #app/ui/pressable.",
-              name: "react-native",
+              importNames: BARE_PRESSABLES,
+              message: BARE_PRESSABLE_MARKER,
+              name: "react-native-gesture-handler",
             },
           ],
         },

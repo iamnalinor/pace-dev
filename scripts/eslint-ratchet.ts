@@ -8,22 +8,38 @@ imported by feature or shared code instead of the kit's `#app/ui/pressable`.
 export const BARE_PRESSABLE_RULE = "no-restricted-imports";
 
 /**
+The message the bare-pressable ban carries (`eslint.config.ts`), and what the ratchet counts it by:
+another `no-restricted-imports` warning is not this backlog's.
+*/
+export const BARE_PRESSABLE_MARKER =
+  "A bare pressable has no state layer (no ripple, hover or focus ring): use Pressable from #app/ui/pressable.";
+
+/**
 The kit-primitive backlog (bug-lessons 109, spec §4.1.2 rule 9): a lucide icon imported outside the
 kit's `Icon`, or `numberOfLines` on React Native's `Text` outside the kit's `Text`.
 */
 export const KIT_PRIMITIVE_RULE = "pace/kit-primitives";
 
-/** One backlog counted down: its rule, and the constant in `eslint-all.ts` that holds its number. */
+/**
+One backlog counted down: its rule, the constant in `eslint-all.ts` that holds its number, and, for
+a rule other backlogs or bans may share, the text its own messages carry (`marker`).
+*/
 export type Ratchet = {
   readonly allowance: number;
   readonly constant: string;
+  readonly marker?: string;
   readonly rule: string;
 };
 
+type Message = { message?: string; ruleId: null | string; severity: number };
+
 type Result = {
-  messages: readonly { ruleId: null | string; severity: number }[];
+  messages: readonly Message[];
   warningCount: number;
 };
+
+const isCounted = ({ marker, rule }: Ratchet, message: Message): boolean =>
+  message.ruleId === rule && (marker === undefined || (message.message ?? "").includes(marker));
 
 type Summary = { counts: Readonly<Record<string, number>>; problem: string | undefined };
 
@@ -44,10 +60,10 @@ is a failure (the whole lint is otherwise zero-tolerance).
 */
 export const summarise = (results: readonly Result[], ratchets: readonly Ratchet[]): Summary => {
   const messages = results.flatMap((result) => result.messages);
-  const counts = Object.fromEntries(
-    ratchets.map(({ rule }) => [
-      rule,
-      messages.filter((message) => message.ruleId === rule).length,
+  const counts: Readonly<Record<string, number>> = Object.fromEntries(
+    ratchets.map((ratchet) => [
+      ratchet.constant,
+      messages.filter((message) => isCounted(ratchet, message)).length,
     ]),
   );
   const counted = Object.values(counts).reduce((total, count) => total + count, 0);
@@ -57,7 +73,7 @@ export const summarise = (results: readonly Result[], ratchets: readonly Ratchet
     return { counts, problem: `${others} other warning(s): fix them.` };
   }
   const problems = ratchets
-    .map((ratchet) => ratchetProblem(ratchet, counts[ratchet.rule] ?? 0))
+    .map((ratchet) => ratchetProblem(ratchet, counts[ratchet.constant] ?? 0))
     .filter((problem) => problem !== undefined);
   return { counts, problem: problems.length > 0 ? problems.join(" ") : undefined };
 };

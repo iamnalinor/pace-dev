@@ -1,6 +1,7 @@
 import { ESLint } from "eslint";
 
 import {
+  BARE_PRESSABLE_MARKER,
   BARE_PRESSABLE_RULE,
   DESIGN_VALUE_RULE,
   KIT_PRIMITIVE_RULE,
@@ -45,6 +46,7 @@ const APP_RATCHETS: readonly Ratchet[] = [
   {
     allowance: BARE_PRESSABLE_WARNINGS,
     constant: "BARE_PRESSABLE_WARNINGS",
+    marker: BARE_PRESSABLE_MARKER,
     rule: BARE_PRESSABLE_RULE,
   },
   {

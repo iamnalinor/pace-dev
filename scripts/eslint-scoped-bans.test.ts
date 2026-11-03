@@ -2,6 +2,8 @@ import { describe, expect, it } from "bun:test";
 import { ESLint } from "eslint";
 import path from "node:path";
 
+import { BARE_PRESSABLE_MARKER } from "./eslint-ratchet.ts";
+
 /**
 The bans scoped to some folders, read from the resolved config so a glob that drifts away from a
 folder fails here. The display-text bans (bug-lessons 110 and 111: `toFixed`, cutting the first
@@ -127,17 +129,26 @@ describe("a bare pressable (bug-lessons F-CMP-01)", () => {
   );
 
   it(
-    "is reported with the way to the kit",
+    "is reported with the way to the kit, the message the ratchet counts it by",
     async () => {
       const [result] = await eslint.lintText(
-        'import { Pressable, Text } from "react-native";\nexport const a = [Pressable, Text];\n',
+        [
+          'import { Pressable, Text } from "react-native";',
+          'import * as RN from "react-native";',
+          'import { TouchableOpacity } from "react-native-gesture-handler";',
+          "export const a = [Pressable, Text, RN.View, TouchableOpacity];",
+          "",
+        ].join("\n"),
         { filePath: path.join(ROOT, "apps/app/src/features/week/week-screen.tsx") },
       );
       const flagged = (result?.messages ?? []).filter(
         (message) => message.ruleId === "no-restricted-imports",
       );
-      expect(flagged).toHaveLength(1);
-      expect(flagged[0]?.message).toContain("#app/ui/pressable");
+      // The named import, the namespace one (it reaches RN.Pressable) and gesture-handler's.
+      expect(flagged.map((message) => message.line)).toEqual([1, 2, 3]);
+      expect(flagged.every((message) => message.message.includes(BARE_PRESSABLE_MARKER))).toBe(
+        true,
+      );
     },
     LINT_APP_FILE_MS,
   );

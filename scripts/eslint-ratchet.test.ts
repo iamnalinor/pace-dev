@@ -1,14 +1,22 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  BARE_PRESSABLE_MARKER,
   BARE_PRESSABLE_RULE,
   DESIGN_VALUE_RULE,
   type Ratchet,
   summarise,
 } from "./eslint-ratchet.ts";
 
+/** A bare-pressable warning as ESLint words it: the rule's own text, then our message. */
+const BARE = `'Pressable' import from 'react-native' is restricted. ${BARE_PRESSABLE_MARKER}`;
+
 const result = (ruleIds: readonly string[]) => ({
-  messages: ruleIds.map((ruleId) => ({ ruleId, severity: 1 })),
+  messages: ruleIds.map((ruleId) => ({
+    message: ruleId === BARE_PRESSABLE_RULE ? BARE : "a warning",
+    ruleId,
+    severity: 1,
+  })),
   warningCount: ruleIds.length,
 });
 
@@ -21,6 +29,7 @@ const designValues = (allowance: number): Ratchet => ({
 const barePressables = (allowance: number): Ratchet => ({
   allowance,
   constant: "BARE_PRESSABLE_WARNINGS",
+  marker: BARE_PRESSABLE_MARKER,
   rule: BARE_PRESSABLE_RULE,
 });
 
@@ -28,7 +37,7 @@ describe("summarise", () => {
   it("counts only this rule's messages against the allowance", () => {
     const results = [result([DESIGN_VALUE_RULE, DESIGN_VALUE_RULE]), result([DESIGN_VALUE_RULE])];
     expect(summarise(results, [designValues(3)])).toEqual({
-      counts: { [DESIGN_VALUE_RULE]: 3 },
+      counts: { DESIGN_VALUE_WARNINGS: 3 },
       problem: undefined,
     });
   });
@@ -73,5 +82,22 @@ describe("summarise", () => {
   it("counts a ratcheted rule's warnings as other warnings where that part allows none", () => {
     const { problem } = summarise([result([BARE_PRESSABLE_RULE])], [designValues(0)]);
     expect(problem).toContain("other warning");
+  });
+
+  it("counts a ratchet with a marker by its own message, not by every warning of its rule", () => {
+    const other = {
+      messages: [
+        {
+          message: "'lodash' import is restricted. Use the core helpers.",
+          ruleId: BARE_PRESSABLE_RULE,
+          severity: 1,
+        },
+      ],
+      warningCount: 1,
+    };
+    const results = [result([BARE_PRESSABLE_RULE]), other];
+    const { counts, problem } = summarise(results, [barePressables(1)]);
+    expect(counts).toEqual({ BARE_PRESSABLE_WARNINGS: 1 });
+    expect(problem).toContain("1 other warning");
   });
 });
