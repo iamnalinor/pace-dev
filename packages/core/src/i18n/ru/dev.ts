@@ -36,4 +36,12 @@ export const ruDev: { readonly [K in keyof typeof enDev]: string } = {
   "dev.gallery.pressable.borderless": "Волна без границ",
   "dev.gallery.pressable.selected": "Выбрано",
   "dev.gallery.pressable.unselected": "Не выбрано",
+  "dev.gallery.section.type": "Роли шрифта",
+  "dev.gallery.type.sample": "Домашка по алгебре, сдать в пятницу",
+  "dev.gallery.type.heading": "Заголовок второго уровня",
+  "dev.gallery.section.textPolicy": "Текст из данных в строке",
+  "dev.gallery.section.icons": "Значки",
+  "dev.gallery.icons.inline": "В строке, рядом с подписью",
+  "dev.gallery.section.link": "Ссылки",
+  "dev.gallery.link.inside": "Обратно на «Сейчас»",
 };

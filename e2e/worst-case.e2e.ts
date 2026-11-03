@@ -58,7 +58,6 @@ const KNOWN: Readonly<Record<(typeof SETS)[number], readonly Known[]>> = {
     { finding: "F-DAT-02", match: /: (Чтение предложений|Reading the committee)/u },
     { finding: "F-DAT-02", match: /: (Это не я|Not me)/u },
     { finding: "F-DAT-07", match: /: 🍽️ Обед/u },
-    { finding: "F-DAT-07", match: /: 🌿 Bartholomew/u },
   ],
 };
 

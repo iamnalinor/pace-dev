@@ -107,7 +107,7 @@ const GalleryBody = ({
             selected={theme}
           />
         </View>
-        <KitSections />
+        <KitSections data={data} />
         <TextSections data={data} />
         <TimeSections data={data} />
         <ChromeSections data={data} />

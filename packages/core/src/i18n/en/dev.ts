@@ -34,4 +34,12 @@ export const enDev = {
   "dev.gallery.pressable.borderless": "Borderless ripple",
   "dev.gallery.pressable.selected": "Selected",
   "dev.gallery.pressable.unselected": "Not selected",
+  "dev.gallery.section.type": "Type roles",
+  "dev.gallery.type.sample": "Algebra homework, due Friday",
+  "dev.gallery.type.heading": "A level-2 heading",
+  "dev.gallery.section.textPolicy": "Text from data in a row",
+  "dev.gallery.section.icons": "Icons",
+  "dev.gallery.icons.inline": "Inline, beside a meta line",
+  "dev.gallery.section.link": "Links",
+  "dev.gallery.link.inside": "Back to Now",
 } as const;
