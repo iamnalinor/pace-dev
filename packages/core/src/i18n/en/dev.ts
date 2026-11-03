@@ -28,4 +28,10 @@ export const enDev = {
   "dev.gallery.section.notification": "Notification",
   "dev.gallery.section.taskHeader": "Task header",
   "dev.gallery.section.taskFooter": "Task footer",
+  "dev.gallery.section.pressable": "State layer",
+  "dev.gallery.pressable.rest": "At rest",
+  "dev.gallery.pressable.disabled": "Unavailable",
+  "dev.gallery.pressable.borderless": "Borderless ripple",
+  "dev.gallery.pressable.selected": "Selected",
+  "dev.gallery.pressable.unselected": "Not selected",
 } as const;

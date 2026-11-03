@@ -30,4 +30,10 @@ export const ruDev: { readonly [K in keyof typeof enDev]: string } = {
   "dev.gallery.section.notification": "Уведомление",
   "dev.gallery.section.taskHeader": "Шапка задачи",
   "dev.gallery.section.taskFooter": "Подвал задачи",
+  "dev.gallery.section.pressable": "Слой состояний",
+  "dev.gallery.pressable.rest": "В покое",
+  "dev.gallery.pressable.disabled": "Недоступно",
+  "dev.gallery.pressable.borderless": "Волна без границ",
+  "dev.gallery.pressable.selected": "Выбрано",
+  "dev.gallery.pressable.unselected": "Не выбрано",
 };
