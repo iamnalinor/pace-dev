@@ -138,7 +138,10 @@ test("signed out, the app's own sign-in comes back to the consent page with the 
   await page.getByLabel("Telegram id").fill(telegramId);
   await page.getByRole("button", { name: "Sign in as dev" }).click();
 
-  await expect(page).toHaveURL(`/oauth/authorize?${query}`);
+  // The router writes the query back in its own spelling (a space as %20, not +): the same request.
+  await expect(page).toHaveURL(/\/oauth\/authorize\?/u);
+  const back = new URL(page.url()).searchParams;
+  expect([...back]).toEqual([...new URLSearchParams(query)]);
   await expect(page.getByText(`Signed in as Dev ${telegramId}`)).toBeVisible();
   await page.getByRole("button", { name: "Allow" }).click();
   await expect.poll(callback.url).toContain("code=");
