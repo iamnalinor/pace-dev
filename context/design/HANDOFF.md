@@ -7,22 +7,40 @@ working ledger; its last lines are the most recent rulings).
 
 
 ## 0. Current session (2026-11-03, fork Hentrixz/pace-dev, branch `claude/vigilant-archimedes-kq5d4w`)
-- Goal: finish PR B's remaining tasks (kit 3.6–3.10 + parked minors, screens 4.1–4.13 with 7.1–7.3),
-  green locally, **no QA round**; then a PR from this fork branch into `claude/pace-design-overhaul-b`
-  of iamnalinor/pace-dev (opened by the owner via compare link — this session cannot reach the upstream
-  repo through the GitHub tools) and make it green.
-- Owner rules for this run: Sonnet for small/mechanical tasks and narrow re-reviews, Opus for kit/screens
-  tasks and the whole-branch review; checkpoint commit + push after every finished task or merged
-  implementer branch (even red), this section updated before each push; implementers push their work
-  to `wip/<task ids>` on the fork. **Strictly sequential after wave 1** (owner): one implementer at
-  a time; the next starts only after the previous one finished and its branch is merged, checked,
-  pushed here, and this file updated. Screens 4.x/7.x one task at a time, no parallel worktrees.
-- Baseline at start (a67cc50): `bun lint` clean, unit green, app 1066/1066.
-- In flight: wave 1 (kit) — three Opus implementers in worktrees: (a) parked minors + 3.6 + 3.8
-  (`wip/task-3.6-3.8`), (b) 3.7 + 3.10 (`wip/task-3.7-3.10`), (c) 3.9 (`wip/task-3.9`). Heavy commands
-  are serialized through a `flock` (e2e ports are fixed).
-- Next: merge wave 1 branch by branch (lint/tests after each, push), then the screens one task at a
-  time (4.1 → 4.13 with 7.1–7.3 folded in), then the branch review, full e2e, PR.
+Session stopped by the owner at a checkpoint. **Nothing of the kit wave is merged into
+`claude/vigilant-archimedes-kq5d4w` yet** — it equals PR B's tip `a67cc50` + HANDOFF commits only.
+All three kit branches start from `a67cc50` (B's tip) and are pushed to the fork:
+
+| Branch (fork) | Hash | Status |
+|---|---|---|
+| `wip/task-3.6-3.8` | `7fd48e7` | Parked minors **done** (`aa43cfe`, lint-clean): N1–N4, Space owned by the kit on checkbox/radio/switch/tab, `checked="mixed"` checkbox only, `aria-disabled` disables Link. 3.6 **mostly done**: draggable handle (30 % / 800 dp/s), sheet travels its height, scrim fades in place, exits kept mounted (`OverlayPresence`), each close path → `onClose` once; Dialog 0.96→1; anchored Popover (flip, Escape, outside click); `visible`→`open` on 11 callers; ratchet design values 68→67. Deferred: detents, dirty-form discard question, Popover in pickers, the F-CMP-02/F-MOT-05/06 bug-lessons row. Review Focus 5 e2e written in `sheet-focus.e2e.ts`, **not run**. QA21 M1 **done**. 3.8 **partial**: TextField rewritten (`purpose`, touched gate, focus ring, `<label for>`), TimeInput on the same box, 5 raw inputs migrated; not done: estimate/subtask/assistant-correction/composer inputs, half-typed time warning, counters, F-CMP-03 row. **Red / unknown**: `7fd48e7` committed with `--no-verify`; last full lint failed on `TextField` complexity (refactored, lint not re-run); no e2e run; `task-3.6-3.8-report.md` not written. `bun test:app` 1104/1104 before the last TextField refactor. |
+| `wip/task-3.7-3.10` | `077e60f` | 3.7 **done**: toast above measured chrome (`ui/float-layer.ts`) or an anchor, status region mounted (announces once), Close, pause on hover/focus; Tooltip 400 ms, hoverable, Escape, nothing on touch (`showsOnTap` removed); offline pill restyled, toast stacks above it, R23-13a (new e2e pass). Not built: swipe-dismiss, §6 motion (5.3). 3.10 **done**: `NavItem` with the 4 px bar, R23-14, name on its own line (64-char test), header scroll-edge hairline; Material tab bar, web nav links with `aria-current`, height published to the toast layer, `deadControls()`. Deviations: no rail haptics (spec §3.10), no filled tab icons. `bun test:app` 1097/1097 and lint clean at `715a1a8`; ratchets design values 66, kit primitives 9. **Red / unknown**: tooltip sweep in `overlays.e2e.ts` failed (hovered an off-screen button), fixed in `077e60f` but not re-run; `077e60f` committed with `--no-verify` (lint not run on its e2e edits); a 3.5 preview test once 1.5 px off under load (likely flake). Report: `context/design/pr-b/task-3.7-3.10-report.md`. Bug-lessons class 123 + 4 log rows. |
+| `wip/task-3.9` | `4d30e8c` | 3.9 **done** (green): Pressable `shape` + small-visual pattern (parked N1 of 3.2), shared disabled colours; `RadioGroup` one tab stop everywhere (guard `radio-callers.test.ts`), chips 44 px; Chip, Tag + hue helpers, `pulse-dot` deleted, Segmented, Switch; `SwitchRow` = `ListRow` toggle (R23-10), ListRow `toggle`/`select`; Button `width`/`shortcut`, IconButton, bell badge on the glyph (R23-13b, F-DAT-10, 99+); CheckCircle, ProgressBar, Slider, Skeleton (1.5:1 guard kept), EmptyState; gallery section; bug-lessons class 123 (F-COL-09) + rows for 6/84/109. `bun lint` clean (ratchets 56 / 28 / 8), `bun test:app` 1101/1101, e2e worst-case, sync-state, composer, keyboard green. Partial: Tag `test.fail` markers in `worst-case.e2e.ts` stay (they match other text; 4.x). Deviation: destructive button = cell colour with a red ring (red on quiet-red fill read 4.31:1). Report: `context/design/pr-b/task-3.9-report.md`. |
+
+Known merge conflicts: both 3.7/3.10 and 3.9 add bug-lessons **class 123** (renumber one); ratchet
+numbers in `scripts/eslint-all.ts` (take the lowest the merged tree measures); 3.9 renamed Button/
+IconButton props used in `ui/sheet.tsx`, `ui/sheet-actions.tsx` (3.6), `ui/sidebar.tsx` (bell
+`place="sidebar"`), `ui/sync-frame.test.tsx` (`EmptyState title=`); 3.9's `icon-button.tsx` must
+drop `showsOnTap` (3.7 removed it); tab bar / rail badges should move to 3.9's `BadgeAnchor`;
+parked N1 touched by both 3.6-3.8 (ListRow) and 3.9 (Pressable).
+
+**Next step** (strictly in this order): merge the kit branches one at a time — suggested 3.9, then
+3.7-3.10, then 3.6-3.8 (the reddest last) — after each: `bun lint` + `bun test:unit` + `bun test:app`,
+commit, push to `claude/vigilant-archimedes-kq5d4w`, update this section. Then finish 3.6/3.8's
+deferred bullets, run the e2e files the kit touched. Then the screens 4.1 → 4.13 with 7.1–7.3 folded
+in, one implementer at a time. Then the whole-branch review (Opus), the full e2e, the PR, CI green.
+
+**Owner rules for this run**: Sonnet for small/mechanical tasks and narrow re-reviews; Opus for kit and
+screen tasks and the whole-branch review. Checkpoint commit + push after every finished task or merged
+branch (even red), this section updated before each push. Implementers push to `wip/<task ids>`.
+Strictly sequential: one implementer at a time, no parallel worktrees (the kit wave above was the
+last parallel one). **No QA round** in this run. Note: the Agent tool's worktree isolation created
+the trees on `main`; each implementer had to reset onto B's tip — brief the next ones to check
+`git merge-base --is-ancestor a67cc50 HEAD` (or the current branch tip) first.
+
+**PR**: not opened yet. This session cannot reach iamnalinor/pace-dev through the GitHub tools (a
+same-named repo is attached); open it from the compare link:
+https://github.com/iamnalinor/pace-dev/compare/claude/pace-design-overhaul-b...Hentrixz:pace-dev:claude/vigilant-archimedes-kq5d4w
 
 ## 1. Owner's standing instructions (binding)
 - **Direction A · Тетрадь.** Decisions already taken are at the end of [`docs/design.md`](../../docs/design.md);
