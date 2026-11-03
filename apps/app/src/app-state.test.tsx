@@ -840,30 +840,35 @@ describe("a stale tab's sign-out racing another tab's sign-in (re-review N3)", (
   });
 });
 
-describe("this tab's own sign-out (fix round 2 review M1)", () => {
-  it("empties the copy on Log out even when another tab's mark is on it", async () => {
+/** Signed in on a shared session store, synced, then one change left unsent. */
+const syncedWithUnsent = async (shared: SessionStore) => {
+  const { eventStore, runtime } = await setup({}, shared);
+  await runtime.auth.loginWithDev("1");
+  await render(
+    <PaceProvider runtime={runtime}>
+      <Probe />
+    </PaceProvider>,
+  );
+  await waitFor(async () => {
+    await expect(eventStore.getStoreId()).resolves.not.toBeNull();
+    await expect(eventStore.listPending()).resolves.toEqual([]);
+  });
+  await act(async () => {
+    runtime.sync.stop();
+    await runtime.state.dispatch({
+      occurredAt: "2026-10-06T10:00:00.000Z",
+      payload: { language: "ru" },
+      type: "settings.updated",
+    });
+  });
+  return { eventStore, runtime };
+};
+
+describe("this tab's own sign-out (fix round 2 review M1, A9 review I1)", () => {
+  it("empties the copy when no session is left, whatever mark is on it", async () => {
     const shared = createMemorySessionStore();
-    const { eventStore, runtime } = await setup({}, shared);
-    await runtime.auth.loginWithDev("1");
-    await render(
-      <PaceProvider runtime={runtime}>
-        <Probe />
-      </PaceProvider>,
-    );
-    await waitFor(async () => {
-      await expect(eventStore.getStoreId()).resolves.not.toBeNull();
-      await expect(eventStore.listPending()).resolves.toEqual([]);
-    });
-    await act(async () => {
-      runtime.sync.stop();
-      await runtime.state.dispatch({
-        occurredAt: "2026-10-06T10:00:00.000Z",
-        payload: { language: "ru" },
-        type: "settings.updated",
-      });
-    });
-    // A tab started later signed in with another token and claimed the copy under it.
-    await shared.set("tok_other_tab");
+    const { eventStore, runtime } = await syncedWithUnsent(shared);
+    // An older or foreign mark stayed (a claim that failed, a token replaced while signed in).
     await runtime.claimLocalCopy("tok_other_tab");
     await act(async () => {
       await runtime.auth.logout();
@@ -877,6 +882,41 @@ describe("this tab's own sign-out (fix round 2 review M1)", () => {
     });
     await expect(eventStore.listPending()).resolves.toEqual([]);
     await expect(eventStore.getStoreId()).resolves.toBeNull();
+  });
+
+  it("keeps the copy while another tab's session is still stored: its unsent change survives", async () => {
+    const shared = createMemorySessionStore();
+    const { eventStore, runtime } = await syncedWithUnsent(shared);
+    // Another tab logged this session out and signed in again: the browser stays signed in.
+    await shared.set("tok_other_tab");
+    await runtime.claimLocalCopy("tok_other_tab");
+    await act(async () => {
+      await runtime.auth.logout();
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("auth")).toHaveTextContent("signed-out:-");
+    });
+    await act(async () => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 50);
+      });
+    });
+    await expect(shared.get()).resolves.toBe("tok_other_tab");
+    await expect(eventStore.listPending()).resolves.toHaveLength(1);
+    await expect(eventStore.getStoreId()).resolves.not.toBeNull();
+  });
+
+  it("empties the copy when the shared store cannot be read (fails toward privacy)", async () => {
+    const shared = createMemorySessionStore();
+    const { eventStore, runtime } = await syncedWithUnsent(shared);
+    await shared.set("tok_other_tab");
+    jest.spyOn(shared, "get").mockRejectedValue(new Error("SecurityError"));
+    await act(async () => {
+      await runtime.auth.logout();
+    });
+    await waitFor(async () => {
+      await expect(eventStore.listAll()).resolves.toEqual([]);
+    });
   });
 });
 
