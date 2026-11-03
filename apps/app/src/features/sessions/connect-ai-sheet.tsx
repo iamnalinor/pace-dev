@@ -52,7 +52,8 @@ export const ConnectAiSheet = ({
         </Text>
         <CodeText>{url}</CodeText>
         {isPublicOriginOther ? (
-          <Text className="font-sans text-caption font-normal text-label-tertiary">
+          // An instruction about the address above, so a meta line, not the quietest tier.
+          <Text className="font-sans text-caption font-normal text-label-secondary">
             {t("connectAi.otherAddress", { used: usedOrigin })}
           </Text>
         ) : null}

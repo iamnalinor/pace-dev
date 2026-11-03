@@ -85,8 +85,18 @@ export const LogoutButton = () => {
     one: t("settings.logout.unsynced.one"),
     other: t("settings.logout.unsynced.other"),
   });
+  // On a computer, a card on a line of its own, as the app's other inline confirms (Delete preset,
+  // Wipe data): beside Export its buttons sat 500 px from the question. On a phone the row is a
+  // column already, and a card's padding would wrap «Всё равно выйти» onto two lines at 390 px.
   return (
-    <View aria-label={question} className="min-w-0 flex-1 gap-2" role="group">
+    <View
+      aria-label={question}
+      className={cx(
+        "w-full",
+        isWide ? "gap-3 rounded-xl border border-separator bg-cell p-4" : "gap-2",
+      )}
+      role="group"
+    >
       <Text
         accessibilityLiveRegion="polite"
         className="font-sans text-subhead font-normal text-label-primary"

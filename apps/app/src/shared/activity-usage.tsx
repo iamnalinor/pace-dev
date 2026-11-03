@@ -107,12 +107,18 @@ const ScreenTimeFailed = ({ onRetry }: { readonly onRetry: () => void }) => {
       <Text accessibilityRole="header" className="font-sans text-headline text-label-primary">
         {t("day.screenTime")}
       </Text>
-      <Text className="font-sans text-footnote text-label-secondary" role="status">
-        {t("day.screenTimeFailed")}
-      </Text>
-      <Button onPress={onRetry} variant="secondary">
-        {t("common.retry")}
-      </Button>
+      {/* A quiet line and a text button flush with it, as Devices and the decision log say a
+          failed read: a filled full-width button was the loudest thing on Day for a footer. */}
+      <View className="items-start">
+        <Text className="font-sans text-footnote text-label-secondary" role="status">
+          {t("day.screenTimeFailed")}
+        </Text>
+        <View className="-ml-4">
+          <Button onPress={onRetry} variant="ghost">
+            {t("common.retry")}
+          </Button>
+        </View>
+      </View>
     </View>
   );
 };

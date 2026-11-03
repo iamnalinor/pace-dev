@@ -294,7 +294,7 @@ test("offline, a line says so; a task written meanwhile goes out on reconnect an
   const traffic = recordSyncTraffic(page);
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Now" })).toBeVisible();
-  const line = page.getByRole("status").filter({ hasText: "You are offline" });
+  const line = page.getByRole("status").filter({ hasText: "Offline · changes will sync" });
   await expect(line).toHaveCount(0);
   await context.setOffline(true);
   await expect(line).toBeVisible();
@@ -330,7 +330,7 @@ for (const [width, height] of [
     await expect(heading).toBeVisible();
     const before = await heading.boundingBox();
     await context.setOffline(true);
-    const line = page.getByRole("status").filter({ hasText: "You are offline" });
+    const line = page.getByRole("status").filter({ hasText: "Offline · changes will sync" });
     await expect(line).toBeVisible();
     expect(await heading.boundingBox()).toEqual(before);
     // The pill keeps to the top of the page, under the browser's bar, and is no wider than it.
@@ -365,7 +365,7 @@ test("a server gone while the tab sits idle: the line says offline without a wri
   const traffic = recordSyncTraffic(page);
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Now" })).toBeVisible();
-  const line = page.getByRole("status").filter({ hasText: "You are offline" });
+  const line = page.getByRole("status").filter({ hasText: "Offline · changes will sync" });
   await expect.poll(() => sockets.length).toBeGreaterThan(0);
   await expect(line).toHaveCount(0);
   // The socket's opening asks for one catch-up pull (what landed before it was there), now the
@@ -464,7 +464,7 @@ test("a server back after a long outage: Retry and a return to the window clear 
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Now" })).toBeVisible();
   await expect.poll(() => sockets.length).toBeGreaterThan(0);
-  const line = page.getByRole("status").filter({ hasText: "You are offline" });
+  const line = page.getByRole("status").filter({ hasText: "Offline · changes will sync" });
   const waysBack = [
     async () => {
       await line.getByRole("button", { name: "Try again" }).click();
