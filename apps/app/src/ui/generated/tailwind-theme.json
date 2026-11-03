@@ -272,7 +272,24 @@
     "10": "40px",
     "12": "48px",
     "16": "64px",
-    "0.5": "2px"
+    "0.5": "2px",
+    "cell-gap": "8px",
+    "gutter": "16px",
+    "gutter-lg": "32px",
+    "gutter-pane": "24px",
+    "header-bottom": "12px",
+    "header-bottom-lg": "16px",
+    "header-top": "8px",
+    "header-top-lg": "28px",
+    "row-gap": "12px",
+    "row-x": "16px",
+    "row-x-lg": "16px",
+    "row-y": "12px",
+    "row-y-lg": "10px",
+    "section": "24px",
+    "section-lg": "28px",
+    "sheet-pad": "20px",
+    "sheet-pad-lg": "24px"
   },
   "typeDesktop": {
     "largeTitle": {

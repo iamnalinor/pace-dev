@@ -47,4 +47,10 @@ export const ruDev: { readonly [K in keyof typeof enDev]: string } = {
   "dev.gallery.icons.inline": "В строке, рядом с подписью",
   "dev.gallery.section.link": "Ссылки",
   "dev.gallery.link.inside": "Обратно на «Сейчас»",
+  "dev.gallery.section.lists": "Сгруппированный список",
+  "dev.gallery.lists.kinds": "Виды строк",
+  "dev.gallery.lists.navigation": "Открывает экран",
+  "dev.gallery.lists.static": "Строка с подписью",
+  "dev.gallery.lists.subtitle": "Подпись переносится под заголовок, когда она длинная",
+  "dev.gallery.lists.compact": "Компактная строка",
 };

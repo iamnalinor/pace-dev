@@ -57,6 +57,8 @@ const SELECTED_ROW_PAIRS: readonly ContrastPair[] = (["bg.app", "bg.cell"] as co
     { bg: SELECTED_ROW_FILL, fg: "label.secondary", over, target: "meta" },
     { bg: SELECTED_ROW_FILL, fg: "label.tertiary", over, target: "textSmall" },
     { bg: SELECTED_ROW_FILL, fg: "status.danger", over, target: "textSmall" },
+    // The kit ListRow's selected bar: the cue that does not lean on the fill (F-COL-02).
+    { bg: SELECTED_ROW_FILL, fg: "accent", over, target: "ui" },
     ...HUE_NAMES.map(
       (name): ContrastPair => ({
         bg: `hue.${name}.tint`,

@@ -45,4 +45,10 @@ export const enDev = {
   "dev.gallery.icons.inline": "Inline, beside a meta line",
   "dev.gallery.section.link": "Links",
   "dev.gallery.link.inside": "Back to Now",
+  "dev.gallery.section.lists": "Grouped list",
+  "dev.gallery.lists.kinds": "Kinds of rows",
+  "dev.gallery.lists.navigation": "Opens a screen",
+  "dev.gallery.lists.static": "A row with a meta line",
+  "dev.gallery.lists.subtitle": "The meta line wraps under the title when it is long",
+  "dev.gallery.lists.compact": "Compact row",
 } as const;

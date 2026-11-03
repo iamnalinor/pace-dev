@@ -1,0 +1,63 @@
+import { Children, Fragment, isValidElement, type ReactNode } from "react";
+import { View, type ViewProps } from "react-native";
+
+import { cx } from "./cx.ts";
+import { RowList } from "./row-list.tsx";
+
+/**
+Where a separator starts (spec §4.1.1: inset to the text start): `row` at the row's own padding
+(rows without a leading slot), `icon` past a leading `icon.control` (16 + 20 + 12 = 48), `none`
+edge to edge. A row type with another leading width (the task row's check) adds its own here.
+*/
+export type SeparatorInset = "icon" | "none" | "row";
+
+const INSET_CLASS: Readonly<Record<SeparatorInset, string>> = {
+  icon: "ml-12",
+  none: "",
+  row: "ml-row-x",
+};
+
+/**
+An inset grouped list (spec §4.1.1, §5.0.3): rows on the cell ground with the large radius and no
+border, a hairline in `separator` only between two rows, inset to the text start. On a phone the
+group sits inside the screen's gutter (`inset`). It is a `RowList`, so Android keeps it a view of
+its own and its rows slide as one (bug-lessons 11).
+*/
+export const Group = ({
+  children,
+  className,
+  inset = true,
+  separatorInset = "row",
+  ...rest
+}: ViewProps & {
+  readonly children: ReactNode;
+  /** Inside the screen's gutter (the default), or edge to edge in a pane that has its own. */
+  readonly inset?: boolean;
+  readonly separatorInset?: SeparatorInset;
+}) => {
+  // `null`, `false` and `undefined` (rows left out by a condition) are no rows; toArray keys each.
+  // eslint-disable-next-line @eslint-react/no-children-to-array -- a separator goes between two rows, so the group must see which children are rows
+  const rows = Children.toArray(children).filter((child) => isValidElement(child));
+  // An empty group is no cell at all (an empty box reads as a broken list; F-A11Y-18).
+  if (rows.length === 0) {
+    return null;
+  }
+  return (
+    <RowList
+      {...rest}
+      className={cx("overflow-hidden rounded-lg bg-cell", inset && "mx-gutter", className)}
+    >
+      {rows.map((row) => (
+        <Fragment key={row.key}>
+          {row === rows[0] ? null : (
+            <View
+              className={cx("border-t border-separator", INSET_CLASS[separatorInset])}
+              testID="group-separator"
+            />
+          )}
+          {row}
+        </Fragment>
+      ))}
+    </RowList>
+  );
+};

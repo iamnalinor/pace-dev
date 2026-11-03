@@ -2,17 +2,28 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 
-import { COLOR_ROLES, documentGround, space, THEMES, TYPE_ROLES, typeRole } from "@pace/core";
+import {
+  COLOR_ROLES,
+  documentGround,
+  layout,
+  space,
+  THEMES,
+  TYPE_ROLES,
+  typeRole,
+} from "@pace/core";
 
 import {
   colorClassName,
   generatedClasses,
   generateDesign,
+  LAYOUT_SPACING,
   tailwindTheme,
   themeVars,
   typeClassName,
 } from "./generate-design.ts";
 import { pageFiles, spliceBlock } from "./page-files.ts";
+
+const byName = (a: string, b: string): number => a.localeCompare(b);
 
 const read = (path: string): string =>
   readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
@@ -88,13 +99,24 @@ describe("generate-design", () => {
     }
   });
 
-  it("keeps spacing keys px-faithful and limited to the space tokens", () => {
+  it("keeps numeric spacing keys px-faithful and limited to the space tokens", () => {
     const { spacing } = tailwindTheme();
-    const values = Object.values(spacing).map((value) => Number(value.replace("px", "")));
+    const numeric = Object.entries(spacing).filter(([key]) => !Number.isNaN(Number(key)));
+    const values = numeric.map(([, value]) => Number(value.replace("px", "")));
     expect(values.toSorted((a, b) => a - b)).toEqual(Object.values(space));
-    for (const [key, value] of Object.entries(spacing)) {
+    for (const [key, value] of numeric) {
       expect(`${Number(key) * 4}px`, key).toBe(value);
     }
+  });
+
+  it("names the layout roles as spacing keys with their token values, desktop under -lg", () => {
+    const { spacing } = tailwindTheme();
+    const named = Object.keys(spacing).filter((key) => Number.isNaN(Number(key)));
+    expect(named.toSorted(byName)).toEqual(Object.keys(LAYOUT_SPACING).toSorted(byName));
+    expect(spacing["row-y"]).toBe(`${layout.rowPadY.phone}px`);
+    expect(spacing["row-y-lg"]).toBe(`${layout.rowPadY.desktop}px`);
+    expect(spacing["header-top-lg"]).toBe(`${layout.headerTop.desktop}px`);
+    expect(generatedClasses()).toContain("py-row-y-lg");
   });
 
   it("gives every type role its phone size and its desktop size from the lg breakpoint", () => {

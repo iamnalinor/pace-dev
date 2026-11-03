@@ -10,6 +10,7 @@ import { ThemeProvider } from "#app/ui/theme-provider.tsx";
 import { GALLERY_SETS, galleryData, type GallerySet } from "@pace/core/testing";
 
 import { KitSections } from "./gallery-kit.tsx";
+import { ListSections } from "./gallery-lists.tsx";
 import { ChromeSections, TaskSections, TextSections, TimeSections } from "./gallery-sections.tsx";
 
 const SET_LABEL: Readonly<Record<GallerySet, MessageKey>> = {
@@ -108,6 +109,7 @@ const GalleryBody = ({
           />
         </View>
         <KitSections data={data} />
+        <ListSections data={data} />
         <TextSections data={data} />
         <TimeSections data={data} />
         <ChromeSections data={data} />
