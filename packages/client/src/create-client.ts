@@ -41,6 +41,11 @@ export type PaceClient = {
   /** Other live messages about the pool (a new notification to show, one to take back). */
   readonly onNotice: (listener: (notice: LiveNotice) => void) => () => void;
   /**
+  How many local changes the server has not acknowledged yet (the outbox): Log out asks before it
+  discards them with the local copy (QA round 23 R23-02).
+  */
+  readonly unsyncedCount: () => Promise<number>;
+  /**
   Lets go of what would outlive a client nobody uses any more (a runtime replaced for another
   server, React's second effect run in development): the line to the other tabs. The sync loop
   and the socket are stopped by whoever started them.
@@ -333,5 +338,9 @@ export const createPaceClient = (options: PaceClientOptions): PaceClient => {
     onNotice,
     state,
     sync,
+    unsyncedCount: async () => {
+      const pending = await options.store.listPending();
+      return pending.length;
+    },
   };
 };

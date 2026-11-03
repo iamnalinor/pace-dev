@@ -161,6 +161,16 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "settings.categoryEstimates.hint":
     "Сначала оценка конкретной активности, затем эта настройка, история и встроенное значение.",
   "settings.logout": "Выйти",
+  "settings.logout.unsynced.one":
+    "{count} изменение ещё не синхронизировано: если выйти сейчас, оно пропадёт.",
+  "settings.logout.unsynced.few":
+    "{count} изменения ещё не синхронизированы: если выйти сейчас, они пропадут.",
+  "settings.logout.unsynced.many":
+    "{count} изменений ещё не синхронизированы: если выйти сейчас, они пропадут.",
+  "settings.logout.unsynced.other":
+    "{count} изменения ещё не синхронизированы: если выйти сейчас, они пропадут.",
+  "settings.logout.wait": "Подождать",
+  "settings.logout.anyway": "Всё равно выйти",
   "settings.deleteAccount": "Удалить аккаунт",
   "settings.deleteAccount.warning":
     "Аккаунт удалится навсегда: задачи, время, пресеты, журнал решений и все подключённые приложения. Отменить это нельзя.",

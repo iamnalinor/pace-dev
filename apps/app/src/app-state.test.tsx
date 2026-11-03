@@ -255,6 +255,57 @@ describe("PaceProvider", () => {
     });
   });
 
+  it("writes no time zone while the first pull fails, and only the account's answer decides it (QA round 23 R23-01)", async () => {
+    const accountZone = "Europe/Moscow";
+    expect(accountZone).not.toBe((await setup()).runtime.clock.deviceTz);
+    let isUp = false;
+    const { eventStore, runtime } = await setup({
+      "GET /api/sync/pull": () =>
+        isUp
+          ? {
+              events: [
+                {
+                  deviceId: "other",
+                  id: "01ARZ3NDEKTSV4RRFFQ69G5FZY",
+                  occurredAt: "2026-10-01T10:00:00.000Z",
+                  payload: { timezone: accountZone },
+                  precision: "exact",
+                  recordedAt: "2026-10-01T10:00:00.000Z",
+                  seq: 1,
+                  source: "web",
+                  type: "settings.updated",
+                },
+              ],
+              more: false,
+              seq: 1,
+              storeId: "store-test",
+            }
+          : problem(500, "internal"),
+    });
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    await act(async () => {
+      await runtime.auth.loginWithDev("1");
+    });
+    await waitFor(() => {
+      expect(runtime.sync.status.getState().lastError).not.toBeNull();
+    });
+    // The empty copy wrote nothing of the account's: nothing waits to be pushed.
+    expect(await eventStore.listPending()).toEqual([]);
+    expect(runtime.state.store.getState().settings.timezone).toBeNull();
+    isUp = true;
+    await act(async () => {
+      await runtime.sync.syncNow();
+    });
+    await waitFor(() => {
+      expect(runtime.state.store.getState().settings.timezone).toBe(accountZone);
+    });
+    expect(await eventStore.listPending()).toEqual([]);
+  });
+
   it("follows the account language", async () => {
     const { runtime } = await setup();
     await runtime.auth.loginWithDev("1");

@@ -74,6 +74,16 @@ const oneSocket = (): {
 };
 
 describe("createPaceClient", () => {
+  it("counts the changes that have not reached the server, for Log out to ask (QA round 23 R23-02)", async () => {
+    const { client } = await setup({}, "tok");
+    await expect(client.unsyncedCount()).resolves.toBe(0);
+    await client.actions.setNightHours(true);
+    await client.actions.setLanguage("ru");
+    await expect(client.unsyncedCount()).resolves.toBe(2);
+    await client.sync.syncNow();
+    await expect(client.unsyncedCount()).resolves.toBe(0);
+  });
+
   it("signs out when the server closes the live socket because the session ended", async () => {
     const socket = oneSocket();
     const me = { isRevoked: false };

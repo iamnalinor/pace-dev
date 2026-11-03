@@ -3,7 +3,7 @@ import { Text, View } from "react-native";
 
 import type { ThemePreference } from "#app/platform/theme.ts";
 
-import { useAuth, usePace, useSettings, useT } from "#app/app-state.tsx";
+import { usePace, useSettings, useT } from "#app/app-state.tsx";
 import { BackgroundHint } from "#app/features/permissions/background-hint.tsx";
 import { usePermissions } from "#app/features/permissions/use-permissions.ts";
 import { SessionsSection } from "#app/features/sessions/sessions-section.tsx";
@@ -20,6 +20,7 @@ import { SettingsLinks } from "#app/features/settings/settings-links.tsx";
 import { TimezoneRow } from "#app/features/settings/timezone-row.tsx";
 import { IS_PHONE } from "#app/platform/device.ts";
 import { DestinationScreen } from "#app/screens/destination-screen.tsx";
+import { LogoutButton } from "#app/shared/logout-button.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button } from "#app/ui/button.tsx";
 import { cx } from "#app/ui/cx.ts";
@@ -125,12 +126,6 @@ const LookRows = () => {
 export const SettingsScreen = () => {
   const t = useT();
   const isWide = useIsWide();
-  const router = useRouter();
-  const { auth } = useAuth();
-  const logout = async (): Promise<void> => {
-    await auth.logout();
-    router.replace("/login");
-  };
   return (
     <DestinationScreen title={t("settings.title")}>
       <LookRows />
@@ -175,9 +170,7 @@ export const SettingsScreen = () => {
         {/* Export data and Log out side by side on a computer, full width on a phone. */}
         <View className={cx("gap-3", isWide && "flex-row flex-wrap")}>
           {IS_PHONE ? null : <ExportRow />}
-          <Button onPress={() => void logout()} variant="secondary">
-            {t("settings.logout")}
-          </Button>
+          <LogoutButton />
         </View>
         <DangerZone />
       </View>

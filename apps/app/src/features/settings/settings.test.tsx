@@ -407,6 +407,33 @@ describe("SettingsScreen", () => {
     });
   });
 
+  it("asks before Log out discards changes that have not synced, and can wait (QA round 23 R23-02)", async () => {
+    const runtime = await createTestRuntime({
+      routes: { "POST /api/sync/push": () => problem(503, "offline") },
+      world: "empty",
+    });
+    await runtime.actions.setNightHours(true);
+    await runtime.actions.setLanguage("en");
+    await renderScreen(<SettingsScreen />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.logout") }));
+    // Nothing is discarded yet: the question names how many, and offers to wait.
+    expect(
+      await screen.findByText("2 changes have not synced yet: logging out now loses them."),
+    ).toBeOnTheScreen();
+    expect(router.replace).not.toHaveBeenCalled();
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.logout.wait") }));
+    expect(screen.queryByText(/have not synced yet/u)).toBeNull();
+    expect(router.replace).not.toHaveBeenCalled();
+    // Log out stays reachable: asked again, the person chooses to log out anyway.
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.logout") }));
+    await fireEvent.press(
+      await screen.findByRole("button", { name: en("settings.logout.anyway") }),
+    );
+    await waitFor(() => {
+      expect(router.replace).toHaveBeenCalledWith("/login");
+    });
+  });
+
   it("waits for Telegram before deleting and can poll after the session disappears", async () => {
     const id = "123e4567-e89b-42d3-a456-426614174000";
     const created = jest.fn(() => ({

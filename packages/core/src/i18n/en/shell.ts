@@ -160,6 +160,15 @@ export const enShell = {
   "settings.categoryEstimates.hint":
     "An activity's own estimate comes first, then this setting, past runs and the built-in value.",
   "settings.logout": "Log out",
+  "settings.logout.unsynced.one": "{count} change has not synced yet: logging out now loses it.",
+  "settings.logout.unsynced.few":
+    "{count} changes have not synced yet: logging out now loses them.",
+  "settings.logout.unsynced.many":
+    "{count} changes have not synced yet: logging out now loses them.",
+  "settings.logout.unsynced.other":
+    "{count} changes have not synced yet: logging out now loses them.",
+  "settings.logout.wait": "Wait",
+  "settings.logout.anyway": "Log out anyway",
   "settings.deleteAccount": "Delete account",
   "settings.deleteAccount.warning":
     "This deletes the account for good: tasks, time, presets, the decision log and every connected app. It cannot be undone.",

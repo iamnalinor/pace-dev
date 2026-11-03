@@ -5,6 +5,7 @@ import { useStore } from "zustand";
 
 import { useAuth, useT } from "#app/app-state.tsx";
 import { serverHost, serverStore } from "#app/platform/server-store.ts";
+import { LogoutButton } from "#app/shared/logout-button.tsx";
 import { Button } from "#app/ui/button.tsx";
 
 import { WAY_OUT } from "./way-out.ts";
@@ -24,7 +25,6 @@ does not.
 */
 const IncompatibleScreen = () => {
   const t = useT();
-  const { auth } = useAuth();
   const { origin, reason } = useStore(serverStore);
   return (
     <View className="flex-1 justify-center bg-app px-6">
@@ -45,9 +45,8 @@ const IncompatibleScreen = () => {
           {reason === "client-outdated" && WAY_OUT.reload !== null ? (
             <Button onPress={WAY_OUT.reload}>{t("update.refresh")}</Button>
           ) : null}
-          <Button onPress={() => void auth.logout()} variant="secondary">
-            {t("settings.logout")}
-          </Button>
+          {/* An outbox this server can never take is lost on Log out too: it asks first (R23-02). */}
+          <LogoutButton />
         </View>
       </View>
     </View>

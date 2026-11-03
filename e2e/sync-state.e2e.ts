@@ -98,66 +98,83 @@ test("a first sync that outlasts the cover shows no final empty copy in either l
 /** How long the failing first pull is watched for its backoff (review M2). */
 const QUIET_FAILING_MS = 6000;
 
-// Now, Day and Projects each said their final empty words in QA 21 (M4).
-for (const url of ["/", "/day", "/projects"]) {
-  test(`${url} after a first pull answered with HTTP 500 shows no final empty copy, and a line with Retry says it has not loaded (QA 21 M4)`, async ({
-    page,
-  }) => {
-    test.setTimeout(60_000);
-    const { token } = await loginViaApi(page);
-    await seedLivedIn(token);
-    const server = { isFailing: true };
-    // A failing deploy answers the socket no better than the pull.
-    await page.routeWebSocket(/\/api\/sync\/live/u, async (socket) => {
-      await (server.isFailing ? socket.close() : Promise.resolve(socket.connectToServer()));
+// Now, Day and Projects each said their final empty words in QA 21 (M4). The browser sits in
+// another zone than the account's (Moscow): the empty copy must not write its own (QA 23 R23-01).
+test.describe("a first pull answered with HTTP 500", () => {
+  test.use({ timezoneId: "Asia/Tokyo" });
+  for (const url of ["/", "/day", "/projects"]) {
+    test(`${url} after a first pull answered with HTTP 500 shows no final empty copy, and a line with Retry says it has not loaded (QA 21 M4)`, async ({
+      page,
+    }) => {
+      test.setTimeout(60_000);
+      const { token } = await loginViaApi(page);
+      await seedLivedIn(token);
+      const server = { isFailing: true };
+      // A failing deploy answers the socket no better than the pull.
+      await page.routeWebSocket(/\/api\/sync\/live/u, async (socket) => {
+        await (server.isFailing ? socket.close() : Promise.resolve(socket.connectToServer()));
+      });
+      const pushed: string[] = [];
+      page.on("request", (request) => {
+        if (request.url().includes("/api/sync/push")) {
+          pushed.push(request.postData() ?? "");
+        }
+      });
+      const failedPulls: number[] = [];
+      await page.route("**/api/sync/pull**", async (route) => {
+        if (server.isFailing) {
+          failedPulls.push(Date.now());
+        }
+        await (server.isFailing
+          ? route.fulfill({ body: '{"code":"internal"}', status: 500 })
+          : route.fallback());
+      });
+      await page.addInitScript(() => {
+        const seen: string[] = [];
+        Object.assign(globalThis, { seenTexts: seen });
+        new MutationObserver(() => {
+          const body = document.querySelector("body");
+          // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- innerText leaves out what is not drawn (the covered app); textContent keeps it
+          seen.push(body === null ? "" : body.innerText);
+        }).observe(document, { characterData: true, childList: true, subtree: true });
+      });
+      await page.goto(url);
+      const line = page.getByRole("status").filter({ hasText: "Your data has not loaded yet" });
+      await expect(line).toBeVisible({ timeout: 15_000 });
+      await expect(
+        page.getByRole("progressbar", { name: "Loading your data…" }).first(),
+      ).toBeVisible();
+      await expectNoA11yViolations(page);
+      // What the page said while the pull failed is judged (the loaded account may be empty).
+      const seen = await page.evaluate(
+        () => (globalThis as unknown as { seenTexts: string[] }).seenTexts,
+      );
+      expect(seen.filter((text) => EMPTY_COPY.test(text))).toEqual([]);
+      // The failing pull backs off (1 s doubling to 60 s), never hammers the server (review M2): in
+      // 6 s of watching, a few tries at most (a loop without backoff sends dozens).
+      const watchedFrom = Date.now();
+      // A window of time is what is measured here, not a condition to wait for.
+      await new Promise((resolve) => {
+        setTimeout(resolve, QUIET_FAILING_MS);
+      });
+      const watched = failedPulls.filter((at) => at >= watchedFrom);
+      expect(watched.length).toBeLessThanOrEqual(4);
+      // The server is back: Retry loads the account at once and the line goes.
+      server.isFailing = false;
+      await line.getByRole("button", { name: "Retry" }).click();
+      // The account's language came with its data.
+      await expect(page.getByRole("link", { name: "Сейчас" })).toBeVisible({ timeout: 10_000 });
+      await expect(line).toHaveCount(0);
+      // Nothing of the account's was written while it was unknown: no zone is pushed after the
+      // recovery (the device's Tokyo is asked about on Now, never written over Moscow). A window of
+      // time is what is measured here: the loop's first tick after the recovery pushes what waits.
+      await new Promise((resolve) => {
+        setTimeout(resolve, QUIET_FAILING_MS);
+      });
+      expect(pushed.filter((body) => body.includes('"timezone"'))).toEqual([]);
     });
-    const failedPulls: number[] = [];
-    await page.route("**/api/sync/pull**", async (route) => {
-      if (server.isFailing) {
-        failedPulls.push(Date.now());
-      }
-      await (server.isFailing
-        ? route.fulfill({ body: '{"code":"internal"}', status: 500 })
-        : route.fallback());
-    });
-    await page.addInitScript(() => {
-      const seen: string[] = [];
-      Object.assign(globalThis, { seenTexts: seen });
-      new MutationObserver(() => {
-        const body = document.querySelector("body");
-        // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- innerText leaves out what is not drawn (the covered app); textContent keeps it
-        seen.push(body === null ? "" : body.innerText);
-      }).observe(document, { characterData: true, childList: true, subtree: true });
-    });
-    await page.goto(url);
-    const line = page.getByRole("status").filter({ hasText: "Your data has not loaded yet" });
-    await expect(line).toBeVisible({ timeout: 15_000 });
-    await expect(
-      page.getByRole("progressbar", { name: "Loading your data…" }).first(),
-    ).toBeVisible();
-    await expectNoA11yViolations(page);
-    // What the page said while the pull failed is judged (the loaded account may be empty).
-    const seen = await page.evaluate(
-      () => (globalThis as unknown as { seenTexts: string[] }).seenTexts,
-    );
-    expect(seen.filter((text) => EMPTY_COPY.test(text))).toEqual([]);
-    // The failing pull backs off (1 s doubling to 60 s), never hammers the server (review M2): in
-    // 6 s of watching, a few tries at most (a loop without backoff sends dozens).
-    const watchedFrom = Date.now();
-    // A window of time is what is measured here, not a condition to wait for.
-    await new Promise((resolve) => {
-      setTimeout(resolve, QUIET_FAILING_MS);
-    });
-    const watched = failedPulls.filter((at) => at >= watchedFrom);
-    expect(watched.length).toBeLessThanOrEqual(4);
-    // The server is back: Retry loads the account at once and the line goes.
-    server.isFailing = false;
-    await line.getByRole("button", { name: "Retry" }).click();
-    // The account's language came with its data.
-    await expect(page.getByRole("link", { name: "Сейчас" })).toBeVisible({ timeout: 10_000 });
-    await expect(line).toHaveCount(0);
-  });
-}
+  }
+});
 
 /** The first sync's cover lasts this long at most (`FIRST_SYNC_COVER_MS` in the app's sync frame). */
 const COVER_MS = 10_000;

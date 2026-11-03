@@ -23,6 +23,7 @@ import { forgetLineDraft } from "./platform/shared-in.ts";
 import { type Pool, poolOf, retryOnWindowFocus } from "./runtime-pool.ts";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
 import { canStartSenders, POLL_LIVE_MS, POLL_OFFLINE_MS, startSenders } from "./senders.ts";
+import { createZoneStep } from "./zone-after-sync.ts";
 
 const RuntimeContext = createContext<null | PaceRuntime>(null);
 /**
@@ -53,10 +54,14 @@ const SyncedContext = createContext<SyncedSessions>(NO_SYNCED_SESSION);
 export const LanguageOverrideContext = createContext<Language | null>(null);
 
 /**
-A signed-in start: this week's homework instances, a first sync, then the account's time
-zone from the device when it has none yet (never "not set").
+A signed-in start: this week's homework instances, a first sync, then the time zone that sync
+allowed (`createZoneStep`, run by the sync's own end), before the senders push it.
 */
-const bootstrap = async (runtime: PaceRuntime, pool: Pool): Promise<void> => {
+const bootstrap = async (
+  runtime: PaceRuntime,
+  pool: Pool,
+  zoneSettled: () => Promise<void>,
+): Promise<void> => {
   const { actions, sync } = runtime;
   if (IS_PHONE) {
     // Every signed-in phone, before any network step (one failing must not skip it): it polls
@@ -65,7 +70,7 @@ const bootstrap = async (runtime: PaceRuntime, pool: Pool): Promise<void> => {
   }
   await actions.ensureInstances();
   await sync.syncNow();
-  await actions.ensureTimezone();
+  await zoneSettled();
   await pool.refresh();
   await sendPhoneData(runtime);
   await startPhonePush(runtime);
@@ -115,13 +120,14 @@ const runSyncLoop = (runtime: PaceRuntime, onSynced: OnSynced): (() => void) => 
   const { actions, auth, sync } = runtime;
   let activeSession = runtime.api.currentSessionToken();
   const pool = poolOf(runtime);
-  const stopLanguageSync = followSyncedLanguage(runtime, onSynced);
+  const zone = createZoneStep(runtime);
+  const stopLanguageSync = followSyncedLanguage(runtime, zone.follow(onSynced));
   const follow = (status: AuthState["status"]): void => {
     if (status === "signed-in") {
       activeSession = runtime.api.currentSessionToken();
       void (async () => {
         try {
-          await bootstrap(runtime, pool);
+          await bootstrap(runtime, pool, zone.settled);
         } catch {
           // Offline mid-start: a return to the app syncs and registers again (no unhandled rejection).
         }
