@@ -313,3 +313,56 @@ test('a session ended from another device says "another device" in every open ta
   expect(refused).toEqual([]);
   await context.close();
 });
+
+test("a tab still starting when its session ends sends nothing more with that session while it checks it (CI run 41668309388)", async ({
+  browser,
+}) => {
+  const telegramId = freshTelegramId();
+  await resetAccount(telegramId);
+  const { token } = await createDevSession(telegramId);
+  const context = await browser.newContext({ viewport: { height: 900, width: 1440 } });
+  await context.addInitScript(
+    ({ key, value }) => {
+      localStorage.setItem(key, value);
+    },
+    { key: SESSION_KEY, value: token },
+  );
+  const tab = await context.newPage();
+  const ended = Promise.withResolvers<null>();
+  let isEnded = false;
+  // Its first pull is on its way when the session ends elsewhere, and the check of the session
+  // that pull's 401 sets off is slow: the start must not go on with the ended session meanwhile.
+  await tab.route("**/api/sync/pull*", async (route) => {
+    await ended.promise;
+    await route.continue();
+  });
+  await tab.route("**/api/me", async (route) => {
+    if (isEnded) {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 1000);
+      });
+    }
+    await route.continue();
+  });
+  const sentAfterEnd: string[] = [];
+  tab.on("request", (request) => {
+    const isOurs = request.headers()["authorization"] === `Bearer ${token}`;
+    if (isEnded && isOurs && !request.url().endsWith("/api/me")) {
+      sentAfterEnd.push(request.url());
+    }
+  });
+  const pulling = tab.waitForRequest("**/api/sync/pull*");
+  await tab.goto("/");
+  await pulling;
+  await endBrowserSessionElsewhere(telegramId);
+  isEnded = true;
+  ended.resolve(null);
+  await expect(tab).toHaveURL(/\/login$/u, { timeout: 15_000 });
+  await expect(tab.getByRole("status").filter({ hasText: ANOTHER_DEVICE })).toBeVisible();
+  await tab.waitForTimeout(1000);
+  // The pull that hears the 401 left before the end; nothing after it carries the session.
+  expect(sentAfterEnd).toEqual([]);
+  // Its handlers end with the page, not after it (bug-lessons class 63).
+  await tab.unrouteAll({ behavior: "ignoreErrors" });
+  await context.close();
+});

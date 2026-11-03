@@ -114,6 +114,50 @@ const readAnswer = async (response: Response, init: RequestInit): Promise<unknow
   }
 };
 
+type ApiClientOptions = {
+  readonly baseUrl: string;
+  readonly fetch?: FetchLike;
+  readonly token: () => string | undefined;
+  /**
+  A call that carried `credential` was answered 401: the session may have ended. Heard before the
+  call fails, with the endpoint it was.
+  */
+  readonly onUnauthorized?: (credential: string, endpoint: EndpointShape) => void;
+  /** Whether this device's session ended and no new one began: nothing that needs one is sent. */
+  readonly sessionEnded?: () => boolean;
+  /**
+  A check of the session in use that is under way (a 401 heard, `me` on its way), or `undefined`.
+  A call that would send that session waits for its answer and then sends whatever is current (or
+  nothing, once it ended): the session's end is never sent again while it is being confirmed (CI
+  run 41668309388). `me` and the log-out are never held: the check is `me`.
+  */
+  readonly sessionCheck?: (endpoint: EndpointShape) => Promise<unknown> | undefined;
+};
+
+/**
+The token a call sends, read once a check of the session under way is answered (a call naming its
+own credential, the log-out, waits for nothing); none for a call that needs one once the session
+ended (it throws).
+*/
+const credentialFor = async (
+  options: ApiClientOptions,
+  endpoint: EndpointShape,
+  callOptions: CallOptions,
+): Promise<string | undefined> => {
+  const checking =
+    endpoint.auth && callOptions.credential === undefined
+      ? options.sessionCheck?.(endpoint)
+      : undefined;
+  if (checking !== undefined) {
+    await checking;
+  }
+  const credential = callOptions.credential ?? options.token();
+  if (credential === undefined && endpoint.auth && options.sessionEnded?.() === true) {
+    throw new ApiError(401, UNAUTHORIZED, "Not signed in");
+  }
+  return credential;
+};
+
 /**
 Typed HTTP client for the Pace API, driven by the shared endpoint contract. The bearer
 token is read on every request so a login or logout takes effect immediately; every request
@@ -125,27 +169,8 @@ from) is not sent without one: it fails here with the server's own 401 `auth/una
 screen or a loop still running after the sign-out asks nothing (QA round 22 R22-02). A device that
 never had a session reaches no screen that makes such calls (the route gate).
 */
-export const createApiClient = (options: {
-  readonly baseUrl: string;
-  readonly fetch?: FetchLike;
-  readonly token: () => string | undefined;
-  /**
-  A call that carried `credential` was answered 401: the session may have ended. Heard before the
-  call fails, with the endpoint it was.
-  */
-  readonly onUnauthorized?: (credential: string, endpoint: EndpointShape) => void;
-  /** Whether this device's session ended and no new one began: nothing that needs one is sent. */
-  readonly sessionEnded?: () => boolean;
-}): ApiClient => {
+export const createApiClient = (options: ApiClientOptions): ApiClient => {
   const doFetch: FetchLike = options.fetch ?? (async (input, init) => await fetch(input, init));
-  /** The token a call sends; none for a call that needs one once the session ended (it throws). */
-  const credentialFor = (endpoint: EndpointShape, callOptions: CallOptions): string | undefined => {
-    const credential = callOptions.credential ?? options.token();
-    if (credential === undefined && endpoint.auth && options.sessionEnded?.() === true) {
-      throw new ApiError(401, UNAUTHORIZED, "Not signed in");
-    }
-    return credential;
-  };
   return {
     currentSessionToken: options.token,
     isCurrentSession: (session) => options.token() === session,
@@ -155,7 +180,7 @@ export const createApiClient = (options: {
         params?: Record<string, string>;
         query?: Record<string, string>;
       };
-      const credential = credentialFor(endpoint, callOptions);
+      const credential = await credentialFor(options, endpoint, callOptions);
       // The protocol rides on every call: a server too new for this app refuses it (426
       // `client/outdated`), which surfaces as an ApiError like any other refusal.
       const headers: Record<string, string> = {

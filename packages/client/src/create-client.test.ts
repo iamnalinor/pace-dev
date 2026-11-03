@@ -237,6 +237,93 @@ describe("createPaceClient", () => {
     expect(api.pathsCalled("/api/me")).toHaveLength(2);
   });
 
+  it.each(["a call's 401", "the socket's close"] as const)(
+    "sends nothing more with the session while %s has it checked, and nothing once it ended (CI run 41668309388)",
+    async (heardBy) => {
+      // A tab still starting (its first sync refused) or one whose socket heard the end: its next
+      // call (the bell's read) leaves while `me` is on its way and would carry the ended session.
+      const socket = oneSocket();
+      const server = { isRevoked: false };
+      const checked = Promise.withResolvers<null>();
+      const { api, client } = await setup(
+        {
+          "GET /api/me": async () => {
+            if (!server.isRevoked) {
+              return fakeMe;
+            }
+            await checked.promise;
+            return problem(401, "auth/unauthorized");
+          },
+          "GET /api/notifications": () => ({ deliveries: {}, items: [], more: false }),
+          "GET /api/sync/pull": () =>
+            server.isRevoked
+              ? problem(401, "auth/unauthorized")
+              : { events: [], more: false, seq: 0, storeId: "store-test" },
+        },
+        "tok",
+        socket.create,
+      );
+      await expect.poll(() => client.auth.store.getState().user).not.toBeNull();
+      const checks = api.pathsCalled("/api/me").length;
+      server.isRevoked = true;
+      if (heardBy === "a call's 401") {
+        await client.sync.syncNow();
+      } else {
+        client.live.start();
+        socket.emit("open", {});
+        socket.emit("close", { code: LIVE_SESSION_ENDED });
+      }
+      await expect.poll(() => api.pathsCalled("/api/me").length).toBe(checks + 1);
+      const refreshed = client.notifications.refresh();
+      await new Promise((resolve) => {
+        setTimeout(resolve, 20);
+      });
+      expect(api.pathsCalled("/api/notifications")).toEqual([]);
+      checked.resolve(null);
+      await refreshed;
+      await expect.poll(() => client.auth.store.getState().status).toBe("signed-out");
+      expect(client.auth.store.getState().endedElsewhere).toBe(true);
+      // Refused here once the check says the session ended: never sent with it.
+      expect(api.pathsCalled("/api/notifications")).toEqual([]);
+      client.live.stop();
+    },
+  );
+
+  it("a call made while a 401 has the session checked goes out once it proves alive (CI run 41668309388)", async () => {
+    const pulls = { count: 0 };
+    const checked = Promise.withResolvers<null>();
+    const { api, client } = await setup(
+      {
+        "GET /api/me": async () => {
+          if (pulls.count > 0) {
+            await checked.promise;
+          }
+          return fakeMe;
+        },
+        "GET /api/notifications": () => ({ deliveries: {}, items: [], more: false }),
+        // The server misjudges once: a 401 for a session that is still good.
+        "GET /api/sync/pull": () => {
+          pulls.count += 1;
+          return pulls.count === 1
+            ? problem(401, "auth/unauthorized")
+            : { events: [], more: false, seq: 0, storeId: "store-test" };
+        },
+      },
+      "tok",
+    );
+    await expect.poll(() => client.auth.store.getState().user).not.toBeNull();
+    const checks = api.pathsCalled("/api/me").length;
+    await client.sync.syncNow();
+    await expect.poll(() => api.pathsCalled("/api/me").length).toBe(checks + 1);
+    const refreshed = client.notifications.refresh();
+    checked.resolve(null);
+    await refreshed;
+    expect(api.pathsCalled("/api/notifications")).toEqual(["/api/notifications"]);
+    expect(api.calls.at(-1)?.headers["authorization"]).toBe("Bearer tok");
+    expect(client.notifications.store.getState().status).toBe("ready");
+    expect(client.auth.store.getState().status).toBe("signed-in");
+  });
+
   it.each(["before", "after"] as const)(
     'a run hung past the hold that lands %s the revoke\'s answer reads as nothing, never "ended elsewhere" (round 7 review 7)',
     async (when) => {
