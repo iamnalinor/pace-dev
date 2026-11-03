@@ -1,5 +1,7 @@
 import "fake-indexeddb/auto";
+import { IDBFactory } from "fake-indexeddb";
 
+import type { EventStore } from "@pace/client";
 import type { Event } from "@pace/core";
 
 import { createEventStore } from "./event-store.web.ts";
@@ -24,18 +26,21 @@ const settingsEvent = (id: string, occurredAt: string): Event => ({
 
 const a = settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(9));
 
-/** One database per test: the stores of two tests never share a copy. */
-afterEach(async () => {
-  const request = indexedDB.deleteDatabase("pace");
-  await new Promise((resolve) => {
-    request.addEventListener("success", resolve);
-    request.addEventListener("blocked", resolve);
-  });
+/** A tab's copy, checked to be in IndexedDB: the memory fallback would make every case vacuous. */
+const openTab = async (): Promise<EventStore> => {
+  const local = createEventStore();
+  await expect(local.isShared()).resolves.toBe(true);
+  return local.store;
+};
+
+/** A browser profile per test: the stores of two tests never share a copy. */
+beforeEach(() => {
+  Object.defineProperty(globalThis, "indexedDB", { configurable: true, value: new IDBFactory() });
 });
 
 describe("the IndexedDB event store's clear", () => {
   it("clears events, the outbox, the cursor, the store id and the sync version", async () => {
-    const store = createEventStore();
+    const store = await openTab();
     await store.append([a]);
     await store.setCursor(7);
     await store.setStoreId("store-a");
@@ -49,7 +54,7 @@ describe("the IndexedDB event store's clear", () => {
   });
 
   it("keeps a copy another session claimed when asked to clear only its own (re-review N3)", async () => {
-    const store = createEventStore();
+    const store = await openTab();
     await store.setOwner("ended:new");
     await store.append([a]);
     await store.setStoreId("store-a");
@@ -66,8 +71,8 @@ describe("the IndexedDB event store's clear", () => {
   });
 
   it("is shared by two tabs: a claim one tab made is seen by the other's clear", async () => {
-    const staleTab = createEventStore();
-    const newTab = createEventStore();
+    const staleTab = await openTab();
+    const newTab = await openTab();
     await staleTab.append([a]);
     await newTab.setOwner("ended:new");
     await staleTab.clear("ended:old");
