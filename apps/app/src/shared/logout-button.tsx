@@ -1,4 +1,3 @@
-import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 
@@ -52,15 +51,16 @@ export const LogoutButton = () => {
   const t = useT();
   const language = useLanguage();
   const isWide = useIsWide();
-  const router = useRouter();
   const { auth } = useAuth();
   const { state, sync, unsyncedCount } = usePace();
   const focus = useConfirmFocus();
   const [unsynced, setUnsynced] = useState(0);
   const known = useUnsyncedCount(unsyncedCount, state.store, sync.status);
+  // Signed out on the device before the server is told, so the route gate shows the login card at
+  // once; nothing navigates after the answer, which remounted that card under the person's typing
+  // (PR A re-review N1, bug class 75).
   const logout = async (): Promise<void> => {
     await auth.logout();
-    router.replace("/login");
   };
   // Read ahead, so a press with nothing unsent logs out at once, with no wait before it: a pause
   // there let a sync run start with the token the log-out then ends (the stale-tab e2e).

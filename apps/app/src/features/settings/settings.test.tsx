@@ -399,12 +399,21 @@ describe("SettingsScreen", () => {
     jest.restoreAllMocks();
   });
 
-  it("logs out and goes to the login card", async () => {
-    await renderScreen(<SettingsScreen />, await createTestRuntime({ world: "empty" }));
+  it("logs out, and leaves the way to the login card to the route gate (PR A re-review N1)", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    await renderScreen(<SettingsScreen />, runtime);
     await fireEvent.press(screen.getByRole("button", { name: en("settings.logout") }));
     await waitFor(() => {
-      expect(router.replace).toHaveBeenCalledWith("/login");
+      expect(runtime.auth.store.getState().status).toBe("signed-out");
     });
+    // A navigation after the log-out's answer remounted a login screen the gate already showed,
+    // emptying what the person had started typing there (bug class 75).
+    await act(async () => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 50);
+      });
+    });
+    expect(router.replace).not.toHaveBeenCalled();
   });
 
   it("asks before Log out discards changes that have not synced, and can wait (QA round 23 R23-02)", async () => {
@@ -430,8 +439,9 @@ describe("SettingsScreen", () => {
       await screen.findByRole("button", { name: en("settings.logout.anyway") }),
     );
     await waitFor(() => {
-      expect(router.replace).toHaveBeenCalledWith("/login");
+      expect(runtime.auth.store.getState().status).toBe("signed-out");
     });
+    expect(router.replace).not.toHaveBeenCalled();
   });
 
   it("waits for Telegram before deleting and can poll after the session disappears", async () => {
@@ -440,16 +450,14 @@ describe("SettingsScreen", () => {
       id,
       expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
     }));
-    await renderScreen(
-      <SettingsScreen />,
-      await createTestRuntime({
-        routes: {
-          "POST /api/account/confirmations": created,
-          [`GET /api/account/confirmations/${id}`]: () => ({ status: "confirmed" }),
-        },
-        world: "empty",
-      }),
-    );
+    const runtime = await createTestRuntime({
+      routes: {
+        "POST /api/account/confirmations": created,
+        [`GET /api/account/confirmations/${id}`]: () => ({ status: "confirmed" }),
+      },
+      world: "empty",
+    });
+    await renderScreen(<SettingsScreen />, runtime);
     await fireEvent.press(screen.getByRole("button", { name: en("settings.deleteAccount") }));
     expect(created).not.toHaveBeenCalled();
     await fireEvent.press(
@@ -458,10 +466,12 @@ describe("SettingsScreen", () => {
     expect(screen.getByText(en("settings.confirmation.waiting"))).toBeOnTheScreen();
     await waitFor(
       () => {
-        expect(router.replace).toHaveBeenCalledWith("/login");
+        expect(runtime.auth.store.getState().status).toBe("signed-out");
       },
       { timeout: 4000 },
     );
+    // The route gate takes a signed-out device to the login card; no navigation of its own.
+    expect(router.replace).not.toHaveBeenCalled();
     expect(created).toHaveBeenCalledTimes(1);
   });
 
@@ -503,31 +513,30 @@ describe("SettingsScreen", () => {
     const id = "123e4567-e89b-42d3-a456-426614174003";
     // This device's clock runs ahead: the request already looks over here.
     const statuses = ["pending", "confirmed"];
-    await renderScreen(
-      <SettingsScreen />,
-      await createTestRuntime({
-        routes: {
-          "POST /api/account/confirmations": () => ({
-            id,
-            expiresAt: new Date(Date.now() - 60_000).toISOString(),
-          }),
-          [`GET /api/account/confirmations/${id}`]: () => ({
-            status: statuses.shift() ?? "confirmed",
-          }),
-        },
-        world: "empty",
-      }),
-    );
+    const runtime = await createTestRuntime({
+      routes: {
+        "POST /api/account/confirmations": () => ({
+          id,
+          expiresAt: new Date(Date.now() - 60_000).toISOString(),
+        }),
+        [`GET /api/account/confirmations/${id}`]: () => ({
+          status: statuses.shift() ?? "confirmed",
+        }),
+      },
+      world: "empty",
+    });
+    await renderScreen(<SettingsScreen />, runtime);
     await fireEvent.press(screen.getByRole("button", { name: en("settings.deleteAccount") }));
     await fireEvent.press(
       screen.getByRole("button", { name: en("settings.deleteAccount.confirm") }),
     );
     await waitFor(
       () => {
-        expect(router.replace).toHaveBeenCalledWith("/login");
+        expect(runtime.auth.store.getState().status).toBe("signed-out");
       },
       { timeout: 7000 },
     );
+    expect(router.replace).not.toHaveBeenCalled();
     expect(screen.queryByText(en("settings.confirmation.expired"))).toBeNull();
   }, 15_000);
 

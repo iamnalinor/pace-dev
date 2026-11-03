@@ -1,4 +1,3 @@
-import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Text, View } from "react-native";
 
@@ -49,7 +48,6 @@ while a Confirm tapped in time is still being carried out (bug class 35).
 const useConfirmationPoll = ({ action, onTerminal, request }: PollInput): void => {
   const { auth } = useAuth();
   const { syncNow } = useSync();
-  const router = useRouter();
   const toast = useToast();
   const t = useT();
   useEffect(() => {
@@ -61,8 +59,8 @@ const useConfirmationPoll = ({ action, onTerminal, request }: PollInput): void =
     const finishConfirmed = async (): Promise<void> => {
       onTerminal(null);
       if (action === "delete") {
+        // Signed out: the route gate takes the device to the login card (bug class 75).
         await auth.finishAccountDeletion();
-        router.replace("/login");
       } else {
         await syncNow();
         toast.show({ message: t("settings.wipe.done") });
@@ -93,7 +91,7 @@ const useConfirmationPoll = ({ action, onTerminal, request }: PollInput): void =
       isActive = false;
       clearTimeout(timer);
     };
-  }, [action, auth, onTerminal, request, router, syncNow, t, toast]);
+  }, [action, auth, onTerminal, request, syncNow, t, toast]);
 };
 
 const useDangerFlow = () => {

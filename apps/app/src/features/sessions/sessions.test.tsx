@@ -398,8 +398,10 @@ describe("Settings → Devices and sessions", () => {
     expect(within(row).getByText("End this session? This device signs out.")).toBeOnTheScreen();
     await fireEvent.press(within(row).getByRole("button", { name: "Revoke" }));
     await waitFor(() => {
-      expect(router.replace).toHaveBeenCalledWith("/login");
+      expect(runtime.auth.store.getState().status).toBe("signed-out");
     });
+    // The route gate takes a signed-out device to the login card; no navigation of its own (N1).
+    expect(router.replace).not.toHaveBeenCalled();
     expect(server.deleted).toEqual(["01CHROME"]);
     expect(runtime.auth.token()).toBeUndefined();
     // The server ended it already: no logout that would answer 401 (QA round 15 L2).

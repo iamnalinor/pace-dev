@@ -1,4 +1,3 @@
-import { useRouter } from "expo-router";
 import { type RefObject, useRef, useState } from "react";
 import { Text, View } from "react-native";
 
@@ -50,7 +49,6 @@ logout to answer 401 (QA round 15 L2, round 6 M1). `ok` once it ended and the lo
 const useEndThisDevice = (
   sessions: Sessions,
 ): ((id: string) => Promise<{ readonly ok: boolean }>) => {
-  const router = useRouter();
   const { auth } = useAuth();
   const runtime = usePace();
   return async (id) => {
@@ -70,7 +68,7 @@ const useEndThisDevice = (
       return { ok: false };
     }
     release();
-    router.replace("/login");
+    // Signed out: the route gate takes the device to the login card (bug class 75).
     return { ok: true };
   };
 };

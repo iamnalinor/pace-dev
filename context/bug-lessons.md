@@ -1211,6 +1211,25 @@ The same rule applies when a previously successful channel is no longer configur
 - **Sweep and guard.** Both Log out buttons (Settings, the versions screen) share `LogoutButton`.
   The half-typed line is already per-account by design (class 103). `settings.test.tsx` pins it.
 
+### 118. A follow-up after a network await that assumes the screen has not moved
+- **Bug.** PR A re-review N1: Log out awaited `auth.logout()` and then called
+  `router.replace("/login")`. The client signs out locally before it sends the POST, so the route
+  gate had already shown the login card; when a slow answer came back, the replace to the route
+  already shown remounted it and emptied the id the person had started typing (the stale-tab e2e's
+  flake, class 75 in fix round 1, was this line, not a session race).
+- **Missed because.** The jest tests asserted the replace was called, which is the bug; the e2e
+  logged out against a fast local Worker, so the answer nearly always came before the typing.
+  Nothing held the answer back.
+- **Rule.** What a state change already does (the gate's redirect on `signed-out`) is not done again
+  after an await: a follow-up placed after a network call runs on whatever screen the person reached
+  meanwhile. Navigation that follows a state change belongs to the one place that watches the state.
+  Test a flow with its answer held (`page.route` with a delay) while the person acts on the next
+  screen.
+- **Sweep and guard.** Deleting the account (`delete-account.tsx`) and ending this device's own
+  session (`sessions-section.tsx`) also navigated to `/login` after signing out; both now leave it
+  to the gate. `login-navigation.test.ts` fails when a file outside the gate and the bare sign-in
+  screens names the `/login` route; `login.e2e.ts` "a slow log-out answer…" holds the answer 2 s.
+
 ## Log
 
 New bugs go here with their class; a new class gets its own section above.
@@ -1575,3 +1594,4 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-03 | Design pass M8 (PR A): the offline and not-loaded pills were three lines (72 px) in Russian at 390 beside the longer «Попробовать снова» of R23-09 (QA round 21 L9 again); the not-loaded line also said «Пробуем снова…» next to a «Попробовать снова» button | 109 (UI copy lengthened without measuring the narrowest width in Russian) | yes: the only other text sharing a row with a retry label is the Day screen-time line, which sits on its own line above its button; the pills now say spec 5.0.5's line («Нет сети · изменения отправятся позже», "Offline · changes will sync later") and «Данные ещё не загрузились.» / "Your data has not loaded yet." | missed because `offline-pill.e2e.ts` ran in English only; it now checks both pills in Russian at 390 keep to two lines (≤ 56 px; red at 72 before) |
 | 2026-11-02 | CI on main after PR #48 (and on Dependabot #50): `offline-pill.e2e.ts` read Now's line controls (New task, To Inbox, Send to the assistant) as covered at both widths; going offline redraws the line (its assistant button), and the one-shot `elementFromPoint` check caught it mid-redraw, while the pill sat at the bottom covering nothing | 20 (a screen judged while it still draws) | yes: the other one-shot geometry checks (`targets.e2e.ts`, route-sweep clipping) already measure after a settle wait | the check polls until the screen settles (a pill that covers a control keeps covering it: RED with the pill moved to the top), and waits for no first-sync cover or grey rows before going offline; 20/20 in a loop with 2 workers |
 | 2026-11-02 | CI on PR #52 (22:40 UTC): `targets.e2e.ts` at 390 read a Week block 'Пошёл в ЦСС, 23:50–00:00' as narrower than 44 px, and locally Now's composer buttons as small; the lived-in seed sits at the real clock, so near midnight its evening blocks split at the day's edge into slivers that crowd one column past the six-lane cap, and the composer was measured mid-transition after typing | 54 (a test on the real clock) and 20 (judged while drawing) | yes: `offline-pill.e2e.ts` got the same settle poll earlier today; `week.e2e.ts` already pins its clock; the other seedLivedIn users assert no time-of-day layout | `seedLivedIn(token, now)` takes a fixed instant; the test seeds and shows at a fixed midday (`page.clock.setFixedTime`) and polls the measurement until it settles; 12/12 in a loop |
+| 2026-11-03 | PR A re-review N1: Log out remounted the login screen when its POST answered late (`logout-button.tsx`: `await auth.logout(); router.replace("/login")`), emptying the id being typed; the cause of the stale-tab e2e flake fix round 1 put down to a session race (class 75) | 118 (new) | yes: `delete-account.tsx` and `sessions-section.tsx` also replaced to `/login` after signing out; both removed, the gate redirects | missed because the jest tests asserted the replace itself and no e2e held the answer; `login.e2e.ts` "a slow log-out answer leaves the login form…" (red before: the field read "" after the answer), `login-navigation.test.ts` (red before: three sign-out files named `/login`), the settings and sessions tests now assert the device signed out and no replace |

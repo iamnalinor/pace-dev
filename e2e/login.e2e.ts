@@ -1,7 +1,7 @@
 import type { Request } from "@playwright/test";
 
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
-import { DEV_TELEGRAM_ID, loginViaApi, resetAccount } from "./support/login.ts";
+import { DEV_TELEGRAM_ID, freshTelegramId, loginViaApi, resetAccount } from "./support/login.ts";
 import { pushAsClient, seedLivedIn, ulid } from "./support/seed.ts";
 import { documentGround, rgb } from "./support/theme-colors.ts";
 
@@ -157,6 +157,65 @@ test("after Log out the network goes quiet: no request names the session, nothin
   await expect(page.getByText(/You were signed out/u)).toHaveCount(0);
   expect(refused.filter(({ at }) => at >= pressedAt).map(({ what }) => what)).toEqual([]);
   expect(errors.filter(({ at }) => at >= pressedAt).map(({ text }) => text)).toEqual([]);
+});
+
+test("a slow log-out answer leaves the login form as the person is filling it in (PR A re-review N1, bug class 75)", async ({
+  page,
+}) => {
+  const telegramId = freshTelegramId();
+  await loginViaApi(page, telegramId);
+  // The server's answer to the log-out is held, as on a slow phone or a busy Durable Object.
+  let isReleased = false;
+  await page.route("**/api/auth/logout", async (route) => {
+    await new Promise((resolve) => {
+      setTimeout(resolve, 2000);
+    });
+    isReleased = true;
+    await route.continue();
+  });
+  await page.goto("/settings");
+  await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
+  // The start's own write (the time zone) sent, so Log out has nothing to ask about.
+  await expect
+    .poll(
+      async () =>
+        await page.evaluate(
+          async () =>
+            await new Promise<number>((resolve, reject) => {
+              const opened = globalThis.indexedDB.open("pace");
+              opened.addEventListener("error", () => {
+                reject(new Error("no local copy"));
+              });
+              opened.addEventListener("success", () => {
+                const count = opened.result
+                  .transaction("pending", "readonly")
+                  .objectStore("pending")
+                  .count();
+                count.addEventListener("success", () => {
+                  resolve(count.result);
+                  opened.result.close();
+                });
+              });
+            }),
+        ),
+      { timeout: 15_000 },
+    )
+    .toBe(0);
+  const answered = page.waitForResponse("**/api/auth/logout");
+  await page.getByRole("button", { exact: true, name: "Log out" }).click();
+  // Signed out on the device at once: the login screen is there before the server answers.
+  await expect(page).toHaveURL(/\/login$/u);
+  const field = page.getByLabel("Telegram id");
+  await field.fill(telegramId);
+  expect(isReleased).toBe(false);
+  await answered;
+  // A follow-up that runs once the answer is in shows itself within a few frames.
+  // eslint-disable-next-line playwright/no-wait-for-timeout, sonarjs/no-fixed-wait-in-tests -- the bug is a remount after the answer; no DOM condition marks that it did not happen
+  await page.waitForTimeout(500);
+  await expect(field).toHaveValue(telegramId);
+  await expect(page.getByRole("button", { name: "Sign in as dev" })).toBeEnabled();
+  await page.getByRole("button", { name: "Sign in as dev" }).click();
+  await expect(page.getByRole("heading", { name: "Now" })).toBeVisible();
 });
 
 test("the theme choice is kept per device and paints the page", async ({ page }) => {
