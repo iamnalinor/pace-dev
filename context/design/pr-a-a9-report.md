@@ -35,8 +35,9 @@ whether they already had.
 **Client** (`packages/client/src/react/oauth.ts`, `apps/app/src/features/oauth/consent-flow.tsx`):
 - `useConsent(api, { authQuery, redirect, session })` takes `ConsentSession`, which is one of three
   states: loading, signed-in (with the name), or signed-out.
-- When a session exists, it always provides the identity: "Signed in as <name>", or "Signed in to
-  Pace" before `me` has answered. Allow is enabled.
+- When a session exists, it always provides the identity: "Signed in as <name>", and Allow is
+  enabled. (Fix round 3, m1: before `me` names the person, the page now shows no identity and keeps
+  Allow disabled; the first version showed "Signed in to Pace" with Allow enabled.)
 - The body carries no proof. The API client adds the bearer.
 - While the auth state is still being read, the page shows no identity step, and Allow stays disabled.
 - If the session was revoked, the 401 shows "Your Pace session has ended. Sign in again to continue."
@@ -178,10 +179,9 @@ banner.
 | M6 | none | **Accepted, not fixed.** A refused clear still broadcasts `reload`, which costs one extra read in another tab. Since M1, only the stale path can be refused, and the fix would change `EventStore.clear`'s return type in five implementations for that one read. |
 | M7 | 073d397 | The claim goes through the state's write queue and the log's write chain (`state.claim`, `LocalLog.claim`), so a sign-out's clear queued before it has its turn first. Test: `create-client.test.ts` "a claim waits for the sign-out's clear queued before it" (red before). Bug-lessons row (class 74). |
 
-**M1's trade-off, as the reviewer framed it.** An own Log out now empties the copy even if another tab
-of the same browser holds a newer session. That other tab's unsynced changes can be lost; it re-pulls
-everything else. The reviewer judged the kept copy, a privacy failure on a shared computer, to be the
-worse of the two.
+**M1's trade-off** (superseded in fix round 3, I1). As first written, an own Log out emptied the copy
+even while another tab of the same browser held a newer session, which could lose that tab's unsynced
+changes. The A9 review ruled that out; see "Fix round 3".
 
 ## Verification
 
@@ -235,3 +235,26 @@ failed, in 17.2 min.
   a real registered client's authorization request, but not a real client's token exchange from Claude.
 - **Shared browsers.** The consent page has no "not you?" switch. A person signed in to Pace in a shared
   browser grants as that account. The page names the account right above Allow.
+
+## Fix round 3 (A9 review: 0 Critical, 2 Important, 6 Minor; plus the CI blocker)
+
+Review: `context/design/pr-a-a9-review.md`. Started from c94d37b. The controller's checkpoint
+ee46194 holds the CI blocker's first commit (the `itOnly` removal, the guard, class 120); 1f7c2cc
+finishes it.
+
+| Item | Commit | What |
+|---|---|---|
+| CI blocker | ee46194, 1f7c2cc | **Cause.** `RuleTester.itOnly = it.only` in `promise-function-async.test.ts` and `no-raw-design-values.test.ts`. Bun throws when it reads `it.only` under `CI`, so `bun test:unit` failed in CI before the API, app and e2e steps. Local runs never set `CI`. **Fix.** The assignment is removed: RuleTester needs it only for a case marked `only`. **Guard.** `scripts/no-focused-tests.test.ts` reads every unit, Worker, script and e2e test file and fails on `it.only`, `describe.only`, `test.only`, `itOnly` or `only: true` (red before, on those two lines). Bug-lessons class 120 (new). Proof: `CI=1 bun test:unit` passes (Verification below). |
+| I1 | 20c515c | **Rule.** An own sign-out clears the copy without the owner check only when no session is left in the shared store; a blocked store counts as empty. While another tab's session is stored, the copy and its unsent changes stay (`dropLocalCopyOnOwnSignOut` in `apps/app/src/local-copy.ts`). **Tests** in `app-state.test.tsx`: the counter-test "keeps the copy while another tab's session is still stored…" (red before); the M1 test, now with no session stored ("empties the copy when no session is left, whatever mark is on it"); "…when the shared store cannot be read". Bug-lessons row (class 117). |
+| I2 | efa40ce | **Test.** `e2e/oauth-consent.e2e.ts` "a frame the widget loads stays in its own box…" runs at 390×844. A stub of `telegram-widget.js` puts a 600×300 frame where the button goes. The test asserts that the frame stays within the card (`testID="consent-card"`), does not intersect "Can't see the Telegram button?" or its button, and that the button still takes the click. **Red against the old layout:** with `telegram-widget.web.tsx` from 3c05b49, the frame started at x = −105 px. It is green on the current layout. Bug-lessons class 121 (new). |
+| m1 | cda6b44 | A signed-in session with no name yet (a stored session before `me` answers) reads as loading: no identity shown, Allow disabled. `oauth.signedIn` is removed from both catalogs. Test: "keeps Allow disabled until it knows whose session it is", with a held `me` (red before). Bug-lessons row (class 62). |
+| m2 | 50b376c | The CSP gains `frame-ancestors 'none'`; `X-Frame-Options: DENY` stays for old browsers. `scripts/web-headers.test.ts` parses `apps/app/public/_headers` and pins both for `/*` (red before). The deployed check is in the owner's release step (m4). Bug-lessons row (class 37). |
+| m3 | b978b23 | **Mapping.** `errorKey` names `auth/forbidden` (`oauth.deviceToken`) and `auth/identity-conflict` (`oauth.identityConflict`), with real sentences in EN and RU. **Test.** `oauth.test.tsx` runs 3 cases (403 `auth/not-allowed`, 403 `auth/forbidden`, 422 `auth/identity-conflict`). Each shows its line, sends one `complete` and no redirect; the two new cases were red before. Bug-lessons row (class 99). |
+| m4 | 4450f2b | `docs/qa.md` "Release round" now carries "The owner's step, once per release: connect a real MCP client end to end", with numbered steps and the `curl -sI …/oauth/authorize` header check. The old line under "Every form" is gone. |
+| m5 | 242e2b8 | Class 119 now holds only the testing rule, and says plainly that its guard is procedural (the owner's release step), with the e2e pinning what can run without Telegram. The product half ("ask whether they already proved it") is filed under class 81, which has a new line pointing back. |
+| m6 | da8e859 | **Log row.** The latency failure: 296 ms against 240, in the full run after ~200 tests, versus the ceilings' method of running the project alone on fresh servers (classes 115 and 116). **CI.** `ci.yml` runs `playwright test --project chromium`, then `playwright test --project latency --no-deps` as a step of its own. Playwright starts a fresh Worker (fresh state), and with `E2E_REUSE_WEB_BUILD=1` it serves the same build without rebuilding. That is one extra server start, no new job, and no ceiling changed. Next, for Task 5.6: collect three CI runs' p75 annotations. |
+
+### Verification (fix round 3)
+
+VERIFY3_PLACEHOLDER
+
