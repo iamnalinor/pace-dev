@@ -167,6 +167,8 @@ export const enShell = {
     "{count} changes have not synced yet: logging out now loses them.",
   "settings.logout.unsynced.other":
     "{count} changes have not synced yet: logging out now loses them.",
+  "settings.logout.unsynced.unknown":
+    "Some changes may not have synced yet: logging out now loses them.",
   "settings.logout.wait": "Wait",
   "settings.logout.anyway": "Log out anyway",
   "settings.deleteAccount": "Delete account",

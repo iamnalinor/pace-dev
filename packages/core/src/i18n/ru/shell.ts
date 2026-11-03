@@ -169,6 +169,8 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
     "{count} изменений ещё не синхронизированы: если выйти сейчас, они пропадут.",
   "settings.logout.unsynced.other":
     "{count} изменения ещё не синхронизированы: если выйти сейчас, они пропадут.",
+  "settings.logout.unsynced.unknown":
+    "Возможно, не все изменения синхронизированы: если выйти сейчас, они пропадут.",
   "settings.logout.wait": "Подождать",
   "settings.logout.anyway": "Всё равно выйти",
   "settings.deleteAccount": "Удалить аккаунт",

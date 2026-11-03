@@ -401,10 +401,11 @@ describe("SettingsScreen", () => {
 
   it("logs out, and leaves the way to the login card to the route gate (PR A re-review N1)", async () => {
     const runtime = await createTestRuntime({ world: "empty" });
+    const logout = jest.spyOn(runtime.auth, "logout");
     await renderScreen(<SettingsScreen />, runtime);
     await fireEvent.press(screen.getByRole("button", { name: en("settings.logout") }));
     await waitFor(() => {
-      expect(runtime.auth.store.getState().status).toBe("signed-out");
+      expect(logout).toHaveBeenCalledTimes(1);
     });
     // A navigation after the log-out's answer remounted a login screen the gate already showed,
     // emptying what the person had started typing there (bug class 75).
@@ -416,11 +417,52 @@ describe("SettingsScreen", () => {
     expect(router.replace).not.toHaveBeenCalled();
   });
 
+  it("reads the outbox at the press: a change whose count has not come back yet still asks (PR A re-review N2)", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    const logout = jest.spyOn(runtime.auth, "logout");
+    // The outbox's read is slow (IndexedDB behind another tab's writes): nothing is known before
+    // it answers, so a count read ahead read 0 and dropped the change without a word.
+    let answer: (count: number) => void = () => undefined;
+    const reads = jest.fn(
+      async () =>
+        await new Promise<number>((resolve) => {
+          answer = resolve;
+        }),
+    );
+    await renderScreen(<SettingsScreen />, { ...runtime, unsyncedCount: reads });
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.logout") }));
+    expect(logout).not.toHaveBeenCalled();
+    await act(async () => {
+      answer(1);
+      await Promise.resolve();
+    });
+    expect(
+      await screen.findByText("1 change has not synced yet: logging out now loses it."),
+    ).toBeOnTheScreen();
+    expect(logout).not.toHaveBeenCalled();
+  });
+
+  it("asks when the outbox cannot be read, without naming a count (PR A re-review N2)", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    const logout = jest.spyOn(runtime.auth, "logout");
+    const reads = jest.fn(async () => await Promise.reject(new Error("IndexedDB refused")));
+    await renderScreen(<SettingsScreen />, { ...runtime, unsyncedCount: reads });
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.logout") }));
+    expect(await screen.findByText(en("settings.logout.unsynced.unknown"))).toBeOnTheScreen();
+    expect(logout).not.toHaveBeenCalled();
+    // Still reachable: the person can log out anyway.
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.logout.anyway") }));
+    await waitFor(() => {
+      expect(logout).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it("asks before Log out discards changes that have not synced, and can wait (QA round 23 R23-02)", async () => {
     const runtime = await createTestRuntime({
       routes: { "POST /api/sync/push": () => problem(503, "offline") },
       world: "empty",
     });
+    const logout = jest.spyOn(runtime.auth, "logout");
     await runtime.actions.setNightHours(true);
     await runtime.actions.setLanguage("en");
     await renderScreen(<SettingsScreen />, runtime);
@@ -429,17 +471,17 @@ describe("SettingsScreen", () => {
     expect(
       await screen.findByText("2 changes have not synced yet: logging out now loses them."),
     ).toBeOnTheScreen();
-    expect(router.replace).not.toHaveBeenCalled();
+    expect(logout).not.toHaveBeenCalled();
     await fireEvent.press(screen.getByRole("button", { name: en("settings.logout.wait") }));
     expect(screen.queryByText(/have not synced yet/u)).toBeNull();
-    expect(router.replace).not.toHaveBeenCalled();
+    expect(logout).not.toHaveBeenCalled();
     // Log out stays reachable: asked again, the person chooses to log out anyway.
     await fireEvent.press(screen.getByRole("button", { name: en("settings.logout") }));
     await fireEvent.press(
       await screen.findByRole("button", { name: en("settings.logout.anyway") }),
     );
     await waitFor(() => {
-      expect(runtime.auth.store.getState().status).toBe("signed-out");
+      expect(logout).toHaveBeenCalledTimes(1);
     });
     expect(router.replace).not.toHaveBeenCalled();
   });
@@ -457,6 +499,7 @@ describe("SettingsScreen", () => {
       },
       world: "empty",
     });
+    const finished = jest.spyOn(runtime.auth, "finishAccountDeletion");
     await renderScreen(<SettingsScreen />, runtime);
     await fireEvent.press(screen.getByRole("button", { name: en("settings.deleteAccount") }));
     expect(created).not.toHaveBeenCalled();
@@ -466,7 +509,7 @@ describe("SettingsScreen", () => {
     expect(screen.getByText(en("settings.confirmation.waiting"))).toBeOnTheScreen();
     await waitFor(
       () => {
-        expect(runtime.auth.store.getState().status).toBe("signed-out");
+        expect(finished).toHaveBeenCalledTimes(1);
       },
       { timeout: 4000 },
     );
@@ -525,6 +568,7 @@ describe("SettingsScreen", () => {
       },
       world: "empty",
     });
+    const finished = jest.spyOn(runtime.auth, "finishAccountDeletion");
     await renderScreen(<SettingsScreen />, runtime);
     await fireEvent.press(screen.getByRole("button", { name: en("settings.deleteAccount") }));
     await fireEvent.press(
@@ -532,7 +576,7 @@ describe("SettingsScreen", () => {
     );
     await waitFor(
       () => {
-        expect(runtime.auth.store.getState().status).toBe("signed-out");
+        expect(finished).toHaveBeenCalledTimes(1);
       },
       { timeout: 7000 },
     );
