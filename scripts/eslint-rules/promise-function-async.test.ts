@@ -8,7 +8,6 @@ import { promiseFunctionAsync } from "./promise-function-async.ts";
 
 RuleTester.describe = describe;
 RuleTester.it = it;
-RuleTester.itOnly = it.only;
 
 // Type-aware: the rule reads each function's return type.
 const tester = new RuleTester({
