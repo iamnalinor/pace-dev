@@ -49,6 +49,46 @@ const raiseToast = async (page: Page, title: string): Promise<void> => {
   await expect(page.getByRole("alert")).toBeVisible();
 };
 
+/** How long the page must go without a scroll event before a wheel's scroll counts as done. */
+const SCROLL_QUIET_MS = 150;
+/** How long to wait for a first scroll event before deciding nothing under the pointer scrolls. */
+const SCROLL_START_MS = 600;
+
+/**
+Turns the wheel and waits until the scroll it starts has ended. `mouse.wheel` resolves when the
+event is sent, not when the page has scrolled: a slow browser (CI's headless shell) still showed
+the old positions to the next read, and the rows that were about to scroll out read as stuck.
+*/
+const wheelAndSettle = async (page: Page, deltaY: number): Promise<void> => {
+  // A handle on a box holding the promise (a promise itself would be awaited before the wheel),
+  // so it lives in the page without a global of its own.
+  const settled = await page.evaluateHandle(
+    ({ quietMs, startMs }) => ({
+      done: new Promise<void>((resolve) => {
+        const signal = new AbortController();
+        const finish = (): void => {
+          signal.abort();
+          resolve();
+        };
+        const timer = { id: setTimeout(finish, startMs) };
+        globalThis.addEventListener(
+          "scroll",
+          () => {
+            clearTimeout(timer.id);
+            timer.id = setTimeout(finish, quietMs);
+          },
+          { capture: true, signal: signal.signal },
+        );
+      }),
+    }),
+    { quietMs: SCROLL_QUIET_MS, startMs: SCROLL_START_MS },
+  );
+  await page.mouse.wheel(0, deltaY);
+  await settled.evaluate(async (scroll) => {
+    await scroll.done;
+  });
+};
+
 /**
 The controls under the toast that stay under it once the content is scrolled by the toast's
 height: a row of a long list may pass under the toast (spec §4.1.4 rule 3) but must scroll out
@@ -61,7 +101,7 @@ const stuckUnderToast = async (page: Page): Promise<readonly string[]> => {
   }
   const toast = await page.getByRole("alert").boundingBox();
   await page.mouse.move(8, (toast?.y ?? 0) - 40);
-  await page.mouse.wheel(0, (toast?.height ?? 0) + 120);
+  await wheelAndSettle(page, (toast?.height ?? 0) + 120);
   const still = await controlsUnder(page, '[role="alert"]');
   return under.filter((control) => still.includes(control));
 };
