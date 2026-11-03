@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react-native";
-import { Text as NativeText } from "react-native";
+import { Text as NativeText, Platform } from "react-native";
 
+import { ROW_BOX as WEB_ROW_BOX } from "./list-row-density.web.ts";
 import { ListRow } from "./list-row.tsx";
 import { ThemeProvider } from "./theme-provider.tsx";
 
@@ -8,6 +9,15 @@ const classesOf = (testID: string): readonly string[] =>
   String(screen.getByTestId(testID).props["className"]).split(" ");
 
 const NOTHING = (): void => undefined;
+
+type Node = { readonly props: Record<string, unknown> };
+
+const classesOfNode = (node: Node | undefined): readonly string[] =>
+  String(node?.props["className"]).split(" ");
+
+/** The min-height utilities of a class list (a variant like `lg:` included). */
+const minHeights = (classes: readonly string[]): readonly string[] =>
+  classes.filter((name) => /(?:^|:)min-h-/u.test(name));
 
 describe("ListRow (spec §4.1.1: slots, density, selected)", () => {
   it("shows its title, subtitle and meta, with the leading and trailing slots", async () => {
@@ -31,24 +41,35 @@ describe("ListRow (spec §4.1.1: slots, density, selected)", () => {
     expect(subtitle).toContain("text-label-secondary");
   });
 
-  it("is 52 high with the row padding on a phone and 44 on a desktop; compact is 44 everywhere", async () => {
-    await render(
-      <ThemeProvider>
-        <ListRow testID="regular" title="Regular" />
-        <ListRow density="compact" testID="compact" title="Compact" />
-      </ThemeProvider>,
+  it("on a phone keeps the 52 row inside the press target; compact is the target itself (48 dp)", async () => {
+    const restore = jest.replaceProperty(Platform, "OS", "android");
+    try {
+      await render(
+        <ThemeProvider>
+          <ListRow onPress={NOTHING} testID="regular" title="Regular" />
+          <ListRow density="compact" onPress={NOTHING} testID="compact" title="Compact" />
+        </ThemeProvider>,
+      );
+      for (const id of ["regular", "compact"]) {
+        // Exactly one min-height on the control, the target: no class order decides the height.
+        expect(minHeights(classesOf(id))).toEqual(["min-h-hit"]);
+      }
+      const [regular, compact] = screen.getAllByTestId("list-row-box");
+      expect(minHeights(classesOfNode(regular))).toEqual(["min-h-row"]);
+      // Nothing below the 48 dp target: compact takes the control's own height.
+      expect(minHeights(classesOfNode(compact))).toEqual([]);
+      expect(classesOfNode(regular)).toEqual(expect.arrayContaining(["px-row-x", "py-row-y"]));
+      expect(classesOfNode(regular).some((name) => name.startsWith("lg:"))).toBe(false);
+    } finally {
+      restore.restore();
+    }
+  });
+
+  it("on the web is 52 on a phone and 44 on a desktop, compact 44 everywhere (both at or above 44 px)", () => {
+    expect(WEB_ROW_BOX.regular.split(" ")).toEqual(
+      expect.arrayContaining(["min-h-row", "lg:min-h-row-compact", "py-row-y", "lg:py-row-y-lg"]),
     );
-    expect(classesOf("regular")).toEqual(
-      expect.arrayContaining([
-        "min-h-row",
-        "lg:min-h-row-compact",
-        "px-row-x",
-        "py-row-y",
-        "lg:py-row-y-lg",
-      ]),
-    );
-    expect(classesOf("compact")).toEqual(expect.arrayContaining(["min-h-row-compact"]));
-    expect(classesOf("compact")).not.toContain("min-h-row");
+    expect(minHeights(WEB_ROW_BOX.compact.split(" "))).toEqual(["min-h-row-compact"]);
   });
 
   it("is no control without a press: no button, nothing to press", async () => {
@@ -89,7 +110,7 @@ describe("ListRow (spec §4.1.1: slots, density, selected)", () => {
     });
   });
 
-  it("selected on a button row (the inspector's row) is the current one: bar, selected state and aria-current", async () => {
+  it("selected on a button row (the inspector's row) is the current one: the bar and aria-current", async () => {
     await render(
       <ThemeProvider>
         <ListRow onPress={NOTHING} selected title="Algebra" />
@@ -110,6 +131,7 @@ describe("ListRow (spec §4.1.1: slots, density, selected)", () => {
       </ThemeProvider>,
     );
     expect(screen.getByTestId("static").props["accessibilityState"]).toEqual({ selected: true });
+    expect(screen.getByTestId("static").props["aria-current"]).toBe(true);
     expect(screen.getByTestId("list-row-selected-bar")).toBeOnTheScreen();
   });
 

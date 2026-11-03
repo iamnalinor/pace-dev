@@ -21,6 +21,14 @@ type SelectableRole = Extract<AccessibilityRole, "gridcell" | "option" | "row" |
 /** The roles that are checked rather than selected (`aria-checked`). */
 type CheckableRole = Extract<AccessibilityRole, "checkbox" | "radio" | "switch">;
 
+/** The roles ARIA lets say `aria-expanded` that React Native knows. */
+type ExpandableRole = Extract<
+  AccessibilityRole,
+  "button" | "combobox" | "link" | "menuitem" | "tab"
+>;
+
+const EXPANDABLE: ReadonlySet<string> = new Set(["button", "combobox", "link", "menuitem", "tab"]);
+
 const SELECTABLE: ReadonlySet<string> = new Set(["gridcell", "option", "row", "tab"]);
 const CHECKABLE: ReadonlySet<string> = new Set(["checkbox", "radio", "switch"]);
 
@@ -58,7 +66,7 @@ export type PressableProps<R extends AccessibilityRole = AccessibilityRole> = {
   readonly checked?: (R extends CheckableRole ? "mixed" | boolean : never) | undefined;
   readonly disabled?: boolean | undefined;
   /** A control that shows and hides a region (a `Disclosure`'s trigger): `aria-expanded`. */
-  readonly expanded?: boolean | undefined;
+  readonly expanded?: (R extends ExpandableRole ? boolean : never) | undefined;
   /** What the press means to the hand (§3.10): `longPress` plays on the long press, the rest on the press. */
   readonly haptic?: HapticKind | undefined;
   readonly ripple?: RippleKind | undefined;
@@ -102,7 +110,7 @@ const stateOf = (
   { checked, expanded, isDisabled, selected }: AskedState,
 ): State => ({
   disabled: isDisabled,
-  ...(expanded !== undefined && { expanded }),
+  ...(expanded !== undefined && EXPANDABLE.has(role) && { expanded }),
   ...(selected !== undefined && SELECTABLE.has(role) && { selected }),
   ...(checked !== undefined && CHECKABLE.has(role) && { checked }),
 });

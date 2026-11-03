@@ -133,6 +133,18 @@ describe("Pressable (the kit's state layer, spec §3.7)", () => {
     expect(screen.getByRole("button", { name: "Done" })).toBeCollapsed();
   });
 
+  it("says expanded only on a role that may disclose (no aria-expanded on a radio)", async () => {
+    await renderLight(
+      // @ts-expect-error -- a radio never says expanded; the markup drops it too
+      <Pressable expanded onPress={jest.fn()} role="radio">
+        <Text>Weekly</Text>
+      </Pressable>,
+    );
+    const radio = screen.getByRole("radio", { name: "Weekly" });
+    expect(radio).not.toBeExpanded();
+    expect(radio).not.toBeCollapsed();
+  });
+
   it("ripples on Android in fill.3, drawn by the platform over the content, bounded by default", async () => {
     const restore = jest.replaceProperty(Platform, "OS", "android");
     try {
@@ -269,8 +281,11 @@ describe("Pressable (the kit's state layer, spec §3.7)", () => {
       <Pressable key="checkbox-selected" role="checkbox" selected />,
       // @ts-expect-error -- a tab is selected, not checked
       <Pressable checked key="tab-checked" role="tab" />,
+      <Pressable expanded key="button-expanded" role="button" />,
+      // @ts-expect-error -- ARIA lets no switch say expanded
+      <Pressable expanded key="switch-expanded" role="switch" />,
     ];
-    expect(typed).toHaveLength(5);
+    expect(typed).toHaveLength(7);
   });
 
   it("ripples and plays nothing when it has nothing to do", async () => {

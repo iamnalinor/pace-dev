@@ -123,6 +123,8 @@ export const FoldedSection = ({
   }
   return (
     <View className="mt-2">
+      {/* The hairline that set the fold apart from the list above it, kept from before the kit. */}
+      <View className="mx-gutter border-t border-separator" testID="fold-hairline" />
       <Disclosure
         count={count}
         label={title}

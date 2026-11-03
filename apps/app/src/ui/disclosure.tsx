@@ -4,6 +4,7 @@ import Animated, {
   type SharedValue,
   useAnimatedStyle,
   useSharedValue,
+  withSequence,
   withTiming,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
@@ -74,7 +75,16 @@ const startGrow = ({ height, isReduced, measured, opacity }: Box, onDone: () => 
 /** Shrinks the box from the measured height while it fades out, then calls `onDone`. */
 const startShrink = ({ height, isReduced, measured, opacity }: Box, onDone: () => void): void => {
   const duration = isReduced ? motion.reduced.fade : motion.exit.md;
-  height.set(isReduced ? measured : withTiming(0, { duration, easing: EASING.exit }));
+  // From the content's current height (it may have grown while open), never a stale one: a
+  // clipped first frame is bug class 5.
+  height.set(
+    isReduced
+      ? measured
+      : withSequence(
+          withTiming(measured, { duration: 0 }),
+          withTiming(0, { duration, easing: EASING.exit }),
+        ),
+  );
   opacity.set(
     withTiming(0, { duration, easing: EASING.exit }, (isFinished) => {
       if (isFinished === true) {

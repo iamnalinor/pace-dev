@@ -8,6 +8,18 @@ import { formatCount } from "@pace/core";
 import { cx } from "./cx.ts";
 import { Text, type TextProps } from "./text.tsx";
 
+/** One trailing thing at most: how many the section holds, or one action. */
+type Trailing =
+  | { readonly action: ReactNode; readonly count?: never }
+  | { readonly action?: never; readonly count?: number | undefined };
+
+export type SectionHeaderProps = Trailing & {
+  readonly title: string;
+  readonly level?: 2 | 3;
+  /** Inside the screen's gutter, over an inset `Group` (the default); off over a flush one. */
+  readonly inset?: boolean;
+};
+
 /**
 A section's heading over a `Group` (spec §4.1.1, §5.0.3): `subhead` in the secondary label, in
 sentence case as written (never upper-cased: no eyebrow, F-TYP-02), 24 above and 8 below, inset to
@@ -20,15 +32,7 @@ export const SectionHeader = ({
   inset = true,
   level = 2,
   title,
-}: {
-  readonly title: string;
-  readonly level?: 2 | 3;
-  /** How many the section holds; never with `action` (one trailing thing). */
-  readonly count?: number | undefined;
-  readonly action?: ReactNode;
-  /** Inside the screen's gutter, over an inset `Group` (the default); off over a flush one. */
-  readonly inset?: boolean;
-}) => {
+}: SectionHeaderProps) => {
   const language = useLanguage();
   const heading: TextProps = { level, role: "subhead", tone: "secondary" };
   return (

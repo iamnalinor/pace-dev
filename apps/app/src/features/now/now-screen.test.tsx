@@ -353,6 +353,10 @@ describe("NowBoard", () => {
     await fireEvent.press(screen.getByRole("radio", { name: "All" }));
     expect(checks()).toHaveLength(6);
     const fold = screen.getByRole("button", { name: "In future · 4" });
+    // A hairline sets the fold apart from the list above it (as before the kit Disclosure).
+    expect(String(screen.getByTestId("fold-hairline").props["className"])).toContain(
+      "border-separator",
+    );
     expect(screen.queryByText("Check test 1 grade")).toBeNull();
     await fireEvent.press(fold);
     expect(screen.getByText("Check test 1 grade")).toBeOnTheScreen();

@@ -10,6 +10,7 @@ import { Disclosure } from "./disclosure.tsx";
 /** The animations started, with the callbacks that finish them (the test decides when). */
 const mockTimings: {
   readonly to: number;
+  readonly duration: number | undefined;
   readonly done: ((isFinished: boolean) => void) | undefined;
 }[] = [];
 
@@ -19,8 +20,12 @@ jest.mock("react-native-reanimated", (): unknown => {
   return {
     ...actual,
     __esModule: true,
-    withTiming: (to: number, _config: unknown, done?: (isFinished: boolean) => void) => {
-      mockTimings.push({ done, to });
+    withTiming: (
+      to: number,
+      config: undefined | { readonly duration?: number },
+      done?: (isFinished: boolean) => void,
+    ) => {
+      mockTimings.push({ done, duration: config?.duration, to });
       return to;
     },
   };
@@ -61,6 +66,10 @@ const Folded = ({
   );
 };
 
+const layout = (height: number) => ({
+  nativeEvent: { layout: { height, width: 300, x: 0, y: 0 } },
+});
+
 const renderFolded = async (props: Parameters<typeof Folded>[0] = {}) =>
   await renderScreen(<Folded {...props} />, await createTestRuntime({ world: "empty" }));
 
@@ -95,6 +104,21 @@ describe("Disclosure (spec §4.1.1, §6 disclosure)", () => {
     expect(JSON.stringify(screen.getByTestId("disclosure-chevron").props["style"])).toContain(
       "90deg",
     );
+  });
+
+  it("closes from the content's current height when it grew while open (no clipped first frame)", async () => {
+    await renderFolded();
+    await fireEvent.press(screen.getByRole("button", { name: "In future · 3" }));
+    await fireEvent(screen.getByTestId("disclosure-content"), "layout", layout(120));
+    await finishAll();
+    // A row arrived while it was open: the content is taller now.
+    await fireEvent(screen.getByTestId("disclosure-content"), "layout", layout(160));
+    mockTimings.length = 0;
+    await fireEvent.press(screen.getByRole("button", { name: "In future · 3" }));
+    // The close's height starts at once from 160 (a 0 ms step), then goes to 0 in the exit time.
+    const start = mockTimings.findIndex((timing) => timing.duration === 0);
+    expect(mockTimings[start]?.to).toBe(160);
+    expect(mockTimings[start + 1]).toMatchObject({ duration: 160, to: 0 });
   });
 
   it("tells when the content is shown, after its layout and its animation (focus moves then)", async () => {

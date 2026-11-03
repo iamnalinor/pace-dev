@@ -52,4 +52,10 @@ describe("SectionHeader (spec §4.1.1, §5.0.3)", () => {
     );
     expect(screen.getByRole("button", { name: "Show all" })).toBeOnTheScreen();
   });
+
+  it("types a count or an action, never both", () => {
+    // @ts-expect-error -- one trailing thing: a count or an action
+    const both = <SectionHeader action={null} count={2} title="Apps" />;
+    expect(both).toBeTruthy();
+  });
 });

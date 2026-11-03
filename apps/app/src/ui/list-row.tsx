@@ -4,15 +4,14 @@ import type { ReactNode } from "react";
 import { View } from "react-native";
 
 import type { HapticKind } from "../platform/haptics.ts";
+import type { RowDensity } from "./list-row-types.ts";
 
 import { cx } from "./cx.ts";
 import { Icon } from "./icon.tsx";
 import { Link } from "./link.tsx";
+import { ROW_BOX } from "./list-row-density.ts";
 import { Pressable } from "./pressable.tsx";
 import { Text } from "./text.tsx";
-
-/** `regular` follows the platform (52 on a phone, 44 on a desktop); `compact` is 44 everywhere. */
-export type RowDensity = "compact" | "regular";
 
 /** The roles a pressable row takes: a button, or a tab of a tablist (a select row is a radio: Task 3.9). */
 export type RowRole = "button" | "tab";
@@ -56,11 +55,6 @@ type PressProps =
     };
 
 export type ListRowProps = PressProps & RowProps;
-
-const DENSITY_CLASS: Readonly<Record<RowDensity, string>> = {
-  compact: "min-h-row-compact",
-  regular: "min-h-row lg:min-h-row-compact",
-};
 
 /** The first title line's box (`body` line height): leading and trailing centre on it. */
 const LINE_BOX = "min-h-6 justify-center";
@@ -157,7 +151,9 @@ const Frame = ({
       <View
         className={className}
         testID={testID}
-        {...(selected && { accessibilityState: { selected: true } })}
+        // TalkBack reads the state; react-native-web reads none, and a div with no role may not
+        // say `aria-selected`, so the web hears `aria-current`.
+        {...(selected && { accessibilityState: { selected: true }, "aria-current": true })}
       >
         {children}
       </View>
@@ -194,23 +190,18 @@ export const ListRow = ({
 }: ListRowProps) => {
   const isSelected = frame.selected === true;
   return (
-    <Frame
-      {...frame}
-      className={cx(
-        "relative flex-row items-center px-row-x py-row-y lg:py-row-y-lg",
-        DENSITY_CLASS[density],
-        isSelected && "bg-fill-1",
-      )}
-    >
+    <Frame {...frame} className={cx("relative flex-row", isSelected && "bg-fill-1")}>
       {isSelected ? <SelectedBar /> : null}
-      <Content
-        leading={leading}
-        meta={meta}
-        subtitle={subtitle}
-        title={title}
-        titleLines={titleLines}
-        trailing={withChevron(trailing, frame.href !== undefined)}
-      />
+      <View className={cx("flex-1 flex-row items-center", ROW_BOX[density])} testID="list-row-box">
+        <Content
+          leading={leading}
+          meta={meta}
+          subtitle={subtitle}
+          title={title}
+          titleLines={titleLines}
+          trailing={withChevron(trailing, frame.href !== undefined)}
+        />
+      </View>
     </Frame>
   );
 };
