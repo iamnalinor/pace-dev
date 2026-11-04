@@ -5,8 +5,8 @@ import type { RepeatChangeProblem } from "@pace/client";
 
 import { useIsAccountUnknown, useLanguage, useT } from "#app/app-state.tsx";
 import { focusField } from "#app/platform/focus-field.ts";
-import { IMPORTANCE_HUES } from "#app/ui/color.tsx";
 import { KnownAfterSync } from "#app/ui/empty-state.tsx";
+import { IMPORTANCE_HUES } from "#app/ui/hue.ts";
 import { RadioChips } from "#app/ui/radio-chips.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 import { ImportanceSchema, presetLabel } from "@pace/core";

@@ -130,7 +130,6 @@ const MonthHeader = ({
       onPress={() => {
         onMonth(shiftMonth(month, -1));
       }}
-      variant="plain"
     />
     <Text
       accessibilityLiveRegion="polite"
@@ -145,7 +144,6 @@ const MonthHeader = ({
       onPress={() => {
         onMonth(shiftMonth(month, 1));
       }}
-      variant="plain"
     />
   </View>
 );

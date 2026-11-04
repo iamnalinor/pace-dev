@@ -5,8 +5,9 @@ import type { MetaPart, NowRow } from "@pace/client";
 
 import { useT } from "#app/app-state.tsx";
 import { metaTexts, type MetaTone } from "#app/format/meta.ts";
-import { ColorTag, IMPORTANCE_HUES } from "#app/ui/color.tsx";
+import { IMPORTANCE_HUES } from "#app/ui/hue.ts";
 import { Icon } from "#app/ui/icon.tsx";
+import { Tag } from "#app/ui/tag.tsx";
 import { type Language, presetLabel } from "@pace/core";
 
 import { useViewer } from "./use-viewer.ts";
@@ -55,11 +56,11 @@ export const MetaLine = ({
   const tagLabel = tag === null ? null : rowTagLabel(tag.tag, viewer.language);
   return (
     <View className="flex-row flex-wrap items-center gap-x-2 gap-y-1">
-      {tag === null || tagLabel === null ? null : <ColorTag color={tag.color}>{tagLabel}</ColorTag>}
+      {tag === null || tagLabel === null ? null : <Tag hue={tag.color}>{tagLabel}</Tag>}
       {importances.map((part) => (
-        <ColorTag color={IMPORTANCE_HUES[part.importance]} key={part.importance}>
+        <Tag hue={IMPORTANCE_HUES[part.importance]} key={part.importance}>
           {t(`importance.${part.importance}`)}
-        </ColorTag>
+        </Tag>
       ))}
       {isRepeating ? <RepeatMark /> : null}
       {texts.length === 0 ? null : (

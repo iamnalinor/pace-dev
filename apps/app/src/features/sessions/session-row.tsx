@@ -111,9 +111,9 @@ const Confirm = ({
           <View className={cx(!isWide && "flex-1")}>
             {/* Escape cancels, as it closes the sheets (QA round 15 L1); one confirm is open at a time. */}
             <Button
-              hotkey={HOTKEYS.escape}
               onPress={onCancel}
               ref={cancelRef}
+              shortcut={HOTKEYS.escape}
               variant="secondary"
               width={width}
             >
@@ -121,7 +121,13 @@ const Confirm = ({
             </Button>
           </View>
           <View className={cx(!isWide && "flex-2")}>
-            <Button busy={isEnding} onPress={onEnd} ref={actionRef} variant="danger" width={width}>
+            <Button
+              busy={isEnding}
+              onPress={onEnd}
+              ref={actionRef}
+              variant="destructive"
+              width={width}
+            >
               {actionLabel}
             </Button>
           </View>

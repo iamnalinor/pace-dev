@@ -45,7 +45,7 @@ export const PresetScreen = ({
   if (preset === undefined) {
     return (
       <PushedScreen title={t("presets.title")}>
-        <EmptyState>{t("presets.notFound")}</EmptyState>
+        <EmptyState title={t("presets.notFound")} />
       </PushedScreen>
     );
   }

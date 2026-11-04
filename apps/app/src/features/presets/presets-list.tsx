@@ -5,12 +5,12 @@ import { Pressable, Text, View } from "react-native";
 import { useAppState, useLanguage, usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button } from "#app/ui/button.tsx";
-import { ActionChip } from "#app/ui/chip.tsx";
-import { ColorTag } from "#app/ui/color.tsx";
+import { Chip } from "#app/ui/chip.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { IconButton } from "#app/ui/icon-button.tsx";
 import { Icon } from "#app/ui/icon.tsx";
 import { SwitchRow } from "#app/ui/switch-row.tsx";
+import { Tag } from "#app/ui/tag.tsx";
 import {
   byPresetOrder,
   EXAMPLE_PRESET_IDS,
@@ -65,7 +65,7 @@ const PresetRow = ({
         }}
       >
         <View className="min-w-0 flex-1 flex-row">
-          <ColorTag color={resolved.ok ? resolved.value.color : null}>{name}</ColorTag>
+          <Tag hue={resolved.ok ? resolved.value.color : null}>{name}</Tag>
         </View>
         {preset.archived ? <Badge isQuiet>{t("presets.archivedBadge")}</Badge> : null}
         <Badge>{t(preset.builtIn ? "presets.builtIn" : "presets.yours")}</Badge>
@@ -76,14 +76,12 @@ const PresetRow = ({
         icon={"chevron-up"}
         label={t("presets.moveUp", { name })}
         onPress={() => void run(actions.movePreset(preset.id, -1))}
-        variant="plain"
       />
       <IconButton
         disabled={isLast}
         icon={"chevron-down"}
         label={t("presets.moveDown", { name })}
         onPress={() => void run(actions.movePreset(preset.id, 1))}
-        variant="plain"
       />
     </View>
   );
@@ -105,14 +103,14 @@ const NewPreset = ({ choices }: { readonly choices: readonly Preset[] }) => {
       </Text>
       <View className="flex-row flex-wrap gap-2">
         {choices.map((preset) => (
-          <ActionChip
+          <Chip
             key={preset.id}
             onPress={() => {
               router.push({ params: { from: preset.id, id: "new" }, pathname: "/presets/[id]" });
             }}
           >
             {presetLabel(preset, language)}
-          </ActionChip>
+          </Chip>
         ))}
       </View>
     </View>

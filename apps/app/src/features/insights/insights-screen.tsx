@@ -7,8 +7,8 @@ import { usePace, useT } from "#app/app-state.tsx";
 import { DestinationScreen } from "#app/screens/destination-screen.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { WeekArrows } from "#app/shared/week-arrows.tsx";
-import { fillClass } from "#app/ui/color.tsx";
 import { EmptyText } from "#app/ui/empty-state.tsx";
+import { fillClass } from "#app/ui/hue.ts";
 import { Text as KitText } from "#app/ui/text.tsx";
 import { formatDuration, formatWeekRange } from "@pace/core";
 

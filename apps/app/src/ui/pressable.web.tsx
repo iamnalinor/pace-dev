@@ -8,6 +8,7 @@ import type { SpacePress } from "./space-press.ts";
 
 import { cx } from "./cx.ts";
 import { type PressableProps, SPACE_ROLES, usePressableProps } from "./pressable-props.ts";
+import { inVisual } from "./pressable-visual.tsx";
 import { spacePress } from "./space-press.web.ts";
 
 export type { PressableProps } from "./pressable-props.ts";
@@ -58,7 +59,7 @@ for React. A Pressable with nothing to do gets no mark, so no hover or press. `d
 react-native-web otherwise holds press-in back 50 ms.
 */
 export const Pressable = <R extends AccessibilityRole>(props: PressableProps<R>) => {
-  const { isLive, rest, ripple, shared } = usePressableProps(props);
+  const { inner, isLive, rest, ripple, shared } = usePressableProps(props);
   const { onKeyDown: callerKeyDown, ...others } = rest as typeof rest & {
     readonly onKeyDown?: (event: KeyEvent) => void;
   };
@@ -69,13 +70,19 @@ export const Pressable = <R extends AccessibilityRole>(props: PressableProps<R>)
   return (
     <NativePressable
       {...others}
+      {...(inner !== undefined && {
+        children: inVisual(others.children, inner, { dataSet: { paceVisual: "true" } }),
+      })}
       {...shared}
       className={cx(TARGET, shared.className)}
       // react-native-web's props React Native's types do not know: `dataSet` becomes a `data-*`
       // attribute, `delayPressIn` its press-in delay (50 ms unless told), `onKeyDown` a key handler.
+      // A small visual (`data-pace-inner`) takes the overlay and the ring off the target.
       {...({
         delayPressIn: 0,
-        ...(isLive && { dataSet: { pacePress: ripple } }),
+        ...(isLive && {
+          dataSet: { pacePress: ripple, ...(inner !== undefined && { paceInner: "true" }) },
+        }),
         ...(onKeyDown !== undefined && { onKeyDown }),
       } as object)}
     />

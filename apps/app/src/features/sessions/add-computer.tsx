@@ -109,9 +109,9 @@ export const AddComputer = ({
           {/* The field takes Enter itself; the button shows it, as other forms' do. */}
           <Button
             busy={isBusy}
-            hotkey={HOTKEYS.enter}
-            hotkeyMode="hint"
             onPress={() => void submit()}
+            shortcut={HOTKEYS.enter}
+            shortcutMode="hint"
           >
             {t("devices.create")}
           </Button>

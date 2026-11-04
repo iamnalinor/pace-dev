@@ -29,9 +29,9 @@ export const Line = ({
 );
 
 /** Not me ends a session for good: the warning look, never the accent; else the first leads. */
-const answerVariant = (answer: Answer, index: number): "danger" | "primary" | "secondary" => {
+const answerVariant = (answer: Answer, index: number): "destructive" | "primary" | "secondary" => {
   if (answer === "revoked") {
-    return "danger";
+    return "destructive";
   }
   return index === 0 ? "primary" : "secondary";
 };
@@ -65,14 +65,14 @@ const NotMeConfirm = ({
       <View className="flex-row flex-wrap gap-2">
         <Button
           disabled={isBusy}
-          hotkey={HOTKEYS.escape}
           onPress={onCancel}
           ref={cancelRef}
+          shortcut={HOTKEYS.escape}
           variant="secondary"
         >
           {t("common.cancel")}
         </Button>
-        <Button busy={isBusy} onPress={onEnd} variant="danger">
+        <Button busy={isBusy} onPress={onEnd} variant="destructive">
           {t("notifications.notMeEnd")}
         </Button>
       </View>

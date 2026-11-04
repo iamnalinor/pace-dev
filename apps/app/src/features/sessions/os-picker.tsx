@@ -1,9 +1,10 @@
-import { Pressable, Text, View } from "react-native";
+import { Text, type View } from "react-native";
 import Svg, { Circle, Ellipse, Path } from "react-native-svg";
 
 import { useT } from "#app/app-state.tsx";
 import { cx } from "#app/ui/cx.ts";
-import { spacePress } from "#app/ui/space-press.ts";
+import { Pressable } from "#app/ui/pressable.tsx";
+import { RadioGroup, useRadio } from "#app/ui/radio-group.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { COMPUTER_OSES, type ComputerOs } from "@pace/client";
 import { composite, type MessageKey } from "@pace/core";
@@ -73,7 +74,55 @@ const Mark = ({
   </Svg>
 );
 
-/** Windows, macOS or Linux as one row of segments; the chosen one in the quiet accent. */
+/** One system's segment: a radio of the picker's group. */
+const Segment = ({
+  chosenRef,
+  os,
+}: {
+  readonly chosenRef: ((node: null | View) => void) | undefined;
+  readonly os: ComputerOs;
+}) => {
+  const t = useT();
+  const { palette } = useTheme();
+  const { checked, onPress, setNode, tabIndex } = useRadio(os);
+  const isChosen = checked;
+  return (
+    <Pressable
+      checked={isChosen}
+      className={cx(
+        "flex-1 flex-row items-center justify-center gap-2 rounded-lg border-2 px-2",
+        isChosen ? "border-accent bg-accent-quiet" : "border-outline bg-cell",
+      )}
+      label={t(NAME_KEY[os])}
+      onPress={onPress}
+      ref={(node: null | View) => {
+        setNode(node);
+        if (isChosen) {
+          chosenRef?.(node);
+        }
+      }}
+      role="radio"
+      tabIndex={tabIndex}
+    >
+      <Mark
+        cutout={isChosen ? composite(palette.accentQuiet, palette["bg.cell"]) : palette["bg.cell"]}
+        ink={isChosen ? palette["accent.text"] : palette["label.secondary"]}
+        os={os}
+      />
+      <Text
+        className={cx(
+          "font-sans text-footnote",
+          isChosen ? "font-medium text-accent-text" : "text-label-secondary",
+        )}
+        numberOfLines={1}
+      >
+        {t(NAME_KEY[os])}
+      </Text>
+    </Pressable>
+  );
+};
+
+/** Windows, macOS or Linux as one row of segments; the chosen one in the quiet accent. One tab stop. */
 export const OsPicker = ({
   chosenRef,
   onChange,
@@ -85,48 +134,19 @@ export const OsPicker = ({
   readonly value: ComputerOs;
 }) => {
   const t = useT();
-  const { palette } = useTheme();
   return (
-    <View accessibilityLabel={t("devices.os")} className="flex-row gap-2" role="radiogroup">
-      {COMPUTER_OSES.map((os) => {
-        const isChosen = os === value;
-        return (
-          <Pressable
-            accessibilityLabel={t(NAME_KEY[os])}
-            accessibilityRole="radio"
-            aria-checked={isChosen}
-            className={cx(
-              "h-hit-web flex-1 flex-row items-center justify-center gap-2 rounded-lg border-2 px-2 active:opacity-80",
-              isChosen ? "border-accent bg-accent-quiet" : "border-outline bg-cell",
-            )}
-            key={os}
-            onPress={() => {
-              onChange(os);
-            }}
-            {...spacePress(() => {
-              onChange(os);
-            })}
-            ref={isChosen ? chosenRef : undefined}
-          >
-            <Mark
-              cutout={
-                isChosen ? composite(palette.accentQuiet, palette["bg.cell"]) : palette["bg.cell"]
-              }
-              ink={isChosen ? palette["accent.text"] : palette["label.secondary"]}
-              os={os}
-            />
-            <Text
-              className={cx(
-                "font-sans text-footnote",
-                isChosen ? "font-medium text-accent-text" : "text-label-secondary",
-              )}
-              numberOfLines={1}
-            >
-              {t(NAME_KEY[os])}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
+    <RadioGroup
+      className="flex-row gap-2"
+      label={t("devices.os")}
+      onChange={(os: ComputerOs) => {
+        onChange(os);
+      }}
+      value={value}
+      values={COMPUTER_OSES}
+    >
+      {COMPUTER_OSES.map((os) => (
+        <Segment chosenRef={chosenRef} key={os} os={os} />
+      ))}
+    </RadioGroup>
   );
 };

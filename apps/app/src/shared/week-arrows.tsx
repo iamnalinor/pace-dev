@@ -20,7 +20,6 @@ export const WeekArrows = ({
         onPress={() => {
           onWeek(previous);
         }}
-        variant="plain"
       />
       <IconButton
         disabled={next === null}
@@ -29,7 +28,6 @@ export const WeekArrows = ({
         onPress={() => {
           onWeek(next);
         }}
-        variant="plain"
       />
     </>
   );

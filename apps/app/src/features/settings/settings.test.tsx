@@ -520,11 +520,16 @@ describe("SettingsScreen", () => {
     await fireEvent.press(screen.getByRole("button", { name: en("settings.deleteAccount") }));
     const remove = screen.getByRole("button", { name: en("settings.deleteAccount.confirm") });
     expect(en("settings.deleteAccount.confirm")).toMatch(/Telegram/u);
-    expect(String(remove.props["className"])).toMatch(/border-danger/u);
+    // Both on the destructive look, alike (spec §4.2.3, F-CMP-07): the quiet danger fill.
+    expect(String(within(remove).getByTestId("pressable-visual").props["className"])).toMatch(
+      /border-danger/u,
+    );
     await fireEvent.press(screen.getByRole("button", { name: en("common.cancel") }));
     await fireEvent.press(screen.getByRole("button", { name: en("settings.wipe") }));
     const wipe = screen.getByRole("button", { name: en("settings.wipe.confirm") });
-    expect(String(wipe.props["className"])).toMatch(/border-danger/u);
+    expect(String(within(wipe).getByTestId("pressable-visual").props["className"])).toMatch(
+      /border-danger/u,
+    );
   });
 
   it("keeps focus through Wipe's and Delete's first confirm: onto Cancel and back to the opener (bug class 5)", async () => {

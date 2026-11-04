@@ -103,7 +103,6 @@ export const LogoutButton = () => {
       <View className={cx("flex-row gap-2", isWide && "justify-end")}>
         <View className={cx(!isWide && "flex-1")}>
           <Button
-            hotkey={HOTKEYS.escape}
             onPress={() => {
               focus.toOpener();
               setAsked(null);
@@ -111,6 +110,7 @@ export const LogoutButton = () => {
               sync.soon();
             }}
             ref={focus.cancelRef(question)}
+            shortcut={HOTKEYS.escape}
             variant="secondary"
             width={isWide ? "auto" : "fill"}
           >
@@ -120,7 +120,7 @@ export const LogoutButton = () => {
         <View className={cx(!isWide && "flex-1")}>
           <Button
             onPress={() => void auth.logout()}
-            variant="danger"
+            variant="destructive"
             width={isWide ? "auto" : "fill"}
           >
             {t("settings.logout.anyway")}

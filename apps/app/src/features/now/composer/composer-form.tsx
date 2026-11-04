@@ -120,7 +120,7 @@ const FormHeader = ({
         {title}
       </Text>
       <View className="shrink">
-        <Button disabled={!canAdd} hotkey={HOTKEYS.enter} hotkeyMode="hint" onPress={onAdd}>
+        <Button disabled={!canAdd} onPress={onAdd} shortcut={HOTKEYS.enter} shortcutMode="hint">
           {actionLabel}
         </Button>
       </View>

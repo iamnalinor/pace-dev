@@ -322,9 +322,9 @@ describe("TaskScreen — work", () => {
   it("edits everything from the pencil: clears the due and sets an estimate", async () => {
     const runtime = await trkScreen();
     await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
-    await fireEvent.press(screen.getByRole("radio", { name: /^Due: /u }));
+    await fireEvent.press(screen.getByRole("button", { name: /^Due: /u }));
     await fireEvent.press(screen.getByRole("button", { name: en("composer.clear") }));
-    await fireEvent.press(screen.getByRole("radio", { name: /^Estimate: /u }));
+    await fireEvent.press(screen.getByRole("button", { name: /^Estimate: /u }));
     await fireEvent.press(screen.getByRole("radio", { name: "1h 30m" }));
     await fireEvent.press(screen.getByRole("radio", { name: en("importance.asap") }));
     await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
@@ -368,7 +368,7 @@ describe("TaskScreen — work", () => {
     await renderScreen(<TaskScreen id={TRK_ID} />, runtime);
     await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
     expect(screen.getByRole("button", { name: en("common.save") })).toBeEnabled();
-    await fireEvent.press(screen.getByRole("radio", { name: /^Due: /u }));
+    await fireEvent.press(screen.getByRole("button", { name: /^Due: /u }));
     await fireEvent.press(screen.getByRole("button", { name: en("composer.clear") }));
     expect(screen.getByRole("button", { name: en("common.save") })).toBeDisabled();
   });
@@ -436,7 +436,7 @@ describe("TaskScreen — work", () => {
     expect(screen.queryByRole("alert")).toBeNull();
     // Closed without a date: now the form says what is missing, with the main due date it knows
     // (QA 14 L4), and announces it.
-    await fireEvent.press(screen.getByRole("radio", { name: /^Final deadline: /u }));
+    await fireEvent.press(screen.getByRole("button", { name: /^Final deadline: /u }));
     expect(screen.getByRole("alert")).toHaveTextContent(
       en("form.finalAfterDue", { due: "tomorrow 18:00" }),
     );

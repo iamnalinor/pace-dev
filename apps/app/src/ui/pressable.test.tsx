@@ -234,6 +234,34 @@ describe("Pressable (the kit's state layer, spec §3.7)", () => {
     expect(classes.split(" ")).toEqual(expect.arrayContaining(["min-h-hit", "min-w-hit", "h-10"]));
   });
 
+  it("draws a visual smaller than the target inside it, without a negative margin (the small-visual pattern)", async () => {
+    await renderLight(
+      <Pressable onPress={jest.fn()} role="button" shape="pill" visual="h-8 px-4 bg-fill-2">
+        <Text>Chip</Text>
+      </Pressable>,
+    );
+    const target = screen.getByRole("button", { name: "Chip" });
+    const outer = String(target.props["className"]).split(" ");
+    // The target is the layout box: no negative margin pulls a neighbour under it (QA21 L1).
+    expect(outer).toEqual(expect.arrayContaining(["min-h-hit", "min-w-hit", "justify-center"]));
+    expect(outer.some((name) => name.startsWith("-m"))).toBe(false);
+    const visual = screen.getByTestId("pressable-visual");
+    expect(String(visual.props["className"]).split(" ")).toEqual(
+      expect.arrayContaining(["h-8", "px-4", "bg-fill-2", "rounded-pill"]),
+    );
+    expect(screen.getByText("Chip")).toBeOnTheScreen();
+  });
+
+  it("gives its corners from shape (a radius token), so ripple, overlay and ring share them", async () => {
+    await renderLight(
+      <Pressable onPress={jest.fn()} role="button" shape="md">
+        <Text>Save</Text>
+      </Pressable>,
+    );
+    const classes = String(screen.getByRole("button", { name: "Save" }).props["className"]);
+    expect(classes.split(" ")).toContain("rounded-md");
+  });
+
   it("says checked to screen readers on a checkbox, a radio and a switch, never selected", async () => {
     await renderLight(
       <>

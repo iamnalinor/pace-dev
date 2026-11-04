@@ -159,7 +159,7 @@ export const ChangeServerSheet = ({ onClose }: { readonly onClose: () => void })
           </Button>
         )}
         {isBuildServer(origin) ? null : (
-          <Button disabled={isMoving} onPress={() => void move(null)} variant="ghost">
+          <Button disabled={isMoving} onPress={() => void move(null)} variant="plain">
             {t("server.reset")}
           </Button>
         )}

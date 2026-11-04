@@ -5,8 +5,8 @@ import type { TaskViewModel } from "@pace/client";
 import { usePace, useT } from "#app/app-state.tsx";
 import { useIsInPane, useTaskBack } from "#app/shared/task-opener.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
-import { inkClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
+import { inkClass } from "#app/ui/hue.ts";
 import { IconButton } from "#app/ui/icon-button.tsx";
 import { Icon } from "#app/ui/icon.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
@@ -62,7 +62,7 @@ const TaskActions = ({
   const remove = useDeleteTask(view);
   return (
     <View className="flex-row">
-      <IconButton icon={"pencil"} label={t("task.edit")} onPress={onEdit} variant="plain" />
+      <IconButton icon={"pencil"} label={t("task.edit")} onPress={onEdit} />
       {isOpen ? (
         <IconButton
           icon={isPaused ? "play" : "pause"}
@@ -70,13 +70,10 @@ const TaskActions = ({
           onPress={() => {
             void run(actions.setStatus(view.id, isPaused ? "in_progress" : "paused"));
           }}
-          variant="plain"
         />
       ) : null}
-      {isOpen ? (
-        <IconButton icon={"ban"} label={t("task.giveUp")} onPress={onGiveUp} variant="plain" />
-      ) : null}
-      <IconButton icon={"trash-2"} label={t("task.delete")} onPress={remove} variant="plain" />
+      {isOpen ? <IconButton icon={"ban"} label={t("task.giveUp")} onPress={onGiveUp} /> : null}
+      <IconButton icon={"trash-2"} label={t("task.delete")} onPress={remove} />
     </View>
   );
 };

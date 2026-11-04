@@ -16,10 +16,11 @@ import { WeekGrid } from "#app/features/week/week-grid.tsx";
 import { CardView } from "#app/screens/inbox-card.tsx";
 import { TaskRows } from "#app/shared/task-list.tsx";
 import { RunningRow } from "#app/shared/tracking/running-row.tsx";
-import { ColorTag, IMPORTANCE_HUES } from "#app/ui/color.tsx";
 import { CountBadge } from "#app/ui/count-badge.tsx";
+import { IMPORTANCE_HUES } from "#app/ui/hue.ts";
 import { useIsWide } from "#app/ui/layout.ts";
 import { SidebarHeader } from "#app/ui/sidebar.tsx";
+import { Tag } from "#app/ui/tag.tsx";
 import { openTasksLabel } from "@pace/client";
 import { formatCount, formatDuration, type MessageKey } from "@pace/core";
 
@@ -82,14 +83,14 @@ export const TextSections = ({ data }: { readonly data: GalleryData }) => {
       <Section title="dev.gallery.section.tags">
         <View className="flex-row flex-wrap gap-2">
           {data.projects.map((project) => (
-            <ColorTag color={project.color} key={project.id}>
+            <Tag hue={project.color} key={project.id}>
               {project.name}
-            </ColorTag>
+            </Tag>
           ))}
           {(["asap", "prioritized", "normal", "nice_to_have"] as const).map((importance) => (
-            <ColorTag color={IMPORTANCE_HUES[importance]} key={importance}>
+            <Tag hue={IMPORTANCE_HUES[importance]} key={importance}>
               {t(`importance.${importance}`)}
-            </ColorTag>
+            </Tag>
           ))}
         </View>
       </Section>

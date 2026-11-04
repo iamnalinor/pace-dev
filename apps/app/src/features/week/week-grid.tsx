@@ -4,8 +4,8 @@ import type { CalendarEvent, Language, UsageRow } from "@pace/core";
 
 import { useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
-import { inkClass, tintClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
+import { inkClass, tintClass } from "#app/ui/hue.ts";
 import { Tooltip } from "#app/ui/tooltip.tsx";
 import {
   gridFromHour,

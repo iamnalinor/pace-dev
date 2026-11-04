@@ -1,12 +1,38 @@
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
-import { fillClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
-import { spacePress } from "#app/ui/space-press.ts";
+import { fillClass } from "#app/ui/hue.ts";
+import { Pressable } from "#app/ui/pressable.tsx";
+import { RadioGroup, useRadio } from "#app/ui/radio-group.tsx";
 import { type ProjectColorName, ProjectColorSchema } from "@pace/core";
 
-/** The project colors as round swatches; each is a radio named after its color. */
+const Swatch = ({ color }: { readonly color: ProjectColorName }) => {
+  const t = useT();
+  const { checked, onPress, setNode, tabIndex } = useRadio(color);
+  return (
+    <Pressable
+      checked={checked}
+      label={t(`color.${color}`)}
+      onPress={onPress}
+      ref={setNode}
+      role="radio"
+      shape="pill"
+      tabIndex={tabIndex}
+      visual={cx("size-8 items-center justify-center", checked && "bg-fill-3")}
+    >
+      <View
+        className={cx(
+          "size-5 rounded-pill",
+          fillClass(color),
+          checked && "border-2 border-label-primary",
+        )}
+      />
+    </Pressable>
+  );
+};
+
+/** The project colors as round swatches: one radio group (one tab stop), each named after its color. */
 export const ColorSwatches = ({
   label,
   onChange,
@@ -15,43 +41,18 @@ export const ColorSwatches = ({
   readonly label: string;
   readonly value: ProjectColorName;
   readonly onChange: (color: ProjectColorName) => void;
-}) => {
-  const t = useT();
-  return (
-    <View
-      accessibilityLabel={label}
-      accessibilityRole="radiogroup"
-      className="flex-row flex-wrap gap-1"
-    >
-      {ProjectColorSchema.options.map((color) => {
-        const isChosen = color === value;
-        return (
-          <Pressable
-            accessibilityLabel={t(`color.${color}`)}
-            accessibilityRole="radio"
-            aria-checked={isChosen}
-            className={cx(
-              "h-hit-web w-hit-web items-center justify-center rounded-pill",
-              isChosen && "bg-fill-3",
-            )}
-            key={color}
-            onPress={() => {
-              onChange(color);
-            }}
-            {...spacePress(() => {
-              onChange(color);
-            })}
-          >
-            <View
-              className={cx(
-                "h-5 w-5 rounded-pill",
-                fillClass(color),
-                isChosen && "border-2 border-label-primary",
-              )}
-            />
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-};
+}) => (
+  <RadioGroup
+    className="flex-row flex-wrap"
+    label={label}
+    onChange={(color: ProjectColorName) => {
+      onChange(color);
+    }}
+    value={value}
+    values={ProjectColorSchema.options}
+  >
+    {ProjectColorSchema.options.map((color) => (
+      <Swatch color={color} key={color} />
+    ))}
+  </RadioGroup>
+);

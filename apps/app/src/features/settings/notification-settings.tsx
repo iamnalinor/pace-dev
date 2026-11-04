@@ -17,7 +17,7 @@ import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button } from "#app/ui/button.tsx";
 import { IconButton } from "#app/ui/icon-button.tsx";
 import { Segmented } from "#app/ui/segmented.tsx";
-import { PaceSwitch } from "#app/ui/switch-row.tsx";
+import { Switch } from "#app/ui/switch.tsx";
 import { TimeInput } from "#app/ui/time-input.tsx";
 import { useToast } from "#app/ui/toast.tsx";
 import { isChannelOn, NOTIFICATION_CHANNELS, NOTIFICATION_KINDS } from "@pace/core";
@@ -58,7 +58,7 @@ export const NotificationChannels = () => {
           </Text>
           {NOTIFICATION_CHANNELS.map((channel) => (
             <View className="w-row items-center" key={channel} role="cell">
-              <PaceSwitch
+              <Switch
                 isOn={isChannelOn(settings, kind, channel)}
                 label={t("notify.switch", {
                   channel: t(`notify.channel.${channel}`),
@@ -165,7 +165,12 @@ export const PushStatus = () => {
       <Text className="font-sans text-footnote text-label-secondary">
         {t("settings.push.hint")}
       </Text>
-      <Segmented onChange={pick} options={options} value={state.choice ?? "auto"} />
+      <Segmented
+        label={t("settings.push.hint")}
+        onChange={pick}
+        options={options}
+        value={state.choice ?? "auto"}
+      />
       {state.isFcmOtherProject ? (
         <Text className="font-sans text-footnote text-label-secondary">
           {t("settings.push.otherProject")}
@@ -214,7 +219,6 @@ export const DigestWindows = () => {
             onPress={() => {
               save(digestWindows.filter((_, position) => position !== index));
             }}
-            variant="plain"
           />
         </View>
       ))}

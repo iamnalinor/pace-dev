@@ -42,7 +42,7 @@ describe("SectionHeader (spec §4.1.1, §5.0.3)", () => {
     await renderScreen(
       <SectionHeader
         action={
-          <Button onPress={() => undefined} variant="ghost">
+          <Button onPress={() => undefined} variant="plain">
             Show all
           </Button>
         }

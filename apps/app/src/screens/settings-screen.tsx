@@ -88,6 +88,7 @@ const LookRows = () => {
     <>
       <Row label={t("settings.theme")}>
         <Segmented
+          label={t("settings.theme")}
           onChange={theme.setPreference}
           options={THEME_PREFERENCES.map((value) => ({
             label: t(`settings.theme.${value}`),
@@ -99,6 +100,7 @@ const LookRows = () => {
       <Row label={t("settings.language")}>
         <KnownAfterSync>
           <Segmented
+            label={t("settings.language")}
             onChange={(language) => {
               void run(actions.setLanguage(language));
             }}

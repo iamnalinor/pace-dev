@@ -1,12 +1,15 @@
-import { useRef } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 
-import type { TagColor } from "./color.tsx";
+import type { TagColor } from "./hue.ts";
 import type { IconName } from "./icon.tsx";
 
 import { Chip } from "./chip.tsx";
+import { RadioGroup, type RadioValue, type RadioVia } from "./radio-group.tsx";
+import { Text } from "./text.tsx";
 
-export type RadioChoice<T extends string> = {
+export type { RadioVia } from "./radio-group.tsx";
+
+export type RadioChoice<T extends RadioValue> = {
   readonly value: T;
   /** What the chip shows. */
   readonly text: string;
@@ -14,102 +17,67 @@ export type RadioChoice<T extends string> = {
   readonly label?: string;
   /** An inline icon, in the tone the chip gives it (`onAccent` once chosen). */
   readonly icon?: IconName;
-  /** The chip's colour mark (a preset's, a project's, an importance's). */
+  /** The project's or the category's hue: a dot before the text. */
   readonly color?: null | TagColor;
 };
 
-/** The keys that move the choice inside the group, and which way. */
-const STEP: Readonly<Record<string, -1 | 1>> = {
-  ArrowDown: 1,
-  ArrowLeft: -1,
-  ArrowRight: 1,
-  ArrowUp: -1,
-};
-
-/** How a choice was made: a press (Enter, Space, a click or a tap) or an arrow moving through. */
-export type RadioVia = "arrow" | "press";
-
 /**
-A labelled radio group of chips with one tab stop, as a radio group is on the web: Tab reaches the
-chosen chip, the arrows choose the next or the previous one (wrapping) and take the focus with
-them (QA round 20 L7: one stop per chip), without scrolling the page as well (round 7 review 9).
-`onChange` hears how the choice was made, so a caller can act on a press and leave an arrow's
-choice alone (the close sheet's Reason takes the cursor only on a press).
+A labelled row of choice chips: a `RadioGroup` (one tab stop, the arrows move the choice, QA round
+20 L7 and 21 L1) with its label shown over the chips. `onChange` hears how the choice was made, so
+a caller can act on a press and leave an arrow's choice alone (the close sheet's Reason takes the
+cursor only on a press). The chips wrap; their 44 px targets touch row to row and never overlap.
 */
-export const RadioChips = <T extends string>({
+export const RadioChips = <T extends RadioValue>({
   choices,
   label,
   onChange,
   onCheckedNode,
+  showLabel = true,
   tall = false,
   value,
 }: {
   /** Hears the chosen chip's node, for a caller that moves focus onto it. */
   readonly onCheckedNode?: (node: null | View) => void;
   readonly choices: readonly RadioChoice<T>[];
-  /** Shown over the chips and naming the group. */
+  /** Names the group; shown over the chips unless `showLabel` is false (a label beside it says it). */
   readonly label: string;
   readonly onChange: (value: T, via: RadioVia) => void;
+  readonly showLabel?: boolean;
   readonly tall?: boolean;
-  readonly value: T;
-}) => {
-  type KeyLike = {
-    readonly key?: string;
-    readonly nativeEvent?: { readonly key?: string };
-    readonly preventDefault?: () => void;
-  };
-  const chipsRef = useRef(new Map<T, View>());
-  // With nothing chosen among them (a choice made elsewhere), the first chip is the tab stop.
-  const stop = choices.some((choice) => choice.value === value) ? value : choices[0]?.value;
-  const onKeyDown = (event: KeyLike): void => {
-    const step = STEP[event.key ?? event.nativeEvent?.key ?? ""];
-    const at = choices.findIndex((choice) => choice.value === stop);
-    const next = step === undefined ? undefined : choices.at((at + step) % choices.length);
-    if (next === undefined) {
-      return;
-    }
-    event.preventDefault?.();
-    onChange(next.value, "arrow");
-    (chipsRef.current.get(next.value) as unknown as null | { focus?: () => void })?.focus?.();
-  };
-  // react-native-web passes the key events to the DOM; React Native's types do not list them.
-  const keys = { onKeyDown };
-  return (
-    <View className="gap-2">
-      <Text className="font-sans text-caption font-normal text-label-tertiary">{label}</Text>
-      <View
-        accessibilityLabel={label}
-        className="flex-row flex-wrap gap-2"
-        role="radiogroup"
-        {...(keys as object)}
-      >
-        {choices.map((choice) => (
-          <Chip
-            key={choice.value}
-            {...(choice.color !== undefined && { color: choice.color })}
-            {...(choice.icon !== undefined && { icon: choice.icon })}
-            onPress={() => {
-              onChange(choice.value, "press");
-            }}
-            ref={(node) => {
-              if (node === null) {
-                chipsRef.current.delete(choice.value);
-              } else {
-                chipsRef.current.set(choice.value, node);
-              }
-              if (choice.value === value) {
-                onCheckedNode?.(node);
-              }
-            }}
-            selected={choice.value === value}
-            tabIndex={choice.value === stop ? 0 : -1}
-            tall={tall}
-            {...(choice.label !== undefined && { label: choice.label })}
-          >
-            {choice.text}
-          </Chip>
-        ))}
-      </View>
-    </View>
-  );
-};
+  readonly value: null | T;
+}) => (
+  <View className="gap-1">
+    {showLabel ? (
+      <Text role="footnote" tone="tertiary">
+        {label}
+      </Text>
+    ) : null}
+    <RadioGroup
+      className="flex-row flex-wrap gap-x-2"
+      label={label}
+      onChange={onChange}
+      value={value}
+      values={choices.map((choice) => choice.value)}
+    >
+      {choices.map((choice) => (
+        <Chip
+          hue={choice.color}
+          icon={choice.icon}
+          key={choice.value}
+          label={choice.label}
+          ref={
+            onCheckedNode !== undefined && choice.value === value
+              ? (node: null | View) => {
+                  onCheckedNode(node);
+                }
+              : undefined
+          }
+          tall={tall}
+          value={choice.value}
+        >
+          {choice.text}
+        </Chip>
+      ))}
+    </RadioGroup>
+  </View>
+);

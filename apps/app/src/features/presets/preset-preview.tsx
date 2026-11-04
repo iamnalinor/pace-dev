@@ -44,11 +44,7 @@ export const PresetPreview = ({ draft }: { readonly draft: PresetDraft }) => {
             tag={{ color: preview.color, tag: { kind: "project", name } }}
           />
           {preview.progressMode === "none" ? null : (
-            <ProgressBar
-              label={t("presets.preview")}
-              marker={null}
-              value={PREVIEW_SAMPLE.progress}
-            />
+            <ProgressBar label={t("presets.preview")} value={PREVIEW_SAMPLE.progress} />
           )}
         </View>
       </View>

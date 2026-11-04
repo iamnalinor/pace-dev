@@ -5,11 +5,15 @@ import type { Task } from "@pace/core";
 
 import { useAppState, useT } from "#app/app-state.tsx";
 import { Icon } from "#app/ui/icon.tsx";
-import { spacePress } from "#app/ui/space-press.ts";
+import { ListRow } from "#app/ui/list-row.tsx";
+import { RadioGroup } from "#app/ui/radio-group.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 import { Text as KitText } from "#app/ui/text.tsx";
 
 const MAX_RESULTS = 8;
+
+/** "No task" among the task ids (a radio needs a value; no id is empty). */
+const NO_TASK = "";
 
 const taskOrder = (a: Task, b: Task): number => {
   if (a.closed === null && b.closed !== null) {
@@ -61,25 +65,27 @@ export const ActivityTaskField = ({
         <Icon name="chevron-down" size="inline" />
       </Pressable>
       {isOpen ? (
-        <View accessibilityLabel={t("day.taskLink")} className="gap-1" role="radiogroup">
+        <View className="gap-1">
           <TextField label={t("day.findTask")} onChangeText={setQuery} value={query} />
-          <TaskChoice
-            isSelected={value === null}
-            label={t("day.noTask")}
-            onPress={() => {
-              choose(null);
+          <RadioGroup
+            label={t("day.taskLink")}
+            onChange={(taskId: string) => {
+              choose(taskId === NO_TASK ? null : taskId);
             }}
-          />
-          {matches.map((task) => (
-            <TaskChoice
-              isSelected={value === task.id}
-              key={task.id}
-              label={task.title}
-              onPress={() => {
-                choose(task.id);
-              }}
-            />
-          ))}
+            value={value ?? NO_TASK}
+            values={[NO_TASK, ...matches.map((task) => task.id)]}
+          >
+            <ListRow density="compact" select={NO_TASK} title={t("day.noTask")} />
+            {matches.map((task) => (
+              <ListRow
+                density="compact"
+                key={task.id}
+                select={task.id}
+                title={task.title}
+                titleLines={2}
+              />
+            ))}
+          </RadioGroup>
           {matches.length === 0 ? (
             <Text className="px-3 py-2 font-sans text-footnote text-label-secondary">
               {t("day.noTaskMatches")}
@@ -90,33 +96,3 @@ export const ActivityTaskField = ({
     </View>
   );
 };
-
-const TaskChoice = ({
-  isSelected,
-  label,
-  onPress,
-}: {
-  readonly isSelected: boolean;
-  readonly label: string;
-  readonly onPress: () => void;
-}) => (
-  <Pressable
-    accessibilityLabel={label}
-    accessibilityRole="radio"
-    aria-checked={isSelected}
-    className="min-h-hit-web justify-center rounded-lg px-3 active:opacity-75"
-    onPress={onPress}
-    {...spacePress(onPress)}
-  >
-    <Text
-      className={
-        isSelected
-          ? "font-sans text-subhead text-accent-text"
-          : "font-sans text-subhead font-normal text-label-primary"
-      }
-      numberOfLines={2}
-    >
-      {label}
-    </Text>
-  </Pressable>
-);

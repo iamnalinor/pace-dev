@@ -59,10 +59,10 @@ export const DateChip = ({
 
   return (
     <Chip
+      expanded={isOpen}
       icon={DATE_ICONS[kind]}
       label={`${t(dateLabel(kind))}: ${text}`}
       onPress={onToggle}
-      selected={isOpen}
     >
       {kind === "start" && value !== null ? `${t("edit.start")} ${text}` : text}
     </Chip>
@@ -134,7 +134,7 @@ export const DatePanel = ({
             onPress={() => {
               onChange(null);
             }}
-            variant="ghost"
+            variant="plain"
           >
             {t("composer.clear")}
           </Button>

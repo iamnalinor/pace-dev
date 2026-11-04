@@ -54,7 +54,7 @@ const Intro = ({
           <Button onPress={onContinue} width="fill">
             {t("onboarding.continue")}
           </Button>
-          <Button onPress={onLater} variant="ghost" width="fill">
+          <Button onPress={onLater} variant="plain" width="fill">
             {t("onboarding.notNow")}
           </Button>
         </>
@@ -113,7 +113,7 @@ const Step = ({
           <Button onPress={action.act} width="fill">
             {action.label}
           </Button>
-          <Button onPress={onSkip} variant="ghost" width="fill">
+          <Button onPress={onSkip} variant="plain" width="fill">
             {t("common.skip")}
           </Button>
         </>

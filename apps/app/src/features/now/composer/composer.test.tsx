@@ -122,13 +122,13 @@ describe("Composer", () => {
     await renderComposer(await createTestRuntime());
     await fireEvent.press(button("nav.newTask"));
     await fireEvent.press(screen.getByRole("radio", { name: "Homework" }));
-    await fireEvent.press(screen.getByRole("radio", { name: /^Estimate: /u }));
-    expect(screen.getByRole("radio", { name: "Estimate: Default (1h)" })).toBeChecked();
+    await fireEvent.press(screen.getByRole("button", { name: /^Estimate: /u }));
+    expect(screen.getByRole("button", { name: "Estimate: Default (1h)" })).toBeExpanded();
     expect(screen.queryByRole("radio", { name: "Default (1h)" })).toBeNull();
     expect(screen.queryByRole("radio", { name: "1h" })).toBeNull();
     await fireEvent.press(screen.getByRole("radio", { name: "30m" }));
-    expect(screen.getByRole("radio", { name: "Estimate: 30m" })).toBeOnTheScreen();
-    await fireEvent.press(screen.getByRole("radio", { name: /^Estimate: /u }));
+    expect(screen.getByRole("button", { name: "Estimate: 30m" })).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: /^Estimate: /u }));
     expect(screen.queryByRole("radio", { name: "Default (1h)" })).toBeNull();
     expect(screen.getByRole("radio", { name: "1h" })).toBeOnTheScreen();
   });
@@ -136,17 +136,17 @@ describe("Composer", () => {
   it("closes the due calendar after picking a day", async () => {
     await renderComposer(await createTestRuntime());
     await fireEvent.press(button("nav.newTask"));
-    await fireEvent.press(screen.getByRole("radio", { name: /Due: No deadline/u }));
+    await fireEvent.press(screen.getByRole("button", { name: /Due: No deadline/u }));
     expect(screen.getByRole("button", { name: /October 7/u })).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("button", { name: /October 7/u }));
     expect(screen.queryByRole("button", { name: /October 7/u })).toBeNull();
-    expect(screen.getByRole("radio", { name: "Due: tomorrow 23:59" })).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Due: tomorrow 23:59" })).toBeOnTheScreen();
   });
 
   it("closes the due calendar when another form field is touched", async () => {
     await renderComposer(await createTestRuntime());
     await fireEvent.press(button("nav.newTask"));
-    await fireEvent.press(screen.getByRole("radio", { name: /Due: No deadline/u }));
+    await fireEvent.press(screen.getByRole("button", { name: /Due: No deadline/u }));
     expect(screen.getByRole("button", { name: /October 7/u })).toBeOnTheScreen();
     await fireEvent(screen.getByLabelText(en("edit.description")), "touchStart");
     expect(screen.queryByRole("button", { name: /October 7/u })).toBeNull();
@@ -776,7 +776,7 @@ describe("Composer", () => {
     await renderComposer(await createTestRuntime());
     await fireEvent.press(button("nav.newTask"));
     await fireEvent.changeText(title(), "Leftover");
-    await fireEvent.press(screen.getByRole("radio", { name: /Due: No deadline/u }));
+    await fireEvent.press(screen.getByRole("button", { name: /Due: No deadline/u }));
     await fireEvent.press(screen.getByRole("button", { name: /October 7/u }));
     await fireEvent.press(screen.getByRole("radio", { name: en("form.repeat.daily") }));
     await fireEvent.press(button("form.addSubtask"));
@@ -788,7 +788,7 @@ describe("Composer", () => {
     expect(line()).toHaveDisplayValue("");
     await fireEvent.press(button("nav.newTask"));
     expect(title()).toHaveDisplayValue("");
-    expect(screen.getByRole("radio", { name: /Due: No deadline/u })).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: /Due: No deadline/u })).toBeOnTheScreen();
     expect(
       screen.getByRole("radio", { checked: true, name: en("form.repeat.none") }),
     ).toBeOnTheScreen();

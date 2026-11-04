@@ -45,7 +45,6 @@ export const DayNav = ({
         onPress={() => {
           onDate(day.previous);
         }}
-        variant="plain"
       />
       <IconButton
         icon={"calendar-days"}
@@ -53,7 +52,6 @@ export const DayNav = ({
         onPress={() => {
           setIsPicking(true);
         }}
-        variant="plain"
       />
       <IconButton
         disabled={day.next === null}
@@ -62,7 +60,6 @@ export const DayNav = ({
         onPress={() => {
           onDate(day.next);
         }}
-        variant="plain"
       />
       <Sheet
         closeLabel={t("common.close")}

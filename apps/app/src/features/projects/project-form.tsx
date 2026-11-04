@@ -83,7 +83,7 @@ export const ProjectForm = ({
       )}
       <View className="flex-row flex-wrap items-center justify-end gap-2">
         {extra === undefined ? null : <View className="mr-auto">{extra}</View>}
-        <Button hotkey={HOTKEYS.escape} onPress={onCancel} variant="ghost">
+        <Button onPress={onCancel} shortcut={HOTKEYS.escape} variant="plain">
           {t("common.cancel")}
         </Button>
         <Button onPress={() => void save()}>{submitLabel}</Button>

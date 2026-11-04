@@ -92,7 +92,7 @@ const LogFailed = ({ onRetry }: { readonly onRetry: () => void }) => {
     <View className="items-start">
       <Text className="font-sans text-footnote text-label-secondary">{t("decisions.failed")}</Text>
       <View className="-ml-4">
-        <Button onPress={onRetry} variant="ghost">
+        <Button onPress={onRetry} variant="plain">
           {t("decisions.retry")}
         </Button>
       </View>

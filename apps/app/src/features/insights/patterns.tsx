@@ -2,8 +2,8 @@ import { Text, View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { fillClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
+import { fillClass } from "#app/ui/hue.ts";
 import {
   focusSleepRows,
   fragmentationTiles,

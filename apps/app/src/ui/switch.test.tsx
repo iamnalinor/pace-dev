@@ -3,7 +3,7 @@ import { fireEvent, screen, within } from "@testing-library/react-native";
 import { renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 
-import { PaceSwitch } from "./switch-row.tsx";
+import { Switch } from "./switch.tsx";
 
 /** The size classes of the track: its box, the same in both states. */
 const box = (classes: string): readonly string[] =>
@@ -11,7 +11,7 @@ const box = (classes: string): readonly string[] =>
 
 const show = async (isOn: boolean, onChange: (isOn: boolean) => void = () => undefined) => {
   await renderScreen(
-    <PaceSwitch isOn={isOn} label="Night hours" onChange={onChange} />,
+    <Switch isOn={isOn} label="Night hours" onChange={onChange} />,
     await createTestRuntime({ world: "empty" }),
   );
   const track = screen.getByTestId("switch-track");
@@ -21,13 +21,17 @@ const show = async (isOn: boolean, onChange: (isOn: boolean) => void = () => und
   };
 };
 
-describe("PaceSwitch", () => {
-  it("is a 48 target around the 32 track, a pill so the focus ring follows it, with no extra room in the layout", async () => {
+describe("Switch", () => {
+  it("is the 48 target around the 32 track with no negative margin; the ring follows the pill", async () => {
     await show(false);
     const classes = (
       screen.getByRole("switch", { name: "Night hours" }).props["className"] as string
     ).split(" ");
-    expect(classes).toEqual(expect.arrayContaining(["-my-2", "h-hit", "rounded-pill", "shrink-0"]));
+    expect(classes).toEqual(expect.arrayContaining(["min-h-hit", "shrink-0"]));
+    expect(classes.some((name) => name.startsWith("-m"))).toBe(false);
+    expect(String(screen.getByTestId("pressable-visual").props["className"])).toContain(
+      "rounded-pill",
+    );
   });
 
   it("insets the off knob 8 px from the track's edge, the gap above and below it (2 border + 4 + 2)", async () => {
@@ -59,5 +63,20 @@ describe("PaceSwitch", () => {
     await show(false, onChange);
     await fireEvent.press(screen.getByRole("switch", { name: "Night hours" }));
     expect(onChange).toHaveBeenCalledWith(true);
+  });
+
+  it("is fill.1 with a quaternary knob and presses nothing when disabled (spec §3.7, no opacity)", async () => {
+    const onChange = jest.fn();
+    await renderScreen(
+      <Switch disabled isOn={false} label="Night hours" onChange={onChange} />,
+      await createTestRuntime({ world: "empty" }),
+    );
+    const track = screen.getByTestId("switch-track");
+    expect(String(track.props["className"])).toContain("bg-fill-1");
+    expect(String(within(track).getByTestId("switch-knob").props["className"])).toContain(
+      "bg-label-quaternary",
+    );
+    await fireEvent.press(screen.getByRole("switch", { name: "Night hours" }));
+    expect(onChange).not.toHaveBeenCalled();
   });
 });
