@@ -29,9 +29,10 @@ const registeredSheets = (): readonly string[] => {
     .toArray();
 };
 
-// A phone's sheet has no cross (the dim and the system's back close it); a dialog has one.
+// A dialog has a cross, and so has a phone's sheet on the web (spec §4.2.21: a phone's browser
+// has no Back to rely on); Android's sheet has none (its handle, the dim and Back close it).
 const SIZES = [
-  { closeStops: 0, height: 844, name: "phone", width: 390 },
+  { closeStops: 1, height: 844, name: "phone", width: 390 },
   { closeStops: 1, height: 900, name: "desktop", width: 1280 },
 ] as const;
 
@@ -271,3 +272,38 @@ for (const size of SIZES) {
     });
   });
 }
+
+/** Whether the focused element shows its ring (`:focus-visible`, never on a mouse click). */
+const hasFocusRing = async (page: Page): Promise<boolean> =>
+  await page.locator(":focus").evaluate((element) => element.matches(":focus-visible"));
+
+test.describe("keyboard only: a sheet opened from a list row (Review Focus 5)", () => {
+  test.use({ viewport: { height: 900, width: 1280 } });
+
+  test("focus starts on its first control, Escape closes it, focus goes back to the row with its ring", async ({
+    page,
+  }) => {
+    const { token } = await loginViaApi(page);
+    await seedLivedIn(token);
+    await page.goto("/history");
+    const undo = page.getByRole("button", { exact: true, name: ru["common.undo"] }).first();
+    await expect(undo).toBeVisible();
+    // From the keyboard: onto the row's control (a Shift+Tab and a Tab come back onto it, so the
+    // browser knows the keyboard moved it), then Enter opens the sheet.
+    await undo.focus();
+    await page.keyboard.press("Shift+Tab");
+    await page.keyboard.press("Tab");
+    await expect(undo).toBeFocused();
+    expect(await hasFocusRing(page)).toBe(true);
+    await page.keyboard.press("Enter");
+    await expect(page.locator(SURFACE)).toBeVisible();
+    await expect.poll(async () => (await focus(page)).isInSheet).toBe(true);
+    // The first control (Cancel), never the dim or the cross; its ring shows.
+    expect((await focus(page)).name).not.toBe(CLOSE);
+    expect(await hasFocusRing(page)).toBe(true);
+    await page.keyboard.press("Escape");
+    await expect(page.locator(SURFACE)).toHaveCount(0);
+    await expect(undo).toBeFocused();
+    expect(await hasFocusRing(page)).toBe(true);
+  });
+});

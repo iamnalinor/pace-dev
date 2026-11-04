@@ -235,9 +235,9 @@ export const PickedSheet = ({ onClose, picked, week }: PickedProps) => {
       closeLabel={t("common.close")}
       name="week-pick"
       onClose={onClose}
+      open
       subtitle={when}
       title={title}
-      visible
     >
       <PickedFacts onLeave={onClose} picked={picked} week={week} />
     </Sheet>

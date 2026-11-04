@@ -86,7 +86,10 @@ export type PressableProps<R extends AccessibilityRole = AccessibilityRole> = {
   /** The name said for it; required when it has no text child (an icon). */
   readonly label?: string | undefined;
   readonly selected?: (R extends SelectableRole ? boolean : never) | undefined;
-  readonly checked?: (R extends CheckableRole ? "mixed" | boolean : never) | undefined;
+  /** Checked; `mixed` only on a checkbox (ARIA allows it nowhere else). */
+  readonly checked?:
+    | (R extends "checkbox" ? "mixed" | boolean : R extends CheckableRole ? boolean : never)
+    | undefined;
   readonly disabled?: boolean | undefined;
   /** A control that shows and hides a region (a `Disclosure`'s trigger): `aria-expanded`. */
   readonly expanded?: (R extends ExpandableRole ? boolean : never) | undefined;
@@ -125,6 +128,14 @@ type AskedState = {
   readonly selected: boolean | undefined;
 };
 
+/** Disabled by either word for it. */
+const isDisabledBy = (disabled: boolean | undefined, ariaDisabled: boolean | undefined): boolean =>
+  disabled === true || ariaDisabled === true;
+
+/** Mixed is a checkbox's alone: a radio or a switch handed it reads unchecked. */
+const checkedOf = (role: AccessibilityRole, checked: "mixed" | boolean): "mixed" | boolean =>
+  checked === "mixed" && role !== "checkbox" ? false : checked;
+
 /** The state a role may say: selected for a tab, checked for a checkable, nothing else. */
 const stateOf = (
   role: AccessibilityRole,
@@ -133,7 +144,10 @@ const stateOf = (
   disabled: isDisabled,
   ...(expanded !== undefined && EXPANDABLE.has(role) && { expanded }),
   ...(selected !== undefined && SELECTABLE.has(role) && { selected }),
-  ...(checked !== undefined && CHECKABLE.has(role) && { checked }),
+  ...(checked !== undefined &&
+    CHECKABLE.has(role) && {
+      checked: checkedOf(role, checked),
+    }),
 });
 
 const shapeClass = (shape: Shape | undefined): string | undefined =>
@@ -162,9 +176,10 @@ never while disabled (the native Pressable fires no press then). A Pressable wit
 long press is not a control: it gets no press, no state layer and no haptic (`isLive`).
 */
 export const usePressableProps = <R extends AccessibilityRole>({
+  "aria-disabled": ariaDisabled,
   checked,
   className,
-  disabled = false,
+  disabled: isDisabledProp,
   expanded,
   haptic,
   label,
@@ -176,7 +191,10 @@ export const usePressableProps = <R extends AccessibilityRole>({
   shape,
   visual,
   ...rest
-}: PressableProps<R>) => {
+}: PressableProps<R> & { readonly "aria-disabled"?: boolean | undefined }) => {
+  // A hyphenated attribute passes any JSX type check: `aria-disabled` disables as `disabled` does,
+  // never a control that looks disabled and still presses (3.2 re-review).
+  const isDisabled = isDisabledBy(isDisabledProp, ariaDisabled);
   const press = useCallback(
     (event: GestureResponderEvent) => {
       if (haptic !== undefined && haptic !== "longPress") {
@@ -205,7 +223,7 @@ export const usePressableProps = <R extends AccessibilityRole>({
     readonly onLongPress: (() => void) | undefined;
     readonly onPress: ((event: GestureResponderEvent) => void) | undefined;
   };
-  const state = stateOf(role, { checked, expanded, isDisabled: disabled, selected });
+  const state = stateOf(role, { checked, expanded, isDisabled, selected });
   const shared: SharedProps = {
     ...(label !== undefined && { accessibilityLabel: label }),
     accessibilityRole: role,
@@ -215,7 +233,7 @@ export const usePressableProps = <R extends AccessibilityRole>({
     ...(state.checked !== undefined && { "aria-checked": state.checked }),
     ...(state.expanded !== undefined && { "aria-expanded": state.expanded }),
     className: targetClass(className, { shape, visual }),
-    disabled,
+    disabled: isDisabled,
     onLongPress: onLongPress === undefined ? undefined : longPress,
     onPress: onPress === undefined ? undefined : press,
   };

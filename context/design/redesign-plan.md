@@ -589,10 +589,11 @@ toast/overlay layer.
       over the tab bar (bug-lessons 10).
 - [ ] PR #48 follow-up: the sidebar highlights Settings while New preset is open (see "PR #48 follow-ups (triage)").
       QA round 23 R23-14 is the same finding on Presets and New preset.
+- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): sidebar rows on `ListRow`/`NavItem` with the same 4 px selected bar as `ListRow`; rail haptics; the header scroll-edge fill (F-LAY-13: `bg.app` + a `separator` hairline once content scrolls under `ScreenHeader`), which no task owned.
 - [ ] Commit.
 
 ---
-- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): sidebar rows on `ListRow`/`NavItem` with the same 4 px selected bar as `ListRow`; rail haptics; the header scroll-edge fill (F-LAY-13: `bg.app` + a `separator` hairline once content scrolls under `ScreenHeader`), which no task owned.
+
 
 ## Batch 4 — Shared rows and screens (PR "Design overhaul 3/7: screens")
 
@@ -1113,3 +1114,5 @@ Task 3.5 (2026-11-03, `Presence` and `Disclosure`): **68** warnings of `pace/no-
 Task 3.7 (2026-11-03, Toast placement and Tooltip): **66** warnings of `pace/no-raw-design-values` (down from 68): the toast's action and the offline pill's Retry (`active:opacity-70` on raw Pressables) are the kit `Pressable` now. `DESIGN_VALUE_WARNINGS` = 66; bare pressables 32 and kit primitives 10 unchanged by this task (Tasks 3.6/3.8/3.9 run in parallel and lower their own; the controller sums them on merge).
 
 Task 3.10 (2026-11-03, Sidebar and TabBar): **`KIT_PRIMITIVE_WARNINGS` = 9** (down from 10): the tab label is the kit `Text` (`caption`, `chrome`, wrapping) instead of React Native's with `numberOfLines`. Design values 66 and bare pressables 32 unchanged by this task.
+
+Task 3.6 (2026-11-03, `Sheet`, `Dialog`, `Popover`): **67** warnings of `pace/no-raw-design-values` (down from 68): the sheet's `shadow-lg` became the `shadow.overlay` token (`shadow(scheme, "overlay")`). `DESIGN_VALUE_WARNINGS` = 67; bare pressables 32 and kit primitives 10 unchanged.

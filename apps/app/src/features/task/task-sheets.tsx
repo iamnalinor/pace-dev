@@ -288,8 +288,8 @@ export const EditTaskSheet = ({
       }
       name="task-edit"
       onClose={onClose}
+      open
       title={t("edit.title")}
-      visible
     >
       <TaskFields
         isStartChosen={isStartChosen(state, { before, taskId: view.id, values })}

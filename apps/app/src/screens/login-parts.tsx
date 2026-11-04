@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { ActivityIndicator, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Text, View } from "react-native";
 
 import type { MessageKey } from "@pace/core";
+
+import { TextField } from "#app/ui/text-field.tsx";
 
 import type { BotLoginPhase } from "./use-bot-login.ts";
 
@@ -68,13 +70,13 @@ export const DevLoginForm = ({ onFailure }: { readonly onFailure: () => void }) 
       <Text className="font-sans text-caption2 font-normal uppercase tabular-nums text-label-tertiary">
         {t("login.dev")}
       </Text>
-      <TextInput
-        accessibilityLabel={t("login.devId")}
-        autoCapitalize="none"
-        className="h-12 rounded-md bg-fill-3 px-3 font-sans text-callout tabular-nums text-label-primary"
+      <TextField
+        isLabelHidden
         keyboardType="number-pad"
+        label={t("login.devId")}
         onChangeText={setTelegramId}
         placeholder={t("login.devId")}
+        purpose="token"
         value={telegramId}
       />
       <Button

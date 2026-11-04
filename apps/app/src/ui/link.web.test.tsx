@@ -47,6 +47,31 @@ describe("Link on the web", () => {
     expect(screen.queryByText("Week screen")).toBeNull();
   });
 
+  it("is disabled by `aria-disabled` as by `disabled`: no live href either way (3.2 re-review)", async () => {
+    await renderRouter(
+      routes(
+        // A hyphenated attribute passes any JSX type: the kit reads it as the disabled state.
+        <Link aria-disabled href="/week">
+          <Text>Week</Text>
+        </Link>,
+      ),
+    );
+    const link = screen.getByRole("link", { name: "Week" });
+    expect(link.props["href"]).toBeUndefined();
+    expect(link).toBeDisabled();
+    await fireEvent.press(link);
+    expect(screen.queryByText("Week screen")).toBeNull();
+  });
+
+  it("takes no other disabled state than `disabled` and `aria-disabled`", () => {
+    const typed = [
+      <Link disabled href="/week" key="disabled" />,
+      // @ts-expect-error -- `accessibilityState` is the kit's to set
+      <Link accessibilityState={{ disabled: true }} href="/week" key="state" />,
+    ];
+    expect(typed).toHaveLength(2);
+  });
+
   it("opens an address outside the app in a new tab, without the opener", async () => {
     await renderRouter(
       routes(

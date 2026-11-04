@@ -85,25 +85,23 @@ export const AddComputer = ({
       footer={created === null ? undefined : <ComputerStepsDone onDone={onClose} />}
       name="add-computer"
       onClose={onClose}
+      open
       title={t("devices.add")}
-      visible
     >
       {created === null ? (
         <View className="gap-3">
           {/* The name is the sheet's one question: focused, the suggestion selected to type over. */}
           <TextField
-            autoComplete="off"
             autoCorrect={false}
-            enterKeyHint="done"
             error={hasFailed ? t("devices.createFailed") : null}
             label={t("devices.name")}
             maxLength={80}
             onChangeText={setName}
             onSubmitEditing={() => void submit()}
+            purpose="name"
             ref={nameRef}
             returnKeyType="done"
             selectTextOnFocus
-            spellCheck={false}
             value={name}
           />
           {/* The field takes Enter itself; the button shows it, as other forms' do. */}

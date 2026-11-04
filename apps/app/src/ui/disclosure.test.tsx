@@ -115,10 +115,14 @@ describe("Disclosure (spec §4.1.1, §6 disclosure)", () => {
     await fireEvent(screen.getByTestId("disclosure-content"), "layout", layout(160));
     mockTimings.length = 0;
     await fireEvent.press(screen.getByRole("button", { name: "In future · 3" }));
-    // The close's height starts at once from 160 (a 0 ms step), then goes to 0 in the exit time.
-    const start = mockTimings.findIndex((timing) => timing.duration === 0);
-    expect(mockTimings[start]?.to).toBe(160);
-    expect(mockTimings[start + 1]).toMatchObject({ duration: 160, to: 0 });
+    // The height is already 160 when the close starts (set as a value, not a 0 ms step, which
+    // still costs the first frame: parked N2), and goes to 0 in the exit time.
+    expect(mockTimings.some((timing) => timing.duration === 0)).toBe(false);
+    // The height and the opacity leave together in the exit time (the chevron turns on its own).
+    expect(mockTimings.filter((timing) => timing.duration === 160)).toEqual([
+      expect.objectContaining({ to: 0 }),
+      expect.objectContaining({ to: 0 }),
+    ]);
   });
 
   it("tells when the content is shown, after its layout and its animation (focus moves then)", async () => {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, Text } from "react-native";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { MetaLine } from "#app/shared/meta-line.tsx";
@@ -9,7 +9,7 @@ import { Icon } from "#app/ui/icon.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
 import { Sheet } from "#app/ui/sheet.tsx";
 import { SwitchRow } from "#app/ui/switch-row.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
+import { TextField } from "#app/ui/text-field.tsx";
 import { IS_TOUCH_BROWSER } from "#app/ui/use-hotkey.tsx";
 import { type ActionResult, taskChoices, type TimeButtonView } from "@pace/client";
 import { formatDuration } from "@pace/core";
@@ -101,24 +101,20 @@ const TaskSearch = ({
   readonly onChange: (query: string) => void;
 }) => {
   const t = useT();
-  const { palette } = useTheme();
   // On a phone, or any touch screen in a browser, the keyboard would cover the list it narrows:
   // it opens on a tap in the field (fix round 5 V4: a wide touch browser is no computer).
   const isTypedInAtOnce = useIsWide() && !IS_TOUCH_BROWSER;
   return (
-    <View className="h-hit-web flex-row items-center gap-2 rounded-lg border border-outline bg-app px-3">
-      <Icon name="search" size="inline" />
-      <TextInput
-        accessibilityLabel={t("time.taskSearch")}
-        autoFocus={isTypedInAtOnce}
-        className="h-hit-web flex-1 font-sans text-callout text-label-primary"
-        onChangeText={onChange}
-        placeholder={t("time.taskSearch")}
-        placeholderTextColor={palette["label.tertiary"]}
-        returnKeyType="search"
-        value={query}
-      />
-    </View>
+    <TextField
+      autoFocus={isTypedInAtOnce}
+      isLabelHidden
+      label={t("time.taskSearch")}
+      onChangeText={onChange}
+      placeholder={t("time.taskSearch")}
+      purpose="search"
+      returnKeyType="search"
+      value={query}
+    />
   );
 };
 
@@ -224,8 +220,8 @@ export const ChoicesSheet = ({
       name="time-choices"
       {...(hasHeader && { header })}
       onClose={onClose}
+      open
       title={t(button.labelKey)}
-      visible
     >
       {button.kind === "calendar" ? <CalendarChoices {...props} /> : null}
       {button.kind === "task" ? (

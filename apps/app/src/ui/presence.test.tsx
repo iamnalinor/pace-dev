@@ -55,6 +55,21 @@ describe("Presence (spec §4.1.1, §6)", () => {
     expect(onExited).toHaveBeenCalledTimes(1);
   });
 
+  it("takes no touches while it leaves (parked N4: the inspector took presses through its exit)", async () => {
+    const view = await render(
+      <Presence show testID="presence">
+        <Text>Preview</Text>
+      </Presence>,
+    );
+    expect(screen.getByTestId("presence").props["pointerEvents"]).not.toBe("none");
+    await view.rerender(
+      <Presence show={false} testID="presence">
+        <Text>Preview</Text>
+      </Presence>,
+    );
+    expect(screen.getByTestId("presence").props["pointerEvents"]).toBe("none");
+  });
+
   it("animates nothing on its first render (initial={false}, F-MOT-07), but enters when shown later", async () => {
     const view = await render(
       <Presence show>

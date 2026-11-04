@@ -25,7 +25,7 @@ The `pace/no-raw-design-values` backlog (redesign-plan, "Lint baseline"). An exa
 warnings fail, fewer fail too until this number is lowered to the new count. At 0 the rule
 becomes an error and this allowance goes away.
 */
-const DESIGN_VALUE_WARNINGS = 66;
+const DESIGN_VALUE_WARNINGS = 65;
 
 /**
 The bare-pressable backlog (bug-lessons F-CMP-01: a React Native `Pressable`/`Touchable*` in

@@ -4,6 +4,7 @@ import { View } from "react-native";
 
 import { Button } from "./button.tsx";
 import { HOTKEYS } from "./hotkeys.ts";
+import { useRegisterSheetPrimary } from "./sheet-submit.tsx";
 
 /**
 A closing row. A form's sheet has only its action, full width: leaving is the dim, the
@@ -33,6 +34,10 @@ export const SheetActions = ({
 }) => {
   // A confirmation (Delete for good) is never one keystroke away; a form's action is.
   const isConfirmation = onCancel !== undefined && cancelLabel !== undefined;
+  // Enter in a single-line field presses a form's action (QA round 21 M1), never a confirmation's.
+  useRegisterSheetPrimary(
+    isConfirmation ? null : { isEnabled: !isDisabled && !isBusy, press: onPrimary },
+  );
   return (
     <View className="flex-row gap-2">
       {isConfirmation ? (

@@ -123,9 +123,9 @@ export const ChangeServerSheet = ({ onClose }: { readonly onClose: () => void })
       formLabel={t("server.title")}
       name="change-server"
       onClose={onClose}
+      open
       subtitle={t("server.subtitle")}
       title={t("server.title")}
-      visible
     >
       <View className="gap-3">
         <TextField

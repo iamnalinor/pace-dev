@@ -15,6 +15,11 @@ a Ctrl/⌘-, Shift- or middle-click open a new tab, and navigates in place on a 
 disabled link has no `href`: react-native-web refuses its press, but the browser would still
 follow the address.
 */
+/** Disabled by either word for it (a hyphenated `aria-disabled` passes any JSX type). */
+const isDisabledAnchor = (props: object): boolean =>
+  (props as { readonly disabled?: boolean }).disabled === true ||
+  (props as { readonly "aria-disabled"?: boolean })["aria-disabled"] === true;
+
 const Anchor = ({
   download: _download,
   href,
@@ -27,7 +32,7 @@ const Anchor = ({
   <Pressable
     {...rest}
     // react-native-web's props React Native's types do not know.
-    {...(rest.disabled !== true && ({ href, hrefAttrs: { rel, target } } as object))}
+    {...(!isDisabledAnchor(rest) && ({ href, hrefAttrs: { rel, target } } as object))}
     onPress={onClick ?? onPress}
     role="link"
   />

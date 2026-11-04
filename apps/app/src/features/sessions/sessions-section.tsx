@@ -11,6 +11,7 @@ import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { useIsWide } from "#app/ui/layout.ts";
+import { OverlayPresence } from "#app/ui/overlay-presence.tsx";
 import { Skeleton } from "#app/ui/skeleton.tsx";
 import { type SessionRow as Row, sessionRows } from "@pace/client";
 import { type Sessions, useSessions } from "@pace/client/react";
@@ -222,9 +223,9 @@ export const SessionsSection = () => {
           {t("connectAi.open")}
         </Button>
       </View>
-      {opened === "addComputer" ? (
-        <AddComputer create={sessions.createAgent} onClose={close} />
-      ) : null}
+      <OverlayPresence value={opened === "addComputer" ? opened : null}>
+        {() => <AddComputer create={sessions.createAgent} onClose={close} />}
+      </OverlayPresence>
       <ConnectAiSheet onClose={close} open={opened === "connectAi"} />
     </View>
   );

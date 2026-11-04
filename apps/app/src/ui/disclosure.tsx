@@ -4,7 +4,6 @@ import Animated, {
   type SharedValue,
   useAnimatedStyle,
   useSharedValue,
-  withSequence,
   withTiming,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
@@ -76,15 +75,12 @@ const startGrow = ({ height, isReduced, measured, opacity }: Box, onDone: () => 
 const startShrink = ({ height, isReduced, measured, opacity }: Box, onDone: () => void): void => {
   const duration = isReduced ? motion.reduced.fade : motion.exit.md;
   // From the content's current height (it may have grown while open), never a stale one: a
-  // clipped first frame is bug class 5.
-  height.set(
-    isReduced
-      ? measured
-      : withSequence(
-          withTiming(measured, { duration: 0 }),
-          withTiming(0, { duration, easing: EASING.exit }),
-        ),
-  );
+  // clipped first frame is bug class 5. The value is set first, so the animation starts from it in
+  // the same frame (a 0 ms timing step would cost that frame: parked N2).
+  height.set(measured);
+  if (!isReduced) {
+    height.set(withTiming(0, { duration, easing: EASING.exit }));
+  }
   opacity.set(
     withTiming(0, { duration, easing: EASING.exit }, (isFinished) => {
       if (isFinished === true) {
@@ -157,6 +153,10 @@ const useContentMotion = (isOpen: boolean, onShown: (() => void) | undefined) =>
     }
     const isNew = measured !== measuredRef.current;
     measuredRef.current = measured;
+    if (phase === "shown") {
+      // Kept in step with the content while it is open, so a close starts from its real height.
+      height.set(measured);
+    }
     if (phase === "opening" && isNew) {
       startGrow({ height, isReduced, measured, opacity }, settle);
     }

@@ -58,8 +58,8 @@ export const ProjectSheet = ({
       closeLabel={t("common.close")}
       name="move-to-project"
       onClose={onClose}
+      open
       title={t("task.moveTitle")}
-      visible
     >
       <RadioGroup
         label={t("task.moveTitle")}

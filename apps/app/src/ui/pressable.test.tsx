@@ -299,6 +299,20 @@ describe("Pressable (the kit's state layer, spec §3.7)", () => {
     expect(done.props["aria-selected"]).toBeUndefined();
   });
 
+  it("says mixed only on a checkbox: a radio or a switch handed mixed reads unchecked", async () => {
+    const loose = { checked: "mixed", role: "radio" } as unknown as {
+      checked: boolean;
+      role: "radio";
+    };
+    await renderLight(
+      <Pressable {...loose} onPress={jest.fn()}>
+        <Text>Weekly</Text>
+      </Pressable>,
+    );
+    const radio = screen.getByRole("radio", { name: "Weekly" });
+    expect(radio.props["accessibilityState"]).toMatchObject({ checked: false });
+  });
+
   it("types selected for tabs and checked for checkables only", () => {
     const typed = [
       <Pressable key="tab" role="tab" selected />,
@@ -312,8 +326,13 @@ describe("Pressable (the kit's state layer, spec §3.7)", () => {
       <Pressable expanded key="button-expanded" role="button" />,
       // @ts-expect-error -- ARIA lets no switch say expanded
       <Pressable expanded key="switch-expanded" role="switch" />,
+      <Pressable checked="mixed" key="checkbox-mixed" role="checkbox" />,
+      // @ts-expect-error -- only a checkbox may be mixed (3.1 re-review)
+      <Pressable checked="mixed" key="radio-mixed" role="radio" />,
+      // @ts-expect-error -- only a checkbox may be mixed
+      <Pressable checked="mixed" key="switch-mixed" role="switch" />,
     ];
-    expect(typed).toHaveLength(7);
+    expect(typed).toHaveLength(10);
   });
 
   it("ripples and plays nothing when it has nothing to do", async () => {

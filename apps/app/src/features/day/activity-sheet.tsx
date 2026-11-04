@@ -262,11 +262,11 @@ export const ActivitySheet = ({ onClose, target, zone }: ActivitySheetProps) => 
       closeLabel={t("common.close")}
       name="activity"
       onClose={onClose}
+      open
       // Only the times are typed, so the days they fall on are named here: both for a night, and
       // as typed once the times read right (a retyped end moves near where it was).
       subtitle={formatDaySpan(range ?? target, zone, language)}
       title={t(target.kind === "edit" ? "day.editTitle" : "day.logPast")}
-      visible
     >
       {/* Said under each field once a save was tried, and gone as soon as it reads right. */}
       <ActivityFields

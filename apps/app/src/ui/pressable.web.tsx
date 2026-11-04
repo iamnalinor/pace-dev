@@ -18,15 +18,15 @@ const TARGET = "min-h-hit-web min-w-hit-web";
 
 type PressHandler = ((event: GestureResponderEvent) => void) | undefined;
 
-type KeyEvent = Parameters<NonNullable<SpacePress["onKeyDown"]>>[0] & {
-  readonly isDefaultPrevented?: () => boolean;
-};
+type KeyEvent = Parameters<NonNullable<SpacePress["onKeyDown"]>>[0];
 
 /**
 Space for a tab, a checkbox, a radio and a switch (bug-lessons class 113), with the disabled gate in
-one place. A caller's own key handler runs first; if it already pressed on Space (an older caller
-that still spreads `spacePress` prevents the key's default), the press is not repeated. The key
-event stands in for the press event: these roles never read a pointer's modifiers.
+one place. The kit owns that key: a Space aimed at the control itself never reaches the caller's
+own key handler, so a caller that still presses on Space (spreading `spacePress`, or by hand
+without preventing the default) cannot press twice (3.1 re-review); its other keys, and a Space
+typed in something inside the control, still reach it. The key event stands in for the press
+event: these roles never read a pointer's modifiers.
 */
 const spaceKey = (
   role: AccessibilityRole,
@@ -37,8 +37,8 @@ const spaceKey = (
     return callerKeyDown;
   }
   return (event) => {
-    callerKeyDown?.(event);
-    if (event.isDefaultPrevented?.() === true) {
+    if (event.key !== " " || event.target !== event.currentTarget) {
+      callerKeyDown?.(event);
       return;
     }
     const press =
