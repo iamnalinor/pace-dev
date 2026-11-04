@@ -1,48 +1,60 @@
 import { useState } from "react";
-import { Image, Text, View } from "react-native";
+import { Image, View } from "react-native";
 
 import { useAuth, useLanguage } from "#app/app-state.tsx";
-import { Icon, type IconSize } from "#app/ui/icon.tsx";
+import { Icon } from "#app/ui/icon.tsx";
+import { Text } from "#app/ui/text.tsx";
 import { initials } from "@pace/core";
 
-/** Telegram photo cached at Pace, with the owner's initials (the person icon when the name has none) when no photo is available. */
-/** From this size (the default 44) the person glyph is a control icon; smaller, an inline one. */
-const LARGE_AVATAR = 32;
+/** The two sizes (spec §4.3.3): 24 (`icon.bar`) in chrome, 40 (`space.9`) beside a row's name. */
+export type AvatarSize = 24 | 40;
 
-const glyphSize = (avatar: number): IconSize => (avatar >= LARGE_AVATAR ? "control" : "inline");
+/** The circle at its size: the classes spelled out, so Tailwind finds them. */
+const CIRCLE: Readonly<Record<AvatarSize, string>> = { 24: "h-6 w-6", 40: "h-10 w-10" };
 
-export const UserAvatar = ({ size = 44 }: { readonly size?: number }) => {
+/** The face without a photo: the initials, or the person icon when the name has no letter. */
+const Initials = ({ letters, size }: { readonly letters: string; readonly size: AvatarSize }) =>
+  letters === "" ? (
+    <View testID="avatar-person">
+      <Icon name="user" size={size === 40 ? "control" : "inline"} />
+    </View>
+  ) : (
+    <Text role={size === 40 ? "subhead" : "caption2"} tone="secondary">
+      {letters}
+    </Text>
+  );
+
+/**
+The owner's Telegram photo cached at Pace (spec §4.3.3), on a `fill.3` circle that holds its
+place while it loads (no shift); without a photo, the initials (graphemes, letters only; core's
+`initials`) in `label.secondary`, `caption2` at 24 (the 11 px floor) and `subhead` at 40, or the
+person icon when the name has no letter. Beside the visible name it is decorative: hidden from
+screen readers, which read the name itself.
+*/
+export const UserAvatar = ({ size = 40 }: { readonly size?: AvatarSize }) => {
   const { user } = useAuth();
   const language = useLanguage();
   const [failedUrl, setFailedUrl] = useState<null | string>(null);
   const photoUrl = user?.photoUrl ?? null;
-  const letters = initials(user?.name ?? "", language);
-  return photoUrl === null || failedUrl === photoUrl ? (
+  return (
     <View
-      className="items-center justify-center rounded-pill bg-accent-quiet"
-      style={{ width: size, height: size }}
+      accessibilityElementsHidden
+      aria-hidden
+      className={`${CIRCLE[size]} items-center justify-center overflow-hidden rounded-pill bg-fill-3`}
+      importantForAccessibility="no-hide-descendants"
+      testID="user-avatar"
     >
-      {letters === "" ? (
-        <View testID="avatar-person">
-          <Icon name="user" size={glyphSize(size)} tone="accent" />
-        </View>
+      {photoUrl === null || failedUrl === photoUrl ? (
+        <Initials letters={initials(user?.name ?? "", language)} size={size} />
       ) : (
-        <Text
-          className="font-sans font-semibold text-accent-text"
-          style={{ fontSize: size * 0.38 }}
-        >
-          {letters}
-        </Text>
+        <Image
+          className={CIRCLE[size]}
+          onError={() => {
+            setFailedUrl(photoUrl);
+          }}
+          source={{ uri: photoUrl }}
+        />
       )}
     </View>
-  ) : (
-    <Image
-      accessibilityLabel={user?.name}
-      onError={() => {
-        setFailedUrl(photoUrl);
-      }}
-      source={{ uri: photoUrl }}
-      style={{ width: size, height: size, borderRadius: size / 2 }}
-    />
   );
 };

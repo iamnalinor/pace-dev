@@ -1,6 +1,6 @@
 import { View } from "react-native";
 
-import { Inspector, type ShellProps, useShellInsets } from "./shell-regions.tsx";
+import { Inspector, type ShellProps, useRegionLayout, useShellInsets } from "./shell-regions.tsx";
 
 export type { ShellProps } from "./shell-regions.tsx";
 
@@ -15,7 +15,11 @@ export const Shell = ({ content, navigation, ...inspector }: ShellProps) => {
   return (
     <View className="flex-1 flex-row bg-app" style={insets} testID="shell">
       {navigation}
-      <View className="min-w-0 flex-1" testID="shell-content">
+      <View
+        className="min-w-0 flex-1"
+        testID="shell-content"
+        {...useRegionLayout(navigation !== undefined)}
+      >
         {content}
       </View>
       <Inspector {...inspector} />

@@ -51,7 +51,7 @@ export const IconButton = ({
     <Icon name={icon} size={size} tone={disabled ? "quaternary" : "primary"} />
   );
   return (
-    <Tooltip label={label} showsOnTap={false}>
+    <Tooltip label={label}>
       <Pressable
         accessibilityHint={hint}
         aria-busy={busy}

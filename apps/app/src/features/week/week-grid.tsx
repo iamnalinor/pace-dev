@@ -165,7 +165,7 @@ const ItemBox = ({
         top: px(item.at.top, grid.hourPx),
       }}
     >
-      <Tooltip isFilling label={`${label}, ${times}`} showsOnTap={false}>
+      <Tooltip isFilling label={`${label}, ${times}`}>
         <Pressable
           accessibilityLabel={named}
           accessibilityRole="button"

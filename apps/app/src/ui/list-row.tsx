@@ -87,7 +87,8 @@ export type ListRowProps = PressProps & RowProps;
 /** The first title line's box (`body` line height): leading and trailing centre on it. */
 const LINE_BOX = "min-h-6 justify-center";
 
-const SelectedBar = () => (
+/** The 4 px accent bar at a selected row's leading edge (a cue that is not colour alone, F-COL-02). */
+export const SelectedBar = () => (
   <View
     className="absolute inset-y-2 left-0.5 w-1 rounded-xs bg-accent"
     testID="list-row-selected-bar"

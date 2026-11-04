@@ -7,17 +7,13 @@ import { useOwnerName, useT } from "../app-state.tsx";
 import { requestNewTask } from "../shared/new-task-request.ts";
 import { NotificationBell } from "../shared/notifications/notification-bell.tsx";
 import { useWaitingCount } from "../shared/use-waiting-count.ts";
-import { UserAvatar } from "../shared/user-avatar.tsx";
 import { KeyHint } from "./button.tsx";
-import { CountBadge } from "./count-badge.tsx";
-import { cx } from "./cx.ts";
 import { HOTKEYS } from "./hotkeys.ts";
 import { Icon, type IconName } from "./icon.tsx";
-import { Link } from "./link.tsx";
 import { PaceMark } from "./logo.tsx";
+import { ARIA_CURRENT, type NavCurrent, NavItem } from "./nav-item.tsx";
 import { Pressable } from "./pressable.tsx";
 import { Text } from "./text.tsx";
-import { useDockToastsHere } from "./toast.tsx";
 import { useHotkey } from "./use-hotkey.tsx";
 
 export type Destination = {
@@ -73,22 +69,30 @@ export const DESTINATIONS: readonly Destination[] = [
   },
 ];
 
+/** Where the person is, for one destination: its own page, a screen it owns, or elsewhere. */
+export const currentOf = (destination: Destination, path: string): NavCurrent => {
+  if (path === destination.href || (path === "/add" && destination.href === "/")) {
+    return "page";
+  }
+  return destination.owns(path) ? "section" : null;
+};
+
 /** A destination link of the navigation (the sidebar's row, the rail's item). */
 export type DestinationLinkProps = {
   /** What waits behind it (the Inbox's badge); 0 for one without. */
   readonly count: number;
   readonly destination: Destination;
-  readonly isCurrent: boolean;
+  readonly current: NavCurrent;
 };
 
 /**
-What every destination link says: its address, `aria-current="page"` when it is the current one,
-and its name for screen readers with what waits behind it, if anything.
+What every destination link says: its address, `aria-current` (`page` on its own page, `true` on a
+screen it owns), and its name for screen readers with what waits behind it, if anything.
 */
-export const useDestinationLink = ({ count, destination, isCurrent }: DestinationLinkProps) => {
+export const useDestinationLink = ({ count, current, destination }: DestinationLinkProps) => {
   const t = useT();
   return {
-    "aria-current": isCurrent ? ("page" as const) : undefined,
+    "aria-current": current === null ? undefined : ARIA_CURRENT[current],
     href: destination.href,
     label:
       count > 0 && destination.countedLabel !== undefined
@@ -102,67 +106,60 @@ export const isSidebarPath = (path: string): boolean =>
   DESTINATIONS.some((destination) => destination.href === path);
 
 /**
-A destination: a link with its address (`<a href>` on the web, so Ctrl/⌘-click opens it in a new
-tab; F-WEB-03). It navigates rather than pushes, so a destination already open is shown again.
+A destination: a `NavItem`, a link with its address (`<a href>` on the web, so Ctrl/⌘-click opens it
+in a new tab; F-WEB-03). It navigates rather than pushes, so a destination already open is shown
+again.
 */
 const SidebarLink = (props: DestinationLinkProps) => {
   const t = useT();
-  const { count, destination, isCurrent } = props;
-  const link = useDestinationLink(props);
+  const { count, current, destination } = props;
+  const { href, label } = useDestinationLink(props);
   return (
-    <Link
-      {...link}
-      className={cx("h-10 flex-row items-center gap-3 rounded-lg px-3", isCurrent && "bg-fill-3")}
-    >
-      <Icon name={destination.icon} tone={isCurrent ? "accent" : "secondary"} />
-      <NativeText
-        className={cx(
-          "flex-1 font-sans text-subhead",
-          isCurrent ? "text-label-primary" : "font-normal text-label-secondary",
-        )}
-      >
-        {t(destination.label)}
-      </NativeText>
-      <CountBadge count={count} />
-    </Link>
-  );
-};
-
-/** The mark, the name and the bell; who is signed in on a line of its own beneath. */
-export const SidebarHeader = ({ owner }: { readonly owner: null | string }) => {
-  const t = useT();
-  return (
-    <>
-      <View className="flex-row items-center gap-2 px-2">
-        <PaceMark size={22} />
-        <NativeText className="flex-1 font-sans text-body font-semibold text-label-primary">
-          {t("app.name")}
-        </NativeText>
-        <NotificationBell place="sidebar" />
-      </View>
-      {/* Who is signed in, on a line of its own: beside the logo and the bell it had 23 px (QA 17 M6). */}
-      {owner === null ? (
-        <View className="mb-2" />
-      ) : (
-        <View
-          accessibilityLabel={t("nav.signedInAs", { name: owner })}
-          accessible
-          className="mb-3 flex-row items-center gap-2 px-2"
-        >
-          <UserAvatar size={24} />
-          <Text className="flex-1" policy="truncate" role="footnote" tone="secondary">
-            {owner}
-          </Text>
-        </View>
-      )}
-    </>
+    <NavItem
+      count={count}
+      current={current}
+      href={href}
+      icon={destination.icon}
+      label={label}
+      title={t(destination.label)}
+    />
   );
 };
 
 /**
-The wide window's navigation, beside every signed-in screen (pushed ones included): it
-navigates by path, so a destination already open is shown again rather than stacked twice.
+The sidebar's header (spec §5.0.1, §4.2.22): the mark, «Pace» and the bell on one row; who is
+signed in on a line of its own under it, in full: beside the mark and the bell a name had 23 px and
+showed one letter (QA 17 M6). A name too long for the column ends in "…" and is whole in its
+tooltip (the web's `title`) and in what a screen reader says. No avatar: the initial beside the name
+said it twice (R22-25).
 */
+export const SidebarHeader = ({ owner }: { readonly owner: null | string }) => {
+  const t = useT();
+  return (
+    <View className="mb-3 gap-1 px-3" testID="sidebar-header">
+      <View className="min-h-hit-web flex-row items-center gap-2">
+        <PaceMark size={22} />
+        <Text className="flex-1" role="headline">
+          {t("app.name")}
+        </Text>
+        <NotificationBell place="sidebar" />
+      </View>
+      {owner === null ? null : (
+        <View
+          accessibilityLabel={t("nav.signedInAs", { name: owner })}
+          accessible
+          className="flex-row"
+          testID="sidebar-owner"
+        >
+          <Text className="flex-1" policy="truncate" role="callout">
+            {owner}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+};
+
 /**
 New task from the navigation (the sidebar's button, the rail's top button): the empty form opens
 on Now, which is brought to the front. Elsewhere than Now, N does the same (Now's composer takes N
@@ -181,28 +178,33 @@ export const useNewTask = (): (() => void) => {
   return newTask;
 };
 
+/**
+The wide window's navigation (spec §4.2.22), beside every signed-in screen (pushed ones included):
+the header, New task (the shell's one filled accent, with its key), and the eight destinations as
+`NavItem`s. It navigates by path, so a destination already open is shown again rather than stacked
+twice.
+*/
 export const Sidebar = () => {
   const t = useT();
   const path = usePathname();
   const owner = useOwnerName();
   const waiting = useWaitingCount();
-  useDockToastsHere();
   const newTask = useNewTask();
   return (
     <View
       aria-label={t("nav.main")}
-      className="w-sidebar gap-1 border-r border-separator bg-sidebar px-3 pb-4 pt-5"
+      className="w-sidebar gap-1 border-r border-separator bg-sidebar px-3 pb-4 pt-4"
       role="navigation"
     >
       <SidebarHeader owner={owner} />
       <Pressable
-        className="mb-3 h-10 flex-row items-center gap-2 rounded-lg bg-accent px-3"
+        className="mb-3 min-h-hit-web flex-row items-center gap-2 rounded-md bg-accent px-3"
         label={t("nav.newTask")}
         onPress={newTask}
         role="button"
       >
         <Icon name="plus" tone="onAccent" />
-        <NativeText className="flex-1 font-sans text-subhead text-accent-on">
+        <NativeText className="flex-1 font-sans text-callout font-medium text-accent-on">
           {t("nav.newTask")}
         </NativeText>
         <KeyHint hotkey={HOTKEYS.newTask} variant="primary" />
@@ -210,8 +212,8 @@ export const Sidebar = () => {
       {DESTINATIONS.map((destination) => (
         <SidebarLink
           count={destination.countedLabel === undefined ? 0 : waiting}
+          current={currentOf(destination, path)}
           destination={destination}
-          isCurrent={destination.owns(path)}
           key={destination.label}
         />
       ))}

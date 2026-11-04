@@ -291,7 +291,7 @@ test("a phone has Now, Day, Inbox and More; More leads to Week and the rest and 
   await page.setViewportSize({ height: 844, width: 390 });
   await loginViaApi(page);
   await page.goto("/");
-  const tabs = page.getByRole("tablist", { name: "Main" }).getByRole("tab");
+  const tabs = page.getByRole("navigation", { name: "Main" }).getByRole("link");
   await expect(tabs).toHaveText(["Now", "Day", "Inbox", "More"]);
   await tabs.getByText("More").click();
   await expect(page.getByRole("heading", { level: 1, name: "More" })).toBeVisible();

@@ -9,6 +9,7 @@ import { Icon } from "./icon.tsx";
 import { Link } from "./link.tsx";
 import { Pressable } from "./pressable.tsx";
 import {
+  currentOf,
   type DestinationLinkProps,
   DESTINATIONS,
   useDestinationLink,
@@ -16,17 +17,22 @@ import {
 } from "./sidebar.tsx";
 import { Text } from "./text.tsx";
 
-/** One destination: the icon over its caption, the current one on a `fill.3` pill. */
+/**
+One destination: the icon over its caption, its page on a `fill.3` pill, a screen it owns (a task,
+Presets) in `label.primary` semibold without the pill (R23-14). No haptic: switching places does not
+buzz (spec §3.10); the press shows in the ripple.
+*/
 const RailLink = (props: DestinationLinkProps) => {
   const t = useT();
-  const { count, destination, isCurrent } = props;
+  const { count, current, destination } = props;
   const link = useDestinationLink(props);
+  const isCurrent = current !== null;
   return (
     <Link {...link} className="w-full items-center gap-1 rounded-lg py-1">
       <View
         className={cx(
           "h-8 w-16 items-center justify-center rounded-pill",
-          isCurrent && "bg-fill-3",
+          current === "page" && "bg-fill-3",
         )}
       >
         <Icon name={destination.icon} tone={isCurrent ? "primary" : "secondary"} />
@@ -81,8 +87,8 @@ export const NavRail = () => {
         {DESTINATIONS.map((destination) => (
           <RailLink
             count={destination.countedLabel === undefined ? 0 : waiting}
+            current={currentOf(destination, path)}
             destination={destination}
-            isCurrent={destination.owns(path)}
             key={destination.label}
           />
         ))}

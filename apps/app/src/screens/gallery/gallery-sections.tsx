@@ -19,6 +19,7 @@ import { RunningRow } from "#app/shared/tracking/running-row.tsx";
 import { CountBadge } from "#app/ui/count-badge.tsx";
 import { IMPORTANCE_HUES } from "#app/ui/hue.ts";
 import { useIsWide } from "#app/ui/layout.ts";
+import { NavItem } from "#app/ui/nav-item.tsx";
 import { SidebarHeader } from "#app/ui/sidebar.tsx";
 import { Tag } from "#app/ui/tag.tsx";
 import { openTasksLabel } from "@pace/client";
@@ -202,8 +203,20 @@ export const ChromeSections = ({ data }: { readonly data: GalleryData }) => {
   return (
     <>
       <Section title="dev.gallery.section.sidebar">
-        <View className="w-sidebar border border-separator bg-app px-3 pt-5">
+        <View className="w-sidebar gap-1 border border-separator bg-sidebar px-3 pb-4 pt-4">
           <SidebarHeader owner={data.ownerName} />
+          {/* The three places a row tells (spec §4.2.22): its page, a screen it owns, elsewhere. */}
+          {(["page", "section", null] as const).map((current) => (
+            <NavItem
+              count={current === null ? 120 : 0}
+              current={current}
+              href="/settings"
+              icon="settings"
+              key={String(current)}
+              label={t("nav.settings")}
+              title={t(current === null ? "nav.insights" : "nav.settings")}
+            />
+          ))}
         </View>
       </Section>
       <Section title="dev.gallery.section.settings">

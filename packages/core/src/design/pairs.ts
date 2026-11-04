@@ -105,6 +105,13 @@ export const USED_PAIRS: readonly ContrastPair[] = [
     (over): ContrastPair => ({ bg: "fill.4", fg: "label.secondary", over, target: "meta" }),
   ),
   ...SELECTED_ROW_PAIRS,
+  // The current destination (spec §4.2.22, §4.2.27): the sidebar's row and the rail's pill on the
+  // sidebar ground, the tab bar's pill on the bar's cell; its name and icon in `label.primary`,
+  // and the sidebar row's 4 px accent bar on the `fill.3` fill.
+  ...(["bg.sidebar", "bg.cell"] as const).flatMap((over): readonly ContrastPair[] => [
+    { bg: "fill.3", fg: "label.primary", over, target: "text" },
+    { bg: "fill.3", fg: "accent", over, target: "ui" },
+  ]),
   // A neutral count badge (unread notifications): secondary digits on `fill.3`.
   ...LABEL_GROUNDS.map(
     (over): ContrastPair => ({ bg: "fill.3", fg: "label.secondary", over, target: "meta" }),

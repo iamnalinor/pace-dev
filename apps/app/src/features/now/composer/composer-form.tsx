@@ -124,10 +124,7 @@ const FormHeader = ({
           {actionLabel}
         </Button>
       </View>
-      <Tooltip
-        label={labelWithHotkey(t("common.close"), HOTKEYS.escape, KEYBOARD)}
-        showsOnTap={false}
-      >
+      <Tooltip label={labelWithHotkey(t("common.close"), HOTKEYS.escape, KEYBOARD)}>
         <Pressable
           accessibilityLabel={t("common.close")}
           accessibilityRole="button"

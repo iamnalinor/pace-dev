@@ -8,6 +8,7 @@ import {
   expectStaysInside,
 } from "./support/geometry.ts";
 import { loginViaApi } from "./support/login.ts";
+import { seedLivedIn } from "./support/seed.ts";
 
 /** The main screens and the tabs, sidebar links or rows of More that reach each (no reload). */
 const PHONE_SCREENS: readonly (readonly [string, readonly string[]])[] = [
@@ -46,7 +47,7 @@ const raiseToast = async (page: Page, title: string): Promise<void> => {
   await addTask(page, title);
   await nowTasks(page).getByText(title).click();
   await page.getByRole("button", { name: "Delete the task" }).click();
-  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(page.getByTestId("toast-card")).toBeVisible();
 };
 
 /** How long the page must go without a scroll event before a wheel's scroll counts as done. */
@@ -95,14 +96,16 @@ height: a row of a long list may pass under the toast (spec §4.1.4 rule 3) but 
 from under it; chrome (the time bar, the tab bar) never scrolls, so it stays found.
 */
 const stuckUnderToast = async (page: Page): Promise<readonly string[]> => {
-  const under = await controlsUnder(page, '[role="alert"]');
+  const under = await controlsUnder(page, '[data-testid="toast-card"]');
   if (under.length === 0) {
     return [];
   }
-  const toast = await page.getByRole("alert").boundingBox();
-  await page.mouse.move(8, (toast?.y ?? 0) - 40);
+  const toast = await page.getByTestId("toast-card").boundingBox();
+  // Over the content above the toast (on a computer the toast floats in the content column, and
+  // the wheel over the sidebar would scroll nothing).
+  await page.mouse.move((toast?.x ?? 0) + (toast?.width ?? 0) / 2, (toast?.y ?? 0) - 40);
   await wheelAndSettle(page, (toast?.height ?? 0) + 120);
-  const still = await controlsUnder(page, '[role="alert"]');
+  const still = await controlsUnder(page, '[data-testid="toast-card"]');
   return under.filter((control) => still.includes(control));
 };
 
@@ -123,7 +126,7 @@ for (const size of SIZES) {
         for (const step of steps) {
           await tap(page, step);
         }
-        await expect(page.getByRole("alert")).toBeVisible();
+        await expect(page.getByTestId("toast-card")).toBeVisible();
         const stuck = await stuckUnderToast(page);
         covered.push(...stuck.map((control) => `${screen}: ${control}`));
       }
@@ -243,5 +246,114 @@ test.describe("motion and overlays at one width", () => {
       "What are you doing?",
     ]);
     expect(covered).toEqual([]);
+  });
+});
+
+/**
+Marks the tooltip bubble on show (`data-e2e-shown`): every trigger keeps its bubble in the page,
+hidden, so the shown one is told by its box.
+*/
+const hasMarkedShownTooltip = async (page: Page): Promise<boolean> =>
+  await page.evaluate(() => {
+    for (const marked of globalThis.document.querySelectorAll<HTMLElement>("[data-e2e-shown]")) {
+      delete marked.dataset["e2eShown"];
+    }
+    const shown = [...globalThis.document.querySelectorAll<HTMLElement>('[role="tooltip"]')].find(
+      (tip) => {
+        const box = tip.getBoundingClientRect();
+        return box.width > 0 && globalThis.getComputedStyle(tip).visibility !== "hidden";
+      },
+    );
+    if (shown === undefined) {
+      return false;
+    }
+    shown.dataset["e2eShown"] = "";
+    return true;
+  });
+
+/** Whether a tooltip shows within the hover delay and a little more; it is marked if it does. */
+const isTooltipShownSoon = async (page: Page): Promise<boolean> => {
+  try {
+    await expect.poll(async () => await hasMarkedShownTooltip(page), { timeout: 1500 }).toBe(true);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+Hovers each icon-only button of the page and lists the controls its tooltip covers (other than the
+button itself). A button whose tooltip does not show (a disabled one) is `tooltips.e2e.ts`'s
+concern; `shown` counts the tooltips looked at.
+*/
+const sweepTooltips = async (
+  page: Page,
+  url: string,
+): Promise<{ readonly covered: readonly string[]; readonly shown: number }> => {
+  const covered: string[] = [];
+  let shown = 0;
+  const names = new Set(await iconOnlyNames(page));
+  for (const name of names) {
+    // By its label as written (a role query reads the computed name, which a description may change).
+    await page.getByLabel(name, { exact: true }).first().hover({ timeout: 5000 });
+    if (await isTooltipShownSoon(page)) {
+      shown += 1;
+      const under = await controlsUnder(page, "[data-e2e-shown]", [name]);
+      covered.push(...under.map((control) => `${url} "${name}": ${control}`));
+    }
+    await page.mouse.move(0, 0);
+  }
+  return { covered, shown };
+};
+
+/** The buttons named only by their label (an icon, digits at most): those show a tooltip. */
+const iconOnlyNames = async (page: Page): Promise<readonly string[]> =>
+  await page.evaluate(() =>
+    [...globalThis.document.querySelectorAll<HTMLElement>('[role="button"], button')]
+      .filter((button) => {
+        const box = button.getBoundingClientRect();
+        const name = button.getAttribute("aria-label") ?? "";
+        // In sight and on top: a press at its centre reaches it (not a screen left under another).
+        const hit = globalThis.document.elementFromPoint(
+          box.left + box.width / 2,
+          box.top + box.height / 2,
+        );
+        const isOnTop = hit !== null && button.contains(hit);
+        return isOnTop && name !== "" && !/\p{L}/u.test(button.textContent.trim());
+      })
+      .map((button) => button.getAttribute("aria-label") ?? ""),
+  );
+
+test.describe("tooltips and toasts on Now, Day and a task (Task 3.7, bug class 6)", () => {
+  test.use({ viewport: { height: 900, width: 1280 } });
+
+  test("no tooltip covers an enabled control other than the one it explains", async ({ page }) => {
+    test.setTimeout(180_000);
+    const { token } = await loginViaApi(page);
+    const seeded = await seedLivedIn(token);
+    const covered: string[] = [];
+    let swept = 0;
+    for (const url of ["/", "/day", `/task/${seeded.openTaskId}`]) {
+      await page.goto(url);
+      await expect(page.getByRole("heading").first()).toBeVisible();
+      await expect(page.getByRole("progressbar")).toHaveCount(0);
+      const found = await sweepTooltips(page, url);
+      swept += found.shown;
+      covered.push(...found.covered);
+    }
+    expect(covered).toEqual([]);
+    expect(swept).toBeGreaterThan(3);
+  });
+
+  test("a toast covers no control on a task it cannot scroll out from under", async ({ page }) => {
+    await loginViaApi(page);
+    await page.goto("/");
+    await addTask(page, "Open me after");
+    // Deleting another task leaves its toast (with Undo) up while the first one opens.
+    await raiseToast(page, "Toast on a task");
+    await nowTasks(page).getByText("Open me after").click();
+    await expect(page.getByRole("button", { name: "Delete the task" })).toBeVisible();
+    await expect(page.getByTestId("toast-card")).toBeVisible();
+    expect(await stuckUnderToast(page)).toEqual([]);
   });
 });

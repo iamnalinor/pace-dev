@@ -1,4 +1,4 @@
-import { Tabs } from "expo-router";
+import { Tabs, useIsFocused } from "expo-router";
 
 import { useT } from "#app/app-state.tsx";
 import { ScreenScene } from "#app/ui/screen-scene.tsx";
@@ -12,11 +12,13 @@ the login screen, and a phone that has not seen the permissions walk-through to 
 export default function TabsLayout() {
   const t = useT();
   const isCompact = useBreakpoint() === "compact";
+  // A screen pushed over the tabs (a task, Week) leaves the bar mounted under it, out of sight.
+  const isFront = useIsFocused();
   return (
     <Tabs
       screenLayout={({ children }) => <ScreenScene>{children}</ScreenScene>}
       screenOptions={{ headerShown: false, tabBarPosition: isCompact ? "bottom" : "left" }}
-      tabBar={(props) => <TabBar {...props} />}
+      tabBar={(props) => <TabBar {...props} isFront={isFront} />}
     >
       <Tabs.Screen name="index" options={{ title: t("nav.now") }} />
       <Tabs.Screen name="day" options={{ title: t("nav.day") }} />

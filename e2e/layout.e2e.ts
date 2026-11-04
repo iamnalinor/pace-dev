@@ -61,7 +61,7 @@ test("a tablet's window (800) has the navigation rail and no tab bar (spec §5.0
   const nav = page.getByRole("navigation", { name: "Main" });
   await expect(nav).toBeVisible();
   await expect(nav.getByRole("link")).toHaveCount(8);
-  await expect(page.getByRole("tablist")).toHaveCount(0);
+  await expect(page.getByTestId("tab-bar")).toHaveCount(0);
   // A destination is top level beside the rail: no Back.
   await nav.getByRole("link", { name: "Projects" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Projects" })).toBeVisible();
