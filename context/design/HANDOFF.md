@@ -7,6 +7,8 @@ working ledger; its last lines are the most recent rulings).
 
 
 ## 0. Current session (2026-11-03, fork Hentrixz/pace-dev, branch `claude/vigilant-archimedes-kq5d4w`)
+> **2026-11-04 update:** the three kit branches below and this section's commits were merged into PR B's branch (`claude/pace-design-overhaul-b`) without review or lint; see [`pr-b/imported-from-hentrixz.md`](pr-b/imported-from-hentrixz.md). "Nothing is merged" below describes the fork at the time.
+
 Session stopped by the owner at a checkpoint. **Nothing of the kit wave is merged into
 `claude/vigilant-archimedes-kq5d4w` yet** — it equals PR B's tip `a67cc50` + HANDOFF commits only.
 All three kit branches start from `a67cc50` (B's tip) and are pushed to the fork:
