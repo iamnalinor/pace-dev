@@ -1116,3 +1116,6 @@ Task 3.7 (2026-11-03, Toast placement and Tooltip): **66** warnings of `pace/no-
 Task 3.10 (2026-11-03, Sidebar and TabBar): **`KIT_PRIMITIVE_WARNINGS` = 9** (down from 10): the tab label is the kit `Text` (`caption`, `chrome`, wrapping) instead of React Native's with `numberOfLines`. Design values 66 and bare pressables 32 unchanged by this task.
 
 Task 3.6 (2026-11-03, `Sheet`, `Dialog`, `Popover`): **67** warnings of `pace/no-raw-design-values` (down from 68): the sheet's `shadow-lg` became the `shadow.overlay` token (`shadow(scheme, "overlay")`). `DESIGN_VALUE_WARNINGS` = 67; bare pressables 32 and kit primitives 10 unchanged.
+
+
+S0 (2026-11-06, green-up of PR B after the import from Hentrixz/pace-dev): **`DESIGN_VALUE_WARNINGS` = 50** (down from 65: the merged tree measured 53, and dropping the three unused `*_ENTER` motion constants took 3 more), **`KIT_PRIMITIVE_WARNINGS` = 7** (down from 9), **`BARE_PRESSABLE_WARNINGS` = 28** (unchanged).

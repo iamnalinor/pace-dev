@@ -30,5 +30,8 @@ List them with `git log --no-merges a67cc50..HEAD` or per merge `git log <merge>
 - `context/design/redesign-plan.md`: both sets of ratchet notes kept.
 
 ## Still open from HANDOFF §0
-Rename-prop fallout in `sheet-actions.tsx`, `sync-frame.test.tsx`; tab bar and rail badges onto
-`BadgeAnchor`; 3.6/3.8 deferred bullets; then `bun lint`, `test:unit`, `test:app`, e2e.
+Closed in S0 (2026-11-06): the rename-prop fallout (`overlay-frame.tsx`, `toast.tsx`; the other
+files were already right), tab bar and rail badges on `BadgeAnchor`, `bun lint`, `test:unit`,
+`test:app` green; safety scan: [import-safety-scan.md](import-safety-scan.md); report:
+[s0-greenup-report.md](s0-greenup-report.md).
+Still open: 3.6/3.8 deferred bullets; e2e (not run in S0).
