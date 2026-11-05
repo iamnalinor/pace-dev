@@ -3,7 +3,7 @@ import { ScrollView, View } from "react-native";
 
 import { useT } from "../app-state.tsx";
 import { useWaitingCount } from "../shared/use-waiting-count.ts";
-import { CountBadge } from "./count-badge.tsx";
+import { BadgeAnchor } from "./count-badge.tsx";
 import { cx } from "./cx.ts";
 import { Icon } from "./icon.tsx";
 import { Link } from "./link.tsx";
@@ -35,10 +35,9 @@ const RailLink = (props: DestinationLinkProps) => {
           current === "page" && "bg-fill-3",
         )}
       >
-        <Icon name={destination.icon} tone={isCurrent ? "primary" : "secondary"} />
-        <View className="absolute -top-1 left-10">
-          <CountBadge count={count} />
-        </View>
+        <BadgeAnchor count={count} tone="danger">
+          <Icon name={destination.icon} tone={isCurrent ? "primary" : "secondary"} />
+        </BadgeAnchor>
       </View>
       <Text
         chrome

@@ -8,7 +8,7 @@ import type { MessageKey } from "@pace/core";
 
 import { useT } from "../app-state.tsx";
 import { useWaitingCount } from "../shared/use-waiting-count.ts";
-import { CountBadge } from "./count-badge.tsx";
+import { BadgeAnchor } from "./count-badge.tsx";
 import { cx } from "./cx.ts";
 import { usePublishTabBar } from "./float-layer.ts";
 import { Icon, type IconName } from "./icon.tsx";
@@ -63,12 +63,9 @@ const TabFace = ({
       className={cx("h-8 w-16 items-center justify-center rounded-pill", isCurrent && "bg-fill-3")}
       testID={isCurrent ? "tab-pill-current" : "tab-pill"}
     >
-      <View>
+      <BadgeAnchor count={count} tone="danger">
         <Icon name={icon} size="bar" tone={isCurrent ? "primary" : "secondary"} />
-        <View className="absolute -top-2 left-5">
-          <CountBadge count={count} />
-        </View>
-      </View>
+      </BadgeAnchor>
     </View>
     <Text
       chrome

@@ -76,9 +76,10 @@ describe("TabBar", () => {
 
   it("anchors the badge at the icon's trailing top and grows it away from the icon (never back over it)", async () => {
     await renderScreen(<TabBar {...propsAt("index", jest.fn())} />, await createTestRuntime());
-    const anchor = screen.getByTestId("count-badge").parent?.props["className"] as string;
-    const classes = anchor.split(" ");
-    expect(classes).toContain("left-5");
+    const anchor = screen.getByTestId("count-badge").parent;
+    const classes = (anchor?.props["className"] as string).split(" ");
+    expect(anchor?.props["style"]).toMatchObject({ left: "100%" });
+    expect(classes).toContain("-top-2");
     expect(classes.some((name) => /^-?right-/.test(name))).toBe(false);
   });
 
