@@ -37,6 +37,13 @@ export const ruServer: { readonly [K in keyof typeof enServer]: string } = {
   "server.bot": "Бот в Telegram",
   "server.invalidUrl": "Введите адрес сервера, например pace.example.dev",
   "server.insecure": "Нужен адрес с https://",
+  "server.restartPending": "Перезапустите приложение для смены сервера",
+  "server.restartExplanation":
+    "Сервер {host} сохранён. Перезапустите Pace, чтобы продолжить на нём.",
+  "server.restartApp": "Перезапустить Pace",
+  "server.restartFailed":
+    "Не удалось перезапустить Pace. Повторите попытку или закройте и откройте приложение.",
+  "server.moveFailed": "Не удалось сменить сервер. Попробуйте ещё раз.",
   "server.unreachable": "Не удаётся связаться с сервером",
   "server.notPace": "Это не сервер Pace",
   "server.serverOutdated":

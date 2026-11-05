@@ -12,6 +12,7 @@ import { IS_PHONE } from "./platform/device.ts";
 import { clearPresentedPoolNotifications } from "./platform/notification-cleanup.ts";
 import { watchServer } from "./platform/server-origin.ts";
 import { serverStore } from "./platform/server-store.ts";
+import { canUseCurrentServer, serverSwitchStore } from "./platform/server-switch-state.ts";
 import { forgetLineDraft } from "./platform/shared-in.ts";
 import { type Pool, poolOf, retryOnWindowFocus } from "./runtime-pool.ts";
 import { canStartSenders, POLL_LIVE_MS, POLL_OFFLINE_MS } from "./senders.ts";
@@ -111,6 +112,22 @@ const followRuntimeObservers = (runtime: PaceRuntime) => {
   return { stopNotices, stopServerChecks, stopFocus };
 };
 
+/** Retire every observer together once a durable selection awaits a cold launch. */
+const stopOnServerSwitch = (dispose: () => void): (() => void) => {
+  const stopHandoff = serverSwitchStore.subscribe(({ origin }) => {
+    if (origin !== null) {
+      dispose();
+    }
+  });
+  if (!canUseCurrentServer()) {
+    dispose();
+  }
+  return () => {
+    stopHandoff();
+    dispose();
+  };
+};
+
 /** Starts/stops the sync loop with the auth status; a foreground return syncs at once. */
 export const runSyncLoop = (runtime: PaceRuntime, onSynced: OnSynced): (() => void) => {
   const { auth, sync } = runtime;
@@ -120,7 +137,7 @@ export const runSyncLoop = (runtime: PaceRuntime, onSynced: OnSynced): (() => vo
   const zone = createZoneStep(runtime);
   const stopLanguageSync = followSyncedLanguage(runtime, zone.follow(onSynced));
   const follow = (status: AuthState["status"]): void => {
-    if (status === "signed-in") {
+    if (status === "signed-in" && canStartSenders(runtime)) {
       activeSession = runtime.api.currentSessionToken();
       void (async () => {
         try {
@@ -173,7 +190,10 @@ export const runSyncLoop = (runtime: PaceRuntime, onSynced: OnSynced): (() => vo
   });
   const subscription = followForeground(runtime, pool, () => isActive);
   const { stopNotices, stopServerChecks, stopFocus } = followRuntimeObservers(runtime);
-  return () => {
+  const dispose = (): void => {
+    if (!isActive) {
+      return;
+    }
     isActive = false;
     stopConfiguration();
     stopFocus();
@@ -185,5 +205,9 @@ export const runSyncLoop = (runtime: PaceRuntime, onSynced: OnSynced): (() => vo
     stopFollowingLive();
     sync.stop();
     runtime.live.stop();
+    if (IS_PHONE && !canUseCurrentServer()) {
+      void stopBackgroundCheck();
+    }
   };
+  return stopOnServerSwitch(dispose);
 };

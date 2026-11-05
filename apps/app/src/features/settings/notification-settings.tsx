@@ -3,8 +3,11 @@ import { useEffect } from "react";
 import { Text, View } from "react-native";
 import { useStore } from "zustand";
 
+import type { FcmIneligibilityReason } from "#app/platform/push-eligibility.ts";
+
 import { usePace, useSettings, useT } from "#app/app-state.tsx";
 import { IS_PHONE } from "#app/platform/device.ts";
+import { restartRuntimeFirebase } from "#app/platform/firebase-runtime.ts";
 import {
   loadOfferedMethods,
   loadPushState,
@@ -91,13 +94,13 @@ const offeredMethods = ({
 
 /** Reads the stored push state and asks the server's methods when Settings opens. */
 const useLoadPushState = (): void => {
-  const { api } = usePace();
+  const { api, baseUrl } = usePace();
   useEffect(() => {
     void (async () => {
       await loadPushState();
-      await loadOfferedMethods(api);
+      await loadOfferedMethods(api, baseUrl);
     })();
-  }, [api]);
+  }, [api, baseUrl]);
 };
 
 /** What the phone uses now, and why when it is not what was picked. */
@@ -133,7 +136,7 @@ export const PushStatus = () => {
   /** What the picker offers: automatic, then a way through the server, then Off. */
   type PushOption = "auto" | PushMethod;
   const t = useT();
-  const { api } = usePace();
+  const { api, baseUrl } = usePace();
   const toast = useToast();
   useLoadPushState();
   const state = useStore(pushStore);
@@ -148,14 +151,17 @@ export const PushStatus = () => {
   const pick = (option: PushOption): void => {
     void (async () => {
       try {
-        await setPushChoice(option === "auto" ? null : option);
+        const { isLatest } = await setPushChoice(option === "auto" ? null : option);
+        if (!isLatest) {
+          return;
+        }
       } catch {
         // The phone did not keep it: the radio is back on the previous pick, and it says so.
         toast.show({ message: t("settings.push.notSaved") });
         return;
       }
       try {
-        await registerPush(api);
+        await registerPush(api, baseUrl);
       } catch {
         // Offline: the pick is kept and registered on the next start.
       }
@@ -167,11 +173,7 @@ export const PushStatus = () => {
         {t("settings.push.hint")}
       </Text>
       <Segmented onChange={pick} options={options} value={state.choice ?? "auto"} />
-      {state.isFcmOtherProject ? (
-        <Text className="font-sans text-footnote text-label-secondary">
-          {t("settings.push.otherProject")}
-        </Text>
-      ) : null}
+      <PushIneligibilityReason reason={state.fcmIneligibilityReason} />
       {state.method === null
         ? null
         : pushLine({ ...state, method: state.method }, t).map((line) => (
@@ -179,6 +181,42 @@ export const PushStatus = () => {
               {line}
             </Text>
           ))}
+    </View>
+  );
+};
+
+/** Presentational explanation: gallery callers supply a reason without changing global state. */
+export const PushIneligibilityReason = ({
+  reason,
+  onRestart = restartRuntimeFirebase,
+}: {
+  readonly reason: FcmIneligibilityReason;
+  readonly onRestart?: () => void;
+}) => {
+  const t = useT();
+  const toast = useToast();
+  if (reason === null) {
+    return null;
+  }
+  return (
+    <View className="gap-2">
+      <Text className="font-sans text-footnote text-label-secondary">
+        {t(`settings.push.reason.${reason}`)}
+      </Text>
+      {reason === "restart-needed" ? (
+        <Button
+          onPress={() => {
+            try {
+              onRestart();
+            } catch {
+              toast.show({ message: t("settings.push.restartFailed") });
+            }
+          }}
+          variant="secondary"
+        >
+          {t("settings.push.restart")}
+        </Button>
+      ) : null}
     </View>
   );
 };

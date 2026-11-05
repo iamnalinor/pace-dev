@@ -53,6 +53,9 @@
     "prepare": "lefthook install",
     "dev:web": "bun run --cwd apps/app dev -- --web"
   },
+  "dependencies": {
+    "zod": "catalog:"
+  },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
     "@biomejs/biome": "2.6.4",

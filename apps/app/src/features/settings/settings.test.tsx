@@ -15,6 +15,7 @@ import { createTestRuntime } from "#app/test/runtime.ts";
 import { problem } from "@pace/client/testing";
 
 import { paceNative } from "../../../modules/pace-native/index.ts";
+import { PushIneligibilityReason } from "./notification-settings.tsx";
 
 /** Where focus went and what was said, as a confirm asked the platform (bug class 5). */
 const mockMoveFocus = jest.fn<undefined, [unknown, string | undefined]>();
@@ -81,6 +82,13 @@ const pushRoutes = () => {
       },
     },
   };
+};
+
+/** Push subscriptions belong to a signed-in session, as they do on a real phone. */
+const createPushRuntime = async (options: Parameters<typeof createTestRuntime>[0]) => {
+  const runtime = await createTestRuntime(options);
+  await runtime.auth.adoptToken("session-settings");
+  return runtime;
 };
 
 describe("SettingsScreen", () => {
@@ -208,7 +216,7 @@ describe("SettingsScreen", () => {
     fakeNotifications.state.granted = true;
     fakeNotifications.state.pushToken = "fcm-token";
     const server = pushRoutes();
-    const runtime = await createTestRuntime({ routes: server.routes, world: "empty" });
+    const runtime = await createPushRuntime({ routes: server.routes, world: "empty" });
     await renderScreen(<SettingsScreen />, runtime);
     const option = (method: "fcm" | "none" | "poll") =>
       screen.getByRole("radio", { name: en(`settings.push.option.${method}`) });
@@ -231,7 +239,7 @@ describe("SettingsScreen", () => {
   it("names each way plainly, and says the background check's rhythm", async () => {
     fakeNotifications.state.granted = true;
     fakeNotifications.state.pushToken = "fcm-token";
-    const runtime = await createTestRuntime({ routes: pushRoutes().routes, world: "empty" });
+    const runtime = await createPushRuntime({ routes: pushRoutes().routes, world: "empty" });
     await renderScreen(<SettingsScreen />, runtime);
     const option = (name: string) => screen.getByRole("radio", { name });
     await waitFor(() => {
@@ -257,7 +265,7 @@ describe("SettingsScreen", () => {
     fakeNotifications.state.granted = true;
     fakeNotifications.state.pushToken = "fcm-token";
     const server = pushRoutes();
-    const runtime = await createTestRuntime({ routes: server.routes, world: "empty" });
+    const runtime = await createPushRuntime({ routes: server.routes, world: "empty" });
     await renderScreen(<SettingsScreen />, runtime);
     const option = (method: "auto" | "fcm" | "none" | "poll") =>
       screen.getByRole("radio", { name: en(`settings.push.option.${method}`) });
@@ -277,7 +285,7 @@ describe("SettingsScreen", () => {
     fakeNotifications.state.granted = true;
     fakeNotifications.state.pushToken = "fcm-token";
     const offered = { pushMethods: ["poll"] };
-    const runtime = await createTestRuntime({
+    const runtime = await createPushRuntime({
       routes: {
         ...pushRoutes().routes,
         "GET /api/push/methods": () => offered,
@@ -306,7 +314,7 @@ describe("SettingsScreen", () => {
     fakeNotifications.state.granted = true;
     fakeNotifications.state.pushToken = "fcm-token";
     jest.spyOn(firebaseProject, "appFirebaseProject").mockReturnValue("pace-app");
-    const runtime = await createTestRuntime({
+    const runtime = await createPushRuntime({
       routes: {
         ...pushRoutes().routes,
         "GET /api/push/methods": () => ({
@@ -327,7 +335,7 @@ describe("SettingsScreen", () => {
   it("says so and keeps the previous pick when the phone refuses to save a method", async () => {
     fakeNotifications.state.granted = true;
     fakeNotifications.state.pushToken = "fcm-token";
-    const runtime = await createTestRuntime({ routes: pushRoutes().routes, world: "empty" });
+    const runtime = await createPushRuntime({ routes: pushRoutes().routes, world: "empty" });
     await setPushChoice(null);
     await renderScreen(<SettingsScreen />, runtime);
     const poll = await screen.findByRole("radio", { name: en("settings.push.option.poll") });
@@ -344,7 +352,7 @@ describe("SettingsScreen", () => {
   it("keeps the picked method shown and selected while offline", async () => {
     fakeNotifications.state.granted = true;
     fakeNotifications.state.pushToken = "fcm-token";
-    const runtime = await createTestRuntime({
+    const runtime = await createPushRuntime({
       routes: { "GET /api/push/methods": () => problem(503, "offline") },
       world: "empty",
     });
@@ -369,7 +377,7 @@ describe("SettingsScreen", () => {
       .mockImplementation(() => {
         exemption.granted = true;
       });
-    const runtime = await createTestRuntime({ routes: pushRoutes().routes, world: "empty" });
+    const runtime = await createPushRuntime({ routes: pushRoutes().routes, world: "empty" });
     await setPushChoice(null);
     await renderScreen(<SettingsScreen />, runtime);
     const option = (method: "fcm" | "poll") =>
@@ -623,4 +631,15 @@ describe("SettingsScreen", () => {
     expect(screen.getByText(en("settings.confirmation.waiting"))).toBeOnTheScreen();
     expect(mockPendingConfirmation.current?.request.id).toBe(id);
   });
+});
+
+it("explains a pending notification restart and only restarts on deliberate activation", async () => {
+  const restart = jest.spyOn(paceNative, "restartApp").mockReturnValue(true);
+  const runtime = await createTestRuntime({ world: "empty" });
+  await renderScreen(<PushIneligibilityReason reason="restart-needed" />, runtime);
+  expect(screen.getByText(en("settings.push.reason.restart-needed"))).toBeOnTheScreen();
+  expect(restart).not.toHaveBeenCalled();
+  await fireEvent.press(screen.getByRole("button", { name: en("settings.push.restart") }));
+  expect(restart).toHaveBeenCalledTimes(1);
+  restart.mockRestore();
 });

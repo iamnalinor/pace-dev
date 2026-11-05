@@ -115,6 +115,26 @@ describe("Change server", () => {
     expect(screen.queryByLabelText(en("server.address"))).toBeNull();
   });
 
+  it("shows a failed move and allows the same checked server to be retried", async () => {
+    await renderLogin();
+    const field = await openSheet();
+    typedServer(() => theirInstance);
+    await fireEvent.changeText(field, "pace.example.dev");
+    await fireEvent.press(screen.getByRole("button", { name: "Check" }));
+    secureStore.writes.isRefused = true;
+    try {
+      await fireEvent.press(await screen.findByRole("button", { name: "Use this server" }));
+      expect(await screen.findByText(en("server.moveFailed"))).toBeOnTheScreen();
+    } finally {
+      secureStore.writes.isRefused = false;
+    }
+    await fireEvent.press(screen.getByRole("button", { name: "Use this server" }));
+    await waitFor(async () => {
+      await expect(readServer()).resolves.toBe("https://pace.example.dev");
+    });
+    expect(screen.queryByLabelText(en("server.address"))).toBeNull();
+  });
+
   it("moves once when Use this server is tapped twice in a row", async () => {
     const runtime = await renderLogin();
     const reset = jest.spyOn(runtime, "resetLocalData");

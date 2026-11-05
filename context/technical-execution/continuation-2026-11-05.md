@@ -138,3 +138,66 @@ instructions. Never prune source events or raw usage as part of cost optimizatio
   serial reruns pass scripts 173, core 905, client 551, Python 54 and API 664. No limits weakened.
 - A pinned, checksum-verified pure-JVM test command and CI step were added; this does not install
   Android or run an emulator. Final unified lint and the second checkpoint remain pending.
+
+### Runtime integration checkpoint in progress
+
+- Checkpoint `a45bb0e` was pushed after full lint, serial unit/API/app tests and 18 JVM controller tests passed; no emulator or exploratory QA ran.
+- Runtime Firebase server handoff and origin/project-scoped push integration are implemented in the working tree. Push/Settings targeted tests passed 75/75; independent read-only review is underway. This is not yet a reviewed/pushed checkpoint or device proof.
+- Deployment pure preflight now preserves the original sanitized baseline verdict for rollback. Explicit configure/disable may replace an invalid additive legacy pair after health checks; keep and strict-invalid baselines fail closed. 56 preflight tests passed. Injected staging/promotion orchestration is in progress, with no remote mutations.
+- Adding the root zod catalog dependency caused unrelated lockfile resolution churn. Retained only the intended workspace dependency entry against the existing pinned graph; `bun install --frozen-lockfile --ignore-scripts` passed.
+
+### Review-driven integration fixes
+
+- Push/Settings expanded to 81 passing tests: unavailable Google is omitted while the preference is retained; per-invocation generation and ordered subscription/persistence writes cover delayed same-origin choices as well as origin changes. Native-compatible promise queues replace the ES2024 API prohibited for Hermes.
+- The persisted-switch UI gate passed scoped review tests, but the independent reviewer traced a pending old bot-login answer into the retained runtime. The UI gate alone is insufficient: cancellation and sender authority are being fixed with a deferred-auth regression. This blocks the app checkpoint until resolved.
+- The pure deployment runner passed independent review and 101 tests. CLI adapters and bootstrap are still incomplete. Temporary secret-file tests add four cases; no remote write occurred.
+- A concrete OTA implementation plan now records protocol, signing, fingerprint, publisher, app and release gates. No OTA dependency, service or activation is claimed.
+
+### Owner authorization: Android execution in PR CI
+
+The owner explicitly authorized using the Android emulator in GitHub Actions to run Android tests as part of this PR. Local emulator/Android startup remains prohibited; exploratory QA remains excluded. Use the existing Android smoke workflow and later expanded flows on the PR's exact commit, inspect artifacts and fix failures before claiming native CI success. This authorization covers CI test execution, not production deployment, release publication or merging the PR. Device-specific FCM delivery proof remains distinct from emulator CI.
+
+### PR Android CI entry point
+
+The existing Android E2E workflow now also accepts a PR label event for `android-e2e`, checking out that PR's exact head SHA. Ordinary pushes do not automatically consume emulator minutes; reapply the label for a newer commit. Manual/reusable entry points remain available. The workflow and documentation change are under independent review and await unified lint and actual GitHub execution. No local emulator has been run.
+
+Pinned Wrangler structured upload output was inspected in the installed 4.156.0 source. A parser now requires one version-upload v1 record for the expected Worker with a version UUID and exact HTTPS preview origin; it rejects missing, duplicate and partial records and does not substitute a mutable preview alias. Ten targeted tests passed. This output alone does not prove version inactivity or trusted preview ownership; control-plane and probe verification remain mandatory.
+
+### Current verification and review evidence
+
+- GitHub open-PR lookup still shows only draft redesign PR #54 (`claude/pace-design-overhaul-b` -> main). No technical PR has been opened yet and redesign commits remain excluded.
+- Unified lint round 3 stopped at 16 new client errors (function limits, parameter mutation, test typing, explicit boundary type and the Hermes-prohibited Promise.withResolvers API). These are being fixed at source without disabling rules; app/root checks have not yet been reached by this run.
+- The HTTP deployment probe adapter passed 39 focused tests: trusted exact origins, schema/identity checks, non-200/redirect rejection and bounded body reading. It has no authenticated control-plane resolver wired yet and performs no remote deployment.
+- Static independent rereview approved the corrected Android label workflow: concurrency is on the gated job, unrelated label events do not cancel it, reusable calls preserve caller checkout and direct label events use the PR head. Actual Actions execution remains pending.
+
+### Owner scope update: design pass deferred
+
+The owner asked to use the existing design system without spending time on a separate design review for now. Continue using the kit, tokens and localized strings; do not run a separate Impeccable/Apple Design review or polish round as a completion gate for this task. Functional checks and code review remain required. The pinned design skill sources were retrieved for reference only; no visual review was completed or claimed. The Impeccable context launcher failed because its engine/cache was unavailable, and its documented direct-context fallback was used. No hooks were installed.
+
+### Session ownership verification
+
+Independent rereview closed the remaining asynchronous adoption/logout cleanup findings. The implementation author completed 563 client tests with coverage thresholds met and 44 targeted app tests. Root then extracted bot polling into auth-bot.ts and owned-token cleanup into a small helper to address the final two client lint function-limit errors; 52 targeted auth/session tests passed after those extractions. Unified lint round 6 is running. No checkpoint is claimed green until the remaining workspaces and subsequent checks finish.
+
+### Follow-up integration checks
+
+Round 6 passed the client workspace and identified three app errors. Extracted the runtime server check, retained a bound AppState spy in the handoff regression, and made notification-choice completion return an explicit `isLatest` outcome. Targeted bootstrap/handoff tests passed 5/5; notifications/Settings passed 84/84. Unified lint round 7 is running; no green integrated result is claimed yet.
+
+The authenticated read-only Cloudflare adapter and probe compatibility tests passed 74/74; independent review is in progress. Its explicit unsupported result preserves the Durable Object Version URL limitation. No live account reads, deployment or traffic changes were performed. The full staged deployment task remains open.
+
+### Pareto priority and draft PR
+
+The owner requested reducing effort and quota consumption. Prioritize finishing the current implemented changes and required checks; do not start additional large features or research while the proposed roadmap deferral is awaiting an answer. This is a priority change, not a claim that the remaining roadmap is complete.
+
+Draft PR #55 (`codex/technical-continuation` -> `main`) was opened at the already pushed checkpoint: https://github.com/iamnalinor/pace-dev/pull/55 . It excludes redesign PR #54. The current runtime and deployment-tooling working tree is not yet pushed. No merge occurred.
+
+Root unified lint round 8 and the full app test run were interrupted before a terminal result; process inspection confirmed neither was still running. These runs are not passes. Round 9 restarts the unified check; full app verification remains pending. Before interruption, the full deployment script suite passed 194 tests after structural fixes. Required package-boundary imports now use the public `@pace/core` export surface.
+
+### Owner clarification: breadth over polish
+
+The owner clarified that the full roadmap stays in scope: implement more features and useful refactoring, defer polish, and finish the current packet first. The earlier proposed deferral of OTA/infrastructure/archive was not accepted. Keep required tests and code review, avoid repeated review/research without changed evidence. OTA manifest/signing implementation now proceeds from the existing plan/report, staged separately while the runtime checkpoint is checked.
+
+Unified lint round 9 reduced root errors to three: the combined keep/disable intent variant did not narrow configure fields, and an auto-fix created an async fixture without await. Split the intent into proper discriminated variants and use an explicitly awaited fake resolution. Round 10 verifies these corrections and remaining unified stages.
+
+### Runtime integration validation
+
+Unified `bun lint` round 13 completed successfully: formatting, all ESLint workspaces (existing 74 design warnings), all TypeScript projects, unused/duplicate-code checks, dependency boundaries, workflow checks and migrations. The final corrections moved bot polling types to their owning module and classified the deployment CLI's zod dependency as a runtime dependency; no rules were weakened. Auth/session regression tests passed 52/52 and deployment scripts 194/194. Full app tests are running; CI also checks the draft PR's current pushed checkpoint. This evidence does not establish Android/FCM or staged production deployment success.

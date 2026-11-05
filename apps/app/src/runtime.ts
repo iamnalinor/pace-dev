@@ -22,6 +22,7 @@ import { createEventStore, type LocalEventStore } from "./platform/event-store.t
 import { createPeerTabs } from "./platform/peer-tabs.ts";
 import { createSecureSessionStore } from "./platform/secure-session.ts";
 import { applyInstanceCheck, markClientOutdated } from "./platform/server-store.ts";
+import { canUseCurrentServer } from "./platform/server-switch-state.ts";
 import { readServer } from "./platform/server.ts";
 import { createSignOutNotes } from "./platform/sign-out-notes.ts";
 
@@ -128,6 +129,7 @@ export const createRuntime = async (options: RuntimeOptions = {}): Promise<PaceR
   const watched = watchingProtocol(fetchOf, baseUrl);
   const client = createPaceClient({
     baseUrl,
+    canSignIn: canUseCurrentServer,
     ...(options.clock !== undefined && { clock: options.clock }),
     deviceId,
     fetch: watched,

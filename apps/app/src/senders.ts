@@ -3,6 +3,7 @@ import { AppState } from "react-native";
 import type { PaceRuntime } from "./runtime.ts";
 
 import { serverStore } from "./platform/server-store.ts";
+import { canUseCurrentServer } from "./platform/server-switch-state.ts";
 
 /**
 How often the client pulls on its own. While the live channel is up the server says when
@@ -23,6 +24,7 @@ export const canStartSenders = ({
 }: Pick<PaceRuntime, "auth" | "baseUrl">): boolean => {
   const server = serverStore.getState();
   return (
+    canUseCurrentServer() &&
     auth.store.getState().status === "signed-in" &&
     !auth.isEnding() &&
     (server.origin !== baseUrl || server.configurationError === null)

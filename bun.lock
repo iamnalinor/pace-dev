@@ -4,6 +4,9 @@
   "workspaces": {
     "": {
       "name": "template",
+      "dependencies": {
+        "zod": "catalog:",
+      },
       "devDependencies": {
         "@axe-core/playwright": "4.13.0",
         "@biomejs/biome": "2.6.4",

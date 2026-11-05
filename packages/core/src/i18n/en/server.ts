@@ -35,6 +35,12 @@ export const enServer = {
   "server.bot": "Telegram bot",
   "server.invalidUrl": "Enter the server's address, like pace.example.dev",
   "server.insecure": "Use an https:// address",
+  "server.restartPending": "Restart to finish changing server",
+  "server.restartExplanation":
+    "The change to {host} is saved. Restart Pace to continue on that server.",
+  "server.restartApp": "Restart Pace",
+  "server.restartFailed": "Couldn't restart Pace. Try again, or close and reopen the app.",
+  "server.moveFailed": "Couldn't change server. Try again.",
   "server.unreachable": "Can't reach this server",
   "server.notPace": "This is not a Pace server",
   "server.serverOutdated": "This server runs an older Pace. Update the server or use another one.",

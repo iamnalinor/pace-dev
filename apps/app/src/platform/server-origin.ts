@@ -4,7 +4,9 @@ import { useStore } from "zustand";
 
 import type { PaceRuntime } from "../runtime.ts";
 
+import { prepareRuntimeFirebase, reconcileRuntimeFirebase } from "./firebase-runtime.ts";
 import { applyInstanceCheck, serverStore } from "./server-store.ts";
+import { canUseCurrentServer } from "./server-switch-state.ts";
 import { readServer } from "./server.ts";
 
 /**
@@ -12,6 +14,7 @@ The server to build the runtime for: `null` until the stored choice is read into
 then its origin (a switch on the login screen changes it, and the runtime is built again).
 */
 export const useServerOrigin = (isNeeded: boolean): null | string => {
+  const [readError, setReadError] = useState<Error | null>(null);
   const [isRead, setIsRead] = useState(false);
   const origin = useStore(serverStore, (state) => state.origin);
   useEffect(() => {
@@ -19,18 +22,50 @@ export const useServerOrigin = (isNeeded: boolean): null | string => {
       return;
     }
     void (async () => {
-      serverStore.setState({ origin: await readServer() });
-      setIsRead(true);
+      try {
+        const selected = await readServer();
+        reconcileRuntimeFirebase(selected);
+        serverStore.setState({ origin: selected });
+        setIsRead(true);
+      } catch {
+        setReadError(new Error("server-read-failed"));
+      }
     })();
   }, [isNeeded]);
+  if (readError !== null) {
+    throw readError;
+  }
   return isRead ? origin : null;
 };
 
 /** Asks the runtime's server what it is and whether it fits this app, into `serverStore`. */
-export const checkServer = async (
+const checks = new WeakMap<object, Promise<void>>();
+export const checkServer = (
   runtime: Pick<PaceRuntime, "baseUrl" | "checkInstance">,
 ): Promise<void> => {
-  applyInstanceCheck(runtime.baseUrl, await runtime.checkInstance());
+  if (!canUseCurrentServer()) {
+    return Promise.resolve();
+  }
+  const pending = checks.get(runtime);
+  if (pending !== undefined) {
+    return pending;
+  }
+  const check = (async () => {
+    try {
+      const result = await runtime.checkInstance();
+      if (!canUseCurrentServer()) {
+        return;
+      }
+      if (result.ok) {
+        prepareRuntimeFirebase(runtime.baseUrl, result.value);
+      }
+      applyInstanceCheck(runtime.baseUrl, result);
+    } finally {
+      checks.delete(runtime);
+    }
+  })();
+  checks.set(runtime, check);
+  return check;
 };
 
 /**

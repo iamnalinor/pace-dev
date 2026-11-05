@@ -5,7 +5,15 @@ import { claimLocalCopy } from "./local-copy.ts";
 import { sendPhoneData, startPhonePush } from "./phone-runtime.ts";
 import { startBackgroundCheck } from "./platform/background-check.ts";
 import { IS_PHONE } from "./platform/device.ts";
+import { isRuntimeFirebase } from "./platform/firebase-runtime.ts";
+import { checkServer } from "./platform/server-origin.ts";
 import { canStartSenders, startSenders } from "./senders.ts";
+
+const checkRuntimeServer = async (runtime: PaceRuntime): Promise<void> => {
+  if (isRuntimeFirebase()) {
+    await checkServer(runtime);
+  }
+};
 
 /**
 A signed-in start: the local copy claimed, this week's homework instances, a first sync, then the time zone that sync
@@ -25,10 +33,13 @@ export const bootstrap = async (
     readonly isActive?: () => boolean;
   },
 ): Promise<void> => {
-  const { actions, sync } = runtime;
   const canContinue = () => isActive() && canStartSenders(runtime);
+  if (!canContinue()) {
+    return;
+  }
   // The copy is this session's before anything is written into it (re-review N3).
   await claimLocalCopy(runtime, session);
+  await checkRuntimeServer(runtime);
   if (!canContinue()) {
     return;
   }
@@ -38,8 +49,8 @@ export const bootstrap = async (
     void startBackgroundCheck();
   }
   const steps = [
-    () => actions.ensureInstances(),
-    () => sync.syncNow(),
+    () => runtime.actions.ensureInstances(),
+    () => runtime.sync.syncNow(),
     zoneSettled,
     () => pool.refresh(),
     () => sendPhoneData(runtime),

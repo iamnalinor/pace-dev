@@ -37,6 +37,7 @@ import {
   taskModel,
   weekModel,
 } from "./gallery-models.ts";
+import { NotificationAvailability } from "./gallery-push-reasons.tsx";
 import { Toasts } from "./gallery-toasts.tsx";
 
 /** How tall an hour of the week grid is here, and how narrow a day column may get on a phone. */
@@ -216,6 +217,9 @@ export const ChromeSections = ({ data }: { readonly data: GalleryData }) => {
       </Section>
       <Section title="dev.gallery.section.settings">
         <SettingsLinks />
+      </Section>
+      <Section title="settings.push.hint">
+        <NotificationAvailability />
       </Section>
       <Section title="dev.gallery.section.counts">
         {data.pluralCounts.map((count) => (

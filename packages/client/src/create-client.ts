@@ -67,6 +67,8 @@ export type PaceClient = {
 
 export type PaceClientOptions = {
   readonly baseUrl: string;
+  /** Refuse late authentication results after the host retires this client. */
+  readonly canSignIn?: (() => boolean) | undefined;
   /** Defaults to the system clock; tests pass a frozen one. */
   readonly clock?: Clock;
   readonly deviceId: string;
@@ -279,7 +281,12 @@ const apiAndAuth = (
     sessionEnded: () => wiring.hasEnded(),
     token: () => wiring.token(),
   });
-  const auth = createAuth({ api, notes: options.signOutNotes, session: options.session });
+  const auth = createAuth({
+    api,
+    notes: options.signOutNotes,
+    session: options.session,
+    canSignIn: options.canSignIn,
+  });
   const checks = sessionChecks(auth, api);
   wiring.token = auth.token;
   wiring.hasEnded = auth.hasEnded;

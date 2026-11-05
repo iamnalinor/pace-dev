@@ -57,6 +57,25 @@ export const enNotify = {
   "notifications.method.fcm": "Google",
   "notifications.method.poll": "Pace",
   "settings.notifications": "Notifications",
+  "settings.push.reason.server-disabled": "This server has turned off Google notifications.",
+  "settings.push.reason.package-missing":
+    "This app is not configured for Google notifications on this server.",
+  "settings.push.reason.restart-needed":
+    "Restart Pace to use the updated notification settings. Your tasks and unsent changes stay on this phone.",
+  "settings.push.reason.initialization-failed":
+    "Google notifications could not start on this phone.",
+  "settings.push.reason.storage-failed": "The phone could not save the notification settings.",
+  "settings.push.reason.unsupported":
+    "This version of Pace cannot use this server’s Google notifications.",
+  "settings.push.reason.invalid-config":
+    "This server’s Google notification settings are incomplete.",
+  "settings.push.reason.configuration-pending":
+    "Checking whether Google notifications are available.",
+  "settings.push.reason.other-project": "This server uses a different Google notification project.",
+  "settings.push.reason.services-unavailable":
+    "Google notification services are unavailable on this phone.",
+  "settings.push.restart": "Restart Pace",
+  "settings.push.restartFailed": "Pace could not restart. Close and reopen the app.",
   "settings.push.hint": "How this phone gets notifications",
   "settings.push.option.auto": "Automatic",
   "settings.push.option.fcm": "Google",
@@ -69,8 +88,7 @@ export const enNotify = {
   "settings.push.none": "This phone shows no notifications; they are all in the app's bell.",
   "settings.push.denied":
     "This phone shows none: notifications are not allowed (Settings → Permissions).",
-  "settings.push.otherProject":
-    "Google: not available, this server uses a different Firebase project.",
+  "settings.push.otherProject": "This server uses a different Google notification project.",
   "settings.push.notSaved": "The phone could not save this choice. Try again.",
   "settings.push.unavailable": "{method} is not available right now.",
   "settings.notifications.hint": "Where each kind of notification goes.",

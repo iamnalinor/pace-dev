@@ -3,7 +3,7 @@
 > Recovery note (2026-11-05): the original record below is historical. Current authority,
 > main-based integration status and remaining work are in
 > [continuation-2026-11-05.md](technical-execution/continuation-2026-11-05.md).
-> Push/checkpoint/PR work is authorized; exploratory QA and emulator execution are excluded.
+> Push/checkpoint/PR work is authorized. Exploratory QA and local Android/emulator execution are excluded; the owner permits Android emulator tests in PR GitHub Actions. Separate design review is deferred.
 
 Срез исходников: 3 ноября 2026. Исполнение начато в этой сессии по разрешению владельца; статус реализации ведётся в `context/technical-execution/ledger.md`.
 

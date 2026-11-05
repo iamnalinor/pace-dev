@@ -1,6 +1,7 @@
+import { type ErrorBoundaryProps, Stack, usePathname } from "expo-router";
+
 import "../global.css";
 
-import { type ErrorBoundaryProps, Stack, usePathname } from "expo-router";
 import { ShareIntentProvider } from "expo-share-intent";
 import { StatusBar } from "expo-status-bar";
 import { View } from "react-native";
@@ -10,6 +11,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { PaceProvider, useAuth } from "#app/app-state.tsx";
 import { GateProvider, isBarePath, NavigatorHold, RouteGate } from "#app/auth/route-gate.tsx";
 import { IncompatibleGate, useIsServerBlocked } from "#app/features/server/incompatible-screen.tsx";
+import { ServerSwitchGate } from "#app/features/server/server-switch-gate.tsx";
 import { CrashDocumentLanguage } from "#app/platform/crash-document-language.tsx";
 import { useCrashNotice } from "#app/platform/crash-notice.ts";
 import { DocumentHead } from "#app/platform/document-head.tsx";
@@ -60,58 +62,60 @@ const Navigator = () => {
   const path = usePathname();
   useCrashNotice();
   return (
-    <UpdateBanner>
-      <SyncFrame isBare={isBarePath(path)}>
-        <View className="flex-1 flex-row bg-app">
-          <CrashContext />
-          <DocumentLanguage />
-          <DocumentHead />
-          <AppDocumentTheme />
-          {hasSidebar ? <Sidebar /> : null}
-          <View className="flex-1">
-            <NavigatorHold>
-              <Stack
-                // A signed-in app its server does not fit sees the versions screen instead of any
-                // route; the navigator stays mounted, so logging out lands on the login screen.
-                layout={({ children }) => (
-                  <IncompatibleGate>
-                    <RouteGate path={path}>
-                      {/* Under the hold and the gate: a tap is followed once the Stack exists. */}
-                      <NotificationLinks />
-                      {children}
-                    </RouteGate>
-                  </IncompatibleGate>
-                )}
-                screenLayout={({ children }) => <ScreenScene>{children}</ScreenScene>}
-                screenOptions={{
-                  contentStyle: { backgroundColor: palette["bg.app"] },
-                  headerShown: false,
-                }}
-              >
-                <Stack.Screen name="(tabs)" />
-                <Stack.Screen name="login" options={{ animation: "fade" }} />
-                <Stack.Screen name="auth/index" options={{ animation: "fade" }} />
-                <Stack.Screen name="task/[id]" />
-                <Stack.Screen name="project/[id]" />
-                <Stack.Screen name="projects" />
-                <Stack.Screen name="week" />
-                <Stack.Screen name="insights" />
-                <Stack.Screen name="settings" />
-                <Stack.Screen name="review" />
-                <Stack.Screen name="history" />
-                <Stack.Screen name="permissions" />
-                <Stack.Screen name="notifications" />
-                <Stack.Screen
-                  name="onboarding"
-                  options={{ animation: "fade", gestureEnabled: false }}
-                />
-              </Stack>
-            </NavigatorHold>
+    <ServerSwitchGate>
+      <UpdateBanner>
+        <SyncFrame isBare={isBarePath(path)}>
+          <View className="flex-1 flex-row bg-app">
+            <CrashContext />
+            <DocumentLanguage />
+            <DocumentHead />
+            <AppDocumentTheme />
+            {hasSidebar ? <Sidebar /> : null}
+            <View className="flex-1">
+              <NavigatorHold>
+                <Stack
+                  // A signed-in app its server does not fit sees the versions screen instead of any
+                  // route; the navigator stays mounted, so logging out lands on the login screen.
+                  layout={({ children }) => (
+                    <IncompatibleGate>
+                      <RouteGate path={path}>
+                        {/* Under the hold and the gate: a tap is followed once the Stack exists. */}
+                        <NotificationLinks />
+                        {children}
+                      </RouteGate>
+                    </IncompatibleGate>
+                  )}
+                  screenLayout={({ children }) => <ScreenScene>{children}</ScreenScene>}
+                  screenOptions={{
+                    contentStyle: { backgroundColor: palette["bg.app"] },
+                    headerShown: false,
+                  }}
+                >
+                  <Stack.Screen name="(tabs)" />
+                  <Stack.Screen name="login" options={{ animation: "fade" }} />
+                  <Stack.Screen name="auth/index" options={{ animation: "fade" }} />
+                  <Stack.Screen name="task/[id]" />
+                  <Stack.Screen name="project/[id]" />
+                  <Stack.Screen name="projects" />
+                  <Stack.Screen name="week" />
+                  <Stack.Screen name="insights" />
+                  <Stack.Screen name="settings" />
+                  <Stack.Screen name="review" />
+                  <Stack.Screen name="history" />
+                  <Stack.Screen name="permissions" />
+                  <Stack.Screen name="notifications" />
+                  <Stack.Screen
+                    name="onboarding"
+                    options={{ animation: "fade", gestureEnabled: false }}
+                  />
+                </Stack>
+              </NavigatorHold>
+            </View>
+            <StatusBar style={scheme === "dark" ? "light" : "dark"} />
           </View>
-          <StatusBar style={scheme === "dark" ? "light" : "dark"} />
-        </View>
-      </SyncFrame>
-    </UpdateBanner>
+        </SyncFrame>
+      </UpdateBanner>
+    </ServerSwitchGate>
   );
 };
 

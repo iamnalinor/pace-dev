@@ -200,7 +200,10 @@ come: `bun test:llm` will run them against the configured OpenAI-compatible endp
 
 ## Android end-to-end
 
-Run **Android E2E** in GitHub Actions on the commit to check. It builds a test-only x86_64
+Run **Android E2E** in GitHub Actions on the commit to check. For a pull request, apply the
+`android-e2e` label: that label event checks out the exact PR head SHA. Remove and reapply the
+label after a new push to request another run; ordinary pushes do not spend emulator minutes.
+Manual dispatch and reusable workflow calls remain available. It builds a test-only x86_64
 release APK (bundled JavaScript and R8), boots a Google APIs emulator on API 34, applies D1
 migrations to fresh local state, and waits for the Worker on the host at `127.0.0.1:8787`.
 The APK reaches it at `http://10.0.2.2:8787`. The workflow can be called by other workflows;

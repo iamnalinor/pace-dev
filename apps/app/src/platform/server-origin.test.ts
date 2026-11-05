@@ -27,3 +27,15 @@ describe("explicit server configuration retry", () => {
     expect(checkInstance).toHaveBeenCalledTimes(1);
   });
 });
+
+it("shares discovery while a start and watcher ask together", async () => {
+  const answer = Promise.withResolvers<Result<Instance, InstanceError>>();
+  const checkInstance = jest.fn(async () => await answer.promise);
+  const runtime = { baseUrl: "https://same.example", checkInstance };
+  serverStore.setState({ origin: runtime.baseUrl });
+  const first = checkServer(runtime);
+  const second = checkServer(runtime);
+  answer.resolve(ok(InstanceSchema.parse(fakeInstance)));
+  await Promise.all([first, second]);
+  expect(checkInstance).toHaveBeenCalledTimes(1);
+});

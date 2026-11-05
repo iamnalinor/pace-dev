@@ -48,3 +48,11 @@ Files: scripts/deploy/{cli,cloudflare,probes,secrets-file,main}.ts; adjacent tes
 - [ ] Add sanitized CLI errors, explicit environment allowlist, no dotenv, restricted 0600 temporary JSON files with finally cleanup. Tests cover success, write failure, command rejection and secret-fragment redaction.
 - [ ] Implement structured authenticated Cloudflare reads distinguishing missing/auth/network/malformed responses. Tests pin exact promotion ID and no post-promotion secret puts.
 - [ ] Run focused scripts/API checks and root lint/review. Record local evidence and external gates: nonproduction DO bootstrap/staging rehearsal, Access exact Version URL, account permissions, device FCM, production activation. Do not claim these ran.
+
+## Platform constraint discovered during adapter implementation (2026-11-05)
+
+The original exact Version URL assumption does not hold for Pace's current Worker: Cloudflare's [Version URL limitations](https://developers.cloudflare.com/workers/versions-and-deployments/version-urls/#limitations) exclude Workers implementing Durable Objects. Pace exports a Durable Object. The existing generic injected runner/probe tests do not establish that its preview route is deployable for Pace, and Task 3b remains incomplete.
+
+[Version overrides](https://developers.cloudflare.com/workers/versions-and-deployments/version-overrides/) require the candidate to be in the current deployment, potentially at 0% while baseline remains at 100%. This is a distinct control-plane operation, and a public override header can select the candidate; it is not a drop-in protected inactive URL. Do not silently fall back to this route or ordinary deployment. Before implementing an explicit override mode, resolve authentication/edge stripping, exact response identity, active-state drift and rollback semantics, and Durable Object routing behavior. Any route must preserve baseline ordinary traffic until candidate proof and backward-compatible migration gates pass.
+
+Continue implementing authenticated snapshot reads and fail closed for unsupported preview capabilities. Do not equate a generated hostname, green fake-fetch test or cloned preview with proof of the exact target Worker's effective bindings. Production remains additive until a supported path is implemented and rehearsed.

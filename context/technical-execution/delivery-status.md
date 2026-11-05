@@ -7,13 +7,13 @@ PR #54. It is not completion of the whole roadmap. Current instructions and deta
 | Area | Implemented and checked locally | Remaining work / evidence |
 | --- | --- | --- |
 | Recovery | Six original commits recovered, archive checksums verified, archive branch pushed; main-based transplant reviewed | Finish integration checks and publish subsequent checkpoints |
-| Android harness | Optional isolated smoke workflow, guarded dev login and emulator-local network policy; stubbed runner tests | Emulator/device execution excluded by owner; more flow definitions and release gating remain |
+| Android harness | Optional isolated smoke workflow, guarded dev login and emulator-local network policy; stubbed runner tests; reviewed PR-label trigger in working tree | Owner now permits emulator execution in PR Actions; local Android remains prohibited. Actual CI execution, expanded flows and release gating remain |
 | Firebase contract | Multi-package public metadata, strict parser, additive compatibility | Native runtime adoption remains |
 | Firebase policy | Opt-in strict API and Worker/DO send guard, shared reason contract, local preflight including policy validation | Exact-version deployment staging and nonproduction rehearsal; no production activation |
-| Client recovery | Known/unknown config reasons, both login variants and signed-in status, nonce cancellation, sender pause, guarded bootstrap recovery; preserved outbox/session | Final integration lint, visual matrix and CI; no exploratory QA per owner |
+| Client recovery | Known/unknown config reasons, login recovery and sender pause; reviewed session ownership and pending-server handoff in working tree | Final integrated checks and CI; separate design review deferred and exploratory QA excluded by owner |
 | Storage | Conditional raw-usage writes; real workerd deterministic cold-instance comparison, original/correction retention and cursor fingerprints | Alarm-inclusive workloads, bounded checkpoint/tail and verified archive/export/restore; no source-event/raw-usage pruning |
-| Native Firebase | Original rollout design preserved | Initialization, process restart, server changes, package identity and device checks; baked config not removed yet |
-| OTA | Original requirements and dependency ordering preserved | Signed publisher protocol, runtime guard, channels, client lifecycle, rollback evidence |
+| Native Firebase | Opt-in native controller foundation committed; runtime handoff and origin/project-scoped push implemented and tested in working tree | Integrated lint/checkpoint, actual Android CI and device-specific FCM evidence; baked compatibility retained |
+| OTA | Original requirements preserved; concrete implementation plan written; protocol/fingerprint source investigation underway | Signed publisher protocol, runtime guard, channels, client lifecycle, rollback evidence |
 | Infrastructure ports | Original coupling survey preserved | Ports, Cloudflare adapters, dependency guards and conditional alternative host proof |
 
 Fresh complete suites at this checkpoint before final lint corrections: scripts 156, core 905,
