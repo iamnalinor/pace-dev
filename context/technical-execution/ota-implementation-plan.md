@@ -1,6 +1,9 @@
 # Signed Android OTA implementation plan
 
-Status: planning; no publisher, endpoint or native OTA integration is implemented yet.
+Status: publisher and signed artifact pipeline checkpointed in `9432b6f`; native build trust,
+app lifecycle and Settings integration are being verified in the next packet. Publication
+automation, the full fingerprint matrix and device acceptance remain open. The historical
+checkboxes below are not a substitute for the evidence in the continuation ledger.
 
 ## Requirements and decisions
 

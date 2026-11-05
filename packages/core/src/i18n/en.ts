@@ -5,6 +5,7 @@ import { enDevices } from "./en/devices.ts";
 import { enInput } from "./en/input.ts";
 import { enLibrary } from "./en/library.ts";
 import { enNotify } from "./en/notify.ts";
+import { enOta } from "./en/ota.ts";
 import { enServer } from "./en/server.ts";
 import { enSessions } from "./en/sessions.ts";
 import { enShell } from "./en/shell.ts";
@@ -19,6 +20,7 @@ export const en = {
   ...enLibrary,
   ...enTime,
   ...enNotify,
+  ...enOta,
   ...enDecisions,
   ...enServer,
   ...enSessions,

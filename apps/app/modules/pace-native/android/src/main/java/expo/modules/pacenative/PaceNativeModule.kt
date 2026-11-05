@@ -40,6 +40,8 @@ class PaceNativeModule : Module() {
     Name("PaceNative")
 
     Function("packageName") { context.packageName }
+    Function("apkVersion") { context.packageManager.getPackageInfo(context.packageName, 0).versionName }
+    Function("otaNetwork") { otaNetwork(context) }
     Function("firebaseStatus") { FirebaseRuntime.controller(context).status().asMap() }
     Function("stageFirebaseConfig") { origin: String, json: String? ->
       FirebaseRuntime.withConfig(context, origin, json, true)

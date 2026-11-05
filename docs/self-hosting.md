@@ -180,3 +180,36 @@ access a database. HTTP 200 means the diagnostic was read, **not** that promotio
 the staging runner must match identity, attempt, policy and the expected ready mode/project.
 Application health, discovery and authenticated routes retain the strict configuration guard.
 Version URL protection is configured separately and must be verified before using a candidate.
+
+## Android OTA build configuration
+
+OTA remains disabled in default builds. The account server cannot choose the code publisher.
+An explicitly configured native build requires all three build inputs:
+
+- `PACE_OTA_URL`: canonical HTTPS publisher URL ending in `/manifest`, without credentials,
+  query parameters or a fragment.
+- `PACE_OTA_CHANNEL`: a lowercase channel such as `preview` or `production`.
+- `PACE_OTA_CERTIFICATE`: exactly `./ota/publisher-certificate.pem`, relative to `apps/app`.
+  Supply a valid public RSA certificate (at least 2048 bits), never the private signing key.
+
+`PACE_OTA_KEY_ID` optionally selects the signature key identifier (default `root`). Partial
+or invalid configuration fails the build. The certificate contents are added to Expo's
+default fingerprint sources; changing trust requires a new compatible APK. This is not a
+replacement for checking the publisher fingerprint against the released APK's metadata.
+
+The app checks on launch and foreground, coalesces concurrent requests, and limits manifest
+checks to once per hour during its lifetime. Account/server switches do not reset this policy.
+Downloads require Android to report an unmetered Wi-Fi network; unknown networks cannot
+authorize a download. Settings and the incompatible-server screen show update status and
+running APK/runtime/update identifiers, with a deliberate restart when an update is ready.
+The web retains its existing service-worker update path.
+
+Expo's automatic checks are set to `NEVER`, including recovery network fetching, so native
+startup does not bypass this download policy. Cached recovery remains Expo's responsibility;
+this does not promise recovery from every post-startup JavaScript failure. Native recovery,
+signature rejection and offline behavior still require the device acceptance scenarios.
+
+The isolated `apps/updates` Worker serves signed immutable manifests/assets from R2. It has
+no private signing key and cannot create signatures. Publication/promotion automation,
+released-APK fingerprint matching and device acceptance remain unfinished; no publisher
+resource or production signing material is provisioned by these changes.

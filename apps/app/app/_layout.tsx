@@ -18,6 +18,7 @@ import { DocumentHead } from "#app/platform/document-head.tsx";
 import { DocumentLanguage } from "#app/platform/document-language.tsx";
 import { DocumentTheme } from "#app/platform/document-theme.tsx";
 import { NotificationLinks } from "#app/platform/notification-links.ts";
+import { OtaProvider } from "#app/platform/ota-provider.tsx";
 import { UpdateBanner } from "#app/platform/update-banner.tsx";
 // Defines the push task (and the foreground handler) before Android may run it.
 import "#app/platform/push-task.ts";
@@ -140,17 +141,19 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ThemeProvider>
-          <PaceProvider>
-            <ShareIntentProvider>
-              <ToastProvider>
-                <TooltipHost>
-                  <GateProvider>
-                    <Navigator />
-                  </GateProvider>
-                </TooltipHost>
-              </ToastProvider>
-            </ShareIntentProvider>
-          </PaceProvider>
+          <OtaProvider>
+            <PaceProvider>
+              <ShareIntentProvider>
+                <ToastProvider>
+                  <TooltipHost>
+                    <GateProvider>
+                      <Navigator />
+                    </GateProvider>
+                  </TooltipHost>
+                </ToastProvider>
+              </ShareIntentProvider>
+            </PaceProvider>
+          </OtaProvider>
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

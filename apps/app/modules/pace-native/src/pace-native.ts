@@ -27,6 +27,10 @@ export type FirebaseStatus = {
 /** The Kotlin module's surface (`modules/pace-native/android`). */
 export type PaceNative = {
   readonly packageName: () => null | string;
+  /** Installed APK version, unaffected by downloaded JavaScript manifests. */
+  readonly apkVersion: () => null | string;
+  /** One active-network snapshot; null never authorizes an OTA asset download. */
+  readonly otaNetwork: () => null | { readonly isWifi: boolean; readonly isMetered: boolean };
   readonly firebaseStatus: () => FirebaseStatus;
   /** Stage before writing SecureStore's server origin. Null config deliberately disables push. */
   readonly stageFirebaseConfig: (origin: string, json: null | string) => FirebaseStatus;
@@ -78,6 +82,8 @@ do. The battery is no obstacle there, so the battery step is never asked for.
 */
 export const fallbackPaceNative: PaceNative = {
   packageName: () => null,
+  apkVersion: () => null,
+  otaNetwork: () => null,
   firebaseStatus: unsupportedFirebase,
   stageFirebaseConfig: unsupportedFirebase,
   commitFirebaseConfig: unsupportedFirebase,

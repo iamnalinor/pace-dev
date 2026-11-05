@@ -21,6 +21,7 @@ import { TimezoneRow } from "#app/features/settings/timezone-row.tsx";
 import { IS_PHONE } from "#app/platform/device.ts";
 import { DestinationScreen } from "#app/screens/destination-screen.tsx";
 import { LogoutButton } from "#app/shared/logout-button.tsx";
+import { OtaStatus } from "#app/shared/ota-status.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button } from "#app/ui/button.tsx";
 import { cx } from "#app/ui/cx.ts";
@@ -129,6 +130,7 @@ export const SettingsScreen = () => {
   return (
     <DestinationScreen title={t("settings.title")}>
       <LookRows />
+      <OtaStatus />
       {/* The account's values wait for its first sync; the device's own (theme, push) do not. */}
       <Row label={t("settings.timezone")}>
         <KnownAfterSync>

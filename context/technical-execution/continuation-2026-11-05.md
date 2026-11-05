@@ -221,3 +221,33 @@ A single independent review found invalid cross-package import rewrites and mism
 After CLI/test lint corrections, `bun test scripts/ota` passed 54 tests / 107 assertions. Multipart coverage checks exact envelope bytes and independently verifies the extracted signature with WebCrypto, without adding a parser dependency. Real workerd/R2 delivery tests passed 8/8. The two real Expo Node-loader regressions passed after the `.js` import correction. No exploratory QA or local Android run occurred.
 
 The installed Expo fingerprint API computed the current tree's hash `659d7a0de63f9a5e7b2535e37949fb1b71399718` from 53 sources. Both `modules/pace-native/android` and `modules/pace-native/runtime-firebase-plugin.ts` have actual source hashes; Expo config still explicitly disables updates and contains the git-derived app version. This is source-inclusion evidence only, not the required comparative fingerprint matrix or an OTA-compatible native release.
+
+### Publisher checkpoint and first Android Actions success
+
+Checkpoint `9432b6f` was committed and pushed to draft PR #55. Its general CI checks passed
+(lint, audit, unit, app, API, isolated updates Worker and JVM tests). Android Actions run
+`42112200861` built the APK and passed the emulator smoke scenario. The emulator ran only in
+GitHub Actions; no local Android tooling was started. The corresponding web E2E run is still
+pending at this entry.
+
+### Native OTA app packet
+
+Implemented opt-in build-time publisher trust, additive certificate fingerprinting, an
+account-independent provider, hourly/coalesced checks, conservative native Wi-Fi metering,
+bounded failed-fetch retries, generation-safe disposal/replay and deliberate restart. Settings
+and the incompatible-server screen expose status and running APK/runtime/update/date. The APK
+version comes from PackageManager rather than downloaded Expo metadata. Web keeps its service
+worker. Details and scoped review are in [the app integration report](ota-app-integration-report.md).
+
+Independent Superpowers-template review closed the failed-fetch request-loop finding and has
+no outstanding critical/important issues. Unified `bun lint` completed successfully after
+splitting the new translations into their own catalogs and fixing the scoped test/config
+issues; no rules were weakened. Full app tests are running before the checkpoint. Production
+activation, the full fingerprint matrix and publication automation remain open, as does the
+rest of the technical roadmap. The owner's Pareto direction prioritizes these capabilities and
+useful refactoring over separate visual polish; it does not cancel unfinished roadmap work.
+
+Full app verification passed: 140 suites / 1055 tests, exit code 0. Existing overlapping-act
+and delayed-Jest-exit warnings also occur in the previous full-app logs; no new failing test
+was skipped. Unified lint and independent review are green for this packet. The next pushed
+commit must receive its own CI and Android smoke evidence.

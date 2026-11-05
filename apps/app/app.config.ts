@@ -7,6 +7,7 @@ import { ANDROID_SMOKE_API_URL } from "./android-smoke.ts";
 import { appVersion } from "./app-version.ts";
 import { firebaseProjectOf } from "./firebase-project.ts";
 import { withRuntimeFirebase } from "./modules/pace-native/runtime-firebase-plugin.ts";
+import { otaBuildConfig } from "./ota-build-config.ts";
 import { THEME_VARS } from "./src/ui/generated/tokens.ts";
 
 /** The dark app ground (`bg.app`): behind the splash, the adaptive icon and the first native frame. */
@@ -193,8 +194,16 @@ const config: ExpoConfig = {
     "./plugins/with-release-signing.js",
     ...(isAndroidSmoke ? ["./plugins/with-emulator-network.js"] : []),
   ],
-  // No OTA updates: releases ship as APKs through GitHub Releases.
-  updates: { enabled: false },
+  // Publisher trust is fixed at build time and never follows the selected account server.
+  ...otaBuildConfig(
+    {
+      publisherUrl: envString("PACE_OTA_URL"),
+      channel: envString("PACE_OTA_CHANNEL"),
+      certificateFile: envString("PACE_OTA_CERTIFICATE"),
+      keyId: envString("PACE_OTA_KEY_ID"),
+    },
+    __dirname,
+  ),
   experiments: { typedRoutes: true },
   extra: {
     apiUrl,
