@@ -25,7 +25,7 @@ The `pace/no-raw-design-values` backlog (redesign-plan, "Lint baseline"). An exa
 warnings fail, fewer fail too until this number is lowered to the new count. At 0 the rule
 becomes an error and this allowance goes away.
 */
-const DESIGN_VALUE_WARNINGS = 65;
+const DESIGN_VALUE_WARNINGS = 50;
 
 /**
 The bare-pressable backlog (bug-lessons F-CMP-01: a React Native `Pressable`/`Touchable*` in
@@ -39,7 +39,7 @@ The kit-primitive backlog (bug-lessons 109; spec §4.1.2 rule 9): a lucide icon 
 `Icon`, or `numberOfLines` on React Native's `Text` outside the kit's `Text`. Exact, like the ones
 above; the screen tasks migrate the callers and lower it; at 0 the rule becomes an error.
 */
-const KIT_PRIMITIVE_WARNINGS = 9;
+const KIT_PRIMITIVE_WARNINGS = 7;
 
 const APP_RATCHETS: readonly Ratchet[] = [
   { allowance: DESIGN_VALUE_WARNINGS, constant: "DESIGN_VALUE_WARNINGS", rule: DESIGN_VALUE_RULE },
@@ -67,6 +67,8 @@ const extra = process.argv.slice(2);
 const stylish = await new ESLint().loadFormatter("stylish");
 
 for (const [name, targets, ratchets] of PARTS) {
+  // ESLint cuts a long report short when it exits into a pipe, so it writes the report to a file.
+  const report = `.cache/eslint/${name}.json`;
   const run = Bun.spawnSync(
     [
       "bunx",
@@ -74,19 +76,21 @@ for (const [name, targets, ratchets] of PARTS) {
       ...targets,
       "--format",
       "json",
+      "--output-file",
+      report,
       "--cache",
       "--cache-location",
       `.cache/eslint/${name}/`,
       ...extra,
     ],
-    { stderr: "inherit", stdout: "pipe" },
+    { stderr: "inherit", stdout: "inherit" },
   );
 
   let results: ESLint.LintResult[];
   try {
-    results = JSON.parse(run.stdout.toString()) as ESLint.LintResult[];
+    results = JSON.parse(await Bun.file(report).text()) as ESLint.LintResult[];
   } catch {
-    console.error(`eslint failed in ${name} (no report):\n${run.stdout.toString()}`);
+    console.error(`eslint failed in ${name} (no report)`);
     process.exit(run.exitCode === 0 ? 1 : run.exitCode);
   }
 
