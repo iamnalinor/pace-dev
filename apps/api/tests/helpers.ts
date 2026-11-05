@@ -5,6 +5,7 @@ import { env, exports } from "cloudflare:workers";
 import { bindNonce } from "../src/auth/nonce.ts";
 import { findUserIdByTelegramId } from "../src/auth/users.ts";
 import { d1 } from "../src/shared/db/d1.ts";
+import { UserStore } from "../src/user-store/user-store.ts";
 
 export const api = exports.default;
 
@@ -149,4 +150,40 @@ export const meterSql = (
       }
     },
   };
+};
+
+/** Constructs an evicted store's replacement for cost tests. */
+export const coldUserStore = async (
+  state: DurableObjectState,
+  bindings: Cloudflare.Env,
+  construct: (state: DurableObjectState, bindings: Cloudflare.Env) => UserStore = (
+    context,
+    environment,
+  ) => new UserStore(context, environment),
+): Promise<UserStore> => {
+  const before = Object.getOwnPropertyDescriptor(state, "blockConcurrencyWhile");
+  const block = state.blockConcurrencyWhile.bind(state);
+  const pending: Promise<unknown>[] = [];
+  Object.defineProperty(state, "blockConcurrencyWhile", {
+    configurable: true,
+    value: async <T>(initialize: () => Promise<T>): Promise<T> => {
+      const initialized = block(initialize);
+      pending.push(initialized);
+      return await initialized;
+    },
+  });
+  try {
+    const instance = construct(state, bindings);
+    await Promise.all(pending);
+    return instance;
+  } catch (error) {
+    await Promise.allSettled(pending);
+    throw error;
+  } finally {
+    if (before === undefined) {
+      Reflect.deleteProperty(state, "blockConcurrencyWhile");
+    } else {
+      Object.defineProperty(state, "blockConcurrencyWhile", before);
+    }
+  }
 };

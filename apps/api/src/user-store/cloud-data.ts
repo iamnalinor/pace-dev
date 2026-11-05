@@ -1,7 +1,7 @@
 import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
 import type { SQLiteColumn } from "drizzle-orm/sqlite-core";
 
-import { and, eq, gt, max, notInArray, type Query, type SQL, sql } from "drizzle-orm";
+import { and, eq, gt, notInArray, type Query, type SQL, sql } from "drizzle-orm";
 
 import type { CalendarEvent, DeviceUse, Interval, UsageRow } from "@pace/core";
 
@@ -245,6 +245,7 @@ const addPhoneUses = async (
       .values({ deviceId, endAt: use.endAt, startAt: use.startAt })
       .onConflictDoUpdate({
         set: { endAt: sql`max(${phoneUses.endAt}, excluded.end_at)` },
+        setWhere: sql`${phoneUses.endAt} < excluded.end_at`,
         target: [phoneUses.deviceId, phoneUses.startAt],
       });
   }
@@ -271,6 +272,7 @@ export const addUsage = async (
           deviceName: upload.deviceName,
           endAt: sql`max(${usageSessions.endAt}, excluded.end_at)`,
         },
+        setWhere: sql`${usageSessions.endAt} < excluded.end_at OR ${usageSessions.deviceName} <> excluded.device_name`,
         target: [usageSessions.deviceId, usageSessions.app, usageSessions.startAt],
       });
   }
@@ -388,19 +390,4 @@ export const rangeStatements = (
     phoneUses: uses.phones.toSQL(),
     usage: usageRange(db, range).toSQL(),
   };
-};
-
-/**
-Each device that sent usage and the end of its newest session: when the person's sessions list
-says an app or an agent last sent data.
-*/
-export const usageDevices = async (
-  db: Db,
-): Promise<readonly { readonly deviceId: string; readonly at: string }[]> => {
-  const { usageSessions } = schema;
-  const rows = await db
-    .select({ at: max(usageSessions.endAt), deviceId: usageSessions.deviceId })
-    .from(usageSessions)
-    .groupBy(usageSessions.deviceId);
-  return rows.filter((row): row is { at: string; deviceId: string } => row.at !== null);
 };

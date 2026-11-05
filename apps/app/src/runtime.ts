@@ -9,14 +9,19 @@ import {
   type SessionStore,
 } from "@pace/client";
 import { type AppHooks, createAppHooks } from "@pace/client/react";
-import { CLIENT_OUTDATED, type Instance, type Result } from "@pace/core";
+import {
+  CLIENT_OUTDATED,
+  FirebaseConfigReasonSchema,
+  type Instance,
+  type Result,
+} from "@pace/core";
 
 import { loadDeviceId } from "./platform/device-id.ts";
 import { IS_PHONE } from "./platform/device.ts";
 import { createEventStore, type LocalEventStore } from "./platform/event-store.ts";
 import { createPeerTabs } from "./platform/peer-tabs.ts";
 import { createSecureSessionStore } from "./platform/secure-session.ts";
-import { markClientOutdated } from "./platform/server-store.ts";
+import { applyInstanceCheck, markClientOutdated } from "./platform/server-store.ts";
 import { readServer } from "./platform/server.ts";
 import { createSignOutNotes } from "./platform/sign-out-notes.ts";
 
@@ -60,6 +65,31 @@ const isClientOutdated = async (response: Response): Promise<boolean> => {
   }
 };
 
+const observeConfiguration = async (response: Response, origin: string): Promise<void> => {
+  if (response.status !== 500) {
+    return;
+  }
+  let body: unknown;
+  try {
+    body = await response.clone().json();
+  } catch {
+    return;
+  }
+  if (
+    typeof body !== "object" ||
+    body === null ||
+    !("code" in body) ||
+    body.code !== "server/misconfigured"
+  ) {
+    return;
+  }
+  const reason = FirebaseConfigReasonSchema.safeParse("reason" in body ? body.reason : null);
+  applyInstanceCheck(origin, {
+    ok: false,
+    error: { kind: "server-misconfigured", reason: reason.success ? reason.data : null },
+  });
+};
+
 /** Every call of the runtime, watched for the server refusing this app as too old. */
 const watchingProtocol =
   (fetchOf: FetchLike, origin: string): FetchLike =>
@@ -68,6 +98,7 @@ const watchingProtocol =
     if (await isClientOutdated(response)) {
       markClientOutdated(origin);
     }
+    await observeConfiguration(response, origin);
     return response;
   };
 

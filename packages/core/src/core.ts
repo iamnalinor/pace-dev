@@ -86,6 +86,7 @@ export {
   TimeZoneSchema,
 } from "./events/payloads.ts";
 export { mergeEvents, sortEvents } from "./events/sort.ts";
+export * from "./firebase/config.ts";
 export { capitalize, clipText, clipWords, initials, splitGraphemes } from "./format/initials.ts";
 export { formatCount, formatNumber, formatPercent, type NumberOptions } from "./format/numbers.ts";
 export { en } from "./i18n/en.ts";

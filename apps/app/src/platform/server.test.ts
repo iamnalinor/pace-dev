@@ -68,6 +68,7 @@ describe("switchServer", () => {
     expect(secureStore.values.has("pace.session")).toBe(false);
     await expect(readServer()).resolves.toBe(B);
     expect(serverStore.getState()).toEqual({
+      configurationError: null,
       instance: instanceB,
       origin: B,
       reason: null,
@@ -86,6 +87,7 @@ describe("switchServer", () => {
     await switchServer(runtime, null);
     await expect(readServer()).resolves.toBe(API_BASE_URL);
     expect(serverStore.getState()).toEqual({
+      configurationError: null,
       instance: null,
       origin: API_BASE_URL,
       reason: null,

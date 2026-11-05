@@ -40,6 +40,7 @@ export const switchServer = async (
   await runtime.resetLocalData();
   await writeServer(choice?.origin ?? null);
   serverStore.setState({
+    configurationError: null,
     instance: choice?.instance ?? null,
     origin: choice?.origin ?? API_BASE_URL,
     reason: null,

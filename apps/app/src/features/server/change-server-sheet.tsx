@@ -16,9 +16,11 @@ import {
   type ServerUrlError,
 } from "@pace/core";
 
+import { configurationErrorKey } from "./configuration-error.ts";
+
 type Problem = InstanceError | ServerUrlError;
 
-const PROBLEM_KEY: Readonly<Record<Problem, MessageKey>> = {
+const PROBLEM_KEY: Readonly<Record<Extract<Problem, string>, MessageKey>> = {
   "client-outdated": "server.clientOutdated",
   insecure: "server.insecure",
   "invalid-url": "server.invalidUrl",
@@ -26,6 +28,9 @@ const PROBLEM_KEY: Readonly<Record<Problem, MessageKey>> = {
   "server-outdated": "server.serverOutdated",
   unreachable: "server.unreachable",
 };
+
+const problemKey = (problem: Problem): MessageKey =>
+  typeof problem === "object" ? configurationErrorKey(problem.reason) : PROBLEM_KEY[problem];
 
 /** One fact about the checked server: a quiet label and the server's own value, read as one. */
 const Fact = ({ label, value }: { readonly label: string; readonly value: string }) => (
@@ -132,7 +137,7 @@ export const ChangeServerSheet = ({ onClose }: { readonly onClose: () => void })
           autoCapitalize="none"
           autoComplete="url"
           autoCorrect={false}
-          error={phase.kind === "refused" ? t(PROBLEM_KEY[phase.problem]) : null}
+          error={phase.kind === "refused" ? t(problemKey(phase.problem)) : null}
           inputMode="url"
           keyboardType="url"
           label={t("server.address")}

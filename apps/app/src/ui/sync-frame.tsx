@@ -2,6 +2,7 @@ import { CloudOff, RefreshCw } from "lucide-react-native";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { AppState, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useStore } from "zustand";
 
 import type { PaceRuntime } from "#app/runtime.ts";
 import type { MessageKey } from "@pace/core";
@@ -14,7 +15,10 @@ import {
   usePace,
   useT,
 } from "#app/app-state.tsx";
+import { configurationErrorKey } from "#app/features/server/configuration-error.ts";
+import { ConfigurationRetry } from "#app/features/server/configuration-notice.tsx";
 import { useIsDeviceOffline } from "#app/platform/device-offline.ts";
+import { serverStore } from "#app/platform/server-store.ts";
 import { canStartSenders } from "#app/senders.ts";
 
 import { Skeleton } from "./skeleton.tsx";
@@ -37,12 +41,19 @@ pushed everything down 37 px mid-typing), and sits where the toast does, clear o
 the screen's footer: at the top it lay over the header's Back, bell and task actions (round 7
 review 3). A press goes through around it.
 */
-const SyncStrip = ({ message }: { readonly message: MessageKey }) => {
+const SyncStrip = ({
+  message,
+  isConfiguration = false,
+}: {
+  readonly message: MessageKey;
+  readonly isConfiguration?: boolean;
+}) => {
   const t = useT();
   const { palette } = useTheme();
   const bottom = useFloatBottom();
   const Icon = message === "errors.offline" ? CloudOff : RefreshCw;
   const canRetry = message === "errors.offline" || message === "sync.notSyncedYet";
+  const retry = canRetry ? <RetryNow /> : null;
   return (
     <View
       className="absolute left-0 right-0 items-center px-4"
@@ -57,7 +68,7 @@ const SyncStrip = ({ message }: { readonly message: MessageKey }) => {
       >
         <Icon aria-hidden color={palette["status.warn"]} size={16} strokeWidth={2} />
         <Text className="shrink py-2 font-sans text-footnote text-label-primary">{t(message)}</Text>
-        {canRetry ? <RetryNow /> : null}
+        {isConfiguration ? <ConfigurationRetry /> : retry}
       </View>
     </View>
   );
@@ -174,6 +185,35 @@ const FirstSyncPlaceholder = () => {
   );
 };
 
+const signedInConfigurationMessage = (
+  status: ReturnType<typeof useAuth>["status"],
+  isBare: boolean,
+  error: ReturnType<typeof serverStore.getState>["configurationError"],
+): MessageKey | null =>
+  status === "signed-in" && !isBare && error !== null ? configurationErrorKey(error.reason) : null;
+
+const useIsOfflineStatus = (status: ReturnType<typeof useAuth>["status"]): boolean => {
+  const isDeviceOffline = useIsDeviceOfflineWithReconnect();
+  return useIsOffline() || (status === "signed-in" && isDeviceOffline);
+};
+
+const useSyncPresentation = (isBare: boolean) => {
+  const { status } = useAuth();
+  const configurationError = useStore(serverStore, (state) => state.configurationError);
+  const configurationMessage = signedInConfigurationMessage(status, isBare, configurationError);
+  const hasConfigurationError = configurationMessage !== null;
+  const isOffline = useIsOfflineStatus(status);
+  const isFirstSync = useIsFirstSync() && !isBare;
+  // A run of this session ended and none has succeeded: the screens keep grey rows (M4).
+  const hasFirstSyncFailed = useIsAccountUnknown() && !isBare && !isFirstSync;
+  const isOverdue = useHasLasted(isFirstSync, FIRST_SYNC_COVER_MS);
+  const isCovered = isFirstSync && !isOverdue && !hasConfigurationError;
+  const message = hasConfigurationError
+    ? configurationMessage
+    : stripMessage({ hasFirstSyncFailed, isOffline, isOverdue });
+  return { isCovered, message, hasConfigurationError };
+};
+
 /**
 The app under the sync line, and covered while it waits for its first sync.
 
@@ -196,15 +236,7 @@ export const SyncFrame = ({
   /** Signing in and the walk-through: never covered. */
   readonly isBare: boolean;
 }) => {
-  const { status } = useAuth();
-  const isDeviceOffline = useIsDeviceOfflineWithReconnect();
-  const isOffline = useIsOffline() || (status === "signed-in" && isDeviceOffline);
-  const isFirstSync = useIsFirstSync() && !isBare;
-  // A run of this session ended and none has succeeded: the screens keep grey rows (M4).
-  const hasFirstSyncFailed = useIsAccountUnknown() && !isBare && !isFirstSync;
-  const isOverdue = useHasLasted(isFirstSync, FIRST_SYNC_COVER_MS);
-  const isCovered = isFirstSync && !isOverdue;
-  const message = stripMessage({ hasFirstSyncFailed, isOffline, isOverdue });
+  const { isCovered, message, hasConfigurationError } = useSyncPresentation(isBare);
   return (
     <View className="flex-1 bg-app">
       {/* Out of the page while covered (not drawn, not read), yet mounted. */}
@@ -212,7 +244,9 @@ export const SyncFrame = ({
         {children}
       </View>
       {isCovered ? <FirstSyncPlaceholder /> : null}
-      {message === null ? null : <SyncStrip message={message} />}
+      {message === null ? null : (
+        <SyncStrip isConfiguration={hasConfigurationError} message={message} />
+      )}
     </View>
   );
 };

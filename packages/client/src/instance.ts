@@ -1,23 +1,39 @@
-import { compatibility, endpoints, err, type Instance, ok, type Result } from "@pace/core";
+import {
+  compatibility,
+  endpoints,
+  err,
+  type FirebaseConfigReason,
+  type Instance,
+  ok,
+  type Result,
+} from "@pace/core";
 
 import { ApiError, createApiClient } from "./api-client.ts";
 
-/** Why a server cannot be used: down or offline, not a Pace server, or a version that does not fit. */
-export type InstanceError = "client-outdated" | "not-pace" | "server-outdated" | "unreachable";
+/** Why a server cannot be used: configuration, availability, identity or compatibility. */
+export type InstanceError =
+  | "client-outdated"
+  | "not-pace"
+  | "server-outdated"
+  | "unreachable"
+  | { readonly kind: "server-misconfigured"; readonly reason: FirebaseConfigReason | null };
 
 type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
 
 /**
 Only two answers say the server is not a Pace this app can read: no route (404) and a JSON answer
-that is not an instance. Anything else in the way (a 5xx, a rate limit, a firewall's challenge, a
+that is not an instance. A typed configuration failure is preserved for recovery. Anything else in the way (a 5xx, a rate limit, a firewall's challenge, a
 proxy asking to sign in, a captive portal's web page, no network) is the path to the server, which
 may well be a fitting Pace: it must never read as a version mismatch.
 */
-const failureOf = (error: unknown): InstanceError => {
+const failureOf = (error: unknown): Result<never, InstanceError> => {
   if (error instanceof ApiError) {
-    return error.status === 404 ? "not-pace" : "unreachable";
+    if (error.status === 500 && error.code === "server/misconfigured") {
+      return err({ kind: "server-misconfigured", reason: error.configurationReason });
+    }
+    return err(error.status === 404 ? "not-pace" : "unreachable");
   }
-  return error instanceof Error && error.name === "ZodError" ? "not-pace" : "unreachable";
+  return err(error instanceof Error && error.name === "ZodError" ? "not-pace" : "unreachable");
 };
 
 /**
@@ -38,7 +54,7 @@ export const checkInstance = async (
   try {
     instance = await api.call(endpoints.instance, {});
   } catch (error) {
-    return err(failureOf(error));
+    return failureOf(error);
   }
   const fit = compatibility(instance);
   return fit === "ok" ? ok(instance) : err(fit);

@@ -4,14 +4,16 @@ import { Text, View } from "react-native";
 
 import type { TelegramLogin } from "@pace/core";
 
+import { ConfigurationNotice } from "#app/features/server/configuration-notice.tsx";
+import { useServerInfo } from "#app/platform/server-store.ts";
+
 import { useAuth, useT } from "../app-state.tsx";
 import { TelegramWidget } from "../auth/telegram-widget.web.tsx";
 import { IS_DEV_LOGIN_ENABLED } from "../platform/api-base.ts";
-import { useServerInfo } from "../platform/server-store.ts";
 import { Button } from "../ui/button.tsx";
 import { PaceLogo } from "../ui/logo.tsx";
-import { DevLoginForm, errorKey, SignedOutLine, Waiting } from "./login-parts.tsx";
-import { useBotLogin } from "./use-bot-login.ts";
+import { DevLoginForm, errorKey, LoginChoices, SignedOutLine } from "./login-parts.tsx";
+import { type useBotLogin, useServerBotLogin } from "./use-bot-login.ts";
 
 /** The Android app opens this page for its browser login and waits on `pace://auth`. */
 const APP_RETURN = "pace://auth";
@@ -82,7 +84,7 @@ e2e builds. Opened by the phone app (`?return=app`), it hands the token back to 
 export const LoginScreen = () => {
   const t = useT();
   const { auth, status } = useAuth();
-  const bot = useBotLogin();
+  const { bot, configurationError } = useServerBotLogin();
   const params = useLocalSearchParams<{ next?: string; return?: string }>();
   const [error, setError] = useState<null | string>(null);
   const isForApp = firstOf(params.return) === "app";
@@ -119,12 +121,14 @@ export const LoginScreen = () => {
           </Text>
           <SignedOutLine />
         </View>
-        {isWaiting ? (
-          <Waiting onCancel={bot.reset} onReopen={bot.reopen} />
+        {configurationError === null ? (
+          <LoginChoices bot={bot}>
+            <LoginOptions bot={bot} onTelegram={onTelegram} />
+          </LoginChoices>
         ) : (
-          <LoginOptions bot={bot} onTelegram={onTelegram} />
+          <ConfigurationNotice />
         )}
-        {message === null ? null : (
+        {configurationError !== null || message === null ? null : (
           <Text
             accessibilityRole="alert"
             className="text-center font-sans text-footnote text-danger"
@@ -132,7 +136,7 @@ export const LoginScreen = () => {
             {message}
           </Text>
         )}
-        {IS_DEV_LOGIN_ENABLED && !isWaiting ? (
+        {configurationError === null && IS_DEV_LOGIN_ENABLED && !isWaiting ? (
           <DevLoginForm
             onFailure={() => {
               setError("failed");

@@ -27,10 +27,10 @@ export const useServerOrigin = (isNeeded: boolean): null | string => {
 };
 
 /** Asks the runtime's server what it is and whether it fits this app, into `serverStore`. */
-const checkServer = (runtime: Pick<PaceRuntime, "baseUrl" | "checkInstance">): void => {
-  void (async () => {
-    applyInstanceCheck(runtime.baseUrl, await runtime.checkInstance());
-  })();
+export const checkServer = async (
+  runtime: Pick<PaceRuntime, "baseUrl" | "checkInstance">,
+): Promise<void> => {
+  applyInstanceCheck(runtime.baseUrl, await runtime.checkInstance());
 };
 
 /**
@@ -43,16 +43,16 @@ export const watchServer = (
   runtime: Pick<PaceRuntime, "auth" | "baseUrl" | "checkInstance">,
 ): (() => void) => {
   if (runtime.auth.store.getState().status !== "loading") {
-    checkServer(runtime);
+    void checkServer(runtime);
   }
   const stopAuth = runtime.auth.store.subscribe((current, previous) => {
     if (current.status !== previous.status && current.status !== "loading") {
-      checkServer(runtime);
+      void checkServer(runtime);
     }
   });
   const returns = AppState.addEventListener("change", (next) => {
     if (next === "active") {
-      checkServer(runtime);
+      void checkServer(runtime);
     }
   });
   return () => {

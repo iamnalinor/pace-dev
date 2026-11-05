@@ -18,6 +18,7 @@ import { mountLinkRoutes } from "./links/link-routes.ts";
 import { mountNotifyRoutes } from "./notify/notify-routes.ts";
 import { mountParseRoutes } from "./parse/parse-routes.ts";
 import { type Config, loadConfig, oauthOrigin, ownOrigin } from "./shared/config.ts";
+import { publicFirebaseConfigOf, refuseMisconfiguredFirebase } from "./shared/firebase-config.ts";
 import { parseProviders } from "./shared/llm/providers.ts";
 import { createLogger } from "./shared/logger.ts";
 import { mount } from "./shared/mount.ts";
@@ -77,6 +78,7 @@ const mountPublicRoutes = (app: Hono<AppEnv>, deps: AppDeps): void => {
         mcp: oauthOrigin(config.apiOrigin, c.req.url) !== null,
         push: push.pushMethods.includes("fcm"),
       },
+      firebase: publicFirebaseConfigOf(c.env),
       loginMethods: ["telegram-widget" as const, "telegram-deeplink" as const],
       minClientProtocol: MIN_CLIENT_PROTOCOL,
       name: "Pace",
@@ -97,6 +99,7 @@ export const createApp = (deps: AppDeps = PLATFORM_DEPS): Hono<AppEnv> => {
       origin: (origin, c: Context<AppEnv>) =>
         isAllowedOrigin(origin, c.env.WEB_ORIGIN) ? origin : "",
     }),
+    refuseMisconfiguredFirebase,
     refuseOutdatedClients(SERVED_TO_ANY_PROTOCOL),
   );
   app.onError((thrown, c) => {

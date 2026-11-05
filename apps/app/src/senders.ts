@@ -2,6 +2,8 @@ import { AppState } from "react-native";
 
 import type { PaceRuntime } from "./runtime.ts";
 
+import { serverStore } from "./platform/server-store.ts";
+
 /**
 How often the client pulls on its own. While the live channel is up the server says when
 something changed, so the poll is only a safety net; while it is down it polls as before.
@@ -15,8 +17,17 @@ and not while this device is ending its own session, where a request the server 
 session is gone would 401 and read as "ended elsewhere" (bug-lessons class 75). Every starter asks
 this one helper (round 7 review 8).
 */
-export const canStartSenders = ({ auth }: Pick<PaceRuntime, "auth">): boolean =>
-  auth.store.getState().status === "signed-in" && !auth.isEnding();
+export const canStartSenders = ({
+  auth,
+  baseUrl,
+}: Pick<PaceRuntime, "auth" | "baseUrl">): boolean => {
+  const server = serverStore.getState();
+  return (
+    auth.store.getState().status === "signed-in" &&
+    !auth.isEnding() &&
+    (server.origin !== baseUrl || server.configurationError === null)
+  );
+};
 
 /**
 The sync loop and the socket, as a signed-in start leaves them (each start is a no-op while
@@ -25,7 +36,9 @@ a hidden tab's (or a backgrounded app's) rests and starts when it is shown (roun
 failed revoke in a hidden tab started it). A state not known yet (a start before the platform's
 first word) counts as shown.
 */
-export const startSenders = (runtime: Pick<PaceRuntime, "auth" | "live" | "sync">): void => {
+export const startSenders = (
+  runtime: Pick<PaceRuntime, "auth" | "baseUrl" | "live" | "sync">,
+): void => {
   if (!canStartSenders(runtime)) {
     return;
   }

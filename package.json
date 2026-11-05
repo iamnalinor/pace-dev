@@ -29,6 +29,7 @@
   "scripts": {
     "dev": "bun run --cwd apps/api dev",
     "build": "bun run --cwd apps/app build:web",
+    "check:config": "bun --no-env-file scripts/check-config.ts",
     "lint": "bun run lint:design && bun run lint:format && bun run lint:eslint && bun run typecheck && bun run lint:knip && bun run lint:dup && bun run lint:arch && bun run lint:workflows && bun run db:check",
     "lint:design": "bun scripts/design/generate-design.ts --check",
     "lint:format": "biome format --write .",

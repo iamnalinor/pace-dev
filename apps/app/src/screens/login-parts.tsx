@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { ActivityIndicator, Text, TextInput, View } from "react-native";
 
 import type { MessageKey } from "@pace/core";
 
-import type { BotLoginPhase } from "./use-bot-login.ts";
+import type { BotLoginPhase, useBotLogin } from "./use-bot-login.ts";
 
 import { useAuth, useT } from "../app-state.tsx";
 import { Button } from "../ui/button.tsx";
@@ -90,7 +90,7 @@ export const DevLoginForm = ({ onFailure }: { readonly onFailure: () => void }) 
   );
 };
 
-export const Waiting = ({
+const Waiting = ({
   onCancel,
   onReopen,
 }: {
@@ -119,3 +119,13 @@ export const Waiting = ({
     </View>
   );
 };
+
+/** Both platforms replace their sign-in choices while the same bot flow is pending. */
+export const LoginChoices = ({
+  bot,
+  children,
+}: {
+  readonly bot: ReturnType<typeof useBotLogin>;
+  readonly children: ReactNode;
+}) =>
+  bot.phase.kind === "waiting" ? <Waiting onCancel={bot.reset} onReopen={bot.reopen} /> : children;

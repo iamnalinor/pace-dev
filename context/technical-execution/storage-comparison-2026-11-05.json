@@ -1,0 +1,2064 @@
+{
+  "base": "e03360ff25eb1fe8205d92da798c578a8511efb7",
+  "candidateDiffSha256": "bbf5a8fe1465be0ded06b2aee0e03e7c8e2e72b29efa1f55019699dfba13ee92",
+  "baseline": [
+    {
+      "fixtureVersion": 1,
+      "identityVersion": 2,
+      "options": {
+        "seed": "replay",
+        "days": 3,
+        "history": 20
+      },
+      "excludedWorkloads": ["scheduled alarms and background alarm delivery"],
+      "bootstrap": "runtime initial creation/migrations excluded; each subsequent cold initialization measured separately",
+      "inputIdentity": "c370dbb27bc62e381e93cdf812ac77f2dd881e0ecadc609e4b3217e8cb6181b1",
+      "finalIdentity": "44bd8bb71b8b59a61c28c34f82e4612047c58b00200b358183bfe4bb1f044565",
+      "taskCount": 23,
+      "operationCount": 22,
+      "measurements": [
+        {
+          "id": "replay-history-events",
+          "phase": "seed",
+          "inputIdentity": "e45df99b754a2e93f2f3b659a835c7584f041c818ca0f20f4035f87578e5b789",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 110,
+            "rowsRead": 92,
+            "rowsWritten": 194
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-history-calendar",
+          "phase": "seed",
+          "inputIdentity": "906c8affbddab862579e191571f63e7a4b5c5598fc5a607874932ab76525d90a",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 24,
+            "rowsWritten": 80
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-history-usage",
+          "phase": "seed",
+          "inputIdentity": "75eb556aac0b6507ed3fe26010ed3af221d6f432ff3bc53289ad64331d980576",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 0,
+            "rowsWritten": 80
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-0-create",
+          "phase": "workload",
+          "inputIdentity": "4dccea02cfcaad920333a379f4f7bf54989ddfd65af163593a1d0fe5c3ed696a",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 5,
+            "rowsRead": 32,
+            "rowsWritten": 9
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-0-calendar-first",
+          "phase": "workload",
+          "inputIdentity": "949d9cf27c1c59cf0a80a92fbfe60461cabae0dea2c72bee7491f02017b667d2",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 25,
+            "rowsWritten": 4
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-0-usage-first",
+          "phase": "workload",
+          "inputIdentity": "1deb938368ece819a9c55e32f35dfa7fbecf2d7a071d378d8b1f0a5353efdca2",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 28,
+            "rowsWritten": 7
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-0-calendar-repeat",
+          "phase": "workload",
+          "inputIdentity": "6e32ed7d5e6f6da5c89330c3c4ab544794a6da97270172de002343c39d4bb3b2",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 1,
+            "rowsWritten": 0
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-0-usage-repeat",
+          "phase": "workload",
+          "inputIdentity": "ef6bc735bc15bb79008fab77ce532f7239d88f2da84c104ad66eacb029fb9aae",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 6,
+            "rowsWritten": 4
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-0-close",
+          "phase": "workload",
+          "inputIdentity": "776dae3ca3cccd171c591ec58328181e8e06649bbda21c0c6e4354ba69bc855b",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 6,
+            "rowsRead": 34,
+            "rowsWritten": 10
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-1-create",
+          "phase": "workload",
+          "inputIdentity": "7506b4c6071df0ce6b214bbba76ed0490888572ac5d13acfbd68b53a334481e4",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 5,
+            "rowsRead": 34,
+            "rowsWritten": 9
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-1-calendar-first",
+          "phase": "workload",
+          "inputIdentity": "6fb9c018ac5b4fcb690e90cf5ddffae6170bd9119e296ca37ccf4663056e38ce",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 28,
+            "rowsWritten": 4
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-1-usage-first",
+          "phase": "workload",
+          "inputIdentity": "95dc3940bc9fe3219ba6fec59585007538637f2bf1dec2d87fe0f69c763dbeaf",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 32,
+            "rowsWritten": 7
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-1-calendar-repeat",
+          "phase": "workload",
+          "inputIdentity": "54d90833b9018a6c0ac5d1f40ef00b4763ed95e60ec83e590090a11ef1f3002d",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 1,
+            "rowsWritten": 0
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-1-usage-repeat",
+          "phase": "workload",
+          "inputIdentity": "fdfc0c5f3de43d7e7aced743cf409d7cc4ab3b64292a0f3c4f8a4dbe4521561a",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 8,
+            "rowsWritten": 4
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-1-close",
+          "phase": "workload",
+          "inputIdentity": "61a90156c70840f6a9f267e5dfe45670e9f1200ff62218fbc4562143084ea640",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 6,
+            "rowsRead": 36,
+            "rowsWritten": 10
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-2-create",
+          "phase": "workload",
+          "inputIdentity": "eb71b2845c05dc0a970d83e723e233485049733f73bac117f17abbfbf4dc3e32",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 5,
+            "rowsRead": 36,
+            "rowsWritten": 9
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-2-calendar-first",
+          "phase": "workload",
+          "inputIdentity": "d053a8faea306f0e07806f226b4e09ab209e31b63c951d43d9c6d9780b6e6d7d",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 30,
+            "rowsWritten": 4
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-2-usage-first",
+          "phase": "workload",
+          "inputIdentity": "cd13a299a78aefca472dd7f2b99427494ae1dc00d5c7788a301c9b48dc537c8c",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 36,
+            "rowsWritten": 7
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-2-calendar-repeat",
+          "phase": "workload",
+          "inputIdentity": "595ff995abd871291eb33c18ebbd5d4f913ab1b38ce5ba6091a528fdf1b99d28",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 1,
+            "rowsWritten": 0
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-2-usage-repeat",
+          "phase": "workload",
+          "inputIdentity": "5fda06c15dc4565e5758465afe31c0dfc8086995687ffd5f26d8b1280e42e9e1",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 8,
+            "rowsWritten": 4
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-2-close",
+          "phase": "workload",
+          "inputIdentity": "9702e7e00531cf19eed79de45b3dad1c4dce910f9aa9a520d0f544eb7beaccc6",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 6,
+            "rowsRead": 38,
+            "rowsWritten": 10
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-correction",
+          "phase": "workload",
+          "inputIdentity": "dd22b50203e911436edb64df1fdfcaa5a25a5d30c9555bab7e007812b5a99b11",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 6,
+            "rowsRead": 39,
+            "rowsWritten": 10
+          },
+          "databaseBytes": 200704
+        }
+      ],
+      "inspection": {
+        "loads": 1,
+        "projectionRows": 0,
+        "rowsRead": 122,
+        "rowsWritten": 0
+      }
+    },
+    {
+      "fixtureVersion": 1,
+      "identityVersion": 2,
+      "options": {
+        "seed": "normal",
+        "days": 1,
+        "history": 0
+      },
+      "excludedWorkloads": ["scheduled alarms and background alarm delivery"],
+      "bootstrap": "runtime initial creation/migrations excluded; each subsequent cold initialization measured separately",
+      "inputIdentity": "354ea8e0c35750678480666aa654ce8f7d57c390f89f28ced9aa71ced5ec6c5b",
+      "finalIdentity": "c7a23535c1d9d4d35acde249fd600648e27f3d7e52b339921b1de726540d7f11",
+      "taskCount": 1,
+      "operationCount": 10,
+      "measurements": [
+        {
+          "id": "normal-history-events",
+          "phase": "seed",
+          "inputIdentity": "2639e14d5baea65473de703c0801ae030d912573e2ae81c2eb05fd440748b12b",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 10,
+            "rowsRead": 12,
+            "rowsWritten": 14
+          },
+          "databaseBytes": 192512
+        },
+        {
+          "id": "normal-history-calendar",
+          "phase": "seed",
+          "inputIdentity": "211c31efa1a8895a16a237156fa4bab71bc69ba8e0be29c1f0e5d0adb7bd516d",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 1,
+            "rowsWritten": 0
+          },
+          "databaseBytes": 192512
+        },
+        {
+          "id": "normal-history-usage",
+          "phase": "seed",
+          "inputIdentity": "77a609a86ec0d38d6a24725e07742b302f977827123b8ab7493ae7ef4cb2a00b",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 0,
+            "rowsWritten": 0
+          },
+          "databaseBytes": 192512
+        },
+        {
+          "id": "normal-day-0-create",
+          "phase": "workload",
+          "inputIdentity": "06b1be9ab336bef544c1230eebad381eec55538103fe7f654ca2c536eb648302",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 5,
+            "rowsRead": 12,
+            "rowsWritten": 9
+          },
+          "databaseBytes": 192512
+        },
+        {
+          "id": "normal-day-0-calendar-first",
+          "phase": "workload",
+          "inputIdentity": "20b1b7a8d28d207df7605e1a594345d360a7aa78b9170058f88025c7c67709f8",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 5,
+            "rowsWritten": 4
+          },
+          "databaseBytes": 192512
+        },
+        {
+          "id": "normal-day-0-usage-first",
+          "phase": "workload",
+          "inputIdentity": "21d89fedbd90def71e07a5a8c3f247dd15fa3666e9e120b6e4e4009d2c848e09",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 8,
+            "rowsWritten": 7
+          },
+          "databaseBytes": 192512
+        },
+        {
+          "id": "normal-day-0-calendar-repeat",
+          "phase": "workload",
+          "inputIdentity": "f0fef140c2f5544d175b573cb601027da8981f23452b8ab8deb3b105fe54575f",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 1,
+            "rowsWritten": 0
+          },
+          "databaseBytes": 192512
+        },
+        {
+          "id": "normal-day-0-usage-repeat",
+          "phase": "workload",
+          "inputIdentity": "58925648c5fed72dddb8e28df8ae60b11261b3c5d619cb0784164c1052c7b86b",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 6,
+            "rowsWritten": 4
+          },
+          "databaseBytes": 192512
+        },
+        {
+          "id": "normal-day-0-close",
+          "phase": "workload",
+          "inputIdentity": "ef412ce0fd7faf1fa7178bdce9ed7d002793af8d246a72d3b7140b38c0c5d7a2",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 6,
+            "rowsRead": 14,
+            "rowsWritten": 10
+          },
+          "databaseBytes": 192512
+        },
+        {
+          "id": "normal-correction",
+          "phase": "workload",
+          "inputIdentity": "d890d67239b3c3ff65fccca2e6e2f55ab0b7381125c0f7b7b61da1b1bb385029",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 6,
+            "rowsRead": 15,
+            "rowsWritten": 10
+          },
+          "databaseBytes": 192512
+        }
+      ],
+      "inspection": {
+        "loads": 1,
+        "projectionRows": 0,
+        "rowsRead": 28,
+        "rowsWritten": 0
+      }
+    },
+    {
+      "fixtureVersion": 1,
+      "identityVersion": 2,
+      "options": {
+        "seed": "normal",
+        "days": 1,
+        "history": 20
+      },
+      "excludedWorkloads": ["scheduled alarms and background alarm delivery"],
+      "bootstrap": "runtime initial creation/migrations excluded; each subsequent cold initialization measured separately",
+      "inputIdentity": "ed8d45d1b92e7e74983c335557f98ab6511551220baae6db6eaafa5a4df43e14",
+      "finalIdentity": "954cf7c11e9866bae31e21467acd290ec3da6230db5f0a29163025e209c8034d",
+      "taskCount": 21,
+      "operationCount": 10,
+      "measurements": [
+        {
+          "id": "normal-history-events",
+          "phase": "seed",
+          "inputIdentity": "9d58c7dc1c9a6470720bdfd6c3a772290419388d830905df40984cd5a3bff276",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 110,
+            "rowsRead": 92,
+            "rowsWritten": 194
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "normal-history-calendar",
+          "phase": "seed",
+          "inputIdentity": "5f457fc67a989a7a143b445aa0133c414fe4f597f7c5b03f526371e931b85916",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 24,
+            "rowsWritten": 80
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "normal-history-usage",
+          "phase": "seed",
+          "inputIdentity": "839792b2da690ccd1694666a4fb458508760783c38be10cc86d164c47d8446fd",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 0,
+            "rowsWritten": 80
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "normal-day-0-create",
+          "phase": "workload",
+          "inputIdentity": "06b1be9ab336bef544c1230eebad381eec55538103fe7f654ca2c536eb648302",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 5,
+            "rowsRead": 32,
+            "rowsWritten": 9
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "normal-day-0-calendar-first",
+          "phase": "workload",
+          "inputIdentity": "20b1b7a8d28d207df7605e1a594345d360a7aa78b9170058f88025c7c67709f8",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 25,
+            "rowsWritten": 4
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "normal-day-0-usage-first",
+          "phase": "workload",
+          "inputIdentity": "21d89fedbd90def71e07a5a8c3f247dd15fa3666e9e120b6e4e4009d2c848e09",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 28,
+            "rowsWritten": 7
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "normal-day-0-calendar-repeat",
+          "phase": "workload",
+          "inputIdentity": "f0fef140c2f5544d175b573cb601027da8981f23452b8ab8deb3b105fe54575f",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 1,
+            "rowsWritten": 0
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "normal-day-0-usage-repeat",
+          "phase": "workload",
+          "inputIdentity": "58925648c5fed72dddb8e28df8ae60b11261b3c5d619cb0784164c1052c7b86b",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 6,
+            "rowsWritten": 4
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "normal-day-0-close",
+          "phase": "workload",
+          "inputIdentity": "ef412ce0fd7faf1fa7178bdce9ed7d002793af8d246a72d3b7140b38c0c5d7a2",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 6,
+            "rowsRead": 34,
+            "rowsWritten": 10
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "normal-correction",
+          "phase": "workload",
+          "inputIdentity": "d890d67239b3c3ff65fccca2e6e2f55ab0b7381125c0f7b7b61da1b1bb385029",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 6,
+            "rowsRead": 35,
+            "rowsWritten": 10
+          },
+          "databaseBytes": 200704
+        }
+      ],
+      "inspection": {
+        "loads": 1,
+        "projectionRows": 0,
+        "rowsRead": 108,
+        "rowsWritten": 0
+      }
+    },
+    {
+      "fixtureVersion": 1,
+      "identityVersion": 2,
+      "options": {
+        "seed": "normal",
+        "days": 1,
+        "history": 100
+      },
+      "excludedWorkloads": ["scheduled alarms and background alarm delivery"],
+      "bootstrap": "runtime initial creation/migrations excluded; each subsequent cold initialization measured separately",
+      "inputIdentity": "cac05e498816a3c5e7a4e7eee09324d16dbb35a91e99c54d2ed17e387bea20b3",
+      "finalIdentity": "e612306c819d53f5ee777868c81421ddb2ee0740af92a1a6610cd0b0962e3b8a",
+      "taskCount": 101,
+      "operationCount": 10,
+      "measurements": [
+        {
+          "id": "normal-history-events",
+          "phase": "seed",
+          "inputIdentity": "e6f5d2b4e21bfe9d0e202197e3a0937c82b486ca891fb9aff0efd1d94583dd84",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 510,
+            "rowsRead": 412,
+            "rowsWritten": 914
+          },
+          "databaseBytes": 233472
+        },
+        {
+          "id": "normal-history-calendar",
+          "phase": "seed",
+          "inputIdentity": "c32dbe98b16a1bf6e80503b4f3b04bb1c7a6b23d8b0b35b66942421be5da3b19",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 104,
+            "rowsWritten": 400
+          },
+          "databaseBytes": 253952
+        },
+        {
+          "id": "normal-history-usage",
+          "phase": "seed",
+          "inputIdentity": "87661dac511b207ab056a73cff14f4f74bb069f98112025a7bb680a3f7c1d7fb",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 0,
+            "rowsWritten": 400
+          },
+          "databaseBytes": 274432
+        },
+        {
+          "id": "normal-day-0-create",
+          "phase": "workload",
+          "inputIdentity": "06b1be9ab336bef544c1230eebad381eec55538103fe7f654ca2c536eb648302",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 5,
+            "rowsRead": 112,
+            "rowsWritten": 9
+          },
+          "databaseBytes": 274432
+        },
+        {
+          "id": "normal-day-0-calendar-first",
+          "phase": "workload",
+          "inputIdentity": "20b1b7a8d28d207df7605e1a594345d360a7aa78b9170058f88025c7c67709f8",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 105,
+            "rowsWritten": 4
+          },
+          "databaseBytes": 274432
+        },
+        {
+          "id": "normal-day-0-usage-first",
+          "phase": "workload",
+          "inputIdentity": "21d89fedbd90def71e07a5a8c3f247dd15fa3666e9e120b6e4e4009d2c848e09",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 108,
+            "rowsWritten": 7
+          },
+          "databaseBytes": 274432
+        },
+        {
+          "id": "normal-day-0-calendar-repeat",
+          "phase": "workload",
+          "inputIdentity": "f0fef140c2f5544d175b573cb601027da8981f23452b8ab8deb3b105fe54575f",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 1,
+            "rowsWritten": 0
+          },
+          "databaseBytes": 274432
+        },
+        {
+          "id": "normal-day-0-usage-repeat",
+          "phase": "workload",
+          "inputIdentity": "58925648c5fed72dddb8e28df8ae60b11261b3c5d619cb0784164c1052c7b86b",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 6,
+            "rowsWritten": 4
+          },
+          "databaseBytes": 274432
+        },
+        {
+          "id": "normal-day-0-close",
+          "phase": "workload",
+          "inputIdentity": "ef412ce0fd7faf1fa7178bdce9ed7d002793af8d246a72d3b7140b38c0c5d7a2",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 6,
+            "rowsRead": 114,
+            "rowsWritten": 10
+          },
+          "databaseBytes": 274432
+        },
+        {
+          "id": "normal-correction",
+          "phase": "workload",
+          "inputIdentity": "d890d67239b3c3ff65fccca2e6e2f55ab0b7381125c0f7b7b61da1b1bb385029",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 6,
+            "rowsRead": 115,
+            "rowsWritten": 10
+          },
+          "databaseBytes": 274432
+        }
+      ],
+      "inspection": {
+        "loads": 1,
+        "projectionRows": 0,
+        "rowsRead": 428,
+        "rowsWritten": 0
+      }
+    }
+  ],
+  "candidate": [
+    {
+      "fixtureVersion": 1,
+      "identityVersion": 2,
+      "options": {
+        "seed": "replay",
+        "days": 3,
+        "history": 20
+      },
+      "excludedWorkloads": ["scheduled alarms and background alarm delivery"],
+      "bootstrap": "runtime initial creation/migrations excluded; each subsequent cold initialization measured separately",
+      "inputIdentity": "c370dbb27bc62e381e93cdf812ac77f2dd881e0ecadc609e4b3217e8cb6181b1",
+      "finalIdentity": "44bd8bb71b8b59a61c28c34f82e4612047c58b00200b358183bfe4bb1f044565",
+      "taskCount": 23,
+      "operationCount": 22,
+      "measurements": [
+        {
+          "id": "replay-history-events",
+          "phase": "seed",
+          "inputIdentity": "e45df99b754a2e93f2f3b659a835c7584f041c818ca0f20f4035f87578e5b789",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 110,
+            "rowsRead": 92,
+            "rowsWritten": 194
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-history-calendar",
+          "phase": "seed",
+          "inputIdentity": "906c8affbddab862579e191571f63e7a4b5c5598fc5a607874932ab76525d90a",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 24,
+            "rowsWritten": 80
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-history-usage",
+          "phase": "seed",
+          "inputIdentity": "75eb556aac0b6507ed3fe26010ed3af221d6f432ff3bc53289ad64331d980576",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 0,
+            "rowsWritten": 80
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-0-create",
+          "phase": "workload",
+          "inputIdentity": "4dccea02cfcaad920333a379f4f7bf54989ddfd65af163593a1d0fe5c3ed696a",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 5,
+            "rowsRead": 32,
+            "rowsWritten": 9
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-0-calendar-first",
+          "phase": "workload",
+          "inputIdentity": "949d9cf27c1c59cf0a80a92fbfe60461cabae0dea2c72bee7491f02017b667d2",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 25,
+            "rowsWritten": 4
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-0-usage-first",
+          "phase": "workload",
+          "inputIdentity": "1deb938368ece819a9c55e32f35dfa7fbecf2d7a071d378d8b1f0a5353efdca2",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 28,
+            "rowsWritten": 7
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-0-calendar-repeat",
+          "phase": "workload",
+          "inputIdentity": "6e32ed7d5e6f6da5c89330c3c4ab544794a6da97270172de002343c39d4bb3b2",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 1,
+            "rowsWritten": 0
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-0-usage-repeat",
+          "phase": "workload",
+          "inputIdentity": "ef6bc735bc15bb79008fab77ce532f7239d88f2da84c104ad66eacb029fb9aae",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 6,
+            "rowsWritten": 0
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-0-close",
+          "phase": "workload",
+          "inputIdentity": "776dae3ca3cccd171c591ec58328181e8e06649bbda21c0c6e4354ba69bc855b",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 6,
+            "rowsRead": 34,
+            "rowsWritten": 10
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-1-create",
+          "phase": "workload",
+          "inputIdentity": "7506b4c6071df0ce6b214bbba76ed0490888572ac5d13acfbd68b53a334481e4",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 5,
+            "rowsRead": 34,
+            "rowsWritten": 9
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-1-calendar-first",
+          "phase": "workload",
+          "inputIdentity": "6fb9c018ac5b4fcb690e90cf5ddffae6170bd9119e296ca37ccf4663056e38ce",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 28,
+            "rowsWritten": 4
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-1-usage-first",
+          "phase": "workload",
+          "inputIdentity": "95dc3940bc9fe3219ba6fec59585007538637f2bf1dec2d87fe0f69c763dbeaf",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 32,
+            "rowsWritten": 7
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-1-calendar-repeat",
+          "phase": "workload",
+          "inputIdentity": "54d90833b9018a6c0ac5d1f40ef00b4763ed95e60ec83e590090a11ef1f3002d",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 1,
+            "rowsWritten": 0
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-1-usage-repeat",
+          "phase": "workload",
+          "inputIdentity": "fdfc0c5f3de43d7e7aced743cf409d7cc4ab3b64292a0f3c4f8a4dbe4521561a",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 8,
+            "rowsWritten": 0
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-1-close",
+          "phase": "workload",
+          "inputIdentity": "61a90156c70840f6a9f267e5dfe45670e9f1200ff62218fbc4562143084ea640",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 6,
+            "rowsRead": 36,
+            "rowsWritten": 10
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-2-create",
+          "phase": "workload",
+          "inputIdentity": "eb71b2845c05dc0a970d83e723e233485049733f73bac117f17abbfbf4dc3e32",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 5,
+            "rowsRead": 36,
+            "rowsWritten": 9
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-2-calendar-first",
+          "phase": "workload",
+          "inputIdentity": "d053a8faea306f0e07806f226b4e09ab209e31b63c951d43d9c6d9780b6e6d7d",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 30,
+            "rowsWritten": 4
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-2-usage-first",
+          "phase": "workload",
+          "inputIdentity": "cd13a299a78aefca472dd7f2b99427494ae1dc00d5c7788a301c9b48dc537c8c",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 36,
+            "rowsWritten": 7
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-2-calendar-repeat",
+          "phase": "workload",
+          "inputIdentity": "595ff995abd871291eb33c18ebbd5d4f913ab1b38ce5ba6091a528fdf1b99d28",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 1,
+            "rowsWritten": 0
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-2-usage-repeat",
+          "phase": "workload",
+          "inputIdentity": "5fda06c15dc4565e5758465afe31c0dfc8086995687ffd5f26d8b1280e42e9e1",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 8,
+            "rowsWritten": 0
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-day-2-close",
+          "phase": "workload",
+          "inputIdentity": "9702e7e00531cf19eed79de45b3dad1c4dce910f9aa9a520d0f544eb7beaccc6",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 6,
+            "rowsRead": 38,
+            "rowsWritten": 10
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "replay-correction",
+          "phase": "workload",
+          "inputIdentity": "dd22b50203e911436edb64df1fdfcaa5a25a5d30c9555bab7e007812b5a99b11",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 6,
+            "rowsRead": 39,
+            "rowsWritten": 10
+          },
+          "databaseBytes": 200704
+        }
+      ],
+      "inspection": {
+        "loads": 1,
+        "projectionRows": 0,
+        "rowsRead": 122,
+        "rowsWritten": 0
+      }
+    },
+    {
+      "fixtureVersion": 1,
+      "identityVersion": 2,
+      "options": {
+        "seed": "normal",
+        "days": 1,
+        "history": 0
+      },
+      "excludedWorkloads": ["scheduled alarms and background alarm delivery"],
+      "bootstrap": "runtime initial creation/migrations excluded; each subsequent cold initialization measured separately",
+      "inputIdentity": "354ea8e0c35750678480666aa654ce8f7d57c390f89f28ced9aa71ced5ec6c5b",
+      "finalIdentity": "c7a23535c1d9d4d35acde249fd600648e27f3d7e52b339921b1de726540d7f11",
+      "taskCount": 1,
+      "operationCount": 10,
+      "measurements": [
+        {
+          "id": "normal-history-events",
+          "phase": "seed",
+          "inputIdentity": "2639e14d5baea65473de703c0801ae030d912573e2ae81c2eb05fd440748b12b",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 10,
+            "rowsRead": 12,
+            "rowsWritten": 14
+          },
+          "databaseBytes": 192512
+        },
+        {
+          "id": "normal-history-calendar",
+          "phase": "seed",
+          "inputIdentity": "211c31efa1a8895a16a237156fa4bab71bc69ba8e0be29c1f0e5d0adb7bd516d",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 1,
+            "rowsWritten": 0
+          },
+          "databaseBytes": 192512
+        },
+        {
+          "id": "normal-history-usage",
+          "phase": "seed",
+          "inputIdentity": "77a609a86ec0d38d6a24725e07742b302f977827123b8ab7493ae7ef4cb2a00b",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 0,
+            "rowsWritten": 0
+          },
+          "databaseBytes": 192512
+        },
+        {
+          "id": "normal-day-0-create",
+          "phase": "workload",
+          "inputIdentity": "06b1be9ab336bef544c1230eebad381eec55538103fe7f654ca2c536eb648302",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 5,
+            "rowsRead": 12,
+            "rowsWritten": 9
+          },
+          "databaseBytes": 192512
+        },
+        {
+          "id": "normal-day-0-calendar-first",
+          "phase": "workload",
+          "inputIdentity": "20b1b7a8d28d207df7605e1a594345d360a7aa78b9170058f88025c7c67709f8",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 5,
+            "rowsWritten": 4
+          },
+          "databaseBytes": 192512
+        },
+        {
+          "id": "normal-day-0-usage-first",
+          "phase": "workload",
+          "inputIdentity": "21d89fedbd90def71e07a5a8c3f247dd15fa3666e9e120b6e4e4009d2c848e09",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 8,
+            "rowsWritten": 7
+          },
+          "databaseBytes": 192512
+        },
+        {
+          "id": "normal-day-0-calendar-repeat",
+          "phase": "workload",
+          "inputIdentity": "f0fef140c2f5544d175b573cb601027da8981f23452b8ab8deb3b105fe54575f",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 1,
+            "rowsWritten": 0
+          },
+          "databaseBytes": 192512
+        },
+        {
+          "id": "normal-day-0-usage-repeat",
+          "phase": "workload",
+          "inputIdentity": "58925648c5fed72dddb8e28df8ae60b11261b3c5d619cb0784164c1052c7b86b",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 6,
+            "rowsWritten": 0
+          },
+          "databaseBytes": 192512
+        },
+        {
+          "id": "normal-day-0-close",
+          "phase": "workload",
+          "inputIdentity": "ef412ce0fd7faf1fa7178bdce9ed7d002793af8d246a72d3b7140b38c0c5d7a2",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 6,
+            "rowsRead": 14,
+            "rowsWritten": 10
+          },
+          "databaseBytes": 192512
+        },
+        {
+          "id": "normal-correction",
+          "phase": "workload",
+          "inputIdentity": "d890d67239b3c3ff65fccca2e6e2f55ab0b7381125c0f7b7b61da1b1bb385029",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 6,
+            "rowsRead": 15,
+            "rowsWritten": 10
+          },
+          "databaseBytes": 192512
+        }
+      ],
+      "inspection": {
+        "loads": 1,
+        "projectionRows": 0,
+        "rowsRead": 28,
+        "rowsWritten": 0
+      }
+    },
+    {
+      "fixtureVersion": 1,
+      "identityVersion": 2,
+      "options": {
+        "seed": "normal",
+        "days": 1,
+        "history": 20
+      },
+      "excludedWorkloads": ["scheduled alarms and background alarm delivery"],
+      "bootstrap": "runtime initial creation/migrations excluded; each subsequent cold initialization measured separately",
+      "inputIdentity": "ed8d45d1b92e7e74983c335557f98ab6511551220baae6db6eaafa5a4df43e14",
+      "finalIdentity": "954cf7c11e9866bae31e21467acd290ec3da6230db5f0a29163025e209c8034d",
+      "taskCount": 21,
+      "operationCount": 10,
+      "measurements": [
+        {
+          "id": "normal-history-events",
+          "phase": "seed",
+          "inputIdentity": "9d58c7dc1c9a6470720bdfd6c3a772290419388d830905df40984cd5a3bff276",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 110,
+            "rowsRead": 92,
+            "rowsWritten": 194
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "normal-history-calendar",
+          "phase": "seed",
+          "inputIdentity": "5f457fc67a989a7a143b445aa0133c414fe4f597f7c5b03f526371e931b85916",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 24,
+            "rowsWritten": 80
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "normal-history-usage",
+          "phase": "seed",
+          "inputIdentity": "839792b2da690ccd1694666a4fb458508760783c38be10cc86d164c47d8446fd",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 0,
+            "rowsWritten": 80
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "normal-day-0-create",
+          "phase": "workload",
+          "inputIdentity": "06b1be9ab336bef544c1230eebad381eec55538103fe7f654ca2c536eb648302",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 5,
+            "rowsRead": 32,
+            "rowsWritten": 9
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "normal-day-0-calendar-first",
+          "phase": "workload",
+          "inputIdentity": "20b1b7a8d28d207df7605e1a594345d360a7aa78b9170058f88025c7c67709f8",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 25,
+            "rowsWritten": 4
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "normal-day-0-usage-first",
+          "phase": "workload",
+          "inputIdentity": "21d89fedbd90def71e07a5a8c3f247dd15fa3666e9e120b6e4e4009d2c848e09",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 28,
+            "rowsWritten": 7
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "normal-day-0-calendar-repeat",
+          "phase": "workload",
+          "inputIdentity": "f0fef140c2f5544d175b573cb601027da8981f23452b8ab8deb3b105fe54575f",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 1,
+            "rowsWritten": 0
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "normal-day-0-usage-repeat",
+          "phase": "workload",
+          "inputIdentity": "58925648c5fed72dddb8e28df8ae60b11261b3c5d619cb0784164c1052c7b86b",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 6,
+            "rowsWritten": 0
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "normal-day-0-close",
+          "phase": "workload",
+          "inputIdentity": "ef412ce0fd7faf1fa7178bdce9ed7d002793af8d246a72d3b7140b38c0c5d7a2",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 6,
+            "rowsRead": 34,
+            "rowsWritten": 10
+          },
+          "databaseBytes": 200704
+        },
+        {
+          "id": "normal-correction",
+          "phase": "workload",
+          "inputIdentity": "d890d67239b3c3ff65fccca2e6e2f55ab0b7381125c0f7b7b61da1b1bb385029",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 6,
+            "rowsRead": 35,
+            "rowsWritten": 10
+          },
+          "databaseBytes": 200704
+        }
+      ],
+      "inspection": {
+        "loads": 1,
+        "projectionRows": 0,
+        "rowsRead": 108,
+        "rowsWritten": 0
+      }
+    },
+    {
+      "fixtureVersion": 1,
+      "identityVersion": 2,
+      "options": {
+        "seed": "normal",
+        "days": 1,
+        "history": 100
+      },
+      "excludedWorkloads": ["scheduled alarms and background alarm delivery"],
+      "bootstrap": "runtime initial creation/migrations excluded; each subsequent cold initialization measured separately",
+      "inputIdentity": "cac05e498816a3c5e7a4e7eee09324d16dbb35a91e99c54d2ed17e387bea20b3",
+      "finalIdentity": "e612306c819d53f5ee777868c81421ddb2ee0740af92a1a6610cd0b0962e3b8a",
+      "taskCount": 101,
+      "operationCount": 10,
+      "measurements": [
+        {
+          "id": "normal-history-events",
+          "phase": "seed",
+          "inputIdentity": "e6f5d2b4e21bfe9d0e202197e3a0937c82b486ca891fb9aff0efd1d94583dd84",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 510,
+            "rowsRead": 412,
+            "rowsWritten": 914
+          },
+          "databaseBytes": 233472
+        },
+        {
+          "id": "normal-history-calendar",
+          "phase": "seed",
+          "inputIdentity": "c32dbe98b16a1bf6e80503b4f3b04bb1c7a6b23d8b0b35b66942421be5da3b19",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 104,
+            "rowsWritten": 400
+          },
+          "databaseBytes": 253952
+        },
+        {
+          "id": "normal-history-usage",
+          "phase": "seed",
+          "inputIdentity": "87661dac511b207ab056a73cff14f4f74bb069f98112025a7bb680a3f7c1d7fb",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 0,
+            "rowsWritten": 400
+          },
+          "databaseBytes": 274432
+        },
+        {
+          "id": "normal-day-0-create",
+          "phase": "workload",
+          "inputIdentity": "06b1be9ab336bef544c1230eebad381eec55538103fe7f654ca2c536eb648302",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 5,
+            "rowsRead": 112,
+            "rowsWritten": 9
+          },
+          "databaseBytes": 274432
+        },
+        {
+          "id": "normal-day-0-calendar-first",
+          "phase": "workload",
+          "inputIdentity": "20b1b7a8d28d207df7605e1a594345d360a7aa78b9170058f88025c7c67709f8",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 105,
+            "rowsWritten": 4
+          },
+          "databaseBytes": 274432
+        },
+        {
+          "id": "normal-day-0-usage-first",
+          "phase": "workload",
+          "inputIdentity": "21d89fedbd90def71e07a5a8c3f247dd15fa3666e9e120b6e4e4009d2c848e09",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 0,
+            "rowsRead": 108,
+            "rowsWritten": 7
+          },
+          "databaseBytes": 274432
+        },
+        {
+          "id": "normal-day-0-calendar-repeat",
+          "phase": "workload",
+          "inputIdentity": "f0fef140c2f5544d175b573cb601027da8981f23452b8ab8deb3b105fe54575f",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 1,
+            "rowsWritten": 0
+          },
+          "databaseBytes": 274432
+        },
+        {
+          "id": "normal-day-0-usage-repeat",
+          "phase": "workload",
+          "inputIdentity": "58925648c5fed72dddb8e28df8ae60b11261b3c5d619cb0784164c1052c7b86b",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 6,
+            "rowsWritten": 0
+          },
+          "databaseBytes": 274432
+        },
+        {
+          "id": "normal-day-0-close",
+          "phase": "workload",
+          "inputIdentity": "ef412ce0fd7faf1fa7178bdce9ed7d002793af8d246a72d3b7140b38c0c5d7a2",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 6,
+            "rowsRead": 114,
+            "rowsWritten": 10
+          },
+          "databaseBytes": 274432
+        },
+        {
+          "id": "normal-correction",
+          "phase": "workload",
+          "inputIdentity": "d890d67239b3c3ff65fccca2e6e2f55ab0b7381125c0f7b7b61da1b1bb385029",
+          "initialization": {
+            "loads": 0,
+            "projectionRows": 0,
+            "rowsRead": 12,
+            "rowsWritten": 0
+          },
+          "operation": {
+            "loads": 1,
+            "projectionRows": 6,
+            "rowsRead": 115,
+            "rowsWritten": 10
+          },
+          "databaseBytes": 274432
+        }
+      ],
+      "inspection": {
+        "loads": 1,
+        "projectionRows": 0,
+        "rowsRead": 428,
+        "rowsWritten": 0
+      }
+    }
+  ]
+}

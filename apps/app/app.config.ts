@@ -3,6 +3,7 @@ import type { ExpoConfig } from "expo/config";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
+import { ANDROID_SMOKE_API_URL } from "./android-smoke.ts";
 import { appVersion } from "./app-version.ts";
 import { firebaseProjectOf } from "./firebase-project.ts";
 import { THEME_VARS } from "./src/ui/generated/tokens.ts";
@@ -46,8 +47,12 @@ const { version, versionCode } = appVersion({
   releaseTag: envString("PACE_RELEASE_TAG") ?? envString("GITHUB_REF_NAME") ?? "",
 });
 
-/** The Firebase config file, when the build has one (see release.yml). */
-const GOOGLE_SERVICES_FILE = envString("GOOGLE_SERVICES_FILE");
+const apiUrl = envString("EXPO_PUBLIC_API_URL") ?? "https://pace-api.nalinor.dev";
+const isDevLogin = envString("EXPO_PUBLIC_DEV_LOGIN") === "1";
+const isAndroidSmoke = isDevLogin && apiUrl === ANDROID_SMOKE_API_URL;
+
+/** The Firebase config file, when the build has one (see release.yml). Smoke runs without it. */
+const GOOGLE_SERVICES_FILE = isAndroidSmoke ? undefined : envString("GOOGLE_SERVICES_FILE");
 
 /** The Firebase project that file is for: the app compares it with the server's. */
 const firebaseProject = (() => {
@@ -63,10 +68,10 @@ const firebaseProject = (() => {
 })();
 
 const config: ExpoConfig = {
-  name: "Pace",
+  name: isAndroidSmoke ? "Pace E2E" : "Pace",
   slug: "pace",
   version,
-  scheme: "pace",
+  scheme: isAndroidSmoke ? "pace-e2e" : "pace",
   platforms: ["android", "web"],
   // The web build is a single-page app served by the pace-web Worker (static assets).
   web: { bundler: "metro", output: "single", favicon: "./assets/favicon.png" },
@@ -77,7 +82,7 @@ const config: ExpoConfig = {
   // iOS is not a target; expo-share-intent's config plugin still expects a bundle identifier.
   ios: { bundleIdentifier: "dev.nalinor.pace" },
   android: {
-    package: "dev.nalinor.pace",
+    package: isAndroidSmoke ? "dev.nalinor.pace.e2e" : "dev.nalinor.pace",
     // Firebase (push through FCM): the file release.yml writes from a secret; without it the
     // build has no Google push and the phone polls instead.
     ...(GOOGLE_SERVICES_FILE !== undefined && { googleServicesFile: GOOGLE_SERVICES_FILE }),
@@ -93,20 +98,22 @@ const config: ExpoConfig = {
       "android.permission.SCHEDULE_EXACT_ALARM",
       "android.permission.USE_EXACT_ALARM",
     ],
-    intentFilters: [
-      {
-        action: "VIEW",
-        autoVerify: true,
-        category: ["BROWSABLE", "DEFAULT"],
-        data: [{ host: "pace.nalinor.dev", pathPrefix: "/app", scheme: "https" }],
-      },
-      {
-        action: "VIEW",
-        autoVerify: true,
-        category: ["BROWSABLE", "DEFAULT"],
-        data: [{ host: "pace.nalinor.dev", pathPrefix: "/task/", scheme: "https" }],
-      },
-    ],
+    ...(!isAndroidSmoke && {
+      intentFilters: [
+        {
+          action: "VIEW",
+          autoVerify: true,
+          category: ["BROWSABLE", "DEFAULT"],
+          data: [{ host: "pace.nalinor.dev", pathPrefix: "/app", scheme: "https" }],
+        },
+        {
+          action: "VIEW",
+          autoVerify: true,
+          category: ["BROWSABLE", "DEFAULT"],
+          data: [{ host: "pace.nalinor.dev", pathPrefix: "/task/", scheme: "https" }],
+        },
+      ],
+    }),
   },
   plugins: [
     "expo-router",
@@ -177,18 +184,23 @@ const config: ExpoConfig = {
       },
     ],
     "./plugins/with-release-signing.js",
+    ...(isAndroidSmoke ? ["./plugins/with-emulator-network.js"] : []),
   ],
   // No OTA updates: releases ship as APKs through GitHub Releases.
   updates: { enabled: false },
   experiments: { typedRoutes: true },
   extra: {
-    apiUrl: envString("EXPO_PUBLIC_API_URL") ?? "https://pace-api.nalinor.dev",
+    apiUrl,
     // The web app, opened for the browser login fallback (`src/platform/api-base.ts`).
-    webOrigin: envString("EXPO_PUBLIC_WEB_ORIGIN") ?? "https://pace.nalinor.dev",
+    webOrigin: isAndroidSmoke
+      ? ANDROID_SMOKE_API_URL
+      : (envString("EXPO_PUBLIC_WEB_ORIGIN") ?? "https://pace.nalinor.dev"),
     // The bot the web login widget signs in with.
-    botUsername: envString("EXPO_PUBLIC_TELEGRAM_BOT") ?? "PaceTaskTrackerBot",
+    botUsername: isAndroidSmoke
+      ? "PaceAndroidSmokeBot"
+      : (envString("EXPO_PUBLIC_TELEGRAM_BOT") ?? "PaceTaskTrackerBot"),
     // A build made for e2e shows the dev login form (only the test Worker accepts it).
-    isDevLogin: envString("EXPO_PUBLIC_DEV_LOGIN") === "1",
+    isDevLogin,
     // FCM works only with a server sending with this same project (`src/platform/notifications.ts`).
     firebaseProject,
   },

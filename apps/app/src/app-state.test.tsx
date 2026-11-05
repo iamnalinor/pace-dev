@@ -256,8 +256,8 @@ describe("PaceProvider", () => {
   });
 
   it("writes no time zone while the first pull fails, and only the account's answer decides it (QA round 23 R23-01)", async () => {
-    const accountZone = "Europe/Moscow";
-    expect(accountZone).not.toBe((await setup()).runtime.clock.deviceTz);
+    const deviceZone = new Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const accountZone = deviceZone === "Europe/Moscow" ? "UTC" : "Europe/Moscow";
     let isUp = false;
     const { eventStore, runtime } = await setup({
       "GET /api/sync/pull": () =>

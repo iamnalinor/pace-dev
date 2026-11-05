@@ -48,7 +48,13 @@ beforeEach(() => {
   jest.mocked(AppState.addEventListener).mockClear();
   secureStore.values.delete("pace.server");
   secureStore.values.delete("pace.session");
-  serverStore.setState({ instance: null, origin: API_BASE_URL, reason: null, status: "unknown" });
+  serverStore.setState({
+    configurationError: null,
+    instance: null,
+    origin: API_BASE_URL,
+    reason: null,
+    status: "unknown",
+  });
 });
 
 const renderLogin = async (routes: Readonly<Record<string, FakeRoute>> = {}) => {
@@ -66,6 +72,29 @@ const openSheet = async () => {
 };
 
 describe("Change server", () => {
+  it("explains a configured-server refusal without offering to move", async () => {
+    await renderLogin();
+    const field = await openSheet();
+    typedServer(() =>
+      Response.json(
+        {
+          code: "server/misconfigured",
+          message: "Server configuration is invalid",
+          reason: "project-mismatch",
+        },
+        { status: 500 },
+      ),
+    );
+    await fireEvent.changeText(field, "pace.example.dev");
+    await fireEvent.press(screen.getByRole("button", { name: "Check" }));
+    expect(
+      await screen.findByText(
+        "The server's Firebase settings name different projects. Ask its owner to correct them.",
+      ),
+    ).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Use this server" })).toBeNull();
+    await expect(readServer()).resolves.toBe(API_BASE_URL);
+  });
   it("checks a typed server, shows what it is, and moves the app to it", async () => {
     await renderLogin();
     expect(screen.getByText("Server: pace-api.nalinor.dev · Change")).toBeOnTheScreen();
@@ -180,6 +209,38 @@ describe("Change server", () => {
       "https://web.example.dev/login?return=app",
       "pace://auth",
     );
+  });
+});
+
+describe("server configuration on login", () => {
+  it("shows the reason, retries once and clears after recovery without a versions screen", async () => {
+    const server = { broken: true };
+    const instance = jest.fn(() =>
+      server.broken
+        ? Response.json(
+            {
+              code: "server/misconfigured",
+              message: "Server configuration is invalid",
+              reason: "project-mismatch",
+            },
+            { status: 500 },
+          )
+        : fakeInstance,
+    );
+    await renderLogin({ "GET /api/instance": instance });
+    expect(
+      await screen.findByText(
+        "The server's Firebase settings name different projects. Ask its owner to correct them.",
+      ),
+    ).toBeOnTheScreen();
+    expect(screen.queryByText(en("server.mismatch"))).toBeNull();
+    expect(screen.queryByText(en("login.openTelegram"))).toBeNull();
+    const calls = instance.mock.calls.length;
+    server.broken = false;
+    await fireEvent.press(screen.getByRole("button", { name: en("sync.retry") }));
+    expect(await screen.findByText(en("login.openTelegram"))).toBeOnTheScreen();
+    expect(serverStore.getState().configurationError).toBeNull();
+    expect(instance).toHaveBeenCalledTimes(calls + 1);
   });
 });
 

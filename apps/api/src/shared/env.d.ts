@@ -29,6 +29,10 @@ declare global {
       push is off and every other channel still works.
       */
       FIREBASE_SERVICE_ACCOUNT?: string;
+      /** Optional google-services.json from the sender's project, for public Android metadata. */
+      FIREBASE_ANDROID_CONFIG?: string;
+      /** Unset/additive retains legacy sending; strict requires a valid Firebase pair. */
+      PACE_FIREBASE_CONFIG_POLICY?: string;
       /**
       The build the Worker runs, shown by `GET /api/instance`: the deploy sets the release tag or
       the commit (`wrangler deploy --var PACE_VERSION:…`); unset reads as `dev`.

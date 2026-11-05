@@ -57,6 +57,9 @@ server at the latest release.
    - `TELEGRAM_WEBHOOK_SECRET`: any random string; Telegram echoes it on every webhook call.
    - Optional `LLM_BASE_URL_1`, `LLM_API_KEY_1`, `LLM_MODEL_1` (and `_2`… for fallbacks).
    - Optional `FIREBASE_SERVICE_ACCOUNT`: the Firebase service account's JSON key.
+   - Optional `FIREBASE_ANDROID_CONFIG`: the raw `google-services.json` from the same Firebase
+     project, with an Android app for each package you intend to support. See
+     [Notifications](#notifications) for what this enables during the rollout.
 5. **Deploy**, either way:
    - **GitHub Actions**: in your fork, set the secrets and variables `deploy.yml` reads
      (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `TELEGRAM_BOT_TOKEN`,
@@ -112,3 +115,58 @@ even with a Firebase project of its own (Settings says why). Everything else wor
 Instant push needs your own build of the app with your Firebase project
 (`GOOGLE_SERVICES_JSON`; see the README's
 [Push notifications](../README.md#push-notifications-firebase)).
+
+The server can also advertise Android initialization metadata ahead of the app rollout. To
+enable it, set `FIREBASE_ANDROID_CONFIG` on the Worker alongside `FIREBASE_SERVICE_ACCOUNT` from
+the same project. The current GitHub Actions workflow only sets the service account. The
+public `GET /api/instance` response lists the project ID, sender ID, and the package name,
+app ID and client API key for each Android app in `google-services.json`. Keep the service
+account key on the server.
+
+An existing service account alone still sends pushes as before and reports `firebase: null`.
+If the Android config is set but invalid or does not match the sender, the Worker reports
+`firebase: null` and logs a reason code without logging either binding. Server discovery,
+health checks and existing push registration keep working as before. Released APKs still
+use the Firebase project they were built with.
+
+#### Check the Firebase pair before rollout
+
+From the repository root, run `bun run check:config` with the two Firebase values supplied
+through the process environment. `FIREBASE_ANDROID_CONFIG` takes the raw contents of
+`google-services.json` (called `GOOGLE_SERVICES_JSON` in release CI);
+`FIREBASE_SERVICE_ACCOUNT` takes the raw service account JSON. Never put either value in a
+command argument.
+
+By default Bun's package runner can load dotenv files and echo the command. In CI or when
+you need only the verdict in the output, disable dotenv loading and silence the runner.
+Pass the intended state explicitly:
+
+```sh
+bun --no-env-file --silent run check:config --expect=configured
+bun --no-env-file --silent run check:config --expect=disabled
+```
+
+With no expectation, either a complete, matching pair or two absent bindings passes. Empty
+strings count as absent. The command prints `configured` or `disabled` on success. It exits
+with status 1 and a fixed reason code on stderr for invalid input:
+`missing-android-config`, `missing-service-account`, `android-config-not-json`,
+`android-config-invalid`, `no-android-clients`, `duplicate-android-package`,
+`invalid-service-account`, `project-mismatch`, `invalid-arguments`,
+`expected-configured`, or `expected-disabled`. The preflight checks the supplied JSON and
+project match; it does not authenticate to Google or verify push delivery. A local
+`disabled` verdict only describes the inputs to this invocation. An existing Worker can
+have a pair stored only in its own secrets.
+
+The current Worker behavior stays additive, including for hosts with only a service account.
+To prepare for future strict enforcement, validate both values before configuring or rotating
+them together. If the pair is managed on the Worker, verify its effective state on the
+deployed version before inheriting it. Omitting local values does not remove deployed
+secrets. To disable deliberately, stage removal of both values in one inactive version.
+
+Before enabling strict enforcement, rehearse the rollout on a nonproduction Worker. The
+staged path must verify the exact inactive candidate through a protected Version URL, checking
+its identity and effective Firebase state before promoting that verified version. Record the
+previous compatible version for rollback, then verify production health, instance discovery and
+push delivery before removing APK-baked config. See the
+[rollout design](../context/technical-execution/firebase-rollout-design.md) for the staging
+procedure, including fresh Workers and Workers with pending Durable Object migrations.

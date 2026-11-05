@@ -9,6 +9,7 @@ import * as cloud from "./cloud-data.ts";
 import { ruledSeriesChange, saveRuledSeries } from "./notification-pool.ts";
 import { armIfPoolUnplanned } from "./pool-retry-alarm.ts";
 import { PoolStore } from "./pool-store.ts";
+import { usageDevices } from "./usage-devices.ts";
 
 /**
 Storage key set while a change of a phone's calendar copy is written but not yet looked at by the
@@ -96,8 +97,8 @@ export abstract class CloudStore extends PoolStore {
   }
 
   /** Each device that sent usage, with the end of its newest session. */
-  async usageDevices(): Promise<ReturnType<typeof cloud.usageDevices>> {
-    return await cloud.usageDevices(this.db);
+  async usageDevices(): Promise<ReturnType<typeof usageDevices>> {
+    return await usageDevices(this.db);
   }
 
   /** App sessions on every device overlapping a range. */
