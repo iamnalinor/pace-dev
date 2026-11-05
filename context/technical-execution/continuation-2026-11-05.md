@@ -251,3 +251,19 @@ Full app verification passed: 140 suites / 1055 tests, exit code 0. Existing ove
 and delayed-Jest-exit warnings also occur in the previous full-app logs; no new failing test
 was skipped. Unified lint and independent review are green for this packet. The next pushed
 commit must receive its own CI and Android smoke evidence.
+
+### Checkpoint 7964023 and native compatibility gates
+
+App integration checkpoint `7964023` was committed and pushed after mandatory pre-commit.
+Its combined CI checks passed; Android smoke and web E2E remain in progress at this entry.
+The next packet adds an APK build record/comparison guard and an actual Expo fingerprint
+collector. It rejects incomplete configuration/native discovery, fixes disabled fingerprinting
+without a certificate, and preserves Expo's default source set. Independent source comparison
+now confirms JS stability and sensitivity to Kotlin, permissions, native configuration and a
+Gradle declaration; repeated baseline is stable. See [the matrix report](ota-fingerprint-matrix-report.md)
+for exact hashes and the distinction from clean-install/native interoperability evidence.
+
+The packet passed 91 OTA/real-loader tests, 32 app/config tests and unified lint. Independent
+review's configuration-discovery finding was fixed RED→GREEN and closed. The runtime record
+is not yet emitted/consumed by an authenticated release/publication workflow; that wiring is
+next, rather than a reason to claim the full OTA task complete.

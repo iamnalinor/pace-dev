@@ -109,6 +109,29 @@ it("uses default root key ID and does not expose a selected server input", () =>
   expect(config.updates?.url).toBe(inputs.publisherUrl);
 });
 
+it("fingerprints disabled builds without a publisher certificate", async () => {
+  copyFileSync(
+    path.join(__dirname, "fingerprint.config.js"),
+    path.join(fixture.directory, "fingerprint.config.js"),
+  );
+  rmSync(path.join(fixture.directory, "ota/publisher-certificate.pem"));
+  writeFileSync(path.join(fixture.directory, "package.json"), "{}");
+  symlinkSync(
+    path.join(__dirname, "node_modules"),
+    path.join(fixture.directory, "node_modules"),
+    "dir",
+  );
+  const fingerprint = await createFingerprintAsync(fixture.directory, {
+    platforms: ["android"],
+    useRNCoreAutolinkingFromExpo: true,
+    silent: true,
+  });
+  expect(fingerprint.hash).toEqual(expect.any(String));
+  expect(
+    fingerprint.sources.some((source) => source.reasons.includes("otaCodeSigningCertificate")),
+  ).toBe(false);
+});
+
 it("includes the stable public certificate bytes as an additive fingerprint source", async () => {
   copyFileSync(
     path.join(__dirname, "fingerprint.config.js"),
