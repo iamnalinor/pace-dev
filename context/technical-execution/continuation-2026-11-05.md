@@ -267,3 +267,21 @@ The packet passed 91 OTA/real-loader tests, 32 app/config tests and unified lint
 review's configuration-discovery finding was fixed RED→GREEN and closed. The runtime record
 is not yet emitted/consumed by an authenticated release/publication workflow; that wiring is
 next, rather than a reason to claim the full OTA task complete.
+
+### Bounded wrap-up requested by the owner
+
+The full roadmap is paused. Finish the current collector/CLI and CI fixes, document the handoff,
+push and verify PR #55 without merging. See [HANDOFF.md](HANDOFF.md) for the authoritative
+remaining scope. No new publication workflow or APK provenance feature is part of this wrap-up.
+
+Run 42115360289 passed combined checks but eight screen matrix cases timed out waiting for the
+gallery's intentional infinite spinner. Shared finite-transition waiting replaces all seven
+duplicated predicates; real-browser regression was RED then GREEN without skipping accessibility.
+Android run 42115386182 exhausted 512 MiB metaspace; all three build sites now retain the 2 GiB
+heap, allow 1 GiB metaspace and exit immediately on memory exhaustion. Seven runner tests pass;
+actual native verification remains in Actions.
+
+Final wrap-up unified lint passed all stages; frozen installation passed. Independent final review
+found no critical/important findings and confirmed the corrected full-argv test table. The local
+route sweep is still finishing; two test report files were removed by an overlapping Playwright
+invocation, requiring an isolated rerun (not an application failure or a waived assertion).

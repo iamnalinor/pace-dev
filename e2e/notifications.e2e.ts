@@ -1,5 +1,6 @@
 import type { Page, Request } from "@playwright/test";
 
+import { waitForTransitions } from "./support/animation-wait.ts";
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { createDevSession, freshTelegramId, loginViaApi } from "./support/login.ts";
 import { pushAsClient, ulid } from "./support/seed.ts";
@@ -336,9 +337,7 @@ for (const size of SIZES) {
   for (const look of LOOKS) {
     test(`the bell, the feed and Settings: ${look.name} ${size.name}`, async ({ page }, info) => {
       const shot = async (name: string) => {
-        await page.waitForFunction(() =>
-          document.getAnimations().every((animation) => animation.playState !== "running"),
-        );
+        await waitForTransitions(page);
         const file = `${look.name}-${size.name}-${name}.png`;
         await page.screenshot({
           path: SHOT_DIR === undefined ? info.outputPath(file) : `${SHOT_DIR}/${file}`,

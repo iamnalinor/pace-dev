@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 
+import { waitForTransitions } from "./support/animation-wait.ts";
 import { expect, test } from "./support/fixtures.ts";
 import { loginViaApi } from "./support/login.ts";
 import { seedLivedIn } from "./support/seed.ts";
@@ -89,9 +90,7 @@ const settled = async (page: Page): Promise<void> => {
     page.getByRole("progressbar", { name: /^(?:Syncing your data|Синхронизируем данные)$/u }),
   ).toHaveCount(0, { timeout: 15_000 });
   await expect(page.getByRole("heading").first()).toBeVisible();
-  await page.waitForFunction(() =>
-    globalThis.document.getAnimations().every((animation) => animation.playState !== "running"),
-  );
+  await waitForTransitions(page);
 };
 
 /** The lived-in account's screens and the controls QA round 18 L6 measured on them. */

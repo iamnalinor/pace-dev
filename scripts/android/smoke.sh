@@ -27,7 +27,11 @@ build() {
     # The generated project may contain a manifest from a previous build. Regenerate it.
     bun run --cwd apps/app prebuild --clean &&
       cd apps/app/android &&
-      ./gradlew :app:assembleRelease --no-daemon -PreactNativeArchitectures=x86_64 -PPACE_STORE_FILE=
+      # Expo's 512 MiB metaspace default exhausted class metadata in Actions.
+      # Fail immediately on JVM exhaustion instead of hanging until the job timeout.
+      ./gradlew :app:assembleRelease --no-daemon \
+        '-Dorg.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=1024m -XX:+ExitOnOutOfMemoryError' \
+        -PreactNativeArchitectures=x86_64 -PPACE_STORE_FILE=
   ) 2>&1 | tee "$artifact_dir/build.log"
   [[ -f "$apk" ]] || fail "Build succeeded without the expected APK: $apk"
 }

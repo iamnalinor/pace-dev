@@ -1,4 +1,3 @@
-import { createFingerprintAsync } from "@expo/fingerprint";
 import { z } from "zod";
 
 import { err, ok, type Result } from "@pace/core";
@@ -42,17 +41,4 @@ export const validateNativeFingerprint = (
   return !hasNativeSources(sources) || (requiresCertificate && !hasCertificate)
     ? err("fingerprint-incomplete")
     : ok(parsed.data.hash);
-};
-
-/** Uses Expo's entire default Android source set; presence checks add gates, never exclusions. */
-export const collectNativeFingerprint = async (
-  projectRoot: string,
-  requiresCertificate: boolean,
-): Promise<Result<string, NativeFingerprintError>> => {
-  try {
-    const fingerprint = await createFingerprintAsync(projectRoot, { platforms: ["android"] });
-    return validateNativeFingerprint(fingerprint, requiresCertificate);
-  } catch {
-    return err("fingerprint-unavailable");
-  }
 };
