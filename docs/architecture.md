@@ -49,6 +49,20 @@ folders (`auth/`, `bot/`, `sync/`, `user-store/`) only reach each other through
 `packages/client/src/view-models/**` additionally run eslint-plugin-functional: no `let`,
 no mutation, no classes, no `throw`.
 
+## Infrastructure ports (migration in progress)
+
+Request provenance is the first extracted host boundary. `shared/ports/request-place.ts`
+defines `RequestPlaceReader`; the Cloudflare adapter alone reads trusted edge headers and
+`request.cf`. `worker.ts` injects it into the application, and authentication consumes the
+injected reader. Direct application instances without a host adapter receive unknown provenance.
+The existing User-Agent bound and stored session fields are unchanged.
+
+ESLint tests enforce ambient-type and metadata restrictions on converted files and ports;
+dependency-cruiser prevents those modules from importing adapters. Other database, actor,
+alarm and socket modules are explicitly still platform-bound. Their remaining migration is
+tracked in `context/technical-execution/ports-implementation-plan.md`; this first boundary does
+not claim a second host or portable actor persistence.
+
 ## The event model
 
 Everything the user does is an append-only event. State is never stored as the truth on

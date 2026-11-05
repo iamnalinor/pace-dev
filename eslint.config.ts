@@ -60,6 +60,31 @@ const RESTRICTED_SYNTAX = [
   },
 ];
 
+/** Incremental conversion scope; migration inventory lives in ports-implementation-plan.md. */
+const PORTABLE_API_FILES = [
+  "apps/api/src/shared/ports/**/*.ts",
+  "apps/api/src/shared/request-place.ts",
+];
+
+const PORTABLE_API_SYNTAX = [
+  {
+    message: "Portable API code uses infrastructure ports: request.cf belongs in the host adapter.",
+    selector:
+      "MemberExpression[computed=false][property.name='cf'], MemberExpression[computed=true][property.value='cf'], ObjectPattern > Property[key.name='cf'], ObjectPattern > Property[key.value='cf']",
+  },
+  {
+    message:
+      "Portable API code uses infrastructure ports: Cloudflare runtime types belong in adapters.",
+    selector:
+      "TSQualifiedName[left.name='Cloudflare'][right.name='Env'], Identifier[name=/^(D1Database|DurableObjectStorage|DurableObjectState|DurableObjectNamespace|KVNamespace|WebSocketPair)$/]",
+  },
+  {
+    message: "Portable API code uses infrastructure ports: platform imports belong in adapters.",
+    selector:
+      "ImportDeclaration[source.value=/^(cloudflare:|@cloudflare\\/|drizzle-orm\\/d1$)/], ExportNamedDeclaration[source.value=/^(cloudflare:|@cloudflare\\/|drizzle-orm\\/d1$)/], ExportAllDeclaration[source.value=/^(cloudflare:|@cloudflare\\/|drizzle-orm\\/d1$)/]",
+  },
+];
+
 /**
 Rendered elements compared with toEqual: a failing comparison prints a diff of the whole tree,
 which takes about a second, so a waitFor around it runs out of time before its retry sees the
@@ -613,6 +638,13 @@ export default defineConfig([
   {
     files: ["e2e/**/*.e2e.ts"],
     rules: { "no-restricted-syntax": ["error", ...RESTRICTED_SYNTAX, OWN_CONTEXT] },
+  },
+
+  {
+    files: PORTABLE_API_FILES,
+    rules: {
+      "no-restricted-syntax": ["error", ...RESTRICTED_SYNTAX, ...PORTABLE_API_SYNTAX],
+    },
   },
 
   // ── Declaration files: ambient/global augmentation needs `interface` and `import()` types

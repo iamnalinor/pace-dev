@@ -72,6 +72,14 @@ jobs:
           path: .cache/jest
           key: jest-${{ runner.os }}-${{ hashFiles('bun.lock') }}-${{ github.sha }}
       - run: bun test:api
+      # The Firebase controller is Android-free: pin its crash/restart decisions without
+      # installing an SDK or starting an emulator. Android build/device gates stay separate.
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Native Firebase controller (JVM only)
+        run: bun run test:native-firebase
 
   e2e:
     name: End-to-end (Playwright)

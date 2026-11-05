@@ -43,6 +43,7 @@
     "test:unit": "bun test scripts && bun run --cwd packages/core test && bun run --cwd packages/client test && python3 -m unittest discover -s tools/pace-agent",
     "test:api": "bun run --cwd apps/api test",
     "test:app": "bun run --cwd apps/app test",
+    "test:native-firebase": "bash scripts/native/test-firebase.sh",
     "test:e2e": "playwright test",
     "test:llm": "bun run --cwd apps/api llm:smoke",
     "test:mutation": "bun run --cwd packages/core test:mutation",

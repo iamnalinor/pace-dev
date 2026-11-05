@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import { ANDROID_SMOKE_API_URL } from "./android-smoke.ts";
 import { appVersion } from "./app-version.ts";
 import { firebaseProjectOf } from "./firebase-project.ts";
+import { withRuntimeFirebase } from "./modules/pace-native/runtime-firebase-plugin.ts";
 import { THEME_VARS } from "./src/ui/generated/tokens.ts";
 
 /** The dark app ground (`bg.app`): behind the splash, the adaptive icon and the first native frame. */
@@ -51,8 +52,14 @@ const apiUrl = envString("EXPO_PUBLIC_API_URL") ?? "https://pace-api.nalinor.dev
 const isDevLogin = envString("EXPO_PUBLIC_DEV_LOGIN") === "1";
 const isAndroidSmoke = isDevLogin && apiUrl === ANDROID_SMOKE_API_URL;
 
+const firebaseMode = envString("EXPO_PUBLIC_FIREBASE_MODE") ?? "baked";
+if (firebaseMode !== "baked" && firebaseMode !== "runtime") {
+  throw new Error("Invalid Firebase build mode");
+}
+
 /** The Firebase config file, when the build has one (see release.yml). Smoke runs without it. */
-const GOOGLE_SERVICES_FILE = isAndroidSmoke ? undefined : envString("GOOGLE_SERVICES_FILE");
+const GOOGLE_SERVICES_FILE =
+  isAndroidSmoke || firebaseMode === "runtime" ? undefined : envString("GOOGLE_SERVICES_FILE");
 
 /** The Firebase project that file is for: the app compares it with the server's. */
 const firebaseProject = (() => {
@@ -202,8 +209,9 @@ const config: ExpoConfig = {
     // A build made for e2e shows the dev login form (only the test Worker accepts it).
     isDevLogin,
     // FCM works only with a server sending with this same project (`src/platform/notifications.ts`).
-    firebaseProject,
+    firebaseMode,
+    ...(firebaseMode === "baked" && { firebaseProject }),
   },
 };
 
-export default config;
+export default firebaseMode === "runtime" ? withRuntimeFirebase(config) : config;

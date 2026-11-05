@@ -32,3 +32,16 @@ describe("PaceNative", () => {
     expect(resolvePaceNative(null)).toBe(fallbackPaceNative);
   });
 });
+
+describe("Firebase without the native module", () => {
+  it("reports unsupported without claiming a project or accepting persisted configuration", () => {
+    const unsupported = { status: "unsupported", projectId: null, reason: null };
+    expect(PaceNative.firebaseStatus()).toEqual(unsupported);
+    expect(PaceNative.packageName()).toBeNull();
+    expect(PaceNative.stageFirebaseConfig("https://pace.test", null)).toEqual(unsupported);
+    expect(PaceNative.commitFirebaseConfig("https://pace.test")).toEqual(unsupported);
+    expect(PaceNative.reconcileFirebaseOrigin("https://pace.test")).toEqual(unsupported);
+    expect(PaceNative.ensureFirebase("https://pace.test", null)).toEqual(unsupported);
+    expect(PaceNative.restartApp()).toBe(false);
+  });
+});

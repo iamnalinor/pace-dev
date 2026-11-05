@@ -48,7 +48,7 @@ const config = {
       comment:
         "An API feature folder must not reach into another one. Share via apps/api/src/shared or compose in app.ts/worker.ts.",
       severity: "error",
-      from: { path: API_FEATURE, pathNot: "^apps/api/src/shared/" },
+      from: { path: API_FEATURE, pathNot: "^apps/api/src/(shared|platform)/" },
       to: {
         path: "^apps/api/src/",
         pathNot: [
@@ -57,6 +57,20 @@ const config = {
           String.raw`^apps/api/src/[^/]+\.ts$`,
         ],
       },
+    },
+    {
+      name: "portable-api-does-not-import-platform",
+      comment:
+        "Converted API consumers and ports depend on abstractions; the host composes adapters.",
+      severity: "error",
+      from: { path: "^apps/api/src/shared/(ports/|request-place[.]ts$)" },
+      to: { path: "^apps/api/src/platform/" },
+    },
+    {
+      name: "api-features-do-not-import-platform",
+      severity: "error",
+      from: { path: API_FEATURE, pathNot: "^apps/api/src/(shared|platform)/" },
+      to: { path: "^apps/api/src/platform/" },
     },
     {
       name: "app-features-are-isolated",

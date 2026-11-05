@@ -39,6 +39,22 @@ class PaceNativeModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("PaceNative")
 
+    Function("packageName") { context.packageName }
+    Function("firebaseStatus") { FirebaseRuntime.controller(context).status().asMap() }
+    Function("stageFirebaseConfig") { origin: String, json: String? ->
+      FirebaseRuntime.withConfig(context, origin, json, true)
+    }
+    Function("commitFirebaseConfig") { origin: String ->
+      FirebaseRuntime.controller(context).commit(origin).asMap()
+    }
+    Function("reconcileFirebaseOrigin") { origin: String ->
+      FirebaseRuntime.controller(context).reconcile(origin).asMap()
+    }
+    Function("ensureFirebase") { origin: String, json: String? ->
+      FirebaseRuntime.withConfig(context, origin, json, false)
+    }
+    Function("restartApp") { restartPace(context) }
+
     // Where the last crash's trace was saved (CrashCatcher), once; null when none is pending.
     Function("takeLastCrash") { CrashCatcher.takeLastCrash(context) }
 

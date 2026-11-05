@@ -38,6 +38,8 @@ declare global {
       the commit (`wrangler deploy --var PACE_VERSION:…`); unset reads as `dev`.
       */
       PACE_VERSION?: string;
+      /** Non-secret unique marker for an inactive deployment verification attempt. */
+      PACE_DEPLOY_ATTEMPT?: string;
       /** Override of the Telegram API origin (tests point it at a mocked host). */
       TELEGRAM_API_ROOT?: string;
       /**

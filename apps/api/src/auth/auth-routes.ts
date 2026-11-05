@@ -178,7 +178,7 @@ const telegramLogin =
       Math.floor(now / 1000),
     );
     if (verified.ok) {
-      const place = requestPlace(c.req.raw);
+      const place = requestPlace(c.req.raw, c.get("requestPlaceReader"));
       return await signIn(d1(c.env.DB), config, {
         env: c.env,
         kind: "browser",
@@ -288,7 +288,7 @@ const devLogin: Handler<typeof endpoints.auth.dev> = async ({ c, body }) => {
     kind: "dev",
     name: "Dev login",
     now: Date.now(),
-    place: requestPlace(c.req.raw),
+    place: requestPlace(c.req.raw, c.get("requestPlaceReader")),
     profile,
     apiOrigin: new URL(c.req.url).origin,
   });
@@ -303,7 +303,7 @@ export const mountAuthRoutes = (app: Hono<AppEnv>, telegramFetch: TelegramTransp
       deviceName: body?.deviceName,
       from,
       now: Date.now(),
-      place: requestPlace(c.req.raw),
+      place: requestPlace(c.req.raw, c.get("requestPlaceReader")),
     });
     const payload = loginPayload(nonce, from);
     const deepLink = `https://t.me/${c.get("config").telegramBotUsername}?start=${payload}`;

@@ -151,7 +151,7 @@ strings count as absent. The command prints `configured` or `disabled` on succes
 with status 1 and a fixed reason code on stderr for invalid input:
 `missing-android-config`, `missing-service-account`, `android-config-not-json`,
 `android-config-invalid`, `no-android-clients`, `duplicate-android-package`,
-`invalid-service-account`, `project-mismatch`, `invalid-arguments`,
+`invalid-service-account`, `project-mismatch`, `invalid-config-policy`, `invalid-arguments`,
 `expected-configured`, or `expected-disabled`. The preflight checks the supplied JSON and
 project match; it does not authenticate to Google or verify push delivery. A local
 `disabled` verdict only describes the inputs to this invocation. An existing Worker can
@@ -170,3 +170,13 @@ previous compatible version for rollback, then verify production health, instanc
 push delivery before removing APK-baked config. See the
 [rollout design](../context/technical-execution/firebase-rollout-design.md) for the staging
 procedure, including fresh Workers and Workers with pending Durable Object migrations.
+
+`GET /api/deployment-readiness` is a public, read-only operator diagnostic, available even
+when configuration or client protocol prevents application calls. It exposes the actual
+`CF_VERSION_METADATA.id`, the non-secret `PACE_DEPLOY_ATTEMPT`, policy and a sanitized strict
+Firebase-pair verdict. Missing identity is explicitly `unavailable`; `PACE_VERSION` cannot
+substitute for it. It does not expose account credentials or Android API keys and does not
+access a database. HTTP 200 means the diagnostic was read, **not** that promotion is safe:
+the staging runner must match identity, attempt, policy and the expected ready mode/project.
+Application health, discovery and authenticated routes retain the strict configuration guard.
+Version URL protection is configured separately and must be verified before using a candidate.

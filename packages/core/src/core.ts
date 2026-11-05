@@ -30,6 +30,7 @@ export {
   type CalendarEvent,
   type UsageRow,
 } from "./api/schemas/cloud.ts";
+export * from "./api/schemas/deployment-readiness.ts";
 export * from "./api/schemas/instance.ts";
 export {
   type LinkPreview,

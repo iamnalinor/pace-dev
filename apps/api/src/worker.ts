@@ -5,6 +5,7 @@ import { OAUTH_SCOPES } from "@pace/core";
 import { createApp } from "./app.ts";
 import { MCP_RESOURCE_METADATA_PATH, mcpHandler } from "./mcp/server.ts";
 import { mountOAuthRoutes } from "./oauth/oauth-routes.ts";
+import { cloudflareRequestPlaceReader } from "./platform/cloudflare/request-place.ts";
 import { oauthOrigin } from "./shared/config.ts";
 import { createLogger } from "./shared/logger.ts";
 
@@ -12,7 +13,7 @@ export { LlmHealth } from "./shared/llm/health-object.ts";
 export { UserStore } from "./user-store/user-store.ts";
 
 /** The HTTP app plus the consent routes, which only make sense behind the provider. */
-const app = mountOAuthRoutes(createApp());
+const app = mountOAuthRoutes(createApp(undefined, cloudflareRequestPlaceReader));
 const log = createLogger("info");
 
 /** A day: MCP clients refresh silently, and a revoked grant is dead within one request anyway. */

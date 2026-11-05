@@ -29,7 +29,7 @@ instructions. Never prune source events or raw usage as part of cost optimizatio
 - [x] Recover original plan, ledger, reports, patches and complete Git history.
 - [x] Independently review recovered Tasks 1–3 using the Superpowers reviewer template.
   No confirmed findings. Client discovery and push fallback traced; runtime verification pending.
-- [ ] Verify main-based integration, commit and push it as the next checkpoint.
+- [x] Verify main-based integration, commit and push it as the next checkpoint.
 - [x] Measure real local workerd read/write costs with identical deterministic workloads.
 - [ ] Implement non-destructive optimizations supported by those measurements, with regression
   tests for corrections, cold instances and unchanged client behavior. Record both reads and writes.
@@ -116,3 +116,25 @@ instructions. Never prune source events or raw usage as part of cost optimizatio
   without weakening rules; checkpoint has not yet been committed or pushed. Native/runtime and
   deployment staging plans are being expanded by GPT-6.1 Sol agents, with device and nonproduction
   deployment evidence kept as explicit release gates.
+- Checkpoint `488c369a7942190daf2d87a703f64c1b2a051967` committed and pushed to
+  `origin/codex/technical-continuation`; local and remote SHAs match. Full `bun lint` passes
+  (48.19 s): ESLint with unchanged 74 design warnings, all typechecks, unused-code check,
+  zero duplication, architecture, workflows and migration consistency.
+- Lint refactors independently reviewed on GPT-6.1 Sol. Follow-up review found an in-flight
+  Telegram login could resume after disable/recovery; generation invalidation now guards both
+  device lookup and nonce creation, including stale rejection/reset. Five new RED→GREEN tests;
+  scoped re-review approved. Seven affected suites / 64 tests exit 0. Sync-frame isolation:
+  14 tests exit 0 without detectOpenHandles findings. Shared login extraction: 21 tests exit 0.
+- Native Firebase and inactive deployment staging implementation dispatched to GPT-6.1 Sol after
+  this clean checkpoint. Default baked APK behavior and production deployment remain unchanged.
+- Native slice 1 implements the opt-in build, origin-bound persistence/reconciliation and process
+  restart bridge. Three Jest suites / 15 tests pass; actual pure Kotlin/JVM tests pass 18/18.
+  Review found an old-origin response could erase a staged server choice: reproduced RED and
+  fixed by revoking origin authority only after durable staging. Re-review approved. Android
+  compilation/device lifecycle and dependent app integration remain unverified/unfinished.
+- Readiness endpoint and request-provenance port reviewed independently, no actionable findings.
+  Real-workerd focused run: 81 cases; expanded readiness: 16 cases. Full application: 953 tests
+  pass and exit normally. Parallel full verification caused timing-sensitive failures; unchanged
+  serial reruns pass scripts 173, core 905, client 551, Python 54 and API 664. No limits weakened.
+- A pinned, checksum-verified pure-JVM test command and CI step were added; this does not install
+  Android or run an emulator. Final unified lint and the second checkpoint remain pending.

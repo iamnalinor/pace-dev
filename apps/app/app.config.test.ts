@@ -35,11 +35,16 @@ describe("app config", () => {
   });
 });
 
-const configFor = (apiUrl: string, devLogin: string): ExpoConfig | undefined => {
+const configFor = (
+  apiUrl: string,
+  devLogin: string,
+  firebaseMode?: string,
+): ExpoConfig | undefined => {
   const restore = jest.replaceProperty(process, "env", {
     ...process.env,
     EXPO_PUBLIC_API_URL: apiUrl,
     EXPO_PUBLIC_DEV_LOGIN: devLogin,
+    EXPO_PUBLIC_FIREBASE_MODE: firebaseMode,
     EXPO_PUBLIC_WEB_ORIGIN: "https://pace.nalinor.dev",
     GOOGLE_SERVICES_FILE: "./google-services.json",
   });
@@ -81,5 +86,27 @@ describe("Android smoke app config", () => {
     expect(other?.android?.package).toBe("dev.nalinor.pace");
     expect(other?.android?.intentFilters).toHaveLength(2);
     expect(other?.plugins).not.toContain(plugin);
+  });
+});
+
+describe("Firebase build mode", () => {
+  it("preserves baked configuration by default", () => {
+    const baked = configFor("https://pace-api.nalinor.dev", "");
+    expect(baked?.android?.googleServicesFile).toBe("./google-services.json");
+    expect(baked?.extra).toHaveProperty("firebaseProject");
+    expect(baked?.extra?.["firebaseMode"]).toBe("baked");
+  });
+
+  it("omits baked Firebase configuration only for an explicit runtime candidate", () => {
+    const runtime = configFor("https://pace-api.nalinor.dev", "", "runtime");
+    expect(runtime?.android?.googleServicesFile).toBeUndefined();
+    expect(runtime?.extra).not.toHaveProperty("firebaseProject");
+    expect(runtime?.extra?.["firebaseMode"]).toBe("runtime");
+  });
+
+  it("refuses unknown supplied modes rather than silently baking a candidate", () => {
+    expect(() => configFor("https://pace-api.nalinor.dev", "", "runtim")).toThrow(
+      "Invalid Firebase build mode",
+    );
   });
 });

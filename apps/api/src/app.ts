@@ -6,6 +6,7 @@ import { endpoints, MIN_CLIENT_PROTOCOL, ok, PROTOCOL, PROTOCOL_HEADER } from "@
 
 import type { AppEnv } from "./shared/app-env.ts";
 import type { ParseProvider } from "./shared/llm/llm.ts";
+import type { RequestPlaceReader } from "./shared/ports/request-place.ts";
 
 import { answerAccountConfirmation, mountAccountRoutes } from "./account/account-routes.ts";
 import { mountAuthRoutes } from "./auth/auth-routes.ts";
@@ -18,12 +19,14 @@ import { mountLinkRoutes } from "./links/link-routes.ts";
 import { mountNotifyRoutes } from "./notify/notify-routes.ts";
 import { mountParseRoutes } from "./parse/parse-routes.ts";
 import { type Config, loadConfig, oauthOrigin, ownOrigin } from "./shared/config.ts";
+import { deploymentReadinessOf } from "./shared/deployment-readiness.ts";
 import { publicFirebaseConfigOf, refuseMisconfiguredFirebase } from "./shared/firebase-config.ts";
 import { parseProviders } from "./shared/llm/providers.ts";
 import { createLogger } from "./shared/logger.ts";
 import { mount } from "./shared/mount.ts";
 import { refuseOutdatedClients } from "./shared/protocol.ts";
 import { pushConfigOf, pushMethodsOf } from "./shared/push/registry.ts";
+import { unknownRequestPlaceReader } from "./shared/request-place.ts";
 import { telegramFetch, type TelegramTransport } from "./shared/telegram-api.ts";
 import { mountSyncRoutes } from "./sync/sync-routes.ts";
 
@@ -89,8 +92,7 @@ const mountPublicRoutes = (app: Hono<AppEnv>, deps: AppDeps): void => {
   });
 };
 
-export const createApp = (deps: AppDeps = PLATFORM_DEPS): Hono<AppEnv> => {
-  const app = new Hono<AppEnv>();
+const mountApiGuards = (app: Hono<AppEnv>): void => {
   app.use(
     "/api/*",
     cors({
@@ -99,9 +101,19 @@ export const createApp = (deps: AppDeps = PLATFORM_DEPS): Hono<AppEnv> => {
       origin: (origin, c: Context<AppEnv>) =>
         isAllowedOrigin(origin, c.env.WEB_ORIGIN) ? origin : "",
     }),
-    refuseMisconfiguredFirebase,
-    refuseOutdatedClients(SERVED_TO_ANY_PROTOCOL),
   );
+  // Read-only operator diagnostics must identify an invalid inactive candidate as well.
+  // This narrow exception cannot authenticate, send notifications or mutate application state.
+  mount(app, endpoints.deploymentReadiness, ({ c }) => ok(deploymentReadinessOf(c.env)));
+  app.use("/api/*", refuseMisconfiguredFirebase, refuseOutdatedClients(SERVED_TO_ANY_PROTOCOL));
+};
+
+export const createApp = (
+  deps: AppDeps = PLATFORM_DEPS,
+  requestPlaceReader: RequestPlaceReader = unknownRequestPlaceReader,
+): Hono<AppEnv> => {
+  const app = new Hono<AppEnv>();
+  mountApiGuards(app);
   app.onError((thrown, c) => {
     if (thrown instanceof HTTPException) {
       // Middleware answers with a prepared JSON response (`res`); anything else gets the generic shape.
@@ -113,6 +125,7 @@ export const createApp = (deps: AppDeps = PLATFORM_DEPS): Hono<AppEnv> => {
   });
   app.notFound((c) => c.json({ code: "not-found", message: "Not found" }, 404));
   app.use(async (c, next) => {
+    c.set("requestPlaceReader", requestPlaceReader);
     const config = loadConfig(c.env);
     if (!config.ok) {
       createLogger("info").error(config.error);

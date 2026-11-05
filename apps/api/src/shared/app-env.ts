@@ -1,4 +1,5 @@
 import type { Config } from "./config.ts";
+import type { RequestPlaceReader } from "./ports/request-place.ts";
 
 export type CurrentUser = {
   readonly id: string;
@@ -16,6 +17,8 @@ export type SessionKind = "agent" | "app" | "browser" | "dev";
 export type AppEnv = {
   Bindings: Cloudflare.Env;
   Variables: {
+    /** Trusted provenance supplied by the host adapter, not arbitrary proxy headers. */
+    requestPlaceReader: RequestPlaceReader;
     /** Parsed vars and secrets, set once per request by the config middleware. */
     config: Config;
     /** Set by the auth guard on endpoints declared `auth: true`. */
