@@ -1,0 +1,7 @@
+# OTA publisher service implementation
+
+Implement the existing OTA plan's isolated publisher as `apps/updates`, with its own R2 binding and no account-server imports, signing key, automatic deployment or public route activation. The serving Worker and publication scripts share runtime-safe manifest/protocol modules exported from `apps/updates/src/shared` as `@pace/updates/*`; signing and filesystem modules remain CLI-only. The Expo wire protocol is distinct from Pace account API endpoint contracts.
+
+The release storage port stages immutable assets and signed manifests, verifies read-back, then promotes the exact runtime/channel pointer with compare-and-swap. Failed staging and concurrent promotion preserve the prior pointer. The Worker exposes GET-only manifest and asset responses, exact runtime/channel selection, fixed errors, protocol-correct unknown-runtime handling, and immutable caching for content-addressed assets. R2 adapter tests run in workerd against isolated local R2. Tests cover missing/corrupt records, storage failure, isolation, asset delivery, signing metadata and request negotiation.
+
+Wire the new workspace into the existing unified lint, type check, architecture and CI test commands. No publisher activation or native OTA enablement is implied. Fingerprint comparison, real Expo export and Android interoperability remain explicit prerequisites for activation. Existing private immutable CI export-snapshot assumptions apply; do not add defenses against unrelated hostile local writers or optional protocol polish during this slice.

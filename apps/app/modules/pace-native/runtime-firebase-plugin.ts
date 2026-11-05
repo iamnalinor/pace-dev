@@ -1,6 +1,6 @@
 import type { ExpoConfig } from "expo/config";
 
-import { type AndroidConfig, withAndroidManifest } from "expo/config-plugins";
+import { type AndroidConfig, withAndroidManifest } from "expo/config-plugins.js";
 
 // Expo's XML model omits provider although Android's manifest supports it.
 type RuntimeManifest = AndroidConfig.Manifest.AndroidManifest & {

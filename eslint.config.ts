@@ -184,6 +184,7 @@ export default defineConfig([
     "**/.wrangler/",
     "apps/api/drizzle/",
     "apps/api/worker-configuration.d.ts",
+    "apps/updates/worker-configuration.d.ts",
     "apps/app/android/",
     "apps/app/.expo/",
     "apps/app/expo-env.d.ts",
@@ -483,7 +484,7 @@ export default defineConfig([
     rules: { "@typescript-eslint/explicit-module-boundary-types": "off" },
   },
   {
-    files: ["apps/api/src/worker.ts"],
+    files: ["apps/api/src/worker.ts", "apps/updates/src/worker.ts"],
     // The Workers runtime loads the entry module's default export.
     rules: { "import-x/no-default-export": "off" },
   },

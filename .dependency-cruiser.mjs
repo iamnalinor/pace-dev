@@ -15,6 +15,31 @@ const API_FEATURE = "^apps/api/src/([^/]+)/";
 /** @type {import("dependency-cruiser").IConfiguration} */
 const config = {
   forbidden: [
+    {
+      name: "updates-independent-of-account-apps",
+      comment: "The publisher cannot depend on the account server or UI.",
+      severity: "error",
+      from: { path: "^apps/updates/" },
+      to: { path: "^apps/(api|app)/" },
+    },
+    {
+      name: "account-apps-independent-of-updates",
+      comment: "Account-server selection cannot control executable update delivery.",
+      severity: "error",
+      from: { path: "^apps/(api|app)/" },
+      to: { path: "^apps/updates/" },
+    },
+    {
+      name: "updates-server-has-no-signing-or-export-io",
+      comment:
+        "The publisher serves signed artifacts; private-key and filesystem operations stay in CI.",
+      severity: "error",
+      from: { path: "^apps/updates/src/" },
+      to: {
+        path: "^scripts/ota/(signing|read-export|asset-key)[.]ts$",
+        dependencyTypesNot: ["type-only"],
+      },
+    },
     // ── Workspace boundaries ────────────────────────────────────────────────────
     {
       name: "core-is-pure",

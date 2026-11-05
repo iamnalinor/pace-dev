@@ -606,3 +606,13 @@ boundary.
 5. Nothing changes on the server: the Durable Object validates with `parseEvent` from
    core, so the new type is accepted as soon as the package is rebuilt. If the UI shows
    it, add the strings to `i18n/en.ts` **and** `ru.ts` (a test asserts the same keys).
+
+### Android update publisher
+
+`apps/updates` is an isolated Worker serving publisher-owned OTA artifacts from its own R2
+binding. It imports neither the account API nor the app. Account-server selection never
+changes the publisher, runtime, channel or signing authority. Runtime-safe manifest/protocol
+and release-storage helpers live in `apps/updates/src/shared`, exported through
+`@pace/updates/*` to publication commands under `scripts/ota`;
+filesystem export reading and private-key signing remain CLI-only and are excluded from the
+Worker runtime dependency graph. The publisher is not deployed or enabled by adding this workspace.

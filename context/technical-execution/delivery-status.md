@@ -13,7 +13,7 @@ PR #54. It is not completion of the whole roadmap. Current instructions and deta
 | Client recovery | Known/unknown config reasons, login recovery and sender pause; reviewed session ownership and pending-server handoff in working tree | Final integrated checks and CI; separate design review deferred and exploratory QA excluded by owner |
 | Storage | Conditional raw-usage writes; real workerd deterministic cold-instance comparison, original/correction retention and cursor fingerprints | Alarm-inclusive workloads, bounded checkpoint/tail and verified archive/export/restore; no source-event/raw-usage pruning |
 | Native Firebase | Opt-in native controller foundation committed; runtime handoff and origin/project-scoped push implemented and tested in working tree | Integrated lint/checkpoint, actual Android CI and device-specific FCM evidence; baked compatibility retained |
-| OTA | Original requirements preserved; concrete implementation plan written; protocol/fingerprint source investigation underway | Signed publisher protocol, runtime guard, channels, client lifecycle, rollback evidence |
+| OTA | Manifest/signing, immutable release staging, atomic channel promotion and isolated R2 delivery service implemented; integration checks underway | Publication CLI/workflow, real export/fingerprint validation, native integration and rollback evidence |
 | Infrastructure ports | Original coupling survey preserved | Ports, Cloudflare adapters, dependency guards and conditional alternative host proof |
 
 Fresh complete suites at this checkpoint before final lint corrections: scripts 156, core 905,

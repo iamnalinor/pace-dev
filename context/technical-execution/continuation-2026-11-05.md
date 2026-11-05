@@ -201,3 +201,23 @@ Unified lint round 9 reduced root errors to three: the combined keep/disable int
 ### Runtime integration validation
 
 Unified `bun lint` round 13 completed successfully: formatting, all ESLint workspaces (existing 74 design warnings), all TypeScript projects, unused/duplicate-code checks, dependency boundaries, workflow checks and migrations. The final corrections moved bot polling types to their owning module and classified the deployment CLI's zod dependency as a runtime dependency; no rules were weakened. Auth/session regression tests passed 52/52 and deployment scripts 194/194. Full app tests are running; CI also checks the draft PR's current pushed checkpoint. This evidence does not establish Android/FCM or staged production deployment success.
+
+### Checkpoint db38aeb and CI evidence
+
+Pushed `db38aeb` to draft PR #55 after unified lint, 52 targeted auth tests, 194 deployment-script tests and the complete app suite (134 suites, 1008 tests) passed. GitHub's combined lint/audit/unit/app/API/JVM job subsequently passed. Android run 42107202031 and web E2E both failed before application tests because Node's Expo config loader could not resolve extensionless `expo/config-plugins`. The .js import fix has real-loader RED→GREEN coverage for baked and runtime modes (2 tests) plus 11 existing config/plugin tests. A new push and CI rerun remain required.
+
+### OTA publisher implementation in progress
+
+The manifest/signing and immutable release pipeline now pass 53 Bun tests. An isolated `apps/updates` Worker with real local R2 tests passes eight cases covering CAS/immutability, exact signed bytes, asset delivery, missing channels, corrupt records and request boundaries. No cloud resources were created or deployed. Reusable runtime modules live in `apps/updates/src/shared` with public `@pace/updates/*` exports; CLI-only signing/filesystem operations remain in `scripts/ota`.
+
+A single independent review found invalid cross-package import rewrites and mismatched channel validation. Both are fixed; delta review closed both findings. Optional MIME-type wildcard support is deferred because the pinned Android client sends supported explicit types. Actual Expo export, fingerprint compatibility, publication tooling, native integration and device recovery evidence remain open. Current unified lint reports 17 shared-module style issues and one regex warning; the author is correcting them without rule suppression.
+
+### Real Expo export validation
+
+`bunx expo export --platform android --output-dir /tmp/pace-ota-export --dump-assetmap` succeeded after the Expo import fix. This generated JavaScript/Hermes and assets only: no native build, Android process or emulator ran. Its 28 files total 10,697,203 bytes. The first OTA read failed on XML drawable MIME support; a captured real metadata regression was RED, the shared XML mapping fixed it, and all 54 OTA tests then passed. An ephemeral in-memory test key signed the real export, staged 31 objects, promoted a preview pointer and selected the original signed bytes successfully. The manifest's runtime was explicitly a nonvalidated spike value; this proves actual export-format compatibility, not native fingerprint or device compatibility. No production signing key, storage or deployment was used.
+
+### Publisher verification before checkpoint
+
+After CLI/test lint corrections, `bun test scripts/ota` passed 54 tests / 107 assertions. Multipart coverage checks exact envelope bytes and independently verifies the extracted signature with WebCrypto, without adding a parser dependency. Real workerd/R2 delivery tests passed 8/8. The two real Expo Node-loader regressions passed after the `.js` import correction. No exploratory QA or local Android run occurred.
+
+The installed Expo fingerprint API computed the current tree's hash `659d7a0de63f9a5e7b2535e37949fb1b71399718` from 53 sources. Both `modules/pace-native/android` and `modules/pace-native/runtime-firebase-plugin.ts` have actual source hashes; Expo config still explicitly disables updates and contains the git-derived app version. This is source-inclusion evidence only, not the required comparative fingerprint matrix or an OTA-compatible native release.
