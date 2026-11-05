@@ -1,13 +1,22 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
-import Animated, { type SharedValue, useAnimatedStyle } from "react-native-reanimated";
+import Animated, {
+  type SharedValue,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 
 import { refuseFocus } from "../platform/refuse-focus.ts";
 import { ButtonWidthContext } from "./button.tsx";
 import { cx } from "./cx.ts";
 import { IconButton } from "./icon-button.tsx";
+import { EASING } from "./motion-presets.ts";
+import { type OverlayKind, overlayTiming } from "./overlay-motion.ts";
 import { SheetSubmitScope } from "./sheet-submit.tsx";
 import { HotkeyLayer } from "./use-hotkey.tsx";
+import { useIsMotionReduced } from "./use-reduced-motion.ts";
 
 /** Fills the modal; a style object, the animated views take no class names. */
 export const FILL = { bottom: 0, left: 0, position: "absolute", right: 0, top: 0 } as const;
@@ -85,7 +94,7 @@ export const OverlayTitle = ({
       // The cross's middle on the title's first line (QA round 16 L10: it sat about 4 px low): a
       // box as tall as the title's line centres it.
       <View className="-mr-2 h-6 justify-center">
-        <IconButton icon="x" label={closeLabel} onPress={onClose} variant="plain" />
+        <IconButton icon="x" label={closeLabel} onPress={onClose} />
       </View>
     ) : null}
   </View>
@@ -143,4 +152,87 @@ export const OverlayLayer = ({ children }: { readonly children: ReactNode }) => 
       <ButtonWidthContext value="fill">{children}</ButtonWidthContext>
     </SheetSubmitScope>
   </HotkeyLayer>
+);
+
+/**
+The 0 → 1 progress of a dialog's or a popover's enter and its way back: the exit lets the overlay go
+(unmounts it) only when it ran to its end; opened again before that, nothing lets go.
+*/
+export const useOverlayProgress = (kind: OverlayKind, isOpen: boolean, letGo: () => void) => {
+  const isReduced = useIsMotionReduced();
+  const progress = useSharedValue(0);
+  useEffect(() => {
+    const { enter, exit } = overlayTiming(kind, isReduced);
+    progress.set(
+      isOpen
+        ? withTiming(1, { duration: enter, easing: EASING.enter })
+        : withTiming(0, { duration: exit, easing: EASING.exit }, (isFinished) => {
+            if (isFinished === true) {
+              scheduleOnRN(letGo);
+            }
+          }),
+    );
+  }, [isOpen, isReduced, kind, letGo, progress]);
+  return { isReduced, progress };
+};
+
+/** The close and the dismiss of an overlay: each asks once, and a dismiss only if it may. */
+export const overlayClosers = ({
+  dismissible,
+  isOpen,
+  onClose,
+}: {
+  readonly dismissible: boolean;
+  readonly isOpen: boolean;
+  readonly onClose: () => void;
+}) => {
+  // Closes once: a second tap, Back or Escape during the exit asks nothing more.
+  const close = (): void => {
+    if (isOpen) {
+      onClose();
+    }
+  };
+  const dismiss = (): void => {
+    if (dismissible) {
+      close();
+    }
+  };
+  return { close, dismiss };
+};
+
+/** The title with its optional cross, then the body: what a dialog's and a sheet's surface holds. */
+export const OverlayContent = ({
+  children,
+  closeLabel,
+  footer,
+  hasCross,
+  header,
+  onClose,
+  subtitle,
+  title,
+  titleId,
+}: {
+  readonly children: ReactNode;
+  readonly closeLabel: string;
+  readonly footer: ReactNode;
+  readonly hasCross: boolean;
+  readonly header: ReactNode;
+  readonly onClose: () => void;
+  readonly subtitle: string | undefined;
+  readonly title: string;
+  readonly titleId: string;
+}) => (
+  <>
+    <OverlayTitle
+      closeLabel={closeLabel}
+      hasCross={hasCross}
+      onClose={onClose}
+      subtitle={subtitle}
+      title={title}
+      titleId={titleId}
+    />
+    <OverlayBody footer={footer} header={header}>
+      {children}
+    </OverlayBody>
+  </>
 );

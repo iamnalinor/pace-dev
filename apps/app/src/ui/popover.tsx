@@ -1,18 +1,15 @@
 import { type ReactNode, type RefObject, useEffect, useState } from "react";
 import { Modal, Pressable, useWindowDimensions, View } from "react-native";
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
-import { scheduleOnRN } from "react-native-worklets";
+import Animated, { useAnimatedStyle } from "react-native-reanimated";
 
 import { layout, shadow } from "@pace/core";
 
 import { paletteVars } from "../platform/theme.ts";
-import { EASING } from "./motion-presets.ts";
-import { FILL, OverlayLayer } from "./overlay-frame.tsx";
-import { overlayTiming, placePopover, POPOVER_SCALE } from "./overlay-motion.ts";
+import { FILL, OverlayLayer, useOverlayProgress } from "./overlay-frame.tsx";
+import { placePopover, POPOVER_SCALE } from "./overlay-motion.ts";
 import { useOverlayPhase } from "./overlay-presence.tsx";
 import { useSheetFocusRef } from "./sheet-focus.ts";
 import { useTheme } from "./theme-provider.tsx";
-import { useIsMotionReduced } from "./use-reduced-motion.ts";
 
 type Box = {
   readonly height: number;
@@ -37,20 +34,7 @@ const useAnchorBox = (anchor: RefObject<null | View>, isOpen: boolean): Box | nu
 
 /** Scale 0.98 → 1 with a fade from the anchor's edge (160 in, 110 out; reduced: the fade). */
 const usePopoverMotion = (isOpen: boolean, letGo: () => void) => {
-  const isReduced = useIsMotionReduced();
-  const progress = useSharedValue(0);
-  useEffect(() => {
-    const { enter, exit } = overlayTiming("popover", isReduced);
-    progress.set(
-      isOpen
-        ? withTiming(1, { duration: enter, easing: EASING.enter })
-        : withTiming(0, { duration: exit, easing: EASING.exit }, (isFinished) => {
-            if (isFinished === true) {
-              scheduleOnRN(letGo);
-            }
-          }),
-    );
-  }, [isOpen, isReduced, letGo, progress]);
+  const { isReduced, progress } = useOverlayProgress("popover", isOpen, letGo);
   return useAnimatedStyle(() => {
     const step = progress.get();
     return isReduced

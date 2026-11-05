@@ -98,14 +98,14 @@ export const boxClass = ({
   cx(
     "relative flex-row items-center gap-2 rounded-md px-4",
     multiline ? "min-h-24 py-3" : "min-h-hit lg:min-h-hit-web",
-    isDisabled ? "bg-fill-1" : "bg-cell border",
+    isDisabled ? "bg-fill-1" : "border bg-cell",
     !isDisabled && (isErrored ? "border-danger" : "border-outline"),
   );
 
 /** The ring of a focused field (any input method, not only the keyboard's; F-A11Y-01): 2 + 2 px. */
 export const FocusRing = () => (
   <View
-    className="border-focus absolute -inset-1 rounded-lg border-2"
+    className="absolute -inset-1 rounded-lg border-2 border-focus"
     pointerEvents="none"
     testID="text-field-ring"
   />
@@ -117,7 +117,7 @@ const ErrorMessage = ({ error, id }: { readonly error: string; readonly id: stri
     <Icon name="triangle-alert" size="inline" tone="danger" />
     <Text
       accessibilityLiveRegion="polite"
-      className="text-footnote text-danger shrink font-sans"
+      className="shrink font-sans text-footnote text-danger"
       role="alert"
     >
       {error}
@@ -127,7 +127,7 @@ const ErrorMessage = ({ error, id }: { readonly error: string; readonly id: stri
 
 /** The hint under the field. */
 const HintMessage = ({ hint, id }: { readonly hint: string; readonly id: string }) => (
-  <Text className="text-footnote text-label-secondary font-sans" nativeID={id}>
+  <Text className="font-sans text-footnote text-label-secondary" nativeID={id}>
     {hint}
   </Text>
 );
@@ -328,7 +328,7 @@ export const TextField = ({ onBlur, onFocus, ...props }: TextFieldProps) => {
           })}
           accessibilityLabel={label}
           className={cx(
-            "text-body min-w-0 flex-1 py-2 font-sans",
+            "min-w-0 flex-1 py-2 font-sans text-body",
             isDisabled ? "text-label-quaternary" : "text-label-primary",
           )}
           editable={editable}

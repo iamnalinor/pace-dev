@@ -107,7 +107,7 @@ export const ToastCard = ({
           </Text>
         </Pressable>
       )}
-      <IconButton icon="x" label={t("common.close")} onPress={onDone} variant="plain" />
+      <IconButton icon="x" label={t("common.close")} onPress={onDone} />
     </View>
   );
 };

@@ -17,7 +17,7 @@ import { paletteVars } from "../platform/theme.ts";
 import { Dialog, type DialogProps } from "./dialog.tsx";
 import { useIsWide } from "./layout.ts";
 import { EASING } from "./motion-presets.ts";
-import { OverlayBody, OverlayLayer, OverlayTitle, Scrim } from "./overlay-frame.tsx";
+import { overlayClosers, OverlayContent, OverlayLayer, Scrim } from "./overlay-frame.tsx";
 import { overlayTiming, shouldDismiss } from "./overlay-motion.ts";
 import { HAS_SHEET_CROSS, IS_HANDLE_ACCESSIBLE } from "./overlay-platform.ts";
 import { useOverlayPhase } from "./overlay-presence.tsx";
@@ -232,17 +232,18 @@ const SheetSurface = ({
       }}
     >
       <Handle closeLabel={closeLabel} gesture={gesture} onDismiss={close} />
-      <OverlayTitle
+      <OverlayContent
         closeLabel={closeLabel}
+        footer={footer}
         hasCross={HAS_SHEET_CROSS}
+        header={header}
         onClose={close}
         subtitle={subtitle}
         title={title}
         titleId={titleId}
-      />
-      <OverlayBody footer={footer} header={header}>
+      >
         {children}
-      </OverlayBody>
+      </OverlayContent>
     </View>
   );
 };
@@ -254,17 +255,7 @@ const BottomSheet = ({ dismissible = true, onClose, open, ...surface }: SheetPro
   const phase = useOverlayPhase(open);
   const sheet = useSheetMotion(phase.isOpen, phase.letGo);
   useScrim(phase.isOpen);
-  // Closes once: a second tap, Back or Escape during the exit asks nothing more.
-  const close = (): void => {
-    if (phase.isOpen) {
-      onClose();
-    }
-  };
-  const dismiss = (): void => {
-    if (dismissible) {
-      close();
-    }
-  };
+  const { close, dismiss } = overlayClosers({ dismissible, isOpen: phase.isOpen, onClose });
   const gesture = handleDrag(sheet.values, { dismissible, onDismiss: close });
   return (
     <Modal

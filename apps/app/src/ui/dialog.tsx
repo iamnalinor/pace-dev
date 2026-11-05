@@ -1,7 +1,6 @@
-import { type ReactNode, useEffect, useId } from "react";
+import { type ReactNode, useId } from "react";
 import { Modal, View } from "react-native";
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
-import { scheduleOnRN } from "react-native-worklets";
+import Animated, { useAnimatedStyle } from "react-native-reanimated";
 
 import { shadow } from "@pace/core";
 
@@ -9,14 +8,18 @@ import type { SheetName } from "./sheet-names.ts";
 
 import { paletteVars } from "../platform/theme.ts";
 import { cx } from "./cx.ts";
-import { EASING } from "./motion-presets.ts";
-import { OverlayBody, OverlayLayer, OverlayTitle, Scrim } from "./overlay-frame.tsx";
-import { DIALOG_SCALE, overlayTiming } from "./overlay-motion.ts";
+import {
+  overlayClosers,
+  OverlayContent,
+  OverlayLayer,
+  Scrim,
+  useOverlayProgress,
+} from "./overlay-frame.tsx";
+import { DIALOG_SCALE } from "./overlay-motion.ts";
 import { useOverlayPhase } from "./overlay-presence.tsx";
 import { useScrim } from "./scrim.ts";
 import { useSheetFocusRef } from "./sheet-focus.ts";
 import { useTheme } from "./theme-provider.tsx";
-import { useIsMotionReduced } from "./use-reduced-motion.ts";
 
 /** A form's width (`layout.dialog`, 560) or a confirmation's (`inspector.width`, 400). */
 export type DialogWidth = "confirm" | "form";
@@ -43,21 +46,7 @@ export type DialogProps = {
 
 /** The enter and exit of a dialog: scale 0.96 → 1 with a fade in, 1 → 0.98 with a fade out (§6). */
 const useDialogMotion = (isOpen: boolean, letGo: () => void) => {
-  const isReduced = useIsMotionReduced();
-  const progress = useSharedValue(0);
-  useEffect(() => {
-    const { enter, exit } = overlayTiming("dialog", isReduced);
-    progress.set(
-      isOpen
-        ? withTiming(1, { duration: enter, easing: EASING.enter })
-        : withTiming(0, { duration: exit, easing: EASING.exit }, (isFinished) => {
-            // Opened again before the exit finished: nothing lets go.
-            if (isFinished === true) {
-              scheduleOnRN(letGo);
-            }
-          }),
-    );
-  }, [isOpen, isReduced, letGo, progress]);
+  const { isReduced, progress } = useOverlayProgress("dialog", isOpen, letGo);
   const style = useAnimatedStyle(() => {
     const step = progress.get();
     if (isReduced) {
@@ -105,17 +94,18 @@ const DialogSurface = ({
       )}
       style={{ boxShadow: shadow(scheme, "overlay") }}
     >
-      <OverlayTitle
+      <OverlayContent
         closeLabel={closeLabel}
+        footer={footer}
         hasCross
+        header={header}
         onClose={close}
         subtitle={subtitle}
         title={title}
         titleId={titleId}
-      />
-      <OverlayBody footer={footer} header={header}>
+      >
         {children}
-      </OverlayBody>
+      </OverlayContent>
     </View>
   );
 };
@@ -142,17 +132,7 @@ export const Dialog = ({
   const motion = useDialogMotion(phase.isOpen, phase.letGo);
   // The web page dims its status bar (`theme-color`) with the dim.
   useScrim(phase.isOpen);
-  // Closes once: a second Escape or click during the exit asks nothing more.
-  const close = (): void => {
-    if (phase.isOpen) {
-      onClose();
-    }
-  };
-  const dismiss = (): void => {
-    if (dismissible) {
-      close();
-    }
-  };
+  const { close, dismiss } = overlayClosers({ dismissible, isOpen: phase.isOpen, onClose });
   return (
     <Modal
       animationType="none"
