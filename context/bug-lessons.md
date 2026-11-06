@@ -1845,6 +1845,7 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-03 | PR B 3.2 re-review: a kit `Link` (and any kit Pressable) handed `aria-disabled` looked disabled to assistive tech and still pressed, and on the web kept its live `href`; a hyphenated JSX attribute passes every prop type, so the type could not refuse it | 10 (a control whose state and behaviour disagree) | yes: `usePressableProps` reads `aria-disabled` as `disabled` for every kit control; the web Link drops `href` on either | `link.web.test.tsx` "is disabled by aria-disabled as by disabled" |
 | 2026-11-06 | PR B 4.2 (F-A11Y-10): the running row sat in `accessibilityLiveRegion="polite"` around a value that changes every minute, so a screen reader spoke the whole row at each tick; no test asserted what is *not* announced | 125 (live region around a ticking value) | yes: the time bar's reading-line status stays one announcement; no other live region wraps a clock (swept `accessibilityLiveRegion` in `apps/app/src`) | `running-card.test.tsx` "is not a live region" and "ticks on Stop, and says a start, a stop and the past-expected once each" (`useRunningAnnouncements`); QA checklist: a value that changes while the screen is idle gets no live region, only a one-off announcement of its transitions |
 | 2026-11-06 | PR B 4.1: a check (a control) inside a pressable row is a nested interactive (axe `nested-interactive`); the first `ListRow`-based task row would have put `CheckCircle` inside the row's Pressable | 10 (a control whose structure disagrees with its role) | yes: `ListRow` takes `control`, rendered beside the press area, never inside it | `task-row.test.tsx` "keeps the check beside the press area, never inside it" |
+| 2026-11-06 | R23-12 / QA21 M2: bare `/add` left the cursor on `BODY` (title focus asked for under the first-sync cover) | 126 (new) | yes: every focus-on-arrival caller | `add-focus.test.tsx` (held first pull), e2e at 390 and 1440 |
 
 ### 125. A live region around a ticking value
 - **Bug.** PR B 4.2 (F-A11Y-10): the running row sat in `accessibilityLiveRegion="polite"` around the
@@ -1858,4 +1859,19 @@ New bugs go here with their class; a new class gets its own section above.
   one-off messages (a reading status, an error). `running-card.test.tsx` pins "not a live region" and
   "announces a start, a stop and past-expected once each"; QA checklist line in `docs/qa.md` scope:
   "does anything that ticks speak?".
+
+
+### 126. A focus asked for while the field cannot take it
+- **Bug.** QA round 21 M2 / round 23 R23-12: a direct load of `/add` opened the New task form, whose
+  title asked for the cursor at mount — under a fresh browser's first-sync cover, where the field is
+  hidden and takes no focus. Focus stayed on `BODY` (a phone and a computer alike). The composer's
+  line already waited for the cover (QA 19 L4); the form's title did not.
+- **Missed because.** Tests rendered the form with the copy already synced, so "focus at mount" always
+  worked; the cover exists only in the first-sync state.
+- **Rule.** Every "focus on arrival" waits for what can hide the field: the first-sync cover
+  (`useIsFirstSync`), an overlay still entering. Ask once it can be seen.
+- **Sweep and guard.** Swept `focusField(` / `autoFocus` callers: the line (done), `TaskFields` title
+  (fixed), the add-computer field (not under the cover). `screens/add-focus.test.tsx` holds the first
+  pull and asserts no focus before the cover lifts and one after; `e2e/composer.e2e.ts` checks the
+  title is focused on a direct load of `/add` at 390 and 1440.
 

@@ -1,17 +1,14 @@
 import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  TextInput,
-  type TextInputKeyPressEvent,
-  View,
-} from "react-native";
+import { ActivityIndicator, type TextInput, type TextInputKeyPressEvent, View } from "react-native";
 
 import { useIsFirstSync, useT } from "#app/app-state.tsx";
 import { lineEnterProps } from "#app/platform/enter-key.ts";
 import { cx } from "#app/ui/cx.ts";
 import { type Hotkey, HOTKEYS, labelWithHotkey } from "#app/ui/hotkeys.ts";
 import { Icon, type IconName, type IconTone } from "#app/ui/icon.tsx";
+import { useIsWide } from "#app/ui/layout.ts";
+import { Pressable } from "#app/ui/pressable.tsx";
+import { TextField } from "#app/ui/text-field.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { Tooltip } from "#app/ui/tooltip.tsx";
 import { KEYBOARD } from "#app/ui/use-hotkey.tsx";
@@ -33,16 +30,14 @@ type LineFlow = {
 };
 
 /**
-The line's own `py-3` and `text-callout` line (the phone column; a desktop line is a pixel shorter):
-the height sums restate those classes, so they move with them (composer.test.tsx reads both through
-the generated scale; bug-lessons class 11).
+The field's own text and padding: a `text-body` line (the kit `TextField`, 16 so a phone's browser
+never zooms) inside a box of `py-2` and a 1 px border; the line grows from one line to eight.
 */
-const PAD_Y_PX = 12;
-const LINE_PX = typeRole("callout", "phone").line;
-/** One line and the padding. */
-const MIN_INPUT_HEIGHT = LINE_PX + 2 * PAD_Y_PX;
-/** Eight lines and the padding: a longer message scrolls inside. */
-const MAX_INPUT_HEIGHT = 8 * LINE_PX + 2 * PAD_Y_PX;
+const LINE_PX = typeRole("body", "phone").line;
+/** One line of text. */
+const MIN_INPUT_HEIGHT = LINE_PX;
+/** Eight lines: a longer message scrolls inside. */
+const MAX_INPUT_HEIGHT = 8 * LINE_PX;
 
 const heightOf = (content: number): number =>
   Math.min(MAX_INPUT_HEIGHT, Math.max(MIN_INPUT_HEIGHT, Math.ceil(content)));
@@ -120,17 +115,16 @@ const LineButton = ({
   return (
     <Tooltip label={labelWithHotkey(label, hotkey, KEYBOARD)}>
       <Pressable
-        accessibilityLabel={label}
-        accessibilityRole="button"
         aria-busy={isBusy}
-        aria-disabled={disabled}
         // A 44px target around the 40px circle (hitSlop does nothing on the web, QA round 18 L6);
-        // side by side they touch. It takes its whole height in the row, which is as tall (one
-        // line and its padding): a reach into the card's padding is clipped by the unfolding
-        // card, so a press there would miss.
-        className="h-hit-web w-hit-web items-center justify-center active:opacity-70"
+        // side by side they touch.
+        className="h-hit-web w-hit-web items-center justify-center"
         disabled={disabled || isBusy}
+        label={label}
         onPress={onPress}
+        ripple="borderless"
+        role="button"
+        shape="pill"
       >
         <View
           className={cx(
@@ -177,15 +171,14 @@ const LineInput = ({
   flow,
   isFocused,
   isLocked,
-  onFocusChange,
+  isReading,
 }: {
   readonly flow: LineFlow;
   readonly isFocused: boolean;
   readonly isLocked: boolean;
-  readonly onFocusChange: (isInFocus: boolean) => void;
+  readonly isReading: boolean;
 }) => {
   const t = useT();
-  const { palette } = useTheme();
   const inputRef = useRef<TextInput>(null);
   const isEmpty = flow.text.trim() === "";
   // A web textarea does not grow by itself: it takes its content's height, up to eight lines.
@@ -206,46 +199,39 @@ const LineInput = ({
   }, [flow.lineFocus]);
   useShareFocus(inputRef, { isFocused, isOnLine: flow.form === null });
   return (
-    <TextInput
-      accessibilityLabel={t("composer.label")}
-      autoFocus={isFocused}
-      className={cx(
-        "flex-1 px-1 py-3 font-sans text-callout",
-        isLocked ? "text-label-secondary" : "text-label-primary",
-      )}
-      editable={!isLocked}
-      multiline
-      onBlur={() => {
-        onFocusChange(false);
-      }}
-      onChangeText={flow.type}
-      onContentSizeChange={onContentSizeChange}
-      onFocus={() => {
-        onFocusChange(true);
-      }}
-      // Locked, its keys are not its own: Escape reaches the form beside it.
-      {...(!isLocked &&
-        lineEnterProps({
-          onEnter: () => {
-            if (!isEmpty) {
-              flow.enter();
-            }
-          },
-          onKeyPress: onEnter(isEmpty, {
-            enter: flow.enter,
-            escape: flow.dismiss,
-            toInbox: () => void flow.toInbox(),
-          }),
-        }))}
-      placeholder={t("composer.placeholder")}
-      placeholderTextColor={palette["label.tertiary"]}
-      ref={inputRef}
-      // An empty line is one line high whatever it measured before (a wrapped placeholder, a
-      // long message just added): a textarea's measured height never shrinks by itself.
-      style={{ height: flow.text === "" ? MIN_INPUT_HEIGHT : inputHeight }}
-      textAlignVertical="top"
-      value={flow.text}
-    />
+    <View className="min-w-0 flex-1">
+      <TextField
+        autoFocus={isFocused}
+        editable={!isLocked}
+        isDraft={isReading}
+        isGrowing
+        isLabelHidden
+        label={t("composer.label")}
+        onChangeText={flow.type}
+        onContentSizeChange={onContentSizeChange}
+        // Locked, its keys are not its own: Escape reaches the form beside it.
+        {...(!isLocked &&
+          lineEnterProps({
+            onEnter: () => {
+              if (!isEmpty) {
+                flow.enter();
+              }
+            },
+            onKeyPress: onEnter(isEmpty, {
+              enter: flow.enter,
+              escape: flow.dismiss,
+              toInbox: () => void flow.toInbox(),
+            }),
+          }))}
+        placeholder={t("composer.placeholder")}
+        purpose="title"
+        ref={inputRef}
+        // An empty line is one line high whatever it measured before (a wrapped placeholder, a
+        // long message just added): a textarea's measured height never shrinks by itself.
+        style={{ height: flow.text === "" ? MIN_INPUT_HEIGHT : inputHeight }}
+        value={flow.text}
+      />
+    </View>
   );
 };
 
@@ -258,7 +244,6 @@ export const QuickLine = ({
   isFocused,
   isLocked,
   isReading,
-  onFocusChange,
 }: {
   readonly flow: LineFlow;
   readonly isFocused: boolean;
@@ -269,30 +254,28 @@ export const QuickLine = ({
   readonly isLocked: boolean;
   /** The assistant is reading the line: Send spins. */
   readonly isReading: boolean;
-  /** The card shows a focus ring while the cursor is in the line. */
-  readonly onFocusChange: (isInFocus: boolean) => void;
 }) => {
   const t = useT();
   const isEmpty = flow.text.trim() === "";
   const isIdle = isEmpty || isLocked;
+  // On a computer the sidebar's New task is the one entry to the empty form (F-CMP-18): the line
+  // offers + only once it holds text to carry into the form's title.
+  const isWide = useIsWide();
   return (
     <View className="flex-row items-end">
-      <View className="mb-1">
-        <LineButton
-          disabled={isLocked}
-          hotkey={HOTKEYS.newTask}
-          icon={"plus"}
-          label={t("nav.newTask")}
-          onPress={flow.expand}
-        />
-      </View>
-      <LineInput
-        flow={flow}
-        isFocused={isFocused}
-        isLocked={isLocked}
-        onFocusChange={onFocusChange}
-      />
-      <View className="mb-1 flex-row">
+      {isWide && isEmpty ? null : (
+        <View>
+          <LineButton
+            disabled={isLocked}
+            hotkey={HOTKEYS.newTask}
+            icon={"plus"}
+            label={t("nav.newTask")}
+            onPress={flow.expand}
+          />
+        </View>
+      )}
+      <LineInput flow={flow} isFocused={isFocused} isLocked={isLocked} isReading={isReading} />
+      <View className="flex-row">
         <LineButton
           disabled={isIdle}
           hotkey={HOTKEYS.toInbox}

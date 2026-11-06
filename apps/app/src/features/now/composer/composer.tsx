@@ -10,6 +10,7 @@ import { Presence } from "#app/ui/presence.tsx";
 import { AiStatus } from "./ai-status.tsx";
 import { type ComposerFlow, useComposerFlow } from "./composer-flow.tsx";
 import { ComposerForm, type FormVariant } from "./composer-form.tsx";
+import { ComposerUnfold, useComposerUnfold } from "./composer-unfold.tsx";
 import { formTitleKey } from "./form-title.ts";
 import { QuickLine } from "./quick-line.tsx";
 
@@ -93,11 +94,9 @@ const Preview = ({ flow }: { readonly flow: ComposerFlow }) => {
 const LineBlock = ({
   flow,
   isFocused,
-  onFocusChange,
 }: {
   readonly flow: ComposerFlow;
   readonly isFocused: boolean;
-  readonly onFocusChange: (isInFocus: boolean) => void;
 }) => (
   <>
     <QuickLine
@@ -105,7 +104,6 @@ const LineBlock = ({
       isFocused={isFocused}
       isLocked={flow.form !== null && flow.isFormInPane}
       isReading={flow.pending.busy}
-      onFocusChange={onFocusChange}
     />
     <Preview flow={flow} />
     <IssueLine flow={flow} />
@@ -116,44 +114,31 @@ const LineBlock = ({
 );
 
 /**
-Now's composer, one card. The line takes a task in words: Enter (or Send) has the assistant
-read it into the task form, a second Enter adds it; + opens the form by hand (the line moves
-into the title); Alt+Enter (or To Inbox) keeps the raw line in the Inbox. Nothing is sent to
-the assistant while typing; a paste is read at once. On a phone the card unfolds into the form
-in place; on a computer the form opens in the right pane and the line stays.
+Now's composer. The line takes a task in words: Enter (or Send) has the assistant read it into the
+task form, a second Enter adds it; + opens the form by hand (the line moves into the title);
+Alt+Enter (or To Inbox) keeps the raw line in the Inbox. Nothing is sent to the assistant while
+typing; a paste is read at once. On a phone the line unfolds into the form's card in place (grow,
+then fade, spec §6); on a computer the form opens in the inspector and the line stays.
 */
 export const Composer = ({ isFocused = false }: { readonly isFocused?: boolean }) => {
   const flow = useComposerFlow();
-  const [isLineInFocus, setIsLineInFocus] = useState(false);
   const isFormHere = flow.form !== null && !flow.isFormInPane;
-  const shape = isFormHere ? "form" : "line";
-  // The line on arrival is simply there (F-MOT-07); a swap to the form and back fades in.
-  const [swap, setSwap] = useState({ hasSwapped: false, shape });
-  if (swap.shape !== shape) {
-    setSwap({ hasSwapped: true, shape });
-  }
+  const unfold = useComposerUnfold(isFormHere ? "form" : "line");
+  const isCard = unfold.shape === "form" || unfold.phase === "grow";
   return (
-    // One card that changes shape: its height is the line's or the form's, and the focused line
-    // rings it in the quiet accent.
+    // The line is the field's own cell; the form is a card that takes its shape and height
+    // without ever clipping its content (bug-lessons 5).
     <View
-      className={cx(
-        "mx-4 mb-3 rounded-xl border bg-cell px-1 py-1",
-        isLineInFocus && !isFormHere ? "border-accent" : "border-outline",
-      )}
+      className={cx("mx-gutter mb-3", isCard && "rounded-xl border border-outline bg-cell p-1")}
       testID="composer-card"
     >
-      {/*
-      The card takes the new shape's height in the swap frame and the new content fades in
-      (spec §6 composer unfold): nothing is ever clipped or drawn outside the card while it grows
-      (F-MOT-08, bug-lessons 5). An opacity fade leaves the field in place to take the cursor.
-      */}
-      <Presence initial={swap.hasSwapped} key={shape} show>
-        {isFormHere ? (
+      <ComposerUnfold {...unfold}>
+        {unfold.shape === "form" ? (
           <ComposerFlowForm variant="card" />
         ) : (
-          <LineBlock flow={flow} isFocused={isFocused} onFocusChange={setIsLineInFocus} />
+          <LineBlock flow={flow} isFocused={isFocused} />
         )}
-      </Presence>
+      </ComposerUnfold>
     </View>
   );
 };

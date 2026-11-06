@@ -1,15 +1,15 @@
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { View } from "react-native";
 
-import { useLanguage, useT } from "#app/app-state.tsx";
+import { useT } from "#app/app-state.tsx";
 import { TaskRows } from "#app/shared/task-list.tsx";
-import { Icon } from "#app/ui/icon.tsx";
+import { Disclosure } from "#app/ui/disclosure.tsx";
+import { SectionHeader } from "#app/ui/section-header.tsx";
 import { groupNowRows, type NowRow } from "@pace/client";
-import { formatCount } from "@pace/core";
 
 const PREVIEW_COUNT = 3;
 
-/** A small preview of one kind of task, expanded without hiding the other kind. */
+/** A small preview of one kind of task; "Show all" unfolds the rest without hiding the other kind. */
 const TaskGroup = ({
   rows,
   title,
@@ -18,43 +18,24 @@ const TaskGroup = ({
   readonly title: string;
 }) => {
   const t = useT();
-  const language = useLanguage();
   const [isExpanded, setIsExpanded] = useState(false);
-  const canExpand = rows.length > PREVIEW_COUNT;
-  const shown = isExpanded ? rows : rows.slice(0, PREVIEW_COUNT);
+  const rest = rows.slice(PREVIEW_COUNT);
   return (
-    <View className="mx-3 overflow-hidden rounded-xl border border-separator bg-cell">
-      <View className="min-h-hit-web flex-row items-center justify-between border-b border-separator px-3">
-        <Text className="font-sans text-footnote font-semibold text-label-secondary">{title}</Text>
-        <View className="flex-row items-center gap-2">
-          <Text className="font-sans text-caption font-normal tabular-nums text-label-tertiary">
-            {formatCount(rows.length, language)}
-          </Text>
-          {canExpand ? (
-            <Pressable
-              accessibilityLabel={t(isExpanded ? "now.collapseGroup" : "now.expandGroup", {
-                title,
-              })}
-              accessibilityRole="button"
-              aria-expanded={isExpanded}
-              className="min-h-hit-web flex-row items-center gap-1 px-1"
-              onPress={() => {
-                setIsExpanded((current) => !current);
-              }}
-            >
-              <Text className="font-sans text-caption text-label-secondary">
-                {t(isExpanded ? "now.collapse" : "now.expand")}
-              </Text>
-              {isExpanded ? (
-                <Icon name="chevron-up" size="inline" />
-              ) : (
-                <Icon name="chevron-down" size="inline" />
-              )}
-            </Pressable>
-          ) : null}
-        </View>
-      </View>
-      <TaskRows animateLayout={false} label={title} rows={shown} />
+    <View>
+      <SectionHeader count={rows.length} title={title} />
+      <TaskRows animateLayout={false} label={title} rows={rows.slice(0, PREVIEW_COUNT)} />
+      {rest.length === 0 ? null : (
+        <Disclosure
+          count={rest.length}
+          label={t("now.showAll")}
+          onToggle={() => {
+            setIsExpanded(!isExpanded);
+          }}
+          open={isExpanded}
+        >
+          <TaskRows animateLayout={false} label={title} rows={rest} />
+        </Disclosure>
+      )}
     </View>
   );
 };
@@ -73,7 +54,7 @@ export const NowTaskGroups = ({ rows }: { readonly rows: readonly NowRow[] }) =>
     );
   }
   return (
-    <View className="gap-3">
+    <View>
       <TaskGroup rows={dated} title={t("now.withDeadline")} />
       <TaskGroup rows={undated} title={t("now.withoutDeadline")} />
     </View>

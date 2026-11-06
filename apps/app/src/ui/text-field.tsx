@@ -151,6 +151,11 @@ export type TextFieldProps = Omit<
   /** Grows from 3 lines to 8, then scrolls (implied by `purpose="description"`). */
   readonly multiline?: boolean | undefined;
   /**
+  One line that grows with what is typed or pasted, up to 8, then scrolls (the composer's line).
+  The caller sets the input's height from `onContentSizeChange`, as a web textarea does not grow.
+  */
+  readonly isGrowing?: boolean | undefined;
+  /**
   The label names the field without showing (a search field whose placeholder says what it is):
   use it only where the field's purpose reads from the screen around it.
   */
@@ -192,6 +197,7 @@ form's action (or the caller's own submit), and the cursor stays (QA round 21 M1
 */
 const inputPropsOf = ({
   describedBy,
+  isGrowing,
   isMultiline,
   isShown,
   onSubmitEditing,
@@ -199,6 +205,7 @@ const inputPropsOf = ({
   submit,
 }: {
   readonly describedBy: string | undefined;
+  readonly isGrowing: boolean;
   readonly isMultiline: boolean;
   readonly isShown: boolean;
   readonly onSubmitEditing: TextInputProps["onSubmitEditing"];
@@ -217,13 +224,14 @@ const inputPropsOf = ({
     multiline: isMultiline,
     onSubmitEditing: onSubmitEditing ?? (isSheetEnter ? submit : undefined),
     textAlignVertical: isMultiline ? "top" : "center",
-    ...(isMultiline && { numberOfLines: 3, style: MULTILINE_MAX }),
+    ...(isMultiline && { numberOfLines: isGrowing ? 1 : 3, style: MULTILINE_MAX }),
   };
 };
 
 /** The props with their defaults: what the field reads before it draws. */
 const withDefaults = ({
   editable = true,
+  isGrowing = false,
   isInvalid = false,
   isLabelHidden = false,
   isSubmitted = false,
@@ -233,11 +241,12 @@ const withDefaults = ({
 }: Omit<TextFieldProps, "onBlur" | "onFocus">) => ({
   ...rest,
   editable,
+  isGrowing,
   isInvalid,
   isLabelHidden,
   isSubmitted,
-  // A description is many lines whoever asks.
-  isMultiline: multiline || purpose === "description",
+  // A description is many lines whoever asks; a growing line is multiline to take a paste.
+  isMultiline: multiline || isGrowing || purpose === "description",
   purpose,
 });
 
@@ -296,6 +305,7 @@ export const TextField = ({ onBlur, onFocus, ...props }: TextFieldProps) => {
     error: _error,
     hint,
     isDraft,
+    isGrowing,
     isInvalid,
     isLabelHidden,
     isMultiline,
@@ -320,13 +330,14 @@ export const TextField = ({ onBlur, onFocus, ...props }: TextFieldProps) => {
           isDisabled,
           isDraft: isDraft === true,
           isErrored: shownError !== null || isInvalid,
-          multiline: isMultiline,
+          multiline: isMultiline && !isGrowing,
         })}
       >
         <Adornments isFocused={field.isFocused} purpose={purpose} />
         <TextInput
           {...inputPropsOf({
             describedBy: hasMessage ? field.messageId : undefined,
+            isGrowing,
             isMultiline,
             isShown: shownError !== null,
             onSubmitEditing,

@@ -4,7 +4,7 @@ import type { PaceRuntime } from "#app/runtime.ts";
 import type { ParseField, TaskDraft } from "@pace/core";
 
 import { requestNewTask } from "#app/shared/new-task-request.ts";
-import { classLinePx, classPx } from "#app/test/class-px.ts";
+import { classLinePx } from "#app/test/class-px.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { FAKE_STORE_ID, fakeUser } from "@pace/client/testing";
@@ -114,7 +114,7 @@ describe("Composer", () => {
     await fireEvent(line(), "contentSizeChange", {
       nativeEvent: { contentSize: { height: 1000, width: 300 } },
     });
-    const eightLines = 8 * classLinePx(line()) + 2 * classPx(line(), "py");
+    const eightLines = 8 * classLinePx(line());
     expect((line().props as { style: { height: number } }).style.height).toBe(eightLines);
   });
 

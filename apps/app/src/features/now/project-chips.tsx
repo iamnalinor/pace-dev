@@ -1,8 +1,7 @@
-import { ScrollView } from "react-native";
-
 import type { ProjectChip } from "@pace/client";
 
 import { useT } from "#app/app-state.tsx";
+import { ChipScroller } from "#app/ui/chip-scroller.tsx";
 import { Chip } from "#app/ui/chip.tsx";
 import { RadioGroup } from "#app/ui/radio-group.tsx";
 
@@ -24,7 +23,7 @@ export const ProjectChips = ({
     return null;
   }
   return (
-    <ScrollView contentContainerClassName="px-4" horizontal showsHorizontalScrollIndicator={false}>
+    <ChipScroller>
       <RadioGroup
         className="flex-row gap-x-2"
         label={t("now.filterByProject")}
@@ -41,6 +40,6 @@ export const ProjectChips = ({
           </Chip>
         ))}
       </RadioGroup>
-    </ScrollView>
+    </ChipScroller>
   );
 };

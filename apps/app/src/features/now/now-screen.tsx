@@ -37,7 +37,7 @@ export const NowBoard = ({
   const future = board.future.filter((row) => isInProject(row));
   const isEmpty = rows.length === 0 && future.length === 0;
   return (
-    <Screen footer={<TimeBar />} header={<NowHeader />}>
+    <Screen anchor="content" footer={<TimeBar />} header={<NowHeader />}>
       {/* On /add (a share) the cursor is in the composer. */}
       <Composer isFocused={isComposerFocused} />
       <ZoneBanner />

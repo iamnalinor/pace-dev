@@ -138,6 +138,20 @@ test("a blank share lands on Now at / with the line focused, like the others (QA
   await expect(page.getByRole("form", { name: "New task" })).toHaveCount(0);
 });
 
+/** A bare /add (the manifest's New task shortcut) puts the cursor in the form's field (QA21 M2, R23-12). */
+for (const [width, height, size] of [
+  [390, 844, "phone"],
+  [1440, 900, "computer"],
+] as const) {
+  test(`a direct load of /add focuses the New task form's title on a ${size}`, async ({ page }) => {
+    await page.setViewportSize({ height, width });
+    await loginViaApi(page);
+    await page.goto("/add");
+    await expect(taskForm(page)).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Title" })).toBeFocused();
+  });
+}
+
 /** Goes to `path` inside the page, as the router does (no new page). */
 const goInPage = async (page: Page, path: string): Promise<void> => {
   await page.evaluate((to) => {

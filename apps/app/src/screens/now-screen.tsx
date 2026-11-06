@@ -1,6 +1,5 @@
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
-import { Text, View } from "react-native";
+import { type ReactNode, useEffect, useState } from "react";
 
 import type { SharedIn } from "#app/platform/shared-line.ts";
 
@@ -12,37 +11,26 @@ import { TaskScreen } from "#app/features/task/task-screen.tsx";
 import { useLineDraftNote } from "#app/platform/shared-in.ts";
 import { TaskOpenerProvider, TaskPaneProvider } from "#app/shared/task-opener.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
+import { Shell } from "#app/ui/shell.tsx";
 
 type Picked = { readonly id: string; readonly close: boolean };
 
-/** The pane beside the list when no form is open: the picked task, or how to pick one. */
+/** The inspector's task: the picked one, with its pane's close. */
 const PickedTask = ({
   onClose,
   picked,
 }: {
-  readonly picked: null | Picked;
+  readonly picked: Picked;
   readonly onClose: () => void;
-}) => {
-  const t = useT();
-  if (picked === null) {
-    return (
-      <View className="flex-1 items-center justify-center">
-        <Text className="font-sans text-subhead font-normal text-label-secondary">
-          {t("now.pickTask")}
-        </Text>
-      </View>
-    );
-  }
-  return (
-    <TaskPaneProvider onClose={onClose}>
-      <TaskScreen id={picked.id} key={picked.id} openClose={picked.close} />
-    </TaskPaneProvider>
-  );
-};
+}) => (
+  <TaskPaneProvider onClose={onClose}>
+    <TaskScreen id={picked.id} key={picked.id} openClose={picked.close} />
+  </TaskPaneProvider>
+);
 
 /**
-On a wide window the picked task opens next to the list, as on the old web app, and so does
-the task form: while it is open the pane holds it, and closing it (or adding the task) brings
+On a wide window the picked task opens in the shell's inspector, and so does the task form: while
+it is open the inspector holds it, collapsed when there is neither, and closing it (or adding the task) brings
 the picked task back. Picking a task while the form is open closes it: its draft goes, the
 line keeps its text.
 */
@@ -55,7 +43,22 @@ const NowSplit = ({
   readonly picked: null | Picked;
   readonly onPick: (picked: null | Picked) => void;
 }) => {
+  const t = useT();
   const flow = useComposerFlow();
+  // The inspector opens with the form or a pick and is collapsed otherwise (F-LAY-03).
+  let inspector: ReactNode;
+  if (flow.form !== null) {
+    inspector = <ComposerPane />;
+  } else if (picked !== null) {
+    inspector = (
+      <PickedTask
+        onClose={() => {
+          onPick(null);
+        }}
+        picked={picked}
+      />
+    );
+  }
   // The check's submit sheet opens once: the form taking the pane over has used it up, so
   // the task coming back after the form does not open the sheet again by itself.
   useEffect(() => {
@@ -71,23 +74,12 @@ const NowSplit = ({
       }}
       selectedId={flow.form === null ? (picked?.id ?? null) : null}
     >
-      <View className="flex-1 flex-row bg-app">
-        <View className="w-narrow-column max-w-1/2 border-r border-separator">
-          <NowBoard isComposerFocused={isComposerFocused} />
-        </View>
-        <View className="flex-1">
-          {flow.form === null ? (
-            <PickedTask
-              onClose={() => {
-                onPick(null);
-              }}
-              picked={picked}
-            />
-          ) : (
-            <ComposerPane />
-          )}
-        </View>
-      </View>
+      <Shell
+        content={<NowBoard isComposerFocused={isComposerFocused} />}
+        inspector={inspector}
+        inspectorLabel={t("now.details")}
+        inspectorOpen={inspector !== undefined}
+      />
     </TaskOpenerProvider>
   );
 };

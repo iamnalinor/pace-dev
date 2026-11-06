@@ -641,18 +641,20 @@ Deferred (2026-11-06): the typed start's Approve (in `ActionCards`, Task 4.3's) 
 
 **Files:** `src/features/now/**` (composer, quick line, form, proposals, calendar offer, filters,
 now-screen) (+ tests).
-- [ ] Spec §5 Now: one-line composer, Enter → proposal, + opens the form in place (title from the
+- [x] Spec §5 Now: one-line composer, Enter → proposal, + opens the form in place (title from the
       line), the form's primary action on the right with its shortcut; filters as a chip
       `radiogroup` that scrolls with a visible cue and wheel support on desktop (F-DAT-02/05-006);
       inspector collapsed when nothing is selected (F-LAY-03); one New task entry on desktop
       (F-CMP-18).
-- [ ] Failing tests: every composer entry path submits (bug-lessons 2; `docs/qa.md` table rows);
+- [x] Failing tests: every composer entry path submits (bug-lessons 2; `docs/qa.md` table rows);
       empty form opened by hand has no error before interaction; filter chips reachable by wheel
       (e2e). Commit.
-- [ ] PR #48 follow-up: QA21 M2, a direct load of `/add` (the manifest's share and shortcut URL)
+- [x] PR #48 follow-up: QA21 M2, a direct load of `/add` (the manifest's share and shortcut URL)
       focuses the New task form's field on a touch phone too (see "PR #48 follow-ups (triage)").
       QA round 23 R23-12 found it on a computer too (bare `/add` at 1440: focus on `BODY`).
-- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): Now's split becomes the Shell inspector (collapsed with nothing picked; the medium inspector as a sheet); the left-anchored content x = 280 and the 720 list column; "Show all" toggles on `Disclosure`; the composer's animated height without a clipped frame (the reviewer's design: grow the card ~160 ms on `easing.enter` with the new content laid out at opacity 0, fade it in ~120 ms from the grow's completion, the preview's Presence after it; reverse: fade 110, then shrink 160; `expectDescendantsStayInside` then counts only boxes with an effective opacity above 0). See spec §6 "composer unfold".
+- [x] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): Now's split becomes the Shell inspector (collapsed with nothing picked; the medium inspector as a sheet); the left-anchored content x = 280 and the 720 list column; "Show all" toggles on `Disclosure`; the composer's animated height without a clipped frame (the reviewer's design: grow the card ~160 ms on `easing.enter` with the new content laid out at opacity 0, fade it in ~120 ms from the grow's completion, the preview's Presence after it; reverse: fade 110, then shrink 160; `expectDescendantsStayInside` then counts only boxes with an effective opacity above 0). See spec §6 "composer unfold".
+
+Deferred (2026-11-06): the medium window still pushes a picked task as a screen (the Week-style sheet for Now's medium inspector is not built; only `expanded` has the inspector). The form's close stays an `IconButton` without the Escape hint in its tooltip (the kit button names only itself). The composer's Send/To Inbox/+ buttons keep their own 44 px round `LineButton` (accent circle) on the kit `Pressable`; no kit `IconButton` variant carries the filled accent. The proposal card (`ActionCards`) is unchanged (spec "facts as ListRows" is Task 4.x of the assistant card); the preview Presence is unchanged, it follows the unfold naturally. The filter cue is a chevron at each end that has more (no gradient). The e2e (`e2e/filters.e2e.ts`, `/add` focus in `composer.e2e.ts`, geometry sampler counting only opacity > 0) were not run locally.
 
 ### Task 4.4: Day (structure; the line signature is Task 7.1)
 

@@ -97,7 +97,7 @@ export const expectStaysInside = async (
 /**
 Bug class 5 for a whole container (spec §6 composer unfold, F-MOT-08): samples every frame while
 `during` runs and settles, and fails when any box drawn inside the element matching `container`
-(each descendant with a size) sticks out of it by more than a pixel on any side. Where
+(each descendant with a size and an effective opacity above 0) sticks out of it by more than a pixel on any side. Where
 `expectStaysInside` follows one child against its clip, this holds every child of a card that
 changes shape: nothing may be drawn outside it or hidden by its edge while it grows.
 */
@@ -122,9 +122,19 @@ export const expectDescendantsStayInside = async (
           if (box !== null) {
             bounds.end = Math.min(bounds.end, now + span);
             const b = box.getBoundingClientRect();
+            // Content laid out at opacity 0 (the composer's form while the card grows) is not drawn.
+            const isSeen = (element: Element): boolean => {
+              for (let node: Element | null = element; node !== null && node !== box; ) {
+                if (Number(globalThis.getComputedStyle(node).opacity) <= 0) {
+                  return false;
+                }
+                node = node.parentElement;
+              }
+              return true;
+            };
             const drawn = [...box.querySelectorAll("*")]
               .map((element) => ({ a: element.getBoundingClientRect(), element }))
-              .filter(({ a }) => a.width > 0 && a.height > 0);
+              .filter(({ a, element }) => a.width > 0 && a.height > 0 && isSeen(element));
             const worst = drawn
               .map(({ a, element }) => ({
                 px: Math.max(

@@ -6,10 +6,20 @@ import { space } from "@pace/core";
 
 import { cx } from "./cx.ts";
 import { useFloatPlace, useLiftToastAbove } from "./float-layer.ts";
+import { useIsWide } from "./layout.ts";
 import { useIsScreenActive } from "./screen-active.ts";
 
 /** The readable column every part of a screen keeps to on a wide window (spec §4.2.18). */
 const COLUMN = "w-full max-w-content-wide self-center";
+
+/**
+A list screen's column on `expanded` (Now, Day): 720 anchored at the region's leading edge, so its
+content starts at the same x on every destination (sidebar 248 + the header's gutter 32 = 280).
+*/
+const ANCHORED = {
+  content: "w-full max-w-content self-start",
+  wide: "w-full max-w-content-wide self-start",
+} as const;
 
 /** The room a list keeps under its last row (64), when nothing floats over its foot. */
 const FOOT_ROOM = space["11"];
@@ -27,6 +37,7 @@ and the wheel scrolls over the gutters too (F-WEB-05).
 export const Screen = ({
   children,
   fills = false,
+  anchor,
   footer,
   header,
   scrollLabel,
@@ -44,7 +55,11 @@ export const Screen = ({
   readonly fills?: boolean;
   readonly footer?: ReactNode;
   readonly header?: ReactNode;
+  /** The column hugs the region's leading edge instead of centring in it (see `ANCHORED`). */
+  readonly anchor?: keyof typeof ANCHORED;
 }) => {
+  const isWide = useIsWide();
+  const column = anchor === undefined || !isWide ? COLUMN : ANCHORED[anchor];
   const insets = useSafeAreaInsets();
   // A toast floats above the footer (the time bar) instead of covering its buttons.
   const [footerHeight, setFooterHeight] = useState(0);
@@ -64,15 +79,15 @@ export const Screen = ({
           className={cx("border-b bg-app", isScrolled ? "border-separator" : "border-transparent")}
           testID="screen-header-edge"
         >
-          <View className={COLUMN}>{header}</View>
+          <View className={column}>{header}</View>
         </View>
       )}
       {fills ? (
-        <View className={cx(COLUMN, "flex-1")}>{children}</View>
+        <View className={cx(column, "flex-1")}>{children}</View>
       ) : (
         <ScrollView
           className="flex-1"
-          contentContainerClassName={COLUMN}
+          contentContainerClassName={column}
           contentContainerStyle={{ paddingBottom: Math.max(FOOT_ROOM, inset) }}
           keyboardShouldPersistTaps="handled"
           onScroll={(event) => {
@@ -94,7 +109,7 @@ export const Screen = ({
       )}
       {footer === undefined ? null : (
         <View
-          className={COLUMN}
+          className={column}
           onLayout={(event) => {
             setFooterHeight(event.nativeEvent.layout.height);
           }}

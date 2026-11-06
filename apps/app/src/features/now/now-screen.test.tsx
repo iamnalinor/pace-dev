@@ -121,19 +121,19 @@ const rowLayouts = (node: unknown): readonly unknown[] => {
   ];
 };
 
+/** The first group's "Show all" fold. */
+const showAll = () => screen.getAllByRole("button", { name: /^Show all/u })[0] as never;
+
 describe("NowBoard", () => {
   it("shows two compact groups when both dated and undated tasks exist", async () => {
     await renderScreen(<Board />, await createTestRuntime());
     expect(screen.getByText(en("now.withDeadline"))).toBeOnTheScreen();
     expect(screen.getByText(en("now.withoutDeadline"))).toBeOnTheScreen();
     expect(checks()).toHaveLength(6);
-    const title = en("now.withDeadline");
-    const expand = screen.getByRole("button", { name: en("now.expandGroup", { title }) });
-    await fireEvent.press(expand);
+    // The first group's rest folds open under "Show all", the same button closes it.
+    await fireEvent.press(showAll());
     expect(checks()).toHaveLength(9);
-    const collapse = screen.getByRole("button", { name: en("now.collapseGroup", { title }) });
-    await fireEvent.press(collapse);
-    expect(checks()).toHaveLength(6);
+    expect(showAll()).toBeExpanded();
   });
 
   it("uses a plain list when filtering leaves only one type of task", async () => {
@@ -158,9 +158,7 @@ describe("NowBoard", () => {
     await renderScreen(<Board />, await createTestRuntime());
     expect(screen.getByText("Tuesday · Oct 6")).toBeOnTheScreen();
     expect(screen.getByText("Now")).toBeOnTheScreen();
-    const title = en("now.withDeadline");
-    const expand = screen.getByRole("button", { name: en("now.expandGroup", { title }) });
-    await fireEvent.press(expand);
+    await fireEvent.press(showAll());
     expect(checks()).toEqual([
       "Mark Calculus HW 5 done",
       "Mark Algebra HW 6 done",
@@ -191,8 +189,7 @@ describe("NowBoard", () => {
     const runtime = await createTestRuntime({ now: late });
     await runtime.state.ingest(rentSeriesEvents());
     await renderScreen(<Board />, runtime);
-    const title = en("now.withDeadline");
-    await fireEvent.press(screen.getByRole("button", { name: en("now.expandGroup", { title }) }));
+    await fireEvent.press(showAll());
     const repeats = en("meta.repeats");
     const rent = screen.getByRole("link", { name: /^Rent/u });
     expect(within(rent).getByRole("image", { name: repeats })).toBeOnTheScreen();
@@ -205,8 +202,7 @@ describe("NowBoard", () => {
     const runtime = await createTestRuntime({ now: "2026-11-10T12:00:00.000Z" });
     await runtime.state.ingest(rentSeriesEvents());
     await renderScreen(<Board />, runtime);
-    const title = en("now.withDeadline");
-    await fireEvent.press(screen.getByRole("button", { name: en("now.expandGroup", { title }) }));
+    await fireEvent.press(showAll());
     const rent = screen.getByRole("link", { name: /^Rent/u });
     expect(within(rent).getByText("9d late")).toBeOnTheScreen();
     expect(within(rent).getByText("final deadline passed Nov 7 23:59")).toBeOnTheScreen();
