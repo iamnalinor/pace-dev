@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 import { act } from "@testing-library/react-native";
 
 import { DayScreen } from "#app/features/day/day-screen.tsx";
+import { InboxScreen } from "#app/features/inbox/inbox-screen.tsx";
 import { NotificationsScreen } from "#app/features/notifications/notifications-screen.tsx";
 import { WeekScreen } from "#app/features/week/week-screen.tsx";
 import { deadControls } from "#app/test/dead-controls.ts";
@@ -10,7 +11,6 @@ import { controlsInsideControls } from "#app/test/nested-controls.ts";
 import { renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 
-import { InboxScreen } from "./inbox-screen.tsx";
 import { MoreScreen } from "./more-screen.tsx";
 import { NowScreen } from "./now-screen.tsx";
 import { SettingsScreen } from "./settings-screen.tsx";

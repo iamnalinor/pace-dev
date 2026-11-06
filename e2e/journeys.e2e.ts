@@ -29,7 +29,7 @@ for (const size of SIZES) {
       // The newest change is the close; the undo is stored once its correction is listed, and
       // navigating sooner can reload the page before the write.
       await expect(page.getByText(`Task closed · ${title}`)).toBeVisible();
-      await page.getByRole("button", { name: "Undo" }).first().click();
+      await page.getByRole("button", { exact: true, name: "Undo" }).first().click();
       await expect(page.getByText("Correction: revoked")).toHaveCount(0);
       await page.getByRole("dialog").getByRole("button", { name: "Undo event" }).click();
       await expect(page.getByText("Correction: revoked")).toBeVisible();
@@ -48,11 +48,11 @@ for (const size of SIZES) {
       await expect(line).toHaveValue("");
       await page.goto("/inbox");
       await expect(page.getByRole("heading", { level: 1, name: "Inbox" })).toBeVisible();
-      const card = page.getByRole("listitem").filter({ hasText: text });
+      const card = page.getByTestId("inbox-capture").filter({ hasText: text });
       await expect(card).toBeVisible();
       await expectNoA11yViolations(page);
-      await card.getByRole("button", { name: "Accept" }).click();
-      await expect(page.getByRole("listitem").filter({ hasText: text })).toHaveCount(0);
+      await page.getByRole("button", { name: `Accept: ${text.slice(0, 20)}` }).click();
+      await expect(card).toHaveCount(0);
     });
 
     test("edits a task in a sheet that covers the page", async ({ page }) => {

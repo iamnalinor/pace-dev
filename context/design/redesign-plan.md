@@ -728,12 +728,14 @@ History's period slot is left to its task (Insights took the same `WeekPeriod`).
 ### Task 4.7: Inbox, Review, Decisions
 
 **Files:** `src/features/inbox/**`, `review/**`, `decisions/**` (+ tests).
-- [ ] Inbox cards clamp text to 4 lines with "Show all" (F-DAT-06), Accept primary / Delete plain
+- [x] Inbox cards clamp text to 4 lines with "Show all" (F-DAT-06), Accept primary / Delete plain
       (F-CMP-15), virtualised; empty states teach (F-CMP-09); empty list renders no `list` role
       (F-A11Y-18). Commit.
-- [ ] PR #48 follow-up: QA21 L7, the rules preview says why the assistant is unavailable, per reason
+- [x] PR #48 follow-up: QA21 L7, the rules preview says why the assistant is unavailable, per reason
       (see "PR #48 follow-ups (triage)").
-- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): Inbox's inspector on the Shell (and its medium sheet); Inbox's "Show all" toggles on `Disclosure`.
+- [x] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): Inbox's inspector on the Shell (and its medium sheet); Inbox's "Show all" toggles on `Disclosure`.
+
+Deferred (2026-11-06): the details sheet is the kit `Sheet` (no medium detent exists; the web/phone sheet opens at its content height). Accept is the tonal small button of spec §5.3 (not filled: N captures must not be N accent bars; the brief's word "primary" read as «the row's main action»), Delete stays a visible plain button, not the ⋯ menu / swipe + inline Undo (the toast's Undo carries it, rule 4.1.4). ↑↓ row selection and ⌘⌫ (delete the selection) are not bound; ⌘↵ accepts through the details' Accept. «Open the line» goes to Now without focusing the composer. The Review row has no separate `review` feature folder (its row lives in `features/inbox`; `/review` still redirects). Decisions: the search sits pinned in the header; «Back to Notifications» is `useBack`. Assistant-correction input onto `TextField` (Task 3.8 deferral) stays with the `ActionCards` rewrite, which no task of the batch builds.
 
 ### Task 4.8: Projects, project page, presets
 
@@ -759,10 +761,12 @@ History's period slot is left to its task (Insights took the same `WeekPeriod`).
 ### Task 4.10: History and Notifications
 
 **Files:** `src/features/history/**`, `notifications/**` (+ tests).
-- [ ] History rows as `ListRow` with a single trailing "Undo" only on the latest undoable event of a
+- [x] History rows as `ListRow` with a single trailing "Undo" only on the latest undoable event of a
       group (F-CMP-14), snapshot rows not checkbox-like; Notifications feed grouped by day,
       virtualised. Commit.
-- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): Notifications as a top-level `ScreenHeader` destination on desktop; History's `PeriodStepper` in the `period` slot.
+- [x] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): Notifications as a top-level `ScreenHeader` destination on desktop; History's `PeriodStepper` in the `period` slot.
+
+Deferred (2026-11-06): a "group" for the single Undo is a task (an event of no task stands alone); any other undoable row is itself a button that opens the same confirm (no long-press, swipe or hover ⋯ menu); ⌫ on a focused event and ←/→/T are not bound. Snapshot rows lead with the kit's 8 px dot (spec says 6, no token). Notifications' unread «new» dot stays for the visit by remembering the ids unread when first shown. Skeleton rows show without the 300 ms wait spec §5.16 names beyond the kit's own delay.
 
 ### Task 4.11: Settings
 
@@ -956,9 +960,11 @@ a red 1 px now mark on today); the running card's half was done with Task 4.2.
 ### Task 7.3: Proposal highlight and the logo
 
 **Files:** `shared/assistant/*` (proposal accepted highlight), `ui/logo.tsx`, `scripts/generate-icons.ts`.
-- [ ] Spec §6 last row: accepted proposal → created row with a one-time `accent.quiet` highlight
+- [x] Spec §6 last row: accepted proposal → created row with a one-time `accent.quiet` highlight
       fading over 600 ms; logo chevrons in the current lime on both themes (owner, round 2; feedback-2/4).
-- [ ] Commit.
+- [x] Commit.
+
+Done (2026-11-06): `motion.highlight` = 600 token; the created task's row (`TaskRow`) carries the wash. An activity created by a typed start is not highlighted (its row is the running card). The logo's SVGs and PNG icons were regenerated with `bun scripts/generate-icons.ts` (lime `#C8F03C` dark / `#5E8C00` light from the `logo` role).
 
 ---
 
@@ -1123,6 +1129,8 @@ once review, QA and CI are green.
 | C "Polish" | 5 + 6 + 8 | motion and the 100 ms render budget, web/PWA, close-out | M–L |
 
 ## Lint baseline
+
+Tasks 4.7 + 4.10 + 7.3 (2026-11-06): `DESIGN_VALUE_WARNINGS` 29 (from 32), `BARE_PRESSABLE_WARNINGS` 8 (from 9): the Inbox, Decisions, History and Notifications rows moved to the kit (`active:opacity-*` and a bare `Pressable` went). `KIT_PRIMITIVE_WARNINGS` unchanged.
 
 Task 1.3 (2026-11-01, after fix round 1 and the interval ruling): 437 warnings of `pace/no-raw-design-values` at introduction, by message id: `arbitraryClass` 424, `rawDuration` 12 (6 `.duration()` builders, 1 `duration:`, 1 `setTimeout`, 4 `*_MS`/`*DURATION` constants in files that import reanimated: `BREATH_MS`, `DISSOLVE_MS`, `DURATION_MS`, `SLIDE_MS`), `rawColor` 1 (a CSS colour name), `rawRadius` 0, `rawFontMetric` 0, `offScaleClass` not active yet (needs `GENERATED_CLASSES`, Task 2.2). Poll/debounce/timeout interval constants outside reanimated files are behaviour and are not counted. The count is an exact ratchet: `scripts/eslint-all.ts` fails the app part when the count is above `DESIGN_VALUE_WARNINGS` and when it is below it (lower the constant to the new number); never raise it, except by a dated line here.
 

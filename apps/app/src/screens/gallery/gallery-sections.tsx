@@ -6,17 +6,18 @@ import type { GalleryData } from "@pace/core/testing";
 
 import { useT } from "#app/app-state.tsx";
 import { ActivityRow } from "#app/features/day/day-rows.tsx";
-import { Item as NotificationItem } from "#app/features/notifications/notifications-screen.tsx";
+import { CaptureRow } from "#app/features/inbox/capture-row.tsx";
+import { Item as NotificationItem } from "#app/features/notifications/notification-item.tsx";
 import { ProjectChips } from "#app/features/now/project-chips.tsx";
 import { SessionRow } from "#app/features/sessions/session-row.tsx";
 import { SettingsLinks } from "#app/features/settings/settings-links.tsx";
 import { TaskFooter } from "#app/features/task/task-footer.tsx";
 import { TaskHeader } from "#app/features/task/task-header.tsx";
 import { WeekGrid } from "#app/features/week/week-grid.tsx";
-import { CardView } from "#app/screens/inbox-card.tsx";
 import { TaskRows } from "#app/shared/task-list.tsx";
 import { RunningCard } from "#app/shared/tracking/running-card.tsx";
 import { CountBadge } from "#app/ui/count-badge.tsx";
+import { Group } from "#app/ui/group.tsx";
 import { IMPORTANCE_HUES } from "#app/ui/hue.ts";
 import { useIsWide } from "#app/ui/layout.ts";
 import { NavItem } from "#app/ui/nav-item.tsx";
@@ -261,12 +262,11 @@ export const ChromeSections = ({ data }: { readonly data: GalleryData }) => {
             {t("dev.gallery.nothing")}
           </Text>
         ) : (
-          // A card is a list item, as in the Inbox: it sits in a list here too (axe).
-          <View aria-label={t("nav.inbox")} className="gap-3" role="list">
+          <Group>
             {cards.map((card) => (
-              <CardView card={card} key={card.id} />
+              <CaptureRow card={card} isSelected={false} key={card.id} onOpen={NOTHING} />
             ))}
-          </View>
+          </Group>
         )}
       </Section>
       <Section title="dev.gallery.section.toast">

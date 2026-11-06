@@ -1,12 +1,12 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 
+import { HistoryScreen } from "#app/features/history/history-screen.tsx";
+import { InboxScreen } from "#app/features/inbox/inbox-screen.tsx";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { ALGEBRA_ID, HW_ID, INBOX_CABLE_ID, INBOX_TEXTS } from "@pace/core/testing";
 
-import { HistoryScreen } from "./history-screen.tsx";
-import { InboxScreen } from "./inbox-screen.tsx";
 import { ProjectScreen } from "./project-screen.tsx";
 import { ProjectsScreen } from "./projects-screen.tsx";
 
@@ -19,13 +19,12 @@ describe("InboxScreen", () => {
     const runtime = await createTestRuntime();
     await renderScreen(<InboxScreen />, runtime);
     expect(screen.getByText(INBOX_TEXTS[INBOX_CABLE_ID])).toBeOnTheScreen();
-    const [accept] = screen.getAllByRole("button", { name: en("common.accept") });
-    if (accept === undefined) {
-      throw new Error("no Accept button");
-    }
+    const accept = screen.getByRole("button", {
+      name: `${en("common.accept")}: ${INBOX_TEXTS[INBOX_CABLE_ID]}`,
+    });
     await fireEvent.press(accept);
     await waitFor(() => {
-      expect(screen.getAllByRole("button", { name: en("common.accept") })).toHaveLength(2);
+      expect(screen.getAllByRole("button", { name: /^Accept: / })).toHaveLength(2);
     });
   });
 });
@@ -117,13 +116,14 @@ describe("HistoryScreen", () => {
     await renderScreen(<HistoryScreen />, await createTestRuntime());
     expect(screen.getByRole("header", { name: en("history.title") })).toBeOnTheScreen();
     expect(screen.getAllByRole("button", { name: en("common.undo") }).length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: en("history.now") })).toBeDisabled();
+    // Today is offered only away from now (F-CPY-06).
+    expect(screen.queryByRole("button", { name: en("period.today") })).toBeNull();
     await fireEvent.press(screen.getByRole("button", { name: en("history.dayBack") }));
     // The day viewed is in the label, and the events stop there.
-    expect(screen.getByText(/^Tasks as they were at .*Oct 5/u)).toBeOnTheScreen();
+    expect(screen.getByText(/^Tasks at .*Oct 5/u)).toBeOnTheScreen();
     expect(screen.getByText(/^Events up to/u)).toBeOnTheScreen();
     // Relative words count from the moment shown: a task due on 5 Oct is "today" there.
     expect(screen.getByText("Due today 23:59")).toBeOnTheScreen();
-    expect(screen.getByRole("button", { name: en("history.now") })).toBeEnabled();
+    expect(screen.getByRole("button", { name: en("period.today") })).toBeEnabled();
   });
 });

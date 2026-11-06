@@ -153,6 +153,15 @@ const OPENERS: readonly Opener[] = [
   },
   {
     open: async (page) => {
+      await page.goto("/inbox");
+      await page.getByTestId("inbox-capture").first().click();
+    },
+    sheet: "inbox-detail",
+    sizes: ["phone"],
+    via: "a capture on the Inbox",
+  },
+  {
+    open: async (page) => {
       await page.goto("/history");
       await page.getByRole("button", { exact: true, name: ru["common.undo"] }).first().click();
     },

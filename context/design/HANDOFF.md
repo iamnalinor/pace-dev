@@ -6,6 +6,45 @@ full decision log is [`overhaul-ledger.md`](overhaul-ledger.md) (a copy of the p
 working ledger; its last lines are the most recent rulings).
 
 
+## 00. Session 2026-11-05/06 (opencode; controller Opus, implementers Sonnet)
+
+**Owner's rules for this run:** PR B only (do not start PR C), never merge without the owner; no QA round;
+the imported Hentrixz commits are untrusted; **budget ≈ $60 for the whole run** (cost per session is in
+`~/.local/share/opencode/opencode.db`, table `session_v2`, column `cost`); implementers on Sonnet with full
+briefs, **one review only, near the end, on Opus** (whole branch, incl. the import); **never run e2e or
+Playwright locally — e2e runs only in the PR's GitHub CI**; tests must not depend on the environment (time
+zone, locale); every deferred item is recorded here even if it is never done. Plugins (skills, agent
+prompts) are cloned under `~/.local/share/agent-plugins/<owner>_<repo>`.
+
+**Done (pushed):** safety scan of the import — nothing dangerous (`pr-b/import-safety-scan.md`); green-up of
+the merged tree (`pr-b/s0-greenup-report.md`: eslint report read from a file, overlay helpers, badges on
+`BadgeAnchor`, ratchets lowered); screens 4.1/4.2/7.2 card (`240e0c2`, `07930b1`), 4.3 Now (`83bfc2a`),
+4.4 + 7.1 Day (`a6efb81`), 4.5 Task (`96d3338`), 4.6 + 7.2 strip Week (`095679d`). Reports:
+`pr-b/task-*-report.md`. Per-task reviews were skipped on purpose (owner): the import was never reviewed
+in depth either — the final Opus review covers both.
+
+**Next:** 4.7 + 4.10 + 7.3, 4.8 + 4.9, 4.11 + 4.12 + 4.13; then B9 "spec completion" (the register below +
+the environment-independence sweep); then the whole-branch Opus review and one fix wave; then push and
+make CI green (e2e is first run there).
+
+### Deferred register (every item a screen task left; the plan has the full note under each task)
+| Task | Deferred | Plan note |
+|---|---|---|
+| 4.1 | `TaskList` paged (30 + «Show 30 more»), not virtualised (nested in the screen scroll); due and "left" are two meta parts on one line; `e2e/scale.e2e.ts` never run | plan §4.1 |
+| 4.2 | typed start's Approve plays no `tick`; region budget is a 40 % scroll cap, no compact one-line running card / IconButton Stop / desktop shell indicator; budget e2e uses one running activity, not two proposals | §4.2 |
+| 4.3 | medium width pushes a picked task (no inspector sheet); the form's close has no Escape hint in its tooltip; composer buttons keep their own round `LineButton`; proposal card (`ActionCards`) not rebuilt ("facts as ListRows"); filter cue is chevrons, not a gradient | §4.3 |
+| 4.4 / 7.1 | 320 short label of `PeriodStepper`; no summary cell (stacked 24 h bar + legend); phone calendar/usage sections and the sleep card keep their old look; rail is an index scaled to the list height, not row-aligned; `dayRail` has no zone arg and lives in `view-models/day-rail.ts`; no "+1" for a third parallel band | §4.4, §7.1 |
+| 4.5 | delete Undo is the toast, not in-place "Task deleted · Restore", focus not moved to the next row; no separate «Cancel the task» in ⋯; no ⌘↵ hint on Save; stats 2×2 at every width (no 4×1 at 720); repeat in stats, not meta; 100 subtasks not virtualised; project picked from a sheet, not a page field; footer at 320 unchecked | §4.5 |
+| 4.6 / 7.2 | day strip not sticky; no edge fade / overscroll containment (hint text stays); runs fold past 6 lanes, spec says 3 (to decide: 3 lanes vs the 44 px target); no empty-week `EmptyState`, loading line, calendar error line; the 23:56 e2e does not seed the account zone (depends on the host zone) | §4.6 |
+| 4.7 | sheet has no medium detent; Accept is tonal small, Delete a plain button (no ⋯/swipe + inline Undo, the toast's Undo carries it); ↑↓ selection and ⌘⌫ not bound; «Open the line» does not focus the composer; no `review` folder (row lives in `features/inbox`); assistant-correction input not on `TextField` (waits for the `ActionCards` rewrite) | §4.7 |
+| 4.10 | Undo grouped per task only; other undoable rows open a confirm (no long-press/swipe/⋯); ⌫ and ←/→/T not bound; snapshot dot 8 px (spec 6, no token); skeleton without the extra 300 ms | §4.10 |
+| 3.6 / 3.8 | Sheet detents; dirty-form discard question; remaining raw inputs (assistant correction); half-typed time warning; counters; bug-lessons rows F-CMP-02/F-MOT-05/06 and F-CMP-03 (check) | HANDOFF §0 |
+| tests | environment dependence: jest `app-state` time-zone case was host-TZ dependent (fixed in `0747db9`); sweep e2e + jest for host TZ/locale, pin the zone (account + Playwright `timezoneId`), bug-lessons class + guard | — |
+
+| 7.3 | an activity created by a typed start is not highlighted (its row is the running card); `ActionCards` → `ProposalCard` rewrite still unbuilt; PNG icons regenerated here, check on a device | §7.3 |
+
+Later batches append their rows here.
+
 ## 0. Current session (2026-11-03, fork Hentrixz/pace-dev, branch `claude/vigilant-archimedes-kq5d4w`)
 > **2026-11-04 update:** the three kit branches below and this section's commits were merged into PR B's branch (`claude/pace-design-overhaul-b`) without review or lint; see [`pr-b/imported-from-hentrixz.md`](pr-b/imported-from-hentrixz.md). "Nothing is merged" below describes the fork at the time.
 

@@ -1917,3 +1917,26 @@ New bugs go here with their class; a new class gets its own section above.
 - **Sweep and guard.** Swept the other minimum-size boxes (Day's rail, the time bar tiles): none is clipped by an
   ancestor. Guard: `week-layout.test.ts` (5 lanes, the 23:56 item, folds) and the e2e in `week.e2e.ts` that
   asserts the target is inside the scroller and covers no neighbour.
+
+### 131. One sentence for several reasons, in the one place that was not swept
+- **Bug.** QA round 21 L7, closed in PR B 4.7: the rules' preview card said «Assistant unavailable» for
+  out of requests, unreachable and «this server has no assistant» alike, while the composer's form had a
+  sentence for each (bug class 99 had fixed the form and the no-card line, not the card).
+- **Missed because.** Class 99's sweep named the screens that show a reading issue; the card's own
+  two-way `?:` (unreadable or everything else) looked complete, and its test used one reason.
+- **Rule.** A text keyed by a reason is looked up by the reason itself (`assistant.rulesUsed.${reason}`), so
+  a new reason is a type error until its sentence exists in both catalogs, never a fall-through branch.
+- **Sweep and guard.** Swept every `reason === …` ternary over `ParseUnavailableReason`. Guard: `it.each`
+  over the reasons in `composer.test.tsx`; the typed key.
+
+### 132. A control inside a pressable row is a button in a button
+- **Bug.** PR B 4.7/4.10 (found while rebuilding the rows): an Inbox row that opens its details and also
+  carries Accept/Delete, and a History row that asks before undoing and also carries Undo, cannot be one
+  pressable (axe `nested-interactive`; TalkBack reads one button).
+- **Missed because.** The old cards were not pressable, so no test could nest; the kit's `ListRow`
+  documents `control` only for a leading check.
+- **Rule.** A row with its own actions is a row beside its actions (the row presses, the actions are
+  siblings), or it is not pressable and the action is the only way in; never both on one box. Buttons that
+  repeat per row name their row («Accept: <text>»).
+- **Sweep and guard.** Swept the lists: Day's rows, Projects and the task rows keep one control per row.
+  Guard: the Inbox and History tests press the row and the button separately by name.
