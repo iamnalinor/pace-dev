@@ -31,6 +31,12 @@ make CI green (e2e is first run there).
 
 Done 2026-11-06 (owner decision, batch 9 item 1b): Now's task groups, their headers and the 3-row preview/«Show all» are replaced by one list with a labelled hairline between dated and undated tasks (`NowTaskGroups`, `Group` `boundaries`). The 4.3 «Show all» deferral about groups no longer applies.
 
+**Fix wave and CI (2026-11-06, end of session):** the final review's findings are fixed (I1, M1 to M5, M7, M8 in
+`1c5f631`, `7880e85`, `e02c90b`; M6 and M9 left: see `pr-b/final-review.md`, "Fix wave"). CI: checks green at
+`e8ead2d`; **e2e red, 18 of 217 failed** after four rounds (run `42254526190`); the list and what is known of
+each is at the end of `pr-b/final-review.md`. The first e2e round of the PR failed 45 tests; the specs had not
+run against any screen. Class 137 in `bug-lessons.md`. A screen task that changes a flow greps `e2e/` for its labels in the same commit.
+
 ### Deferred register (every item a screen task left; the plan has the full note under each task)
 | Task | Deferred | Plan note |
 |---|---|---|
