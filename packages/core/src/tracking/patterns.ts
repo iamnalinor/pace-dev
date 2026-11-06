@@ -1,6 +1,6 @@
 import type { ActivityCategory, TimeState } from "./model.ts";
 
-import { addDaysIn, addMinutesIso, formatInZone, startOfDayIn } from "../time.ts";
+import { addMinutesIso, formatInZone, nextDayStartIn, startOfDayIn } from "../time.ts";
 import { FOCUS_CATEGORIES } from "./categories.ts";
 import { type Range, type Segment, sumMinutes, timeline } from "./timeline.ts";
 
@@ -107,7 +107,7 @@ const NIGHT_ENDS_UNTIL_MINUTES = 14 * 60;
 /** Midnight of each day from `date` on, inside the range and not after now. */
 const dayStarts = (date: string, range: ZonedRange): readonly string[] =>
   date < range.to && date <= range.now
-    ? [date, ...dayStarts(addDaysIn(date, 1, range.zone), range)]
+    ? [date, ...dayStarts(nextDayStartIn(date, range.zone), range)]
     : [];
 
 /** Each day of the range: the sleep of the night before against the focus time of the day. */
@@ -125,7 +125,7 @@ export const focusVsSleep = (time: TimeState, range: ZonedRange): readonly Focus
     return {
       date,
       focusMinutes: sumMinutes(
-        focusSegments(time, { from: date, now: range.now, to: addDaysIn(date, 1, range.zone) }),
+        focusSegments(time, { from: date, now: range.now, to: nextDayStartIn(date, range.zone) }),
       ),
       sleepMinutes: night.length === 0 ? null : sumMinutes(night),
     };

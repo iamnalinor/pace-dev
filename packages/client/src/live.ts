@@ -5,10 +5,12 @@ import {
   LIVE_V2,
   type LiveClientMessage,
   type LiveServerMessage,
-  LiveServerMessageSchema,
   PROTOCOL,
 } from "@pace/core";
 
+import type { LiveEventsPage } from "./live-types.ts";
+
+import { type LiveHandlers as Handlers, onLiveMessage } from "./live-messages.ts";
 import { createRequests, LiveUnavailable } from "./live-requests.ts";
 import { createRun, type Run } from "./live-run.ts";
 import { createTimers, type LiveTimers, retryDelay } from "./live-timers.ts";
@@ -28,7 +30,7 @@ export type SocketLike = {
 export type LiveStatus = { readonly isConnected: boolean };
 
 /** A page of the store's log as a v2 socket carries it (a pull's answer, or new events unasked). */
-export type LiveEventsPage = Omit<Extract<LiveServerMessage, { type: "events" }>, "id" | "type">;
+export type { LiveEventsPage } from "./live-types.ts";
 
 export type LiveChannel = {
   readonly status: StoreApi<LiveStatus>;
@@ -112,67 +114,6 @@ const parseMessage = (data: unknown): null | { readonly type?: unknown } => {
   }
 };
 
-type Handlers = {
-  readonly open: () => void;
-  readonly hello: () => void;
-  readonly changed: () => void;
-  readonly answer: (message: LiveServerMessage) => boolean;
-  readonly events?: ((page: LiveEventsPage) => void) | undefined;
-  readonly message?: ((message: unknown) => void) | undefined;
-  readonly close: (code: unknown) => void;
-  readonly pong: () => void;
-};
-
-const SYNC_TYPES = new Set(["changed", "error", "events", "hello", "pushed"] as const);
-
-type SyncMessage = Extract<
-  LiveServerMessage,
-  { type: typeof SYNC_TYPES extends Set<infer T> ? T : never }
->;
-
-const isSyncMessage = (message: LiveServerMessage): message is SyncMessage =>
-  (SYNC_TYPES as ReadonlySet<string>).has(message.type);
-
-/** A message of the sync protocol: the server speaks v2, the log grew, an answer, new events. */
-const onSyncMessage = (message: SyncMessage, on: Handlers): void => {
-  switch (message.type) {
-    case "hello": {
-      on.hello();
-      return;
-    }
-    case "changed": {
-      on.changed();
-      return;
-    }
-    case "events": {
-      if (!on.answer(message)) {
-        const { events, more, seq, since, storeId } = message;
-        on.events?.({ events, more, seq, since, storeId });
-      }
-      return;
-    }
-    case "error":
-    case "pushed": {
-      // One that answers no open request was given up on: HTTP has taken it over.
-      on.answer(message);
-    }
-  }
-};
-
-/**
-One message as the channel reads it: the sync protocol's own goes to `onSyncMessage`; a type a
-newer server added is passed over; the rest (the pool's notices, also when off-contract) goes
-to `message` as parsed JSON, which reads it with its own schema.
-*/
-const onMessage = (raw: { readonly type?: unknown }, on: Handlers): void => {
-  const parsed = LiveServerMessageSchema.safeParse(raw);
-  if (parsed.success && isSyncMessage(parsed.data)) {
-    onSyncMessage(parsed.data, on);
-  } else if (!parsed.success || parsed.data.type !== "unknown") {
-    on.message?.(raw);
-  }
-};
-
 /** Wires one socket: open, its messages (a keep-alive's pong among them), close. */
 const follow = (socket: SocketLike, on: Handlers): void => {
   socket.addEventListener("open", on.open);
@@ -183,7 +124,7 @@ const follow = (socket: SocketLike, on: Handlers): void => {
     }
     const message = parseMessage(data);
     if (message !== null) {
-      onMessage(message, on);
+      onLiveMessage(message, on);
     }
   });
   socket.addEventListener("close", ({ code }) => {
@@ -238,6 +179,7 @@ const createLine = (onQuiet: () => void) => {
       });
     },
     settle: requests.settle,
+    invalid: requests.invalid,
     use: (next: SocketLike): void => {
       socket = next;
       isV2 = false;
@@ -259,6 +201,7 @@ const handlersFor = (
   },
 ): Handlers => ({
   answer: line.settle,
+  invalid: line.invalid,
   changed: on.options.onChange,
   // A socket already replaced (or stopped) closing says nothing about the current one.
   close: (code) => {

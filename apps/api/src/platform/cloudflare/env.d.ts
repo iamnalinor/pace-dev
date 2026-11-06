@@ -5,6 +5,12 @@ declare global {
     // Secrets (`wrangler secret put`) and optional vars are not in wrangler.jsonc, so
     // `wrangler types` does not know them. Parsed by shared/config.ts.
     interface Env {
+      /** Isolated bucket supplied only by the API test runner. */
+      TEST_HISTORY_ARCHIVE: R2Bucket;
+      /** Optional copy-only history bucket, provisioned separately by the host. */
+      HISTORY_ARCHIVE?: R2Bucket;
+      /** Disabled unless the host explicitly selects checkpoint shadow comparison. */
+      PACE_HISTORY_CHECKPOINT_MODE?: string;
       /** Bot token from @BotFather: verifies Login Widget payloads and sends bot replies. */
       TELEGRAM_BOT_TOKEN?: string;
       /** Shared secret Telegram echoes in `X-Telegram-Bot-Api-Secret-Token` on every webhook call. */
@@ -29,11 +35,17 @@ declare global {
       push is off and every other channel still works.
       */
       FIREBASE_SERVICE_ACCOUNT?: string;
+      /** Optional google-services.json from the sender's project, for public Android metadata. */
+      FIREBASE_ANDROID_CONFIG?: string;
+      /** Unset/additive retains legacy sending; strict requires a valid Firebase pair. */
+      PACE_FIREBASE_CONFIG_POLICY?: string;
       /**
       The build the Worker runs, shown by `GET /api/instance`: the deploy sets the release tag or
       the commit (`wrangler deploy --var PACE_VERSION:…`); unset reads as `dev`.
       */
       PACE_VERSION?: string;
+      /** Non-secret unique marker for an inactive deployment verification attempt. */
+      PACE_DEPLOY_ATTEMPT?: string;
       /** Override of the Telegram API origin (tests point it at a mocked host). */
       TELEGRAM_API_ROOT?: string;
       /**

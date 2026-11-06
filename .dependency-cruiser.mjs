@@ -15,6 +15,31 @@ const API_FEATURE = "^apps/api/src/([^/]+)/";
 /** @type {import("dependency-cruiser").IConfiguration} */
 const config = {
   forbidden: [
+    {
+      name: "updates-independent-of-account-apps",
+      comment: "The publisher cannot depend on the account server or UI.",
+      severity: "error",
+      from: { path: "^apps/updates/" },
+      to: { path: "^apps/(api|app)/" },
+    },
+    {
+      name: "account-apps-independent-of-updates",
+      comment: "Account-server selection cannot control executable update delivery.",
+      severity: "error",
+      from: { path: "^apps/(api|app)/" },
+      to: { path: "^apps/updates/" },
+    },
+    {
+      name: "updates-server-has-no-signing-or-export-io",
+      comment:
+        "The publisher serves signed artifacts; private-key and filesystem operations stay in CI.",
+      severity: "error",
+      from: { path: "^apps/updates/src/" },
+      to: {
+        path: "^scripts/ota/(signing|read-export|asset-key)[.]ts$",
+        dependencyTypesNot: ["type-only"],
+      },
+    },
     // ── Workspace boundaries ────────────────────────────────────────────────────
     {
       name: "core-is-pure",
@@ -48,7 +73,7 @@ const config = {
       comment:
         "An API feature folder must not reach into another one. Share via apps/api/src/shared or compose in app.ts/worker.ts.",
       severity: "error",
-      from: { path: API_FEATURE, pathNot: "^apps/api/src/shared/" },
+      from: { path: API_FEATURE, pathNot: "^apps/api/src/(shared|platform)/" },
       to: {
         path: "^apps/api/src/",
         pathNot: [
@@ -57,6 +82,28 @@ const config = {
           String.raw`^apps/api/src/[^/]+\.ts$`,
         ],
       },
+    },
+    {
+      name: "portable-api-does-not-import-platform",
+      comment:
+        "Converted API consumers and ports depend on abstractions; the host composes adapters.",
+      severity: "error",
+      from: {
+        path: "^apps/api/src/",
+        pathNot: [
+          "^apps/api/src/platform/",
+          "^apps/api/src/worker[.]ts$",
+          "[.]test[.]ts$",
+          "[.]d[.]ts$",
+        ],
+      },
+      to: { path: "^apps/api/src/platform/" },
+    },
+    {
+      name: "api-features-do-not-import-platform",
+      severity: "error",
+      from: { path: API_FEATURE, pathNot: "^apps/api/src/(shared|platform)/" },
+      to: { path: "^apps/api/src/platform/" },
     },
     {
       name: "app-features-are-isolated",

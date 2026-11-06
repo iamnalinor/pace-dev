@@ -144,3 +144,69 @@ describe("sync transports", () => {
     live.stop();
   });
 });
+
+describe("enhanced socket contract boundaries", () => {
+  it("rejects corrupt enhanced records without retrying the request over HTTP", async () => {
+    const { server, live, transport } = setup();
+    server.options.isHolding = true;
+    const completion = (async () => {
+      try {
+        await transport.pull(0, 200, { checkpointVersion: 1 });
+        return null;
+      } catch (error) {
+        return error instanceof Error ? error.message : String(error);
+      }
+    })();
+    const raw = server.sockets.at(-1);
+    if (raw === undefined) {
+      throw new Error("no socket");
+    }
+    const request = JSON.parse(raw.sent.at(-1) ?? "{}") as { id: string };
+    raw.receive(
+      JSON.stringify({
+        type: "events",
+        id: request.id,
+        since: 0,
+        seq: 1,
+        storeId: STORE_ID,
+        events: [],
+        records: [{ seq: 1, event: {} }],
+        more: false,
+      }),
+    );
+    expect(await completion).toBe("sync/invalid-response");
+    expect(server.requests.map((request) => request.transport)).toEqual(["socket"]);
+    live.stop();
+  });
+  it("preserves actual sequence records on proactive events", () => {
+    const sockets = fakeSockets();
+    const pages: unknown[] = [];
+    const live = createLiveChannel({
+      baseUrl: "https://api.test",
+      createSocket: sockets.create,
+      deviceId: "dev",
+      token: () => "token",
+      onChange: () => undefined,
+      onEvents: (page) => {
+        pages.push(page);
+      },
+    });
+    live.start();
+    const raw = sockets.made.at(-1);
+    if (raw === undefined) {
+      throw new Error("no socket");
+    }
+    raw.open();
+    say(raw, {
+      type: "events",
+      since: 0,
+      seq: 7,
+      storeId: STORE_ID,
+      events: [remote],
+      records: [{ seq: 7, event: remote }],
+      more: false,
+    });
+    expect(pages).toEqual([expect.objectContaining({ records: [{ seq: 7, event: remote }] })]);
+    live.stop();
+  });
+});

@@ -8,6 +8,7 @@ import {
   isoWeekKey,
   isValidTimeZone,
   minutesBetween,
+  nextDayStartIn,
   startOfDayIn,
   startOfWeekIn,
   zonesDiffer,
@@ -22,6 +23,44 @@ const msArb = fc.integer({ max: Date.UTC(2030, 0, 1), min: Date.UTC(2020, 0, 1) 
 const instantArb = msArb.map((ms) => new Date(ms).toISOString());
 const zoneArb = fc.constantFrom(...ZONES);
 const minutesArb = fc.integer({ max: 100_000, min: -100_000 });
+
+describe("nextDayStartIn", () => {
+  it.each([
+    ["2018-11-04T03:00:00.000Z", "America/Sao_Paulo", "2018-11-05T02:00:00.000Z"],
+    ["2026-03-08T05:00:00.000Z", NEW_YORK, "2026-03-09T04:00:00.000Z"],
+    ["2026-11-01T04:00:00.000Z", NEW_YORK, "2026-11-02T05:00:00.000Z"],
+    ["2011-12-29T20:00:00.000Z", "Pacific/Apia", "2011-12-30T10:00:00.000Z"],
+  ])("finds the next existing day boundary after %s in %s", (at, zone, expected) => {
+    expect(nextDayStartIn(at, zone)).toBe(expected);
+  });
+
+  it("closes the current date and starts a new date even around midnight transitions", () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom(
+          "2018-11-04T03:00:00.000Z",
+          "2011-12-29T20:00:00.000Z",
+          "2026-03-08T05:00:00.000Z",
+        ),
+        fc.constantFrom("America/Sao_Paulo", "Pacific/Apia", NEW_YORK, "Asia/Kathmandu"),
+        fc.integer({ min: -48, max: 48 }),
+        (anchor, zone, hours) => {
+          const at = addMinutesIso(anchor, hours * 60);
+          const boundary = nextDayStartIn(at, zone);
+          const before = new Date(Date.parse(boundary) - 1).toISOString();
+          expect(boundary > at).toBe(true);
+          expect(formatInZone(before, zone, "yyyy-MM-dd")).toBe(
+            formatInZone(at, zone, "yyyy-MM-dd"),
+          );
+          expect(
+            formatInZone(boundary, zone, "yyyy-MM-dd") > formatInZone(at, zone, "yyyy-MM-dd"),
+          ).toBe(true);
+          expect(startOfDayIn(boundary, zone)).toBe(boundary);
+        },
+      ),
+    );
+  });
+});
 
 describe("startOfDayIn / endOfDayIn", () => {
   it("spans 23 hours on the Berlin spring-forward day", () => {

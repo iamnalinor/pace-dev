@@ -49,6 +49,39 @@ folders (`auth/`, `bot/`, `sync/`, `user-store/`) only reach each other through
 `packages/client/src/view-models/**` additionally run eslint-plugin-functional: no `let`,
 no mutation, no classes, no `throw`.
 
+## Infrastructure ports and adapters
+
+API domain modules consume contracts in `shared/ports`. Cloudflare composition lives in
+`platform/cloudflare` and `worker.ts`; raw bindings and driver construction do not cross into
+routes, notifications, sync or the user-store service.
+
+| Contract | Responsibility | Cloudflare adapter |
+| --- | --- | --- |
+| SQLite database | Existing typed SQLite queries; shared database batches commit atomically | `sqlite.ts` (D1), `actor-storage.ts` (DO SQLite and migrations) |
+| ActorStorage / ActorValues | Actor-owned SQLite transactions and durable values | `actor-storage.ts` |
+| Scheduler | Persistent get/set/delete alarm, preserving earliest-wakeup policy | `actor-storage.ts` |
+| ActorContext / LiveChannel | Session-tagged sockets, upgrades, keepalive and actor initialization | `live-channel.ts` |
+| UserStoreHost | Resolve a person's existing typed RPC service | `bindings.ts`, hosted `user-store.ts` |
+| KeyValue / OAuth | Grant storage and provider operations | `key-value.ts`, `oauth.ts` |
+| RequestPlaceReader | Trusted request provenance | `request-place.ts` |
+
+The domain UserStore keeps its current service composition. The Cloudflare Durable Object wraps
+that service and forwards its explicit RPC surface. Each actor serializes top-level calls through
+its own queue, including external awaits; internal service calls do not re-enter it. A slow external
+operation can therefore delay that user's next call, while another user's actor remains independent.
+The adapter owns DO inheritance, migration execution, WebSocket pairs and hibernating keepalive.
+
+The database contract deliberately targets SQLite, not arbitrary SQL dialects. No second runtime
+or production migration is implemented here. The web assets binding already lives exclusively in
+`apps/app/worker.ts`, the web deployment's composition entry; API domain code does not consume it,
+so no unused API Assets abstraction or cross-app import is introduced.
+
+ESLint AST checks reject Cloudflare ambient types and request metadata outside composition;
+dependency-cruiser rejects domain imports of platform modules. Tests exercise the actual workerd
+adapters, atomic batch rollback, repeated migrations, persisted/earliest/past alarms, actor RPC
+serialization across an await, other-user progress, and the existing session-scoped socket tests.
+See [the execution plan](../context/technical-execution/tasks-8-9-plan.md).
+
 ## The event model
 
 Everything the user does is an append-only event. State is never stored as the truth on
@@ -592,3 +625,13 @@ boundary.
 5. Nothing changes on the server: the Durable Object validates with `parseEvent` from
    core, so the new type is accepted as soon as the package is rebuilt. If the UI shows
    it, add the strings to `i18n/en.ts` **and** `ru.ts` (a test asserts the same keys).
+
+### Android update publisher
+
+`apps/updates` is an isolated Worker serving publisher-owned OTA artifacts from its own R2
+binding. It imports neither the account API nor the app. Account-server selection never
+changes the publisher, runtime, channel or signing authority. Runtime-safe manifest/protocol
+and release-storage helpers live in `apps/updates/src/shared`, exported through
+`@pace/updates/*` to publication commands under `scripts/ota`;
+filesystem export reading and private-key signing remain CLI-only and are excluded from the
+Worker runtime dependency graph. The publisher is not deployed or enabled by adding this workspace.

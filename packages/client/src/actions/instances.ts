@@ -22,7 +22,7 @@ export type InstanceActions = {
 const appendSystem = async (deps: ActionDeps, inputs: readonly EventInput[]): Promise<number> => {
   const snapshot = deps.state.store.getState();
   const now = deps.clock.now();
-  const known = new Set(snapshot.log.map((event) => event.id));
+  const known = snapshot.knownEventIds;
   const fresh = inputs.filter(
     (input) =>
       (input.id === undefined || !known.has(input.id)) &&
@@ -41,11 +41,15 @@ const appendSystem = async (deps: ActionDeps, inputs: readonly EventInput[]): Pr
 };
 
 /** Every id in the log, revoked ones included: a taken-back instance is not made again. */
-const idsOf = (state: { readonly log: readonly { readonly id: string }[] }): ReadonlySet<string> =>
-  new Set(state.log.map((event) => event.id));
+const idsOf = (state: { readonly knownEventIds: ReadonlySet<string> }): ReadonlySet<string> =>
+  state.knownEventIds;
 
 export const instanceActions = (deps: ActionDeps): InstanceActions => ({
   ensureInstances: async () => {
+    await deps.state.ready;
+    if (deps.state.store.getState().status !== "ready") {
+      return 0;
+    }
     const now = deps.clock.now();
     const before = deps.state.store.getState();
     const instances = await appendSystem(

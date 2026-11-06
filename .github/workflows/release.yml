@@ -122,7 +122,10 @@ jobs:
 
       - name: Assemble release APK
         working-directory: apps/app/android
-        run: ./gradlew :app:assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
+        run: >-
+          ./gradlew :app:assembleRelease --no-daemon
+          '-Dorg.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=1024m -XX:+ExitOnOutOfMemoryError'
+          -PreactNativeArchitectures=arm64-v8a
 
       - name: Rename APK
         run: |

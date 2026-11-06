@@ -8,6 +8,7 @@ import { useT } from "#app/app-state.tsx";
 import { ActivityRow } from "#app/features/day/day-screen.tsx";
 import { Item as NotificationItem } from "#app/features/notifications/notifications-screen.tsx";
 import { ProjectChips } from "#app/features/now/project-chips.tsx";
+import { ConfigurationProblem } from "#app/features/server/configuration-notice.tsx";
 import { SessionRow } from "#app/features/sessions/session-row.tsx";
 import { SettingsLinks } from "#app/features/settings/settings-links.tsx";
 import { TaskFooter } from "#app/features/task/task-footer.tsx";
@@ -36,6 +37,7 @@ import {
   taskModel,
   weekModel,
 } from "./gallery-models.ts";
+import { NotificationAvailability } from "./gallery-push-reasons.tsx";
 import { Toasts } from "./gallery-toasts.tsx";
 
 /** How tall an hour of the week grid is here, and how narrow a day column may get on a phone. */
@@ -205,8 +207,19 @@ export const ChromeSections = ({ data }: { readonly data: GalleryData }) => {
           <SidebarHeader owner={data.ownerName} />
         </View>
       </Section>
+      <Section title="server.misconfigured">
+        <ConfigurationProblem
+          isChecking={false}
+          onRetry={NOTHING}
+          reason="duplicate-android-package"
+        />
+        <ConfigurationProblem isChecking onRetry={NOTHING} reason={null} />
+      </Section>
       <Section title="dev.gallery.section.settings">
         <SettingsLinks />
+      </Section>
+      <Section title="settings.push.hint">
+        <NotificationAvailability />
       </Section>
       <Section title="dev.gallery.section.counts">
         {data.pluralCounts.map((count) => (

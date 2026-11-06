@@ -1,0 +1,627 @@
+{
+  "now": "2026-11-06T12:00:00.000Z",
+  "baseline": {
+    "state": {
+      "tasks": {
+        "byId": {
+          "open": {
+            "id": "open",
+            "createdEventId": "auto:restore:create",
+            "title": "Old open task",
+            "presetId": "personal",
+            "seriesId": null,
+            "seriesRevision": null,
+            "userModified": true,
+            "projectId": null,
+            "importance": null,
+            "importanceSetAt": null,
+            "dueAt": null,
+            "dueTz": null,
+            "startAt": null,
+            "startTz": null,
+            "estimateMinutes": null,
+            "subtasks": [],
+            "slider": null,
+            "description": null,
+            "sourceText": null,
+            "sources": [],
+            "fields": { "link": null, "submitVia": null },
+            "overrides": null,
+            "status": "in_progress",
+            "statusSince": "2026-01-03T09:00:00.000Z",
+            "touched": true,
+            "createdAt": "2026-01-02T00:00:00.000Z",
+            "submittedAt": null,
+            "closed": null,
+            "reopenedAt": null,
+            "lastEventAt": "2026-01-03T09:00:00.000Z"
+          }
+        }
+      },
+      "projects": { "byId": {} },
+      "presets": {
+        "byId": {
+          "hw": {
+            "id": "hw",
+            "name": "Homework",
+            "extends": null,
+            "builtIn": true,
+            "archived": false,
+            "definition": {
+              "defaultImportance": "normal",
+              "deadlinePolicy": { "kind": "hard" },
+              "submission": "per_subtask",
+              "progressMode": "subtasks",
+              "recurrence": null,
+              "fields": {
+                "link": false,
+                "description": true,
+                "startAt": false,
+                "submitVia": false
+              },
+              "defaultEstimateMinutes": 60,
+              "color": "yellow"
+            },
+            "createdAt": "1970-01-01T00:00:00.000Z",
+            "order": 1
+          },
+          "work": {
+            "id": "work",
+            "name": "Work",
+            "extends": null,
+            "builtIn": true,
+            "archived": false,
+            "definition": {
+              "defaultImportance": "normal",
+              "deadlinePolicy": { "kind": "hard" },
+              "submission": "whole",
+              "progressMode": "slider",
+              "recurrence": null,
+              "fields": { "link": true, "description": true, "startAt": true, "submitVia": false },
+              "defaultEstimateMinutes": 120,
+              "color": "violet"
+            },
+            "createdAt": "1970-01-01T00:00:00.000Z",
+            "order": 2
+          },
+          "personal": {
+            "id": "personal",
+            "name": "Personal",
+            "extends": null,
+            "builtIn": true,
+            "archived": false,
+            "definition": {
+              "defaultImportance": "normal",
+              "deadlinePolicy": { "kind": "hard" },
+              "submission": "whole",
+              "progressMode": "subtasks",
+              "recurrence": null,
+              "fields": {
+                "link": false,
+                "description": false,
+                "startAt": false,
+                "submitVia": false
+              },
+              "defaultEstimateMinutes": 30,
+              "color": "orange"
+            },
+            "createdAt": "1970-01-01T00:00:00.000Z",
+            "order": 3
+          },
+          "deferred": {
+            "id": "deferred",
+            "name": "Deferred",
+            "extends": null,
+            "builtIn": true,
+            "archived": false,
+            "definition": {
+              "defaultImportance": "nice_to_have",
+              "deadlinePolicy": { "kind": "hard" },
+              "submission": "whole",
+              "progressMode": "none",
+              "recurrence": null,
+              "fields": {
+                "link": false,
+                "description": false,
+                "startAt": true,
+                "submitVia": false
+              },
+              "defaultEstimateMinutes": 15,
+              "color": "slate"
+            },
+            "createdAt": "1970-01-01T00:00:00.000Z",
+            "order": 4
+          },
+          "inbox": {
+            "id": "inbox",
+            "name": "Inbox",
+            "extends": null,
+            "builtIn": true,
+            "archived": false,
+            "definition": {
+              "defaultImportance": "nice_to_have",
+              "deadlinePolicy": { "kind": "hard" },
+              "submission": "whole",
+              "progressMode": "none",
+              "recurrence": null,
+              "fields": {
+                "link": false,
+                "description": false,
+                "startAt": false,
+                "submitVia": false
+              },
+              "defaultEstimateMinutes": 15,
+              "color": "teal"
+            },
+            "createdAt": "1970-01-01T00:00:00.000Z",
+            "order": 5
+          }
+        }
+      },
+      "settings": {
+        "language": "ru",
+        "timezone": "UTC",
+        "digestWindows": [],
+        "quietHours": { "from": "23:00", "to": "08:00" },
+        "nightHours": false,
+        "categoryEstimates": {},
+        "notificationChannels": {
+          "login": { "telegram": true, "app": true, "web": true },
+          "deadline_digest": { "telegram": true, "app": false, "web": false },
+          "event_start": { "telegram": true, "app": false, "web": false },
+          "activity_overrun": { "telegram": false, "app": true, "web": false }
+        }
+      },
+      "time": {
+        "activities": {
+          "reading": {
+            "buttonId": null,
+            "category": "chores",
+            "endAt": "2026-01-03T10:00:00.000Z",
+            "expectMinutes": null,
+            "id": "reading",
+            "isAlongside": false,
+            "originEventId": "auto:restore:start",
+            "isLogged": false,
+            "label": "Reading",
+            "startAt": "2026-01-03T09:00:00.000Z",
+            "stillAt": null,
+            "taskId": "open"
+          }
+        }
+      },
+      "series": { "byId": {} }
+    },
+    "log": [
+      {
+        "id": "auto:restore:settings",
+        "occurredAt": "2026-01-01T00:00:00.000Z",
+        "recordedAt": "2026-01-01T00:00:00.000Z",
+        "deviceId": "fixture",
+        "precision": "exact",
+        "source": "app",
+        "type": "settings.updated",
+        "payload": { "timezone": "UTC", "digestWindows": [] }
+      },
+      {
+        "id": "auto:restore:create",
+        "occurredAt": "2026-01-02T00:00:00.000Z",
+        "recordedAt": "2026-01-02T00:00:00.000Z",
+        "deviceId": "fixture",
+        "precision": "exact",
+        "source": "app",
+        "type": "task.created",
+        "payload": {
+          "taskId": "open",
+          "title": "Old open task",
+          "presetId": "personal",
+          "subtasks": [],
+          "fields": {}
+        }
+      },
+      {
+        "id": "auto:restore:future-revoke",
+        "occurredAt": "2026-02-01T00:00:00.000Z",
+        "recordedAt": "2026-02-01T00:00:00.000Z",
+        "deviceId": "fixture",
+        "precision": "exact",
+        "source": "app",
+        "type": "event.revoked",
+        "payload": { "targetId": "auto:restore:future" }
+      },
+      {
+        "id": "auto:restore:z",
+        "occurredAt": "2026-03-01T00:00:00.000Z",
+        "recordedAt": "2026-03-01T00:00:00.000Z",
+        "deviceId": "fixture",
+        "precision": "exact",
+        "source": "app",
+        "type": "settings.updated",
+        "payload": { "language": "ru" }
+      },
+      {
+        "id": "auto:restore:a",
+        "occurredAt": "2026-03-01T00:00:00.000Z",
+        "recordedAt": "2026-03-01T00:00:00.000Z",
+        "deviceId": "fixture",
+        "precision": "exact",
+        "source": "app",
+        "type": "settings.updated",
+        "payload": { "language": "en" }
+      },
+      {
+        "id": "auto:restore:future",
+        "occurredAt": "2026-04-01T00:00:00.000Z",
+        "recordedAt": "2026-04-01T00:00:00.000Z",
+        "deviceId": "fixture",
+        "precision": "exact",
+        "source": "app",
+        "type": "task.created",
+        "payload": {
+          "taskId": "future",
+          "title": "Revoked before arrival",
+          "presetId": "personal",
+          "subtasks": [],
+          "fields": {}
+        }
+      },
+      {
+        "id": "auto:restore:amend",
+        "occurredAt": "2026-05-01T00:00:00.000Z",
+        "recordedAt": "2026-05-01T00:00:00.000Z",
+        "deviceId": "fixture",
+        "precision": "exact",
+        "source": "app",
+        "type": "event.amended",
+        "payload": { "targetId": "auto:restore:create", "patch": { "title": "Temporary title" } }
+      },
+      {
+        "id": "auto:restore:undo-amend",
+        "occurredAt": "2026-06-01T00:00:00.000Z",
+        "recordedAt": "2026-06-01T00:00:00.000Z",
+        "deviceId": "fixture",
+        "precision": "exact",
+        "source": "app",
+        "type": "event.revoked",
+        "payload": { "targetId": "auto:restore:amend" }
+      },
+      {
+        "id": "auto:restore:start",
+        "occurredAt": "2026-01-03T09:00:00.000Z",
+        "recordedAt": "2026-01-03T09:00:00.000Z",
+        "deviceId": "fixture",
+        "precision": "exact",
+        "source": "app",
+        "type": "activity.started",
+        "payload": {
+          "activityId": "reading",
+          "label": "Reading",
+          "category": "chores",
+          "taskId": "open"
+        }
+      },
+      {
+        "id": "auto:restore:stop",
+        "occurredAt": "2026-01-03T10:00:00.000Z",
+        "recordedAt": "2026-01-03T10:00:00.000Z",
+        "deviceId": "fixture",
+        "precision": "exact",
+        "source": "app",
+        "type": "activity.stopped",
+        "payload": { "activityId": "reading" }
+      }
+    ]
+  },
+  "restored": {
+    "state": {
+      "tasks": {
+        "byId": {
+          "open": {
+            "id": "open",
+            "createdEventId": "auto:restore:create",
+            "title": "Old open task",
+            "presetId": "personal",
+            "seriesId": null,
+            "seriesRevision": null,
+            "userModified": true,
+            "projectId": null,
+            "importance": null,
+            "importanceSetAt": null,
+            "dueAt": null,
+            "dueTz": null,
+            "startAt": null,
+            "startTz": null,
+            "estimateMinutes": null,
+            "subtasks": [],
+            "slider": null,
+            "description": null,
+            "sourceText": null,
+            "sources": [],
+            "fields": { "link": null, "submitVia": null },
+            "overrides": null,
+            "status": "in_progress",
+            "statusSince": "2026-01-03T09:00:00.000Z",
+            "touched": true,
+            "createdAt": "2026-01-02T00:00:00.000Z",
+            "submittedAt": null,
+            "closed": null,
+            "reopenedAt": null,
+            "lastEventAt": "2026-01-03T09:00:00.000Z"
+          }
+        }
+      },
+      "projects": { "byId": {} },
+      "presets": {
+        "byId": {
+          "hw": {
+            "id": "hw",
+            "name": "Homework",
+            "extends": null,
+            "builtIn": true,
+            "archived": false,
+            "definition": {
+              "defaultImportance": "normal",
+              "deadlinePolicy": { "kind": "hard" },
+              "submission": "per_subtask",
+              "progressMode": "subtasks",
+              "recurrence": null,
+              "fields": {
+                "link": false,
+                "description": true,
+                "startAt": false,
+                "submitVia": false
+              },
+              "defaultEstimateMinutes": 60,
+              "color": "yellow"
+            },
+            "createdAt": "1970-01-01T00:00:00.000Z",
+            "order": 1
+          },
+          "work": {
+            "id": "work",
+            "name": "Work",
+            "extends": null,
+            "builtIn": true,
+            "archived": false,
+            "definition": {
+              "defaultImportance": "normal",
+              "deadlinePolicy": { "kind": "hard" },
+              "submission": "whole",
+              "progressMode": "slider",
+              "recurrence": null,
+              "fields": { "link": true, "description": true, "startAt": true, "submitVia": false },
+              "defaultEstimateMinutes": 120,
+              "color": "violet"
+            },
+            "createdAt": "1970-01-01T00:00:00.000Z",
+            "order": 2
+          },
+          "personal": {
+            "id": "personal",
+            "name": "Personal",
+            "extends": null,
+            "builtIn": true,
+            "archived": false,
+            "definition": {
+              "defaultImportance": "normal",
+              "deadlinePolicy": { "kind": "hard" },
+              "submission": "whole",
+              "progressMode": "subtasks",
+              "recurrence": null,
+              "fields": {
+                "link": false,
+                "description": false,
+                "startAt": false,
+                "submitVia": false
+              },
+              "defaultEstimateMinutes": 30,
+              "color": "orange"
+            },
+            "createdAt": "1970-01-01T00:00:00.000Z",
+            "order": 3
+          },
+          "deferred": {
+            "id": "deferred",
+            "name": "Deferred",
+            "extends": null,
+            "builtIn": true,
+            "archived": false,
+            "definition": {
+              "defaultImportance": "nice_to_have",
+              "deadlinePolicy": { "kind": "hard" },
+              "submission": "whole",
+              "progressMode": "none",
+              "recurrence": null,
+              "fields": {
+                "link": false,
+                "description": false,
+                "startAt": true,
+                "submitVia": false
+              },
+              "defaultEstimateMinutes": 15,
+              "color": "slate"
+            },
+            "createdAt": "1970-01-01T00:00:00.000Z",
+            "order": 4
+          },
+          "inbox": {
+            "id": "inbox",
+            "name": "Inbox",
+            "extends": null,
+            "builtIn": true,
+            "archived": false,
+            "definition": {
+              "defaultImportance": "nice_to_have",
+              "deadlinePolicy": { "kind": "hard" },
+              "submission": "whole",
+              "progressMode": "none",
+              "recurrence": null,
+              "fields": {
+                "link": false,
+                "description": false,
+                "startAt": false,
+                "submitVia": false
+              },
+              "defaultEstimateMinutes": 15,
+              "color": "teal"
+            },
+            "createdAt": "1970-01-01T00:00:00.000Z",
+            "order": 5
+          }
+        }
+      },
+      "settings": {
+        "language": "ru",
+        "timezone": "UTC",
+        "digestWindows": [],
+        "quietHours": { "from": "23:00", "to": "08:00" },
+        "nightHours": false,
+        "categoryEstimates": {},
+        "notificationChannels": {
+          "login": { "telegram": true, "app": true, "web": true },
+          "deadline_digest": { "telegram": true, "app": false, "web": false },
+          "event_start": { "telegram": true, "app": false, "web": false },
+          "activity_overrun": { "telegram": false, "app": true, "web": false }
+        }
+      },
+      "time": {
+        "activities": {
+          "reading": {
+            "buttonId": null,
+            "category": "chores",
+            "endAt": "2026-01-03T10:00:00.000Z",
+            "expectMinutes": null,
+            "id": "reading",
+            "isAlongside": false,
+            "originEventId": "auto:restore:start",
+            "isLogged": false,
+            "label": "Reading",
+            "startAt": "2026-01-03T09:00:00.000Z",
+            "stillAt": null,
+            "taskId": "open"
+          }
+        }
+      },
+      "series": { "byId": {} }
+    },
+    "log": [
+      {
+        "id": "auto:restore:settings",
+        "occurredAt": "2026-01-01T00:00:00.000Z",
+        "recordedAt": "2026-01-01T00:00:00.000Z",
+        "deviceId": "fixture",
+        "precision": "exact",
+        "source": "app",
+        "type": "settings.updated",
+        "payload": { "timezone": "UTC", "digestWindows": [] }
+      },
+      {
+        "id": "auto:restore:create",
+        "occurredAt": "2026-01-02T00:00:00.000Z",
+        "recordedAt": "2026-01-02T00:00:00.000Z",
+        "deviceId": "fixture",
+        "precision": "exact",
+        "source": "app",
+        "type": "task.created",
+        "payload": {
+          "taskId": "open",
+          "title": "Old open task",
+          "presetId": "personal",
+          "subtasks": [],
+          "fields": {}
+        }
+      },
+      {
+        "id": "auto:restore:future-revoke",
+        "occurredAt": "2026-02-01T00:00:00.000Z",
+        "recordedAt": "2026-02-01T00:00:00.000Z",
+        "deviceId": "fixture",
+        "precision": "exact",
+        "source": "app",
+        "type": "event.revoked",
+        "payload": { "targetId": "auto:restore:future" }
+      },
+      {
+        "id": "auto:restore:z",
+        "occurredAt": "2026-03-01T00:00:00.000Z",
+        "recordedAt": "2026-03-01T00:00:00.000Z",
+        "deviceId": "fixture",
+        "precision": "exact",
+        "source": "app",
+        "type": "settings.updated",
+        "payload": { "language": "ru" }
+      },
+      {
+        "id": "auto:restore:a",
+        "occurredAt": "2026-03-01T00:00:00.000Z",
+        "recordedAt": "2026-03-01T00:00:00.000Z",
+        "deviceId": "fixture",
+        "precision": "exact",
+        "source": "app",
+        "type": "settings.updated",
+        "payload": { "language": "en" }
+      },
+      {
+        "id": "auto:restore:future",
+        "occurredAt": "2026-04-01T00:00:00.000Z",
+        "recordedAt": "2026-04-01T00:00:00.000Z",
+        "deviceId": "fixture",
+        "precision": "exact",
+        "source": "app",
+        "type": "task.created",
+        "payload": {
+          "taskId": "future",
+          "title": "Revoked before arrival",
+          "presetId": "personal",
+          "subtasks": [],
+          "fields": {}
+        }
+      },
+      {
+        "id": "auto:restore:amend",
+        "occurredAt": "2026-05-01T00:00:00.000Z",
+        "recordedAt": "2026-05-01T00:00:00.000Z",
+        "deviceId": "fixture",
+        "precision": "exact",
+        "source": "app",
+        "type": "event.amended",
+        "payload": { "targetId": "auto:restore:create", "patch": { "title": "Temporary title" } }
+      },
+      {
+        "id": "auto:restore:undo-amend",
+        "occurredAt": "2026-06-01T00:00:00.000Z",
+        "recordedAt": "2026-06-01T00:00:00.000Z",
+        "deviceId": "fixture",
+        "precision": "exact",
+        "source": "app",
+        "type": "event.revoked",
+        "payload": { "targetId": "auto:restore:amend" }
+      },
+      {
+        "id": "auto:restore:start",
+        "occurredAt": "2026-01-03T09:00:00.000Z",
+        "recordedAt": "2026-01-03T09:00:00.000Z",
+        "deviceId": "fixture",
+        "precision": "exact",
+        "source": "app",
+        "type": "activity.started",
+        "payload": {
+          "activityId": "reading",
+          "label": "Reading",
+          "category": "chores",
+          "taskId": "open"
+        }
+      },
+      {
+        "id": "auto:restore:stop",
+        "occurredAt": "2026-01-03T10:00:00.000Z",
+        "recordedAt": "2026-01-03T10:00:00.000Z",
+        "deviceId": "fixture",
+        "precision": "exact",
+        "source": "app",
+        "type": "activity.stopped",
+        "payload": { "activityId": "reading" }
+      }
+    ]
+  }
+}

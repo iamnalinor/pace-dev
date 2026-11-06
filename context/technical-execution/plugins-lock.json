@@ -1,0 +1,42 @@
+[
+  {
+    "name": "agent-skills",
+    "url": "https://github.com/vercel-labs/agent-skills.git",
+    "sha": "1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62"
+  },
+  {
+    "name": "apple-design-skill",
+    "url": "https://github.com/dickwu/apple-design-skill.git",
+    "sha": "ff4ebddf0488598723a82bfdce1afb04de0b1c44"
+  },
+  {
+    "name": "everything-claude-code",
+    "url": "https://github.com/affaan-m/everything-claude-code.git",
+    "sha": "b38be6a7f6350964d59328b52f0624e1d1d552d1"
+  },
+  {
+    "name": "impeccable",
+    "url": "https://github.com/pbakaus/impeccable.git",
+    "sha": "9fadc41729c38fd47d7ae622b501558653f9d2e9"
+  },
+  {
+    "name": "knowledge-work-plugins",
+    "url": "https://github.com/anthropics/knowledge-work-plugins.git",
+    "sha": "2574e29377c7173d0cecffef29a6ecbd7f8ccb5d"
+  },
+  {
+    "name": "pm-skills",
+    "url": "https://github.com/product-on-purpose/pm-skills.git",
+    "sha": "9b920db418c5bf641edea9afb4915a286e1d42ea"
+  },
+  {
+    "name": "skills",
+    "url": "https://github.com/emilkowalski/skills.git",
+    "sha": "f1090bec277140d02ed202440185ad9d02ac1490"
+  },
+  {
+    "name": "superpowers",
+    "url": "https://github.com/obra/superpowers.git",
+    "sha": "2ce8aa15d05bd57213e6f746f953aafb7ded7a8b"
+  }
+]

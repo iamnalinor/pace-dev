@@ -5,9 +5,13 @@ What one tab tells the other tabs of the same browser profile about the local co
 (one IndexedDB, one device id): events it wrote or pulled into it, or that it dropped the copy
 and read it again (a log out, a reset store).
 */
-export type StoreChange =
-  | { readonly events: readonly Event[]; readonly kind: "events" }
-  | { readonly kind: "reload" };
+export type StoreIdentity = {
+  readonly copyToken?: string;
+  readonly storeId?: null | string;
+  readonly owner?: null | string;
+};
+export type StoreChange = StoreIdentity &
+  ({ readonly events: readonly Event[]; readonly kind: "events" } | { readonly kind: "reload" });
 
 /**
 The line between those tabs (a BroadcastChannel on the web; none in the app, one process). The
@@ -30,8 +34,17 @@ export const parseStoreChange = (message: unknown): null | StoreChange => {
   if (!isRecord(message)) {
     return null;
   }
+  const identity: StoreIdentity = {
+    ...(typeof message["copyToken"] === "string" && { copyToken: message["copyToken"] }),
+    ...((typeof message["storeId"] === "string" || message["storeId"] === null) && {
+      storeId: message["storeId"],
+    }),
+    ...((typeof message["owner"] === "string" || message["owner"] === null) && {
+      owner: message["owner"],
+    }),
+  };
   if (message["kind"] === "reload") {
-    return { kind: "reload" };
+    return { kind: "reload", ...identity };
   }
   const events = message["events"];
   if (message["kind"] !== "events" || !Array.isArray(events)) {
@@ -43,5 +56,6 @@ export const parseStoreChange = (message: unknown): null | StoreChange => {
       return parsed.ok ? [parsed.value] : [];
     }),
     kind: "events",
+    ...identity,
   };
 };

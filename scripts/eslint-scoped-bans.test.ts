@@ -81,3 +81,85 @@ describe("an action's answer in the app", () => {
     LINT_APP_FILE_MS,
   );
 });
+
+const PORTABLE_FILE = "apps/api/src/shared/request-place.ts";
+const PLATFORM_MESSAGE = "Portable API code uses infrastructure ports";
+
+const platformMessages = async (code: string, file = PORTABLE_FILE): Promise<readonly string[]> => {
+  const [result] = await eslint.lintText(code, { filePath: path.join(ROOT, file) });
+  return (result?.messages ?? [])
+    .filter((message) => message.message.startsWith(PLATFORM_MESSAGE))
+    .map((message) => message.message);
+};
+
+describe("portable API infrastructure boundaries", () => {
+  it.each([
+    "apps/api/src/auth/sessions.ts",
+    "apps/api/src/user-store/user-store.ts",
+    "apps/api/src/shared/llm/health-store.ts",
+    "apps/api/src/mcp/server.ts",
+    "apps/api/src/app.ts",
+  ])(
+    "guards every converted domain module: %s",
+    async (file) => {
+      expect(
+        await platformMessages("export type Leak = DurableObjectStub;", file),
+      ).not.toHaveLength(0);
+      expect(
+        await platformMessages('export { drizzle } from "drizzle-orm/durable-sqlite";', file),
+      ).not.toHaveLength(0);
+    },
+    LINT_APP_FILE_MS,
+  );
+
+  it.each([
+    "export const leak = (request: Request) => request.cf;",
+    'export const leak = (request: Request) => request["cf"];',
+    "export const leak = (request: Request) => { const { cf } = request; return cf; };",
+    'export const leak = (request: Request) => { const { ["cf"]: data } = request; return data; };',
+    "export type Leak = Cloudflare.Env;",
+    "export type Leak = D1Database;",
+    "export type Leak = DurableObjectStorage;",
+    "export const leak = () => new WebSocketPair();",
+    'import type { DurableObject } from "cloudflare:workers"; export type Leak = DurableObject;',
+    'import type { ExecutionContext } from "@cloudflare/workers-types"; export type Leak = ExecutionContext;',
+    'import { drizzle } from "drizzle-orm/d1"; export const leak = drizzle;',
+  ])(
+    "rejects the AST leak: %s",
+    async (code) => {
+      expect(await platformMessages(code)).not.toHaveLength(0);
+    },
+    LINT_APP_FILE_MS,
+  );
+
+  it(
+    "guards new ports as well as the first converted consumer",
+    async () => {
+      expect(
+        await platformMessages(
+          "export type Leak = D1Database;",
+          "apps/api/src/shared/ports/request-place.ts",
+        ),
+      ).not.toHaveLength(0);
+    },
+    LINT_APP_FILE_MS,
+  );
+
+  it(
+    "allows portable Request types and adapter-owned Cloudflare metadata",
+    async () => {
+      expect(
+        await platformMessages(
+          "export const read = (request: Request) => request.headers.get('User-Agent');",
+        ),
+      ).toHaveLength(0);
+      expect(
+        await platformMessages(
+          "export const read = (request: Request) => request.cf;",
+          "apps/api/src/platform/cloudflare/request-place.ts",
+        ),
+      ).toHaveLength(0);
+    },
+    LINT_APP_FILE_MS,
+  );
+});

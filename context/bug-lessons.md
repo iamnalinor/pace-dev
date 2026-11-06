@@ -34,6 +34,14 @@ The classes so far are below. Each has its standing rule, and new code is writte
   own-session notice on read, the feed kept re-marking it (~70 requests a second, the bell never
   cleared); the server-side fix and its re-review looked at the server diff only.
 
+- **Instance (Firebase recovery).** The screen disabled a bot login, but its asynchronous device
+  lookup and nonce creation only checked current availability. After disable → recover, an old
+  completion became eligible again, saved a nonce, opened Telegram and restarted polling; a stale
+  failure could also replace the recovered idle state. Tests had only disabled an already polling
+  nonce. One attempt generation now guards every awaited boundary and is invalidated on disable,
+  reset and unmount; deferred-success/failure tests pin both lookup and creation boundaries and
+  assert that persistence, external navigation and polling stay quiet.
+
 ### 2. One entry path tested, the others assumed
 - **Bug.** Same as 1. Also: the Inbox button counted something Now's counter did not.
 - **Missed because.** The tests followed the happy path the author had in mind.
@@ -512,6 +520,11 @@ The same rule applies when a previously successful channel is no longer configur
 - **Rule.** A test that fires a Durable Object's alarm by hand keeps every alarm the store can arm ahead of the real clock (freeze `Date` far ahead with `vi.setSystemTime`, or give the store instants decades on) and asserts that the alarm it fires was there (`fireAlarm` in `sleep.int.test.ts`). Never `setAlarm(Date.now() - …)` against a live store. Sweep: `sleep.int.test.ts` and `sleep-pass.test.ts` now run on 2099 instants. The other tests that arm alarms at past fixed instants (`notify.int.test.ts`, `projections.int.test.ts`) never fire one by hand and do their work inside one `runInDurableObject` callback; the runtime's run of their alarm sends through the stubbed Telegram (`tests/setup.ts`) and so far changed no assertion. They are the next place to look if a notify test flickers.
 
 ### 55. A hot path whose cost grows with all history
+- **Measurement isolation (2026-11-05).** Running the full unit, workerd and Jest suites plus
+  typed lint concurrently distorted the materializer cost ratio and timed out an alarm test,
+  followed by an alarm-value failure consistent with unfinished work. Unchanged suites passed when
+  run sequentially (905 core and 664 API tests). Follow CI's serial order for timing-sensitive
+  verification; diagnose load before changing algorithms, timeouts or expected alarm values.
 - **Bug.** Whole-branch review I2: every sleep pass (each phone upload, each night alarm, about 150 a day) read the whole `usage_sessions` table (`end_at > ?` had no index, `SCAN usage_sessions`), and every phone upload loaded the whole event log because `knownUntil` moved and so the digest always changed. Nothing is pruned (the owner keeps the data), so the Workers Free daily reads would run out within months.
 - **Missed because.** Tests ran against stores with a few rows; nothing measured rows read or the query plan, and the digest guard was checked with a host whose `knownUntil` did not move. Then (re-review I-1 of fix wave 10–15) the same guard was checked with hosts that answered every use whatever `from` they were asked for, so the window's front never moved: in production it moves with every pass, at night through the previous day's use, and the digest changed on almost every pass. Then (re-review I-1 of fix wave 10–15, round 2) the hold saved nothing in production at all: a Durable Object idle for a minute or two is evicted, so between alarms 15 minutes apart every alarm and upload started on a cold instance, and the sleep host's `zone()` materialized the whole log to read one setting, the alarm ran the pool pass (whose `derive` materializes it) at every sleep look, and every cold rebuild deleted and rewrote every projection row. The fake hosts stubbed `zone`, and the workerd test kept one warm instance all night, so the cache always hit. Nothing counted loads or rows written on a cold instance.
 - **Rule.** A read on a path that runs per upload, per alarm or per pass is bounded by its window, through an index on the bound it filters (check with `EXPLAIN QUERY PLAN` and the cursor's `rowsRead` in a test with months of history). An `ORDER BY` on another indexed column can send SQLite back to a full index scan: sort in code. A guard that skips work compares only what the work can depend on, and what changes on every call (like `knownUntil`, or a window's front that moves with `now`) is compared against the next instant it matters (`sleepHorizon`) or held still while the guard lasts (the hold's `anchor`, read from instead of the moving front, let go a day on), with a property that a pass inside the guard decides nothing wherever the front is. A fake of a windowed read answers only what its window holds, and a cost test runs over a whole night of passes with a full day of history before it. A cost test runs on a cold instance (a new `UserStore` over the same storage for every call, as production evicts between alarms) and counts whole-log loads and rows written with `meterSql`; a fake host that stubs a read (`zone`) the real host makes through the costly path hides exactly this. Every wait that shares an alarm reads nothing before its own time (`poolAtAlarm`, the queue's due text, `sleepAtAlarm`); a table derived from the log carries a mark of the log `seq` and build it mirrors, so a cold start writes nothing, and a rebuild after an out-of-order write rewrites only the rows that differ; an upload that a client sends again unchanged (the calendar copy) writes no row and wakes nothing. Rows kept up incrementally no longer heal at every cold start, so a property pins them: any writes, in order or not, corrections included, leave the same rows as every row written from scratch (`projections-diff.int.test.ts`).
@@ -1327,6 +1340,19 @@ The same rule applies when a previously successful channel is no longer configur
   card, clear of "Can't see the Telegram button?" and its button, which still takes the click (red
   against the old layout: the frame started 105 px left of the screen).
 
+### 122. A unit test that relies on optional tools from the host
+
+- **Bug.** The Android runner's shell tests stubbed the SDK and Maestro but inherited `jq` from
+  the host. The normal unit suite failed its Android fixtures on a machine without that tool.
+- **Missed because.** CI and the local development image both provided `jq`. The fixture inherited
+  their full `PATH`, hiding the extra prerequisite.
+- **Rule.** Shell fixtures in the unit suite get a `PATH` with the repository runtime, basic shell
+  utilities, and the external commands supplied by the test. Use the repository runtime for JSON
+  validation in code exercised by that suite.
+- **Sweep and guard.** The other `jq` calls run in GitHub workflows outside the unit suite. The
+  Android runner validates both the APK config and the health payload with Bun. The runner tests
+  use an explicit tool list without `jq`.
+
 ## Log
 
 New bugs go here with their class; a new class gets its own section above.
@@ -1715,3 +1741,151 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-03 | CI run 41668309388 (PR #53): `live.e2e.ts` "a session ended from another device says 'another device' in every open tab" saw a 401 for `/api/notifications?limit=50` after both tabs showed the login card. The second tab was still starting when the session ended: its first pull got the 401, the session check (`me`) went out, and the bootstrap went on to `pool.refresh()` with the ended token before `me` answered; the read's answer landed after the test began listening | 75 (a request sent in the gap of a hand-over: here the gap between a 401 and the `me` check's answer) | yes: the two senders that carry the session are the API client (every call) and the live socket's (re)connect; both now wait for a check under way (`sessionChecks` in `create-client.ts`), and the socket's session-ended close joins the same check instead of a second `me`. No other code sends the token (`Authorization` and `pace.auth.` appear only in `api-client.ts` and `live.ts`) | missed because the e2e ended the session after the second tab showed Log out, and only on a loaded runner was its bootstrap still between the pull and the bell; locally 20/20 passed. Red first: two `create-client.test.ts` cases (a call's 401, the socket's close) with `me` held, a `live.test.ts` case for the reconnect, and a deterministic `live.e2e.ts` test that holds the starting tab's first pull until the end and slows `me` by 1 s (it caught the same `/api/notifications` read, plus a second pull); a test that a call held for a check that keeps the session still goes out with it |
 | 2026-11-03 | PR A CI fix review I1, m1: the hold of a session check waited on `me` with no deadline and ignored the caller's abort, so a `me` that got no answer would have stalled every held call, the sync's run (its 30 s timeout only aborts) and ending this device; a check that rejected would have failed the held calls with its own error | 62 (a value not known yet stood in as a final answer: here "the check is still on its way" waited for good) | yes: the two waits on a check (`heldUntilChecked` in `held-call.ts`, the live waiter in `live.ts`) both end on any answer, a rejection included; the check itself (`session-checks.ts`) is bounded by `REQUEST_DEADLINE_MS` and resolves to a `Result` whatever happens | `create-client.test.ts` "a check whose `me` never answers gives up after the request deadline…" (fake timers: held until the deadline, then sent once, nothing signed out) and `api-client.test.ts` cases for an abort while held and a check that fails; red before (the held call hung) |
 | 2026-11-03 | PR A CI fix review I2: the new `live.e2e.ts` test opened its own context and released its route handlers and the context only on the green path, so a failed step would leave a handler waiting (the "Test ended" failure of A9 fix round 3) | 63 (a handler that outlives the page it serves, with nobody owning its end) | yes: every `browser.newContext()` in `e2e/` (five in `live.e2e.ts`, one in `design-shots.e2e.ts`) now goes through the `openContext` fixture, which unroutes every page and closes every context it opened when the test ends, passed or failed | the `openContext` fixture in `e2e/support/fixtures.ts`, and a lint rule (`no-restricted-syntax`, `OWN_CONTEXT` in `eslint.config.ts`) that refuses `.newContext(` in an e2e test file |
+| 2026-11-03 | Android harness review: the ordinary unit suite inherited `jq` from the host and failed before starting the fixture without it | 122 (new) | yes: the other `jq` calls are in hosted deploy, release, and LLM workflows, outside the unit suite | `smoke.test.ts` runs the real predicates with only Bun, basic shell utilities, and the fixture commands on `PATH` (four failures before the fix) |
+| 2026-11-03 | Firebase preflight: Bun's outer `--no-env-file` did not stop the Bun subprocess from reading dotenv | 120 (runner behavior hidden by the test environment) | yes: `check:config` is the only Firebase preflight package script; the future CI caller also uses the outer flag | the subprocess test runs the actual package command with both bindings unset in the environment and malformed in a fixture `.env`; dropping the child's `--no-env-file` makes the intended disabled check fail |
+| 2026-11-05 | Raw usage retries executed conflict updates even when max(endAt) kept the stored end unchanged, consuming 8 SQLite writes for two repeated/shorter uploads of two rows | 55 (output-only assertions missed physical writes) | yes: both max(endAt) upserts in cloud-data.ts now condition updates on end extension; sessions also preserve device-name updates. Other upserts record profile or push-status changes; calendar and projections already compare changes | cloud-data-writes.test.ts meters real workerd SQL: 8 writes RED, 0 GREEN; accepted counts, historical rows, extension and rename retained; full API 616 tests pass |
+| 2026-11-05 | Configuration recovery initially retained an earlier version mismatch, leaving the versions gate active; the reverse transition retained stale configuration copy | 62 (stale evidence treated as current state) | yes: the two authoritative failure transitions in server-store clear the superseded failure, success and origin change clear configuration status; unreachable keeps last evidence intentionally | server-configuration.test.ts pins both mismatch/configuration transitions RED then GREEN, same-origin recovery and old-origin refusal |
+| 2026-11-05 | Full app suite failed the first-sync timezone guard on a Europe/Moscow host because the test hardcoded Moscow as a zone different from the device | 120 (host environment hidden by CI) | yes: searched all tests for deviceTz inequality assumptions; only this test assumed a particular host zone. It now selects a distinct account zone and avoids constructing an unused extra runtime | original full run 938 pass/1 fail at explicit inequality; focused app-state regression rerun after fixture correction, with both Moscow and UTC host checks required |
+| 2026-11-05 | Configuration-error presentation hid pending bot-login cancellation while nonce polling continued, and signed-in senders retried after the configuration failure; active requests did not publish the typed failure into server state | 1 (one side of a contract changed without tracing every reader and sender) | yes: both login variants now abort pending nonce state; ordinary typed responses publish an origin-scoped error; sync/live and background checks pause; recovery owns one guarded bootstrap that resumes uploads/push and senders without losing the outbox | configuration-network.test.tsx real-runtime regressions: hidden nonce made 6 requests RED, then quiet; active sync marked no configuration failure RED; unsent-event outbox preserved, recovery sync once, stale-origin isolation and interrupted phone startup covered; 89 affected tests passed |
+| 2026-11-05 | Integration review found preflight accepted an unknown rollout policy while runtime rejected every API request for the same value | 1 (configuration contract implemented on one side only) | yes: CLI and runtime now share FirebaseConfigPolicySchema; unset remains additive, unknown and empty supplied values fail closed without echoing values | check-config.test.ts valid/disabled pair with invalid policy failed RED (CLI exited0), then GREEN; existing runtime unknown-policy coverage retained |
+
+| 2026-11-05 | Native Firebase review: stage(B) persisted a pending server choice while A retained ensure authority; an in-flight ensure(A) could replace the whole record, erase B and make commit(B) fail after the origin write | 1 (handoff generation changed on one path while an older completion retained write authority) | yes: swept all native record writers and trustedOrigin transitions; stage now revokes ensure authority only after successful persistence, commit already revokes it, reconcile alone grants it from the authoritative origin, and ensure requires it. Reconcile must consume the actual persisted origin, never a captured old response | original17 JVM cases tested stale origins after reconciliation and crash cut points but omitted a delayed completion between stage and commit; FirebaseControllerTest.pendingSwitchRevokesOldEnsureAuthorityOnlyAfterDurableStage was RED on the real JVM (18 run/1 fail), then GREEN18/18, also pinning failed-stage usability and successful commit of B |
+| 2026-11-05 | Runtime server switching could leave native Firebase authority attached to the proposed origin after a failed handoff; a failure after persisting the new origin differs from a failure before it | 1 (handoff authority), 62 (stale evidence) | yes: swept stage, reset, origin write, commit and restart failure paths; failed stage preserves old authority, later failures reread durable origin and reconcile against it instead of a captured UI origin | earlier tests covered successful switches and native persistence cut points but not JS failure recovery; server-runtime and firebase-runtime regressions pin durable-origin recovery and keep old-runtime FCM blocked after a failed restart |
+| 2026-11-05 | Reopening notification settings rediscovered server capabilities and erased a known device-services failure, presenting FCM as available again | 62 (new capability evidence overwrote a separate device verdict) | yes: registration and Settings discovery share origin/native-authority-scoped failure retention; authority changes invalidate the old failure rather than carrying it to another server | previous tests covered initial token failure but not a subsequent availability refresh; notifications refresh regression now retains services-unavailable for the same authority |
+| 2026-11-05 | Independent runtime review found that a saved server selection followed by failed restart left old-server sign-in usable behind a dismissible error; reopening then silently selected the new server | 1 (durable handoff and UI authority differ) | yes: reviewed post-write commit/restart failure paths and whole Navigator composition; a root pending-switch gate now replaces routes and sidebar after the durable commit point, with restart-only recovery | prior persistence tests checked native authority and storage but not the still-mounted login; component coverage pins persisted B, absent old login/dismissal, retry and exactly one reset; failed origin writes do not activate the gate |
+| 2026-11-05 | A deferred old push-method storage write could finish after a newer registration, leaving SecureStore on FCM while the visible store correctly showed polling | 48 (stale async completion), 1 (durable versus visible authority) | yes: reviewed token, subscription POST, method persistence and final store publication; native writes are ordered and authority is rechecked before writing and publishing | prior race tests stopped at token retrieval or asserted only the visible store; a deferred overlapping SecureStore write regression failed before ordering and now asserts the final durable method as well as the visible one |
+| 2026-11-05 | Two push registrations for the same origin/session/native snapshot could race when the person changed the preferred method: a delayed older FCM token could overwrite a newer polling registration | 48 (stale async completion within one authority) | yes: registration invocation now has its own generation in addition to origin/session/native checks; subscription writes are ordered as well as local persistence, so an already in-flight old POST finishes before the newer selection is registered | previous races changed origin or native configuration, which masked same-authority overlap; deferred token regression was RED, followed by in-flight POST ordering and persistence failure-recovery coverage; combined push/Settings suite passed 81 tests |
+| 2026-11-05 | Server handoff review traced a late bot-login answer and then a later boundary inside an already-started session save: either could restore old authentication after the new origin was selected | 48 (stale async completion), 1 (handoff authority) | yes: trace grants, resumed bot polling, browser adoption, session persistence/clear, bootstrap and foreground observers; session retirement must revoke authority synchronously and drain/clear old writes before persisting the new origin, while the pending handoff quiesces senders | earlier tests delayed network answers but not the following storage await; new client and real-runtime regressions delay both grant responses and SessionStore.set, pin no adopted old session or me request, and require origin persistence to wait for draining; clear failure blocks the handoff |
+| 2026-11-05 | OTA export extension lookup accepted inherited object property names such as `constructor` as MIME entries | Untrusted keys accessing inherited object properties | Swept the new OTA metadata/MIME lookup; require an own property with a string value before accepting an extension | Earlier unknown-extension cases used names absent from the prototype; a `constructor` regression failed before the own-string guard and now passes |
+| 2026-11-05 | OTA Accept negotiation initially let a wildcard override an explicit MIME `q=0` exclusion | Specific exclusion lost to broad fallback | Swept JSON, multipart and no-update negotiation; resolve the most specific matching range before deciding acceptance | Earlier cases tested wildcard acceptance and exclusions separately; overlapping explicit exclusions plus wildcard regressions were RED then GREEN |
+
+| 2026-11-06 | Android CI failed while Expo read app.config.ts: the runtime Firebase plugin imported extensionless expo/config-plugins, which Node 24 ESM does not resolve | Build-loader mismatch: transpiler-only tests cannot prove native CLI module resolution | Swept app config and plugin imports: the runtime plugin was the only ESM value import of this Expo subpath and now names config-plugins.js; expo/config imports are type-only, while the existing signing plugin uses CommonJS require and is unaffected | Jest transpilation resolved the extensionless path, so plugin unit tests passed without exercising Expo’s Node loader. New Bun script tests invoke the actual Node Expo config CLI in baked and runtime modes; both failed before the fix and pass afterward, without prebuild or an emulator. GitHub Actions still must rerun the actual Android build |
+| 2026-11-06 | Real Expo Android export contained XML drawable assets and the OTA MIME whitelist rejected the complete export | Representative build inputs missing from unit fixtures | Swept all extensions in the real 28-file export; added application/xml to the shared MIME mapping used by both packaging and serving | Synthetic fixtures only covered fonts and images; a captured Expo 57 metadata regression failed before the XML mapping, and the actual export now passes read/sign/stage/promote/select in isolated memory storage |
+| 2026-11-06 | OTA effect cleanup retired a controller retained by React's effect replay; stale restart failure could also replace a newer lifetime's state | 63 (work outliving its owner) | yes: traced OTA check, network decision, fetch and restart completions; existing PaceProvider creates a fresh runtime inside each effect and closes late creations | lifecycle replay and disposed-generation tests; explicit reactivation preserves the hourly budget while generation checks reject retired results |
+| 2026-11-06 | OTA fetch failure was retried on each later foreground/network event even though manifest checks were hourly; Expo fetchUpdateAsync itself performs network work | 1 (indirect request loop) | yes: traced both Expo check and fetch entry points, including the first Wi-Fi resume and retained ready update; no other OTA network entry points exist | separate fetch-attempt budget and sequential-event regression pin request silence until the next allowed attempt; concurrent-only tests had missed sequential retries |
+| 2026-11-06 | Default-disabled OTA fingerprinting failed because the optional certificate was unconditionally listed as an extra file | 120 (build environment hidden by fixture setup) | yes: the only custom extraSource is the public certificate; enabled build validation still requires it, disabled builds add it only when present | real fingerprint test without the certificate RED ENOENT→GREEN; previous fixture always created the certificate |
+| 2026-11-06 | Expo fingerprinting returned a successful hash after subprocess restrictions silently removed native autolinking sources | 62 (partial evidence treated as authoritative) | yes: traced Expo and RN autolinking groups plus the local Android directory; actual 17-source result is rejected and the complete 62-source result accepted | publication collector checks required hashed Expo configuration, native/autolinking sources and enabled certificate presence without reducing Expo defaults; primitive hash-equality tests alone cannot establish complete native evidence |
+
+| 2026-11-06 | Eight web matrix cases waited forever for the gallery's intentional infinite loading spinner | Readiness confused finite transitions with perpetual activity | Swept all seven document animation waits into a shared finite-transition helper; accessibility and gallery coverage remain enabled | Previous tests exercised settled screens only; real-browser regression combines an infinite spinner and finite transition, proves the finite transition finishes, and covers paused animation |
+| 2026-11-06 | Android Actions exhausted 512 MiB Gradle metaspace and hung until the 55-minute job timeout | Build resource growth without a bounded failure mode | Swept smoke, CI and release assemble commands; retain 2 GiB heap, raise metaspace to 1 GiB and exit on OOM | Stubbed build tests did not assert effective JVM limits; runner and workflow guards now pin all three entry points and failure propagation; native evidence must come from Actions |
+| 2026-11-06 | Type checking caught an invalid-arguments CLI table passing each array as positional test arguments instead of one argv value | Parameterized fixtures changed the input shape and made negative tests pass for the wrong reason | Swept new runtime/Android test tables; wrap argv cases in named objects so the complete array reaches the parser | Runtime tests alone accepted the wrong input as invalid; unified type checking exposed it and the corrected table now exercises duplicate, missing and forbidden flags explicitly |
+
+| 2026-11-06 | Equal-time events arriving across batches were appended to the warm materialization in arrival order: a lower id's settings patch could win on both client and server, while a full rebuild correctly kept the higher id's patch | Canonical ordering truncated at an incremental boundary | Swept both `shouldRematerialize` callers: client `local-log` and server `canApplyInOrder`; both sort fresh batches but retain only the previous timestamp. The shared guard now conservatively rebuilds on equality because the id tie-break cannot be proven without the previous id; strictly later events remain incremental and corrections retain their rebuild path | Existing materializer order properties generated unique timestamps; the client's equal-time fixture changed independent settings fields, so it did not expose conflicting winners. New core boundary, local dispatch/remote ingest and real UserStore append/read regressions were RED with lower-id `en` incorrectly replacing higher-id `ru`, then GREEN and consistent with a full rebuild |
+
+Checkpoint correction closure includes future targets. A correction currently ignored because its target is missing can become active when that ordinary target arrives later in the cursor tail. Retaining only projection state, all source ids and the final canonical key loses this dependency. Initial tests generated corrections targeting earlier events, so no property exercised a correction before its target. Sweep: both new tail corrections and new ordinary ids named by any base correction must require intact-source replay; correctionTargets retains all unique target ids, including targets already present, unknown targets and correction ids. Guard: regression supplies a base revocation whose unknown target later arrives as task.created, and malformed correctionTargets metadata is rejected. Keep this class in checkpoint/bootstrap/archive reconstruction reviews.
+
+| 2026-11-06 | Daily usage splitting and daily readers extended a skipped-midnight day into the next date: São Paulo 2018-11-04 starts at 01:00, and adding one calendar day retained 01:00 instead of ending at the next midnight | Calendar boundaries confused with same-wall-clock date arithmetic | Swept daily range ends in usage aggregation, Day/Week/screen-time view models, focus/sleep patterns, MCP get_day and app phone/calendar reads. All use shared nextDayStartIn (end of local day plus one millisecond); Day navigation normalizes its previous day start; Week-generated day starts, week navigation/end, Insights ranges and project-week aggregates normalize every shifted boundary. General same-wall-clock addDaysIn behavior stays unchanged | Existing DST fixtures covered 02:00 transitions in New York/Berlin, and time properties generated 2020 onward without midnight-transition zones. New daily split and screen-time regressions were RED (24 hours assigned to the 23-hour date); shared literal/property guards also cover midnight DST, 23/25-hour days and Apia's skipped date. Follow-up Tehran 2021 Monday-midnight regressions were RED for a missing Tuesday hour, next-week leakage and a project hour counted twice across weeks |
+
+| 2026-11-06 | A revocation/amendment received before its missing target was ignored when the later ordinary target arrived on the warm ordered path: the client showed the uncorrected state until reload, and the server had the same gap | Correction dependency closure missing from warm incremental authority | Swept client LocalLog, server StateCache and CheckpointCache. Maintain all correction target IDs, including unknown targets and correction IDs; a later target forces source rebuild. Client rebuild refreshes the index after reload, canonical adoption and rollback, while ordinary append checks remain O(1) per ID rather than rescanning history | The checkpoint pure replay already retained unresolved targets, but existing warm client/server tests only corrected already-present events. Eight client loaded/same-session × dispatch/ingest × revoke/amend regressions were RED (`ru` instead of corrected `en`), then GREEN; shuffled correction-chain prefixes compare warm results with complete replay and the incremental performance guard remains green. Server workerd checkpoint cache regression `base correction fulfilled by a later target` was RED with an incorrectly present task, then GREEN |
+
+Archive codec implementation finding (2026-11-06): a backup validates its representation and capture identity, not today's business input policy. Initial row schemas validated nonempty text/ISO fields and positive intervals. Existing SQL only requires TEXT NOT NULL, and cloud-data.ts:235 explicitly persists zero-length phone uses; these valid historical source rows could therefore block an entire archive. Existing tests used only ordinary positive intervals and nonempty event fields. Sweep in scoped new codec: changed every raw row field to strict string type without current input constraints; removed end/start ordering entirely; retained monthly source-text prefix, cursor, revision, uniqueness, strict object shape and byte/hash/count checks. Guard: six RED→GREEN table cases preserve zero/reversed app/phone rows and historical empty/opaque SQL text exactly. Raw usage aggregates separately enforce their input policy.
+
+A preexisting review item for Task9B raw revision work (not changed here): cloud-data.ts filters intervals lexicographically (phone endAt>=startAt, sessions endAt>startAt), but legal UTC ISO strings with different precision are not always lexicographically chronological (`...00Z` versus `...00.001Z`). Review alongside actual upload contracts before changing existing semantics. The codec never normalizes source strings and no longer orders intervals.
+
+Ownership keys need a total encoding boundary: encodeURIComponent throws on lone UTF-16 surrogates. Identity schemas now reject malformed UTF-16 before key generation and return archive/invalid; a RED→GREEN test pins that behavior. Raw source strings remain JSON-escaped losslessly, including opaque historical payloads.
+
+| 2026-11-06 | The first immutable daily splitter recursively consumed one day and spread the entire remaining tail, overflowing on a valid 1900–2026 source interval | Input cardinality becomes call-stack depth and quadratic array copying | Replaced the splitter with balanced splits on actual local-day boundaries: logarithmic stack depth and O(days log days) copying, without a new input cap or local mutation exceptions. Preserves skipped-midnight and skipped-date behavior | The initial property only generated intervals up to seven days. A 46,021-day regression was RED with stack overflow, then GREEN; Apia's entirely skipped date is covered separately |
+
+
+### 2026-11-06 — checkpoint sync must preserve source and transport evidence
+
+A current projection is not the source envelope needed for undo, correction or historical export.
+The previous complete-log-only tests did not expose origin lookups performed before hydration.
+The checkpoint client now hydrates before source-origin lookups and gates unsafe direct staging;
+full-history guards protect History/export. The sweep covers task, series, inbox, work and activity
+origin actions, recurrence IDs and empty-account detection. Focused checkpoint/action cases pin
+ordinary offline actions versus explicit source-dependent refusal.
+
+The first enhanced socket integration dropped actual sequence records from proactive events and
+treated malformed known replies as unanswered requests. This could lose cursor evidence or time
+out and repeat the request over HTTP. Legacy-only transport tests had no enhanced envelope.
+The client now preserves sequence records and rejects malformed known replies immediately as
+sync/invalid-response; it does not use a second transport to hide corrupt responses. Both requested
+and proactive paths are covered by the new RED→GREEN transport tests.
+
+A captured high-water cursor is not a count: SQLite AUTOINCREMENT conflict attempts can leave
+unallocated sequence numbers. Archive restore must compare the captured source inventory digest
+and counts, preserving original sequences and all allocated lower-cursor records. A gaplessness
+assumption in the implementation plan was corrected before restore implementation.
+
+### 2026-11-06 — session tests must wait for the outbox, not just the screen
+
+PR55 CI run 42199912608 passed 197 browser tests but the stale-tab logout case
+stopped on the legitimate unsynced-change confirmation. Its captured page showed
+one pending change: startup settings can still be syncing after Settings renders.
+Previous fast runs happened to acknowledge that write before the logout click.
+The shared two-tab setup now waits for live sender startup (which follows timezone
+persistence), then the existing outboxSent condition before session-only assertions.
+Review caught that waiting only for zero can succeed before startup creates its
+first write. The logout traffic test also waits for this condition:
+zero outstanding HTTP requests does not prove a socket-delivered outbox is empty.
+The sweep leaves intentional unsynced-logout and incompatible-server tests intact.
+Validation is the existing live/login browser regression suite; no fixed sleep or
+automatic acceptance of the data-loss confirmation is added.
+
+### 2026-11-06 — archive inventories need canonical field order
+
+The first real remote restore rehearsal rejected identical raw records because
+SQL capture and schema-parsed archive records inserted object keys in different
+orders. JSON.stringify is deterministic only after representation normalization.
+Normalize both sides through the archive record schema before inventory hashing;
+leave every opaque SQL string unchanged. Earlier codec tests round-tripped one
+representation and did not combine freshly captured rows with independently
+decoded monthly objects. The restore regression now mixes a selected remote
+month, its superseded raw revision and retained source, then compares inventory,
+state and export. Equal-revision conflict checks run on schema-normalized records.
+
+The same rehearsal work exposed local day labels passed as UTC instants during
+daily aggregate rebuilding. In negative-offset zones that selects the previous
+local date. Resolve the label at local noon before startOfDayIn, then use the
+shared nextDayStartIn boundary. Tests must include both positive and negative
+offsets and timezone changes; UTC-only aggregate fixtures cannot expose this.
+
+### 2026-11-06 — bind asynchronous work to the copy that started it
+
+Checkpoint review found that reading identity after a network response does not
+protect the original request. A pending batch could also be captured before an
+account replacement and sent with the next copy's storeId. Checking identity then
+acknowledging in a separate transaction leaves another replacement window. Earlier
+single-owner sync tests did not pause these boundaries. The sweep covers enhanced
+and legacy pages, pending batches, acknowledgements, version upgrades, history and
+export. Capture copyToken/owner/generation before the await, retain that guard for
+every batch, and check it inside each persistent mutation. Legacy pages now apply
+source, acknowledgements and cursor together without inventing source sequences.
+Held-operation regressions replace the owner mid-flight and require no foreign
+write, acknowledgement, download or stale resource-status update.
+
+### 2026-11-06 — resource demand must follow coverage transitions
+
+History could mount while the initial local copy was still full/empty, finish its
+first demand immediately, then remain loading after bootstrap installed partial
+coverage. An effect keyed only by manual retry missed this transition. Existing
+tests mounted History after bootstrap. Demand now follows coverage and copy
+identity, while failure and clock ticks do not trigger repeated requests. The app
+regression mounts History first, installs a checkpoint later and asserts exactly
+one hydration. Storage acquisition errors also belong inside the declared Result
+boundary so consumers receive a retryable failure rather than a rejected promise.
+
+### 2026-11-06 — empty cache checks must not consume a later useful attempt
+
+The first real checkpoint browser run received source mode because a warm actor
+checked an empty log and recorded its once-per-day advancement marker. Old source
+arriving afterward could not create its eligible checkpoint until the next day.
+Earlier bootstrap fixtures inserted source before constructing their cache, so
+they missed the warm-empty lifecycle. A zero-sequence state now returns before
+consuming the day marker. Nonempty negative prefix checks remain cached: a later
+backdate cannot move ahead of an already recent first delivery row. The real-actor
+regression was RED then GREEN; the same browser assertion subsequently passed
+without relaxing its requirement for actual checkpoint coverage.
+
+### 2026-11-06 — lifecycle fences and optional work must preserve cold-alarm behavior
+
+The full API suite caught two alarm integration mistakes that the focused archive
+packet omitted. A cold domain service checked its cleanup fence before awaiting
+readiness, so it treated initialization as a busy cleanup and returned early.
+Also, archiveHistory evaluated the current timezone (loading the log) before the
+archive service could reject an absent optional binding. Await readiness before
+checking the fence, and reject absent optional services before evaluating expensive
+arguments. The existing night-cost suite supplies the guard: cold direct alarms
+must process due work, and unrelated/off-feature alarms must not load the log.
+Include that suite whenever lifecycle wrappers or optional alarm branches change.

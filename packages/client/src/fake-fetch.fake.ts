@@ -50,6 +50,7 @@ export const FAKE_STORE_ID = "store-test";
 
 /** The sync routes of an empty server: nothing to pull, everything accepted. */
 export const emptySyncRoutes: Readonly<Record<string, FakeRoute>> = {
+  "GET /api/instance": () => fakeInstance,
   "GET /api/sync/pull": () => ({ events: [], more: false, seq: 0, storeId: FAKE_STORE_ID }),
   "POST /api/sync/push": ({ body }) => ({
     accepted: (body as { readonly events: readonly { readonly id: string }[] }).events.map(

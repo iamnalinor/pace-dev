@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import { AUTO_SLEEP_LABEL, type Event, sleepStartId } from "@pace/core";
 import { artboardEvents, at, ctx, MOSCOW, NOW } from "@pace/core/testing";
 
-import { setupActions } from "../actions/fixture.fake.ts";
+import { setupActions, unwrap } from "../actions/fixture.fake.ts";
+import { completeHistoryOf } from "../history-types.ts";
 import { dayModel } from "./day.ts";
 import { historyViewModel } from "./history.ts";
 import { timeBarModel } from "./time-bar.ts";
@@ -42,7 +43,10 @@ const labelsIn = async (language: "en" | "ru", label?: string) => {
   );
   const week = weekModel(state, null, ctx(NOW));
   const block = week.days.flatMap((each) => each.blocks).find((each) => each.id.startsWith(AUTO));
-  const history = historyViewModel(state, { atIso: NOW, deviceTz: MOSCOW });
+  const history = historyViewModel(unwrap(completeHistoryOf(state)), {
+    atIso: NOW,
+    deviceTz: MOSCOW,
+  });
   return {
     bar: timeBarModel(state, ctx(NOW)).running?.label,
     day: row?.kind === "activity" ? row.row.label : undefined,

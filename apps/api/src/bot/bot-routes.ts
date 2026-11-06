@@ -4,10 +4,10 @@ import { webhookCallback } from "grammy";
 
 import type { AppEnv } from "../shared/app-env.ts";
 import type { Config } from "../shared/config.ts";
+import type { Db } from "../shared/db/d1.ts";
 import type { ParseProvider } from "../shared/llm/llm.ts";
 import type { TelegramTransport } from "../shared/telegram-api.ts";
 
-import { d1, type Db } from "../shared/db/d1.ts";
 import { isIpInCidrs } from "../shared/ip.ts";
 import { llmHealthAfterResponse } from "../shared/llm/health-store.ts";
 import { createLogger } from "../shared/logger.ts";
@@ -52,8 +52,8 @@ export const mountBotRoutes = (app: Hono<AppEnv>, deps: BotRouteDeps): void => {
     if (config.telegramBotToken === undefined || config.telegramWebhookSecret === undefined) {
       return c.json({ code: "bot/not-configured", message: "Telegram bot is not configured" }, 503);
     }
-    const db = d1(c.env.DB);
-    const storeOf = (userId: string) => c.env.USER_STORE.get(c.env.USER_STORE.idFromName(userId));
+    const db = c.env.DB;
+    const storeOf = (userId: string) => c.env.USER_STORE.of(userId);
     const bindLogin = deps.bindLogin(db);
     const bot = createBot({
       apiRoot: config.telegramApiRoot,

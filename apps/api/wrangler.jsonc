@@ -8,6 +8,7 @@
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "routes": [{ "pattern": "pace-api.nalinor.dev", "custom_domain": true }],
   "observability": { "enabled": true },
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
   // Secrets (set with `wrangler secret put`, never here): TELEGRAM_BOT_TOKEN (from @BotFather),
   // TELEGRAM_WEBHOOK_SECRET (random string echoed by Telegram on every webhook call).
   // Optional vars set at deploy time: BOT_INFO (JSON of getMe), TELEGRAM_API_ROOT (tests only),

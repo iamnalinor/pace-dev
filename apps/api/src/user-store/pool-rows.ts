@@ -1,5 +1,3 @@
-import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
-
 import { and, desc, eq, inArray, isNull, lt, ne, or } from "drizzle-orm";
 
 import {
@@ -16,10 +14,11 @@ import {
 } from "@pace/core";
 
 import type { NotifyError } from "../shared/contract.ts";
+import type { SqliteDatabase } from "../shared/ports/sqlite.ts";
 
 import * as schema from "./schema.ts";
 
-type Db = DrizzleSqliteDODatabase<typeof schema>;
+type Db = SqliteDatabase<"sync", typeof schema>;
 type Row = typeof schema.notifications.$inferSelect;
 
 /** Telegram's copy of a notification: where it went, if anywhere. */

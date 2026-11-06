@@ -5,7 +5,6 @@ import { endpoints, err, ok, type Session } from "@pace/core";
 import type { AppEnv } from "../shared/app-env.ts";
 
 import { requireUser } from "../shared/current-user.ts";
-import { d1 } from "../shared/db/d1.ts";
 import { mount, type Problem } from "../shared/mount.ts";
 import { type Grant, listGrants, revokeGrant } from "../shared/oauth-grants.ts";
 import { deleteSession } from "../shared/session-rows.ts";
@@ -63,7 +62,7 @@ export const mountSessionRoutes = (app: Hono<AppEnv>): void => {
   mount(app, endpoints.sessions.list, async ({ c }) => {
     const userId = requireUser(c).id;
     const [rows, reporting, grants] = await Promise.all([
-      listSessions(d1(c.env.DB), userId, Date.now()),
+      listSessions(c.env.DB, userId, Date.now()),
       userStoreOf(c).usageDevices(),
       listGrants(c.env.OAUTH_KV, userId),
     ]);
@@ -82,11 +81,11 @@ export const mountSessionRoutes = (app: Hono<AppEnv>): void => {
     const userId = requireUser(c).id;
     const isRevoked = params.id.startsWith(MCP_PREFIX)
       ? await revokeGrant(c.env.OAUTH_KV, userId, params.id.slice(MCP_PREFIX.length))
-      : await deleteSession(d1(c.env.DB), { sessionId: params.id, userId }, userStoreOf(c));
+      : await deleteSession(c.env.DB, { sessionId: params.id, userId }, userStoreOf(c));
     return isRevoked ? ok({ ok: true as const }) : err(SESSION_NOT_FOUND);
   });
   mount(app, endpoints.sessions.createAgent, async ({ body, c }) => {
-    const created = await createSession(d1(c.env.DB), {
+    const created = await createSession(c.env.DB, {
       days: AGENT_DAYS,
       kind: "agent",
       name: body.name,

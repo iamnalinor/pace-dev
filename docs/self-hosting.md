@@ -57,6 +57,9 @@ server at the latest release.
    - `TELEGRAM_WEBHOOK_SECRET`: any random string; Telegram echoes it on every webhook call.
    - Optional `LLM_BASE_URL_1`, `LLM_API_KEY_1`, `LLM_MODEL_1` (and `_2`… for fallbacks).
    - Optional `FIREBASE_SERVICE_ACCOUNT`: the Firebase service account's JSON key.
+   - Optional `FIREBASE_ANDROID_CONFIG`: the raw `google-services.json` from the same Firebase
+     project, with an Android app for each package you intend to support. See
+     [Notifications](#notifications) for what this enables during the rollout.
 5. **Deploy**, either way:
    - **GitHub Actions**: in your fork, set the secrets and variables `deploy.yml` reads
      (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `TELEGRAM_BOT_TOKEN`,
@@ -112,3 +115,101 @@ even with a Firebase project of its own (Settings says why). Everything else wor
 Instant push needs your own build of the app with your Firebase project
 (`GOOGLE_SERVICES_JSON`; see the README's
 [Push notifications](../README.md#push-notifications-firebase)).
+
+The server can also advertise Android initialization metadata ahead of the app rollout. To
+enable it, set `FIREBASE_ANDROID_CONFIG` on the Worker alongside `FIREBASE_SERVICE_ACCOUNT` from
+the same project. The current GitHub Actions workflow only sets the service account. The
+public `GET /api/instance` response lists the project ID, sender ID, and the package name,
+app ID and client API key for each Android app in `google-services.json`. Keep the service
+account key on the server.
+
+An existing service account alone still sends pushes as before and reports `firebase: null`.
+If the Android config is set but invalid or does not match the sender, the Worker reports
+`firebase: null` and logs a reason code without logging either binding. Server discovery,
+health checks and existing push registration keep working as before. Released APKs still
+use the Firebase project they were built with.
+
+#### Check the Firebase pair before rollout
+
+From the repository root, run `bun run check:config` with the two Firebase values supplied
+through the process environment. `FIREBASE_ANDROID_CONFIG` takes the raw contents of
+`google-services.json` (called `GOOGLE_SERVICES_JSON` in release CI);
+`FIREBASE_SERVICE_ACCOUNT` takes the raw service account JSON. Never put either value in a
+command argument.
+
+By default Bun's package runner can load dotenv files and echo the command. In CI or when
+you need only the verdict in the output, disable dotenv loading and silence the runner.
+Pass the intended state explicitly:
+
+```sh
+bun --no-env-file --silent run check:config --expect=configured
+bun --no-env-file --silent run check:config --expect=disabled
+```
+
+With no expectation, either a complete, matching pair or two absent bindings passes. Empty
+strings count as absent. The command prints `configured` or `disabled` on success. It exits
+with status 1 and a fixed reason code on stderr for invalid input:
+`missing-android-config`, `missing-service-account`, `android-config-not-json`,
+`android-config-invalid`, `no-android-clients`, `duplicate-android-package`,
+`invalid-service-account`, `project-mismatch`, `invalid-config-policy`, `invalid-arguments`,
+`expected-configured`, or `expected-disabled`. The preflight checks the supplied JSON and
+project match; it does not authenticate to Google or verify push delivery. A local
+`disabled` verdict only describes the inputs to this invocation. An existing Worker can
+have a pair stored only in its own secrets.
+
+The current Worker behavior stays additive, including for hosts with only a service account.
+To prepare for future strict enforcement, validate both values before configuring or rotating
+them together. If the pair is managed on the Worker, verify its effective state on the
+deployed version before inheriting it. Omitting local values does not remove deployed
+secrets. To disable deliberately, stage removal of both values in one inactive version.
+
+Before enabling strict enforcement, rehearse the rollout on a nonproduction Worker. The
+staged path must verify the exact inactive candidate through a protected Version URL, checking
+its identity and effective Firebase state before promoting that verified version. Record the
+previous compatible version for rollback, then verify production health, instance discovery and
+push delivery before removing APK-baked config. See the
+[rollout design](../context/technical-execution/firebase-rollout-design.md) for the staging
+procedure, including fresh Workers and Workers with pending Durable Object migrations.
+
+`GET /api/deployment-readiness` is a public, read-only operator diagnostic, available even
+when configuration or client protocol prevents application calls. It exposes the actual
+`CF_VERSION_METADATA.id`, the non-secret `PACE_DEPLOY_ATTEMPT`, policy and a sanitized strict
+Firebase-pair verdict. Missing identity is explicitly `unavailable`; `PACE_VERSION` cannot
+substitute for it. It does not expose account credentials or Android API keys and does not
+access a database. HTTP 200 means the diagnostic was read, **not** that promotion is safe:
+the staging runner must match identity, attempt, policy and the expected ready mode/project.
+Application health, discovery and authenticated routes retain the strict configuration guard.
+Version URL protection is configured separately and must be verified before using a candidate.
+
+## Android OTA build configuration
+
+OTA remains disabled in default builds. The account server cannot choose the code publisher.
+An explicitly configured native build requires all three build inputs:
+
+- `PACE_OTA_URL`: canonical HTTPS publisher URL ending in `/manifest`, without credentials,
+  query parameters or a fragment.
+- `PACE_OTA_CHANNEL`: a lowercase channel such as `preview` or `production`.
+- `PACE_OTA_CERTIFICATE`: exactly `./ota/publisher-certificate.pem`, relative to `apps/app`.
+  Supply a valid public RSA certificate (at least 2048 bits), never the private signing key.
+
+`PACE_OTA_KEY_ID` optionally selects the signature key identifier (default `root`). Partial
+or invalid configuration fails the build. The certificate contents are added to Expo's
+default fingerprint sources; changing trust requires a new compatible APK. This is not a
+replacement for checking the publisher fingerprint against the released APK's metadata.
+
+The app checks on launch and foreground, coalesces concurrent requests, and limits manifest
+checks to once per hour during its lifetime. Account/server switches do not reset this policy.
+Downloads require Android to report an unmetered Wi-Fi network; unknown networks cannot
+authorize a download. Settings and the incompatible-server screen show update status and
+running APK/runtime/update identifiers, with a deliberate restart when an update is ready.
+The web retains its existing service-worker update path.
+
+Expo's automatic checks are set to `NEVER`, including recovery network fetching, so native
+startup does not bypass this download policy. Cached recovery remains Expo's responsibility;
+this does not promise recovery from every post-startup JavaScript failure. Native recovery,
+signature rejection and offline behavior still require the device acceptance scenarios.
+
+The isolated `apps/updates` Worker serves signed immutable manifests/assets from R2. It has
+no private signing key and cannot create signatures. Publication/promotion automation,
+released-APK fingerprint matching and device acceptance remain unfinished; no publisher
+resource or production signing material is provisioned by these changes.

@@ -1,8 +1,8 @@
-import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
 import { meterSql } from "./helpers.ts";
+import { runInUserStore as runInDurableObject } from "./host.ts";
 
 const freshStore = () => env.USER_STORE.get(env.USER_STORE.idFromName(crypto.randomUUID()));
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { LlmHealth } from "./health-object.ts";
+import type { LlmHealth } from "../../../tests/host.ts";
 
 import { createHealthKeeper, type KeeperStorage } from "./health-keeper.ts";
 import { HEALTH_CACHE_MS, objectHealth } from "./health-store.ts";
@@ -150,7 +150,10 @@ describe("a long fake day through the isolate's memory", () => {
     const changes: HealthChange[] = [];
     const namespace = namespaceOf(createHealthKeeper(storage), changes);
     let clock = Date.parse("2026-11-02T00:00:00.000Z");
-    const memory = objectHealth(namespace, { cache: {}, clock: () => clock });
+    const memory = objectHealth(() => namespace.get(namespace.idFromName("global")), {
+      cache: {},
+      clock: () => clock,
+    });
     const reads = 24 * 30;
     for (let read = 0; read < reads; read += 1) {
       clock += 2 * MINUTE;

@@ -1,9 +1,15 @@
 import { z } from "zod";
 
+import { CHECKPOINT_VERSION } from "../checkpoint/version.ts";
 import { LiveNoticeSchema } from "../notify/pool.ts";
 import { err, ok, type Result } from "../result.ts";
 import { loosen } from "./loose.ts";
-import { StoreIdSchema, SyncPushBodySchema, SyncPushOutputSchema } from "./schemas/sync.ts";
+import {
+  SequencedSyncRecordSchema,
+  StoreIdSchema,
+  SyncPushBodySchema,
+  SyncPushOutputSchema,
+} from "./schemas/sync.ts";
 
 /*
 The live socket (`GET /api/sync/live`). `pace.v1` only says `changed` and the pool's notices;
@@ -58,6 +64,9 @@ export const LiveClientMessageSchema = z.discriminatedUnion("type", [
     type: z.literal("pull"),
     id: RequestIdSchema,
     since: z.number().int().nonnegative(),
+    storeId: StoreIdSchema.optional(),
+    through: z.number().int().nonnegative().optional(),
+    checkpointVersion: z.literal(CHECKPOINT_VERSION).optional(),
     limit: z.number().int().min(1).max(500).optional(),
   }),
 ]);
@@ -97,6 +106,8 @@ const SyncMessages = [
     seq: z.number().int().nonnegative(),
     storeId: StoreIdSchema,
     events: z.array(z.unknown()),
+    records: z.array(SequencedSyncRecordSchema).optional(),
+    bootstrapRequired: z.boolean().optional(),
     more: z.boolean(),
   }),
   /** A request refused: `store/changed`, `bad-request` (with the id when one was readable). */

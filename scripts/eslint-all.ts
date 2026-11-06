@@ -23,6 +23,7 @@ const PARTS: readonly (readonly [string, readonly string[], number])[] = [
   ["packages", ["packages"], 0],
   ["api", ["apps/api"], 0],
   ["app", ["apps/app"], DESIGN_VALUE_WARNINGS],
+  ["updates", ["apps/updates"], 0],
   ["root", [".", "--ignore-pattern", "apps/**", "--ignore-pattern", "packages/**"], 0],
 ];
 

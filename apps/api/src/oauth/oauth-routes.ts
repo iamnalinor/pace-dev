@@ -1,7 +1,5 @@
 import type { Context, Hono } from "hono";
 
-import { authorizationErrorRedirect } from "@cloudflare/workers-oauth-provider";
-
 import {
   endpoints,
   err,
@@ -17,7 +15,6 @@ import {
 import type { AppEnv } from "../shared/app-env.ts";
 import type { GrantMetadata } from "../shared/oauth-grants.ts";
 
-import { d1 } from "../shared/db/d1.ts";
 import { type Handler, mount, type Problem } from "../shared/mount.ts";
 import { oauthHelpers } from "../shared/oauth-helpers.ts";
 import { bearerOf, resolveSessionIdentity } from "../shared/session-identity.ts";
@@ -79,9 +76,9 @@ const identityOf = async (
     const hasSecondProof = body.telegram !== undefined || body.devTelegramId !== undefined;
     return hasSecondProof
       ? err(IDENTITY_CONFLICT)
-      : await resolveSessionIdentity(d1(c.env.DB), c.get("config"), { now, token: bearer });
+      : await resolveSessionIdentity(c.env.DB, c.get("config"), { now, token: bearer });
   }
-  return await resolveTelegramIdentity(d1(c.env.DB), c.get("config"), {
+  return await resolveTelegramIdentity(c.env.DB, c.get("config"), {
     devTelegramId: body.devTelegramId,
     now,
     telegram: body.telegram,
@@ -120,9 +117,7 @@ const complete: Handler<typeof endpoints.oauth.complete> = async ({ c, body }) =
 
 const deny: Handler<typeof endpoints.oauth.deny> = async ({ c, body }) => {
   const consent = await loadConsent(c, body.authQuery);
-  return consent.ok
-    ? ok({ redirectTo: authorizationErrorRedirect(consent.value.request, "access_denied") })
-    : consent;
+  return consent.ok ? ok({ redirectTo: oauthHelpers(c).deny(consent.value.request) }) : consent;
 };
 
 export const mountOAuthRoutes = (app: Hono<AppEnv>): Hono<AppEnv> => {

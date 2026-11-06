@@ -1,4 +1,3 @@
-import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
@@ -7,6 +6,7 @@ import { endpoints, LIVE_SESSION_ENDED, LiveServerMessageSchema, newId } from "@
 import { LIVE_EXPIRES_HEADER, LIVE_SESSION_HEADER } from "../src/shared/socket-auth.ts";
 import { replyCloseCode } from "../src/user-store/live-sockets.ts";
 import { answerOf, api, call, json, loginAsDev, pushEvents, storeIdOf } from "./helpers.ts";
+import { runInUserStore as runInDurableObject } from "./host.ts";
 
 type LiveMessage = ReturnType<typeof LiveServerMessageSchema.parse>;
 type Events = Extract<LiveMessage, { type: "events" }>;
@@ -711,4 +711,78 @@ describe("live sockets end with their session", () => {
     expect(response.status).toBe(401);
     expect(response.webSocket).toBeNull();
   });
+});
+
+it("carries actual burned-gap cursors in proactive and requested checkpoint-aware live records", async () => {
+  const token = await loginAsDev("1001");
+  const first = event();
+  const { seq: firstSeq } = await pushEvents<{ seq: number }>(token, [first]);
+  const base = firstSeq - 1;
+  const generation = await storeIdOf(token);
+  const stub = await userStore(token);
+  await runInDurableObject(stub, async (_store, state) => {
+    state.storage.sql.exec(
+      "INSERT INTO events (id,type,occurred_at,recorded_at,device_id,precision,source,payload) SELECT id,type,occurred_at,recorded_at,device_id,precision,source,payload FROM events WHERE id=? ON CONFLICT(id) DO NOTHING",
+      first.id,
+    );
+  });
+  const reader = await openV2(token, "checkpoint-reader");
+  const last = event();
+  const { seq: lastSeq } = await pushEvents<{ seq: number }>(token, [last]);
+  expect(lastSeq).toBe(firstSeq + 2);
+  const [, proactive] = await reader.until("events");
+  expect(proactive).toMatchObject({
+    since: firstSeq,
+    seq: lastSeq,
+    records: [{ seq: lastSeq, event: { id: last.id } }],
+  });
+  reader.socket.send(
+    JSON.stringify({
+      id: "history",
+      type: "pull",
+      since: base,
+      through: lastSeq,
+      storeId: generation,
+      checkpointVersion: 1,
+      limit: 1,
+    }),
+  );
+  const [, page] = await reader.until("events");
+  expect(page).toMatchObject({
+    id: "history",
+    seq: firstSeq,
+    more: true,
+    records: [{ seq: firstSeq, event: { id: first.id } }],
+  });
+  reader.socket.send(
+    JSON.stringify({
+      id: "history-last",
+      type: "pull",
+      since: firstSeq,
+      through: lastSeq,
+      storeId: generation,
+      checkpointVersion: 1,
+      limit: 1,
+    }),
+  );
+  const [, final] = await reader.until("events");
+  expect(final).toMatchObject({
+    seq: lastSeq,
+    more: false,
+    records: [{ seq: lastSeq, event: { id: last.id } }],
+  });
+  reader.socket.send(
+    JSON.stringify({
+      id: "settled",
+      type: "pull",
+      since: lastSeq,
+      through: lastSeq,
+      storeId: generation,
+      checkpointVersion: 1,
+    }),
+  );
+  const [, settled] = await reader.until("events");
+  expect(settled).toMatchObject({ records: [], events: [], seq: lastSeq, more: false });
+  expect(await reader.next()).toBeNull();
+  reader.socket.close();
 });

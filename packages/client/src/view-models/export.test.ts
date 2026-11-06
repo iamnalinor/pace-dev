@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { NOW } from "@pace/core/testing";
 
 import { setupActions, unwrap } from "../actions/fixture.fake.ts";
+import { completeHistoryOf } from "../history-types.ts";
 import { exportSheets } from "./export.ts";
 
 const LECTURE_START = new Date(Date.parse(NOW) - 90 * 60_000).toISOString();
@@ -19,7 +20,7 @@ describe("the spreadsheet export", () => {
       }),
     );
     const state = world.state.store.getState();
-    const sheets = exportSheets(state, NOW);
+    const sheets = exportSheets(unwrap(completeHistoryOf(state)), NOW);
     expect(sheets.map((sheet) => sheet.name)).toEqual([
       "tasks",
       "subtasks",

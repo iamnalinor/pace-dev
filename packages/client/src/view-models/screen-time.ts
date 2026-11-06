@@ -1,4 +1,4 @@
-import { addDaysIn, startOfDayIn, type UsageRow } from "@pace/core";
+import { nextDayStartIn, startOfDayIn, type UsageRow } from "@pace/core";
 
 type Span = { readonly startAt: string; readonly endAt: string };
 
@@ -101,7 +101,7 @@ export const appsDuring = (usage: readonly UsageRow[], span: Span): readonly App
 /** One account-local day, with device time deduplicated across its apps. */
 export const screenTime = (usage: readonly UsageRow[], day: string, zone: string): ScreenTime => {
   const from = startOfDayIn(day, zone);
-  const to = addDaysIn(from, 1, zone);
+  const to = nextDayStartIn(from, zone);
   const pieces = clipped(usage, { startAt: from, endAt: to });
   const devices = Object.entries(Object.groupBy(pieces, (piece) => piece.deviceId))
     .map(([id, rows]): DeviceTime | null =>

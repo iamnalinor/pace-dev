@@ -60,6 +60,28 @@ const RESTRICTED_SYNTAX = [
   },
 ];
 
+/** All domain modules consume ports; composition and tests own host APIs. */
+const PORTABLE_API_FILES = ["apps/api/src/**/*.ts"];
+
+const PORTABLE_API_SYNTAX = [
+  {
+    message: "Portable API code uses infrastructure ports: request.cf belongs in the host adapter.",
+    selector:
+      "MemberExpression[computed=false][property.name='cf'], MemberExpression[computed=true][property.value='cf'], ObjectPattern > Property[key.name='cf'], ObjectPattern > Property[key.value='cf']",
+  },
+  {
+    message:
+      "Portable API code uses infrastructure ports: Cloudflare runtime types belong in adapters.",
+    selector:
+      "TSQualifiedName[left.name='Cloudflare'][right.name='Env'], Identifier[name=/^(D1[A-Za-z]*|DurableObject[A-Za-z]*|KVNamespace[A-Za-z]*|SqlStorage[A-Za-z]*|WebSocketPair|WebSocketRequestResponsePair|ExecutionContext|Fetcher)$/]",
+  },
+  {
+    message: "Portable API code uses infrastructure ports: platform imports belong in adapters.",
+    selector:
+      "ImportDeclaration[source.value=/^(cloudflare:|@cloudflare\\/|drizzle-orm\\/(d1|durable-sqlite)(\\/|$))/], ExportNamedDeclaration[source.value=/^(cloudflare:|@cloudflare\\/|drizzle-orm\\/(d1|durable-sqlite)(\\/|$))/], ExportAllDeclaration[source.value=/^(cloudflare:|@cloudflare\\/|drizzle-orm\\/(d1|durable-sqlite)(\\/|$))/]",
+  },
+];
+
 /**
 Rendered elements compared with toEqual: a failing comparison prints a diff of the whole tree,
 which takes about a second, so a waitFor around it runs out of time before its retry sees the
@@ -159,6 +181,7 @@ export default defineConfig([
     "**/.wrangler/",
     "apps/api/drizzle/",
     "apps/api/worker-configuration.d.ts",
+    "apps/updates/worker-configuration.d.ts",
     "apps/app/android/",
     "apps/app/.expo/",
     "apps/app/expo-env.d.ts",
@@ -458,7 +481,7 @@ export default defineConfig([
     rules: { "@typescript-eslint/explicit-module-boundary-types": "off" },
   },
   {
-    files: ["apps/api/src/worker.ts"],
+    files: ["apps/api/src/worker.ts", "apps/updates/src/worker.ts"],
     // The Workers runtime loads the entry module's default export.
     rules: { "import-x/no-default-export": "off" },
   },
@@ -613,6 +636,14 @@ export default defineConfig([
   {
     files: ["e2e/**/*.e2e.ts"],
     rules: { "no-restricted-syntax": ["error", ...RESTRICTED_SYNTAX, OWN_CONTEXT] },
+  },
+
+  {
+    files: PORTABLE_API_FILES,
+    ignores: ["apps/api/src/platform/**", "apps/api/src/worker.ts", "**/*.test.ts", "**/*.d.ts"],
+    rules: {
+      "no-restricted-syntax": ["error", ...RESTRICTED_SYNTAX, ...PORTABLE_API_SYNTAX],
+    },
   },
 
   // ── Declaration files: ambient/global augmentation needs `interface` and `import()` types

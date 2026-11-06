@@ -1,6 +1,7 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { AppState, Text } from "react-native";
 
+import { serverStore } from "#app/platform/server-store.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { FAKE_STORE_ID, fakeUser, problem } from "@pace/client/testing";
@@ -24,6 +25,37 @@ const App = () => (
     <Text>{en("now.empty")}</Text>
   </SyncFrame>
 );
+
+describe("server configuration while signed in", () => {
+  it("keeps the local screen and session while showing the configuration reason", async () => {
+    const runtime = await createTestRuntime({
+      routes: {
+        "GET /api/instance": () =>
+          Response.json(
+            {
+              code: "server/misconfigured",
+              message: "Server configuration is invalid",
+              reason: "project-mismatch",
+            },
+            { status: 500 },
+          ),
+      },
+    });
+    await runtime.auth.me();
+    await renderScreen(<App />, runtime);
+    expect(
+      await screen.findByText(
+        "The server's Firebase settings name different projects. Ask its owner to correct them.",
+      ),
+    ).toBeOnTheScreen();
+    expect(screen.getByText(en("now.empty"))).toBeOnTheScreen();
+    expect(runtime.auth.store.getState().status).toBe("signed-in");
+    expect(screen.queryByText(en("server.mismatch"))).toBeNull();
+    await act(async () => {
+      serverStore.setState({ configurationError: null });
+    });
+  });
+});
 
 describe("the first-sync cover (QA round 17 M4)", () => {
   it("shows no empty copy while an empty copy waits for its first sync, then the screen", async () => {

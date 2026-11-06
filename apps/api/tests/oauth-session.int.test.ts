@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { createSession } from "../src/auth/sessions.ts";
 import { upsertTelegramUser } from "../src/auth/users.ts";
-import { d1 } from "../src/shared/db/d1.ts";
+import { d1 } from "../src/platform/cloudflare/sqlite.ts";
 import { call, loginAsDev, readJson } from "./helpers.ts";
 import { authorizeQuery, codeFrom, exchangeCode, pkce, registerClient } from "./oauth-flow.ts";
 

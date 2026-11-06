@@ -1,11 +1,13 @@
 import { BEDTIME_FROM_HOUR, formatInZone, NIGHT_UNTIL_HOUR, wallClockInstant } from "@pace/core";
 
+import type { Scheduler } from "../shared/ports/scheduler.ts";
+
 // The store has one alarm for everything it waits on: the notification pool's next pass and its
 // retries, the assistant's queue, automatic sleep. Each arms it through `armEarliest`, so none
 // moves another's earlier time later; `alarm()` runs them all and each arms its next time again.
 
 /** Moves the store's one alarm to `at` when that is earlier than the one set (or none is). */
-export const armEarliest = async (storage: DurableObjectStorage, at: number): Promise<void> => {
+export const armEarliest = async (storage: Scheduler, at: number): Promise<void> => {
   const existing = await storage.getAlarm();
   if (existing === null || at < existing) {
     await storage.setAlarm(at);

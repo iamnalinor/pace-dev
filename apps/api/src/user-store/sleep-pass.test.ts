@@ -1,4 +1,3 @@
-import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -11,8 +10,7 @@ import {
   wallClockInstant,
 } from "@pace/core";
 
-import type { UserStore } from "./user-store.ts";
-
+import { runInUserStore as runInDurableObject, type UserStore } from "../../tests/host.ts";
 import { HELD_KEY, heldOf } from "./sleep-hold.ts";
 import {
   DECIDED_UNTIL_KEY,

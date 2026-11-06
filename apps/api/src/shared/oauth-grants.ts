@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import type { KeyValue } from "./ports/key-value.ts";
+
 /*
 The MCP apps' grants, read and revoked straight from OAUTH_KV in the layout
 @cloudflare/workers-oauth-provider keeps them (`grant:<user>:<grant>`, its tokens under
@@ -40,7 +42,7 @@ const grantPrefix = (userId: string): string => `grant:${userId}:`;
 
 /** Every key under `prefix`, page after page. */
 const keysUnder = async (
-  kv: KVNamespace,
+  kv: KeyValue,
   prefix: string,
   cursor?: string,
 ): Promise<readonly string[]> => {
@@ -50,7 +52,7 @@ const keysUnder = async (
 };
 
 /** The person's grants; one the provider stored in another shape is skipped. */
-export const listGrants = async (kv: KVNamespace, userId: string): Promise<readonly Grant[]> => {
+export const listGrants = async (kv: KeyValue, userId: string): Promise<readonly Grant[]> => {
   const prefix = grantPrefix(userId);
   // A grant key holds no further colon after the prefix; anything deeper is not a grant.
   const keys = await keysUnder(kv, prefix);
@@ -74,7 +76,7 @@ false when they hold no such grant (already revoked, or not theirs).
 */
 // eslint-disable-next-line unicorn/consistent-boolean-name -- an action that reports whether a grant went, like deleteSession
 export const revokeGrant = async (
-  kv: KVNamespace,
+  kv: KeyValue,
   userId: string,
   grantId: string,
 ): Promise<boolean> => {
@@ -96,7 +98,7 @@ export const revokeGrant = async (
 Revokes every grant of the person and every token under them, whatever shape the provider stored
 them in: an account deleted leaves no key of its own behind (re-review N4).
 */
-export const revokeAllGrants = async (kv: KVNamespace, userId: string): Promise<void> => {
+export const revokeAllGrants = async (kv: KeyValue, userId: string): Promise<void> => {
   const keys = [
     ...(await keysUnder(kv, `token:${userId}:`)),
     ...(await keysUnder(kv, grantPrefix(userId))),

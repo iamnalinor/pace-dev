@@ -23,9 +23,23 @@ const PUSH_PROBLEMS: Readonly<Record<typeof STORE_CHANGED, Problem>> = {
   },
 };
 
+const pullProblem = (code: "store/changed" | "sync/invalid-cursor"): Problem => {
+  switch (code) {
+    case "store/changed": {
+      return PUSH_PROBLEMS[code];
+    }
+    case "sync/invalid-cursor": {
+      return {
+        code,
+        message: "The requested history cursor is outside this store snapshot",
+        status: 422,
+      };
+    }
+  }
+};
+
 /** The signed-in user's Durable Object: its id is the user id. */
-const userStore = (c: Context<AppEnv>) =>
-  c.env.USER_STORE.get(c.env.USER_STORE.idFromName(requireUser(c).id));
+const userStore = (c: Context<AppEnv>) => c.env.USER_STORE.of(requireUser(c).id);
 
 /**
 The live channel (`GET /api/sync/live`, a WebSocket) to the user's store. On `pace.v1` it says
@@ -56,12 +70,17 @@ const mountLiveRoute = (app: Hono<AppEnv>): void => {
     const headers = new Headers(c.req.raw.headers);
     headers.set(LIVE_SESSION_HEADER, session.sessionId);
     headers.set(LIVE_EXPIRES_HEADER, String(session.expiresAt));
-    const store = c.env.USER_STORE.get(c.env.USER_STORE.idFromName(session.user.id));
+    const store = c.env.USER_STORE.of(session.user.id);
     return await store.fetch(new Request(c.req.raw.url, { headers }));
   });
 };
 
 export const mountSyncRoutes = (app: Hono<AppEnv>): void => {
+  mount(app, endpoints.sync.bootstrap, async ({ c, query }) => {
+    const result = await userStore(c).bootstrap(query.limit);
+    return ok(result.kind === "source" ? result : { ...result, records: [...result.records] });
+  });
+
   mount(app, endpoints.sync.push, async ({ c, body }) => {
     const result = await userStore(c).push(body.storeId, body.events, {
       now: new Date().toISOString(),
@@ -74,8 +93,16 @@ export const mountSyncRoutes = (app: Hono<AppEnv>): void => {
   });
 
   mount(app, endpoints.sync.pull, async ({ c, query }) => {
-    const result = await userStore(c).list(query.since, query.limit);
+    const pulled = await userStore(c).pull(query);
+    if (!pulled.ok) {
+      return err(pullProblem(pulled.error));
+    }
+    const result = pulled.value;
     return ok({
+      ...(result.records !== undefined && { records: [...result.records] }),
+      ...(result.bootstrapRequired !== undefined && {
+        bootstrapRequired: result.bootstrapRequired,
+      }),
       events: [...result.events],
       more: result.more,
       seq: result.seq,

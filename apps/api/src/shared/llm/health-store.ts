@@ -1,4 +1,4 @@
-import type { LlmHealth } from "./health-object.ts";
+import type { HealthActor } from "../ports/bindings.ts";
 
 import { createLogger } from "../logger.ts";
 import { logChanges } from "./health-keeper.ts";
@@ -46,7 +46,6 @@ in the meantime does not wait its second for it again; far shorter than a good r
 export const HEALTH_FAILURE_CACHE_MS = 5000;
 
 /** The deployment's one health object. */
-const OBJECT_NAME = "global";
 
 /** What an isolate last read or saved, and when (its own clock). */
 export type HealthCache = {
@@ -91,7 +90,7 @@ an error and the empty health is kept for `HEALTH_FAILURE_CACHE_MS`; a state the
 save is never cached.
 */
 export const objectHealth = (
-  namespace: DurableObjectNamespace<LlmHealth>,
+  object: () => HealthActor,
   options: ObjectHealthOptions = {},
 ): HealthMemory => {
   const {
@@ -99,7 +98,6 @@ export const objectHealth = (
     clock = Date.now,
     readTimeoutMs = HEALTH_READ_TIMEOUT_MS,
   } = options;
-  const object = () => namespace.get(namespace.idFromName(OBJECT_NAME));
   const remember = (health: Health, ttl = HEALTH_CACHE_MS): Health => {
     cache.value = { at: clock(), health, ttl };
     return health;
@@ -149,14 +147,13 @@ export const inBackground = (
 });
 
 /** The deployment's health memory, from the bindings of this request or Durable Object. */
-export const llmHealthOf = (env: {
-  readonly LLM_HEALTH: DurableObjectNamespace<LlmHealth>;
-}): HealthMemory => objectHealth(env.LLM_HEALTH);
+export const llmHealthOf = (env: { readonly LLM_HEALTH: HealthMemory }): HealthMemory =>
+  env.LLM_HEALTH;
 
 /** The deployment's health memory for a request: what its read showed is saved after the response. */
 export const llmHealthAfterResponse = (
-  env: { readonly LLM_HEALTH: DurableObjectNamespace<LlmHealth> },
-  ctx: Pick<ExecutionContext, "waitUntil">,
+  env: { readonly LLM_HEALTH: HealthMemory },
+  ctx: { readonly waitUntil: (promise: Promise<unknown>) => void },
 ): HealthMemory =>
   inBackground(llmHealthOf(env), (promise) => {
     ctx.waitUntil(promise);

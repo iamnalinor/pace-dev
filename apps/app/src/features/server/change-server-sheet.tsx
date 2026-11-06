@@ -16,9 +16,11 @@ import {
   type ServerUrlError,
 } from "@pace/core";
 
+import { configurationErrorKey } from "./configuration-error.ts";
+
 type Problem = InstanceError | ServerUrlError;
 
-const PROBLEM_KEY: Readonly<Record<Problem, MessageKey>> = {
+const PROBLEM_KEY: Readonly<Record<Extract<Problem, string>, MessageKey>> = {
   "client-outdated": "server.clientOutdated",
   insecure: "server.insecure",
   "invalid-url": "server.invalidUrl",
@@ -26,6 +28,9 @@ const PROBLEM_KEY: Readonly<Record<Problem, MessageKey>> = {
   "server-outdated": "server.serverOutdated",
   unreachable: "server.unreachable",
 };
+
+const problemKey = (problem: Problem): MessageKey =>
+  typeof problem === "object" ? configurationErrorKey(problem.reason) : PROBLEM_KEY[problem];
 
 /** One fact about the checked server: a quiet label and the server's own value, read as one. */
 const Fact = ({ label, value }: { readonly label: string; readonly value: string }) => (
@@ -92,16 +97,9 @@ const useServerCheck = () => {
   return { check, edit, phase, text };
 };
 
-/**
-"Change server" (signed out, from the login screen): the address of another Pace server, checked
-against `/api/instance` (it must be a Pace this app fits) before the app moves to it; or back to
-the build's own server. Moving drops this phone's local log and any stored token.
-*/
-export const ChangeServerSheet = ({ onClose }: { readonly onClose: () => void }) => {
-  const t = useT();
+const useServerMove = (onClose: () => void) => {
   const runtime = usePace();
-  const origin = useStore(serverStore, (state) => state.origin);
-  const { check, edit, phase, text } = useServerCheck();
+  const [moveFailed, setMoveFailed] = useState(false);
   const [isMoving, setIsMoving] = useState(false);
   // A latch read synchronously: two taps in one frame both see the state still false.
   const movingRef = useRef(false);
@@ -113,9 +111,33 @@ export const ChangeServerSheet = ({ onClose }: { readonly onClose: () => void })
     }
     movingRef.current = true;
     setIsMoving(true);
-    await switchServer(runtime, choice);
-    onClose();
+    setMoveFailed(false);
+    try {
+      await switchServer(runtime, choice);
+      onClose();
+    } catch {
+      setMoveFailed(true);
+    } finally {
+      movingRef.current = false;
+      setIsMoving(false);
+    }
   };
+
+  return { isMoving, move, moveFailed };
+};
+
+/**
+"Change server" (signed out, from the login screen): the address of another Pace server, checked
+against `/api/instance` (it must be a Pace this app fits) before the app moves to it; or back to
+the build's own server. Moving drops this phone's local log and any stored token.
+*/
+export const ChangeServerSheet = ({ onClose }: { readonly onClose: () => void }) => {
+  const t = useT();
+  const origin = useStore(serverStore, (state) => state.origin);
+  const { check, edit, phase, text } = useServerCheck();
+  const { isMoving, move, moveFailed } = useServerMove(onClose);
+  const checkError = phase.kind === "refused" ? t(problemKey(phase.problem)) : null;
+  const error = moveFailed ? t("server.moveFailed") : checkError;
 
   return (
     <Sheet
@@ -132,7 +154,7 @@ export const ChangeServerSheet = ({ onClose }: { readonly onClose: () => void })
           autoCapitalize="none"
           autoComplete="url"
           autoCorrect={false}
-          error={phase.kind === "refused" ? t(PROBLEM_KEY[phase.problem]) : null}
+          error={error}
           inputMode="url"
           keyboardType="url"
           label={t("server.address")}

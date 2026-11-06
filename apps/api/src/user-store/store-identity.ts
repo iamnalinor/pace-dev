@@ -1,13 +1,7 @@
-import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
-
-import { migrate } from "drizzle-orm/durable-sqlite/migrator";
-
-import type * as schema from "./schema.ts";
+import type { ActorStorage } from "../shared/ports/actor-storage.ts";
 
 import migrations from "../../drizzle/do/migrations.js";
 import { randomBase64Url } from "../shared/crypto.ts";
-
-type Db = DrizzleSqliteDODatabase<typeof schema>;
 
 /**
 The generation of every store's data. A store that started under another epoch (or before
@@ -26,7 +20,7 @@ const STORE_ID_KEY = "storeId";
 The store's random id (16 bytes, base64url), made on first use. Clearing the storage forgets
 it, so a wiped store answers a new one and clients know to drop their local copy.
 */
-export const storeIdOf = async (storage: DurableObjectStorage): Promise<string> => {
+export const storeIdOf = async (storage: ActorStorage): Promise<string> => {
   const existing = await storage.get<string>(STORE_ID_KEY);
   if (existing !== undefined) {
     return existing;
@@ -37,28 +31,46 @@ export const storeIdOf = async (storage: DurableObjectStorage): Promise<string> 
 };
 
 /** Every row, key and the alarm: what a wipe and an epoch change both drop. */
-const clear = async (storage: DurableObjectStorage): Promise<void> => {
+const clear = async (storage: ActorStorage): Promise<void> => {
   await storage.deleteAlarm();
   await storage.deleteAll();
 };
 
 /** Migrates, then stamps the current epoch and the store id (a new one after a clear). */
-const prepare = async (db: Db, storage: DurableObjectStorage): Promise<void> => {
-  await migrate(db, migrations);
-  await storage.put(EPOCH_KEY, STORE_EPOCH);
+type ReadyOptions = { readonly storeId?: string; readonly beforeReady?: () => Promise<void> };
+const prepare = async (
+  storage: ActorStorage,
+  migrate: () => Promise<void>,
+  options: ReadyOptions,
+): Promise<void> => {
+  await migrate();
+  if (options.storeId !== undefined) {
+    await storage.put(STORE_ID_KEY, options.storeId);
+  }
   await storeIdOf(storage);
+  await options.beforeReady?.();
+  // The final readiness stamp must never precede restoring an in-progress cleanup fence.
+  await storage.put(EPOCH_KEY, STORE_EPOCH);
 };
 
 /** Readies a starting store: one from another epoch is emptied before it migrates. */
-export const openStore = async (db: Db, storage: DurableObjectStorage): Promise<void> => {
+export const openStore = async (
+  storage: ActorStorage,
+  migrate: () => Promise<void>,
+  options: ReadyOptions = {},
+): Promise<void> => {
   if ((await storage.get<number>(EPOCH_KEY)) !== STORE_EPOCH) {
     await clear(storage);
   }
-  await prepare(db, storage);
+  await prepare(storage, migrate, options);
 };
 
 /** Empties the store and readies it again under a new store id. */
-export const resetStore = async (db: Db, storage: DurableObjectStorage): Promise<void> => {
+export const resetStore = async (
+  storage: ActorStorage,
+  migrate: () => Promise<void>,
+  options: ReadyOptions = {},
+): Promise<void> => {
   await clear(storage);
-  await prepare(db, storage);
+  await prepare(storage, migrate, options);
 };

@@ -43,6 +43,33 @@ const world = materialize(
 const DAY = { from: T("00:00"), now: T("12:00"), to: "2026-10-08T00:00:00.000Z" };
 
 describe("insights", () => {
+  it("does not count the next Monday in a week whose first midnight was skipped", () => {
+    const state = materialize(
+      [
+        at(100, "2021-03-28T19:30:00.000Z", {
+          type: "activity.logged",
+          payload: {
+            activityId: "boundary",
+            category: "study",
+            label: "Monday",
+            taskId: "t-sheet",
+            startAt: "2021-03-28T19:30:00.000Z",
+            endAt: "2021-03-28T20:30:00.000Z",
+          },
+        }),
+      ],
+      coreReducer,
+      world,
+    );
+    expect(
+      weeklyProjectMinutes(state, "p-alg", {
+        now: "2021-03-31T12:00:00.000Z",
+        weeks: 2,
+        zone: "Asia/Tehran",
+      }),
+    ).toEqual([0, 60]);
+  });
+
   it("sums the day by category and by project", () => {
     expect(timeByCategory(world, DAY)).toEqual([
       { category: "study", minutes: 120 },

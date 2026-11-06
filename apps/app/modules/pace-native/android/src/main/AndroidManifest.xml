@@ -1,5 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
+  <!-- OTA downloads require a known unmetered Wi-Fi connection. -->
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
   <!-- Usage access is granted by the person in system settings, not at install time. -->
   <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
       tools:ignore="ProtectedPermissions" />
@@ -8,6 +10,13 @@
   <!-- The battery-optimization exemption, asked only while the phone polls for notifications. -->
   <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
   <!-- Android 11+ package visibility: launcher apps, so their names can be shown next to usage. -->
+  <application>
+    <!-- A separate process can terminate the old Firebase singleton before a fresh launch. -->
+    <activity android:name="expo.modules.pacenative.FirebaseRestartActivity"
+        android:process=":pace_restart" android:exported="false"
+        android:excludeFromRecents="true" android:noHistory="true"
+        android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+  </application>
   <queries>
     <intent>
       <action android:name="android.intent.action.MAIN" />

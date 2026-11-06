@@ -159,6 +159,7 @@ export const enShell = {
   "onboarding.notNow": "Not now",
   "onboarding.step": "{index} of {total}",
   "settings.export.action": "Export data",
+  "settings.export.failed": "Could not download the export. Try again.",
   "settings.export.done": "Downloaded {file}",
   "settings.digestWindows": "Digest times",
   "settings.quietHours": "Quiet hours",

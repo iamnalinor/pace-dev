@@ -5,7 +5,8 @@ import { serverInfoOf } from "./server-store.ts";
 const instance = (apiOrigin: string): Instance => ({
   apiOrigin,
   botUsername: "PaceTestBot",
-  features: { assistant: false, mcp: true, push: false },
+  features: { assistant: false, historyCheckpoint: null, mcp: true, push: false },
+  firebase: null,
   loginMethods: ["telegram-deeplink"],
   minClientProtocol: 1,
   name: "Pace",
@@ -18,6 +19,7 @@ describe("the server's address the screens hand out (QA round 18 L10)", () => {
   it("is the origin the app talks to when the server names another one", () => {
     // A Worker started with its dev `API_ORIGIN` (8787) on another port: the named one is dead.
     const info = serverInfoOf({
+      configurationError: null,
       instance: instance("http://localhost:8787"),
       origin: "http://localhost:8818",
       reason: null,
@@ -28,6 +30,7 @@ describe("the server's address the screens hand out (QA round 18 L10)", () => {
 
   it("is the origin the app talks to before the server answered", () => {
     const info = serverInfoOf({
+      configurationError: null,
       instance: null,
       origin: "https://pace.example.org",
       reason: null,
@@ -38,6 +41,7 @@ describe("the server's address the screens hand out (QA round 18 L10)", () => {
 
   it("keeps the server's own values for the rest", () => {
     const info = serverInfoOf({
+      configurationError: null,
       instance: instance("https://pace.example.org"),
       origin: "https://pace.example.org",
       reason: null,
@@ -56,6 +60,7 @@ describe("the MCP URL the screens hand out (round 7 review 1)", () => {
     // The Worker's protected resource is `${API_ORIGIN}/mcp` (apps/api/src/worker.ts): an MCP
     // client refuses tokens for any other resource than the URL it was given.
     const info = serverInfoOf({
+      configurationError: null,
       instance: instance("https://pace.example.org"),
       origin: "https://pace.lan:8443",
       reason: null,
@@ -69,6 +74,7 @@ describe("the MCP URL the screens hand out (round 7 review 1)", () => {
 
   it("is the address in use, with nothing to say, while the two agree or the server has not answered", () => {
     const agreed = serverInfoOf({
+      configurationError: null,
       instance: instance("https://pace.example.org"),
       origin: "https://pace.example.org",
       reason: null,
@@ -77,6 +83,7 @@ describe("the MCP URL the screens hand out (round 7 review 1)", () => {
     expect(agreed.mcpUrl).toBe("https://pace.example.org/mcp");
     expect(agreed.isPublicOriginOther).toBe(false);
     const unknown = serverInfoOf({
+      configurationError: null,
       instance: null,
       origin: "https://pace.example.org",
       reason: null,
@@ -89,6 +96,7 @@ describe("the MCP URL the screens hand out (round 7 review 1)", () => {
   it("hands out no MCP URL when the server says it has no MCP (re-review N4)", () => {
     const lan = instance("https://pace.lan:8443");
     const info = serverInfoOf({
+      configurationError: null,
       instance: { ...lan, features: { ...lan.features, mcp: false } },
       origin: "https://pace.lan:8443",
       reason: null,

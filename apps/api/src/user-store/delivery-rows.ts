@@ -1,5 +1,3 @@
-import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
-
 import {
   and,
   desc,
@@ -14,12 +12,13 @@ import {
   type SQL,
 } from "drizzle-orm";
 
+import type { SqliteDatabase } from "../shared/ports/sqlite.ts";
 import type { PushSubscription } from "../shared/push-subscriptions.ts";
 import type { PollEntry } from "../shared/push/poll-transport.ts";
 
 import * as schema from "./schema.ts";
 
-type Db = DrizzleSqliteDODatabase<typeof schema>;
+type Db = SqliteDatabase<"sync", typeof schema>;
 
 /**
 One attempt to deliver a notification, as the delivery log keeps it: a push to a device, or the

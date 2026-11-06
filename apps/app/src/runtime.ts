@@ -1,3 +1,4 @@
+import { sha256Text } from "#app/platform/sha256-text.ts";
 import {
   checkInstance,
   type Clock,
@@ -7,16 +8,23 @@ import {
   type PaceClient,
   type PaceClientOptions,
   type SessionStore,
+  type Sha256Text,
 } from "@pace/client";
 import { type AppHooks, createAppHooks } from "@pace/client/react";
-import { CLIENT_OUTDATED, type Instance, type Result } from "@pace/core";
+import {
+  CLIENT_OUTDATED,
+  FirebaseConfigReasonSchema,
+  type Instance,
+  type Result,
+} from "@pace/core";
 
 import { loadDeviceId } from "./platform/device-id.ts";
 import { IS_PHONE } from "./platform/device.ts";
 import { createEventStore, type LocalEventStore } from "./platform/event-store.ts";
 import { createPeerTabs } from "./platform/peer-tabs.ts";
 import { createSecureSessionStore } from "./platform/secure-session.ts";
-import { markClientOutdated } from "./platform/server-store.ts";
+import { applyInstanceCheck, markClientOutdated } from "./platform/server-store.ts";
+import { canUseCurrentServer } from "./platform/server-switch-state.ts";
 import { readServer } from "./platform/server.ts";
 import { createSignOutNotes } from "./platform/sign-out-notes.ts";
 
@@ -43,6 +51,7 @@ export type RuntimeOptions = {
   readonly fetch?: FetchLike;
   readonly now?: () => string;
   readonly session?: SessionStore;
+  readonly sha256Text?: Sha256Text;
 };
 
 /** Whether a refused call is the server turning away this app as too old (426 `client/outdated`). */
@@ -60,6 +69,31 @@ const isClientOutdated = async (response: Response): Promise<boolean> => {
   }
 };
 
+const observeConfiguration = async (response: Response, origin: string): Promise<void> => {
+  if (response.status !== 500) {
+    return;
+  }
+  let body: unknown;
+  try {
+    body = await response.clone().json();
+  } catch {
+    return;
+  }
+  if (
+    typeof body !== "object" ||
+    body === null ||
+    !("code" in body) ||
+    body.code !== "server/misconfigured"
+  ) {
+    return;
+  }
+  const reason = FirebaseConfigReasonSchema.safeParse("reason" in body ? body.reason : null);
+  applyInstanceCheck(origin, {
+    ok: false,
+    error: { kind: "server-misconfigured", reason: reason.success ? reason.data : null },
+  });
+};
+
 /** Every call of the runtime, watched for the server refusing this app as too old. */
 const watchingProtocol =
   (fetchOf: FetchLike, origin: string): FetchLike =>
@@ -68,6 +102,7 @@ const watchingProtocol =
     if (await isClientOutdated(response)) {
       markClientOutdated(origin);
     }
+    await observeConfiguration(response, origin);
     return response;
   };
 
@@ -85,10 +120,11 @@ const sessionOf = (
 
 /** Builds the client stack on the platform adapters; options override them (tests). */
 export const createRuntime = async (options: RuntimeOptions = {}): Promise<PaceRuntime> => {
+  const hash = options.sha256Text ?? sha256Text;
   // A store a test hands in is nobody else's.
   const local: LocalEventStore =
     options.eventStore === undefined
-      ? createEventStore()
+      ? createEventStore(hash)
       : { isShared: () => Promise.resolve(false), store: options.eventStore };
   const eventStore = local.store;
   const deviceId = await (options.deviceId ?? loadDeviceId)();
@@ -97,6 +133,7 @@ export const createRuntime = async (options: RuntimeOptions = {}): Promise<PaceR
   const watched = watchingProtocol(fetchOf, baseUrl);
   const client = createPaceClient({
     baseUrl,
+    canSignIn: canUseCurrentServer,
     ...(options.clock !== undefined && { clock: options.clock }),
     deviceId,
     fetch: watched,
@@ -106,13 +143,14 @@ export const createRuntime = async (options: RuntimeOptions = {}): Promise<PaceR
     // The event log tells which shell a change came from.
     source: IS_PHONE ? "app" : "web",
     store: eventStore,
+    sha256Text: hash,
   });
   return {
     ...client,
     baseUrl,
     checkInstance: async () => await checkInstance(baseUrl, watched),
     deviceId,
-    hooks: createAppHooks(client.state, client.clock),
+    hooks: createAppHooks(client.state, client.clock, client.history),
     resetLocalData: async () => {
       // Through the log's write queue: a write still waiting must not land in the wiped store.
       await client.state.clear();

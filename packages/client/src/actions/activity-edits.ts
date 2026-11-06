@@ -237,6 +237,10 @@ const closedBy = (deps: ActionDeps, origin: Event): null | string => {
 
 /** Takes a block off the ledger; the one its start had ended stays ended where it was. */
 const deleteActivity = async (deps: ActionDeps, activityId: string): ActionResult => {
+  const history = await deps.state.ensureHistory();
+  if (!history.ok) {
+    return history;
+  }
   const origin = originOf(deps, activityId);
   if (origin === undefined) {
     return err("event/not-found");

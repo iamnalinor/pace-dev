@@ -2,14 +2,19 @@ import { describe, expect, it } from "vitest";
 
 import { CALC_HW5_ID, HW_ID, MOSCOW, NOW, sheetId, TRK_ID } from "@pace/core/testing";
 
+import type { AppState } from "../state.ts";
+
 import { setupActions, unwrap } from "../actions/fixture.fake.ts";
+import { completeHistoryOf } from "../history-types.ts";
 import { historyViewModel } from "./history.ts";
+
+const fullSource = (state: AppState) => unwrap(completeHistoryOf(state));
 
 describe("historyViewModel", () => {
   it("names how a task was closed: done, cancelled or skipped (QA round 20 L8)", async () => {
     const world = await setupActions();
     const [skipped] = unwrap(await world.actions.closeTask({ outcome: "skipped", taskId: TRK_ID }));
-    const history = historyViewModel(world.state.store.getState(), {
+    const history = historyViewModel(fullSource(world.state.store.getState()), {
       atIso: NOW,
       deviceTz: MOSCOW,
     });
@@ -21,7 +26,7 @@ describe("historyViewModel", () => {
   it("names the activity an activity event is about", async () => {
     const world = await setupActions();
     const [started] = unwrap(await world.actions.startChoice("rest"));
-    const history = historyViewModel(world.state.store.getState(), {
+    const history = historyViewModel(fullSource(world.state.store.getState()), {
       atIso: NOW,
       deviceTz: MOSCOW,
     });
@@ -42,9 +47,10 @@ describe("historyViewModel", () => {
     );
     const [archived] = unwrap(await world.actions.archivePreset("gym"));
     const named = (id: string | undefined) =>
-      historyViewModel(world.state.store.getState(), { atIso: NOW, deviceTz: MOSCOW }).events.find(
-        (entry) => entry.id === id,
-      )?.taskTitle;
+      historyViewModel(fullSource(world.state.store.getState()), {
+        atIso: NOW,
+        deviceTz: MOSCOW,
+      }).events.find((entry) => entry.id === id)?.taskTitle;
     expect([named(created?.id), named(renamed?.id), named(archived?.id)]).toEqual([
       "Swim",
       "Swim",
@@ -56,14 +62,14 @@ describe("historyViewModel", () => {
     const world = await setupActions();
     const [solved] = unwrap(await world.actions.markSolved(HW_ID, "s5"));
     const [revoked] = unwrap(await world.actions.undoLast());
-    const history = historyViewModel(world.state.store.getState(), {
+    const history = historyViewModel(fullSource(world.state.store.getState()), {
       atIso: NOW,
       deviceTz: MOSCOW,
     });
 
     expect(history.at).toBe(NOW);
     expect(history.board.rows.map((row) => row.id)).toContain(CALC_HW5_ID);
-    const monday = historyViewModel(world.state.store.getState(), {
+    const monday = historyViewModel(fullSource(world.state.store.getState()), {
       atIso: "2026-10-05T08:00:00.000Z",
       deviceTz: MOSCOW,
     });

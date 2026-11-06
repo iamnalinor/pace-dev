@@ -62,6 +62,10 @@ const SLIDER_MAX = 10;
 const unmarkSolved =
   (deps: ActionDeps): WorkActions["unmarkSolved"] =>
   async (taskId, subtaskId) => {
+    const history = await deps.state.ensureHistory();
+    if (!history.ok) {
+      return history;
+    }
     // Effective events are in canonical order, so the last match is the latest solve.
     const latest = deps.state.store
       .getState()

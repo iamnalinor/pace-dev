@@ -1,6 +1,5 @@
 import {
   coreReducer,
-  type CoreState,
   type Event,
   EVENT_LABEL_KEYS,
   INITIAL_CORE_STATE,
@@ -13,15 +12,11 @@ import {
   taskById,
 } from "@pace/core";
 
+import type { CompleteHistorySource } from "../history-types.ts";
+
 import { type NowViewModel, nowViewModel } from "./now.ts";
 
-/** The client state as history reads it: the materialized slices plus both logs. */
-export type HistorySource = CoreState & {
-  /** Effective events: corrections applied. */
-  readonly events: readonly Event[];
-  /** Every event, corrections included. */
-  readonly log: readonly Event[];
-};
+export type HistorySource = CompleteHistorySource;
 
 export type HistoryEntry = {
   readonly id: string;

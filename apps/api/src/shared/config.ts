@@ -54,6 +54,14 @@ const cidrList = (text: string, ctx: z.RefinementCtx): readonly string[] => {
   return entries;
 };
 
+const HistoryCheckpointModeSchema = z.enum(["off", "shadow", "active"]);
+
+/** Strict validation also protects actor construction outside the HTTP configuration middleware. */
+export const historyCheckpointModeOf = (
+  value: string | undefined,
+): z.output<typeof HistoryCheckpointModeSchema> =>
+  HistoryCheckpointModeSchema.default("off").parse(value);
+
 const EnvSchema = z.object({
   ENVIRONMENT: z.enum(["development", "test", "production"]),
   ALLOWED_TELEGRAM_IDS: z.string().transform(csv),
@@ -67,6 +75,7 @@ const EnvSchema = z.object({
   LLM_PROVIDER: z.enum(["auto", "fake"]).default("auto"),
   API_ORIGIN: z.string().optional(),
   PACE_VERSION: z.string().optional(),
+  PACE_HISTORY_CHECKPOINT_MODE: HistoryCheckpointModeSchema.default("off"),
 });
 
 /** One OpenAI-compatible endpoint: its models are tried in order, each with every key. */
@@ -168,6 +177,7 @@ export type Config = {
   readonly apiOrigin: string | undefined;
   /** The build this Worker runs (a release tag or a commit, set at deploy); `dev` otherwise. */
   readonly version: string;
+  readonly historyCheckpointMode: z.output<typeof HistoryCheckpointModeSchema>;
 };
 
 /** A loopback host as the OAuth provider tells one (RFC 8252 §7.3): `localhost`, `[::1]`, 127.0.0.0/8. */
@@ -266,5 +276,6 @@ export const loadConfig = (env: object): Result<Config, string> => {
     llmProvider: value.LLM_PROVIDER,
     apiOrigin: apiOriginOf(value.API_ORIGIN),
     version: versionOf(value.PACE_VERSION),
+    historyCheckpointMode: value.PACE_HISTORY_CHECKPOINT_MODE,
   });
 };

@@ -10,7 +10,14 @@ import {
   type Task,
 } from "@pace/core";
 
-import { type ActionDeps, type ActionResult, emit, stamp, taskOf } from "./deps.ts";
+import {
+  type ActionDeps,
+  type ActionResult,
+  emit,
+  stamp,
+  taskOf,
+  withCompleteHistory,
+} from "./deps.ts";
 
 export type SeriesActions = {
   readonly updateSeries: (seriesId: string, schedule: SeriesSchedule) => ActionResult;
@@ -56,6 +63,45 @@ const templateOf = (
   seriesRevision: 0,
 });
 
+const startSeriesForTask = (deps: ActionDeps): SeriesActions["startSeriesForTask"] =>
+  withCompleteHistory<Parameters<SeriesActions["startSeriesForTask"]>>(
+    deps,
+    async (taskId, schedule) => {
+      const task = taskOf(deps, taskId);
+      // A task whose series ended starts a new one; a task in a running series cannot.
+      if (
+        !task.ok ||
+        activeSeriesOf(deps.state.store.getState().series, task.value.seriesId) !== undefined
+      ) {
+        return err("action/invalid-input");
+      }
+      const created = deps.state.store
+        .getState()
+        .events.find((event) => event.type === "task.created" && event.payload.taskId === taskId);
+      if (created?.type !== "task.created") {
+        return err("action/invalid-input");
+      }
+      const seriesId = newId();
+      const startAt = task.value.startAt ?? deps.clock.now();
+      const startTz = task.value.startTz ?? deps.clock.deviceTz;
+      const due = task.value.dueAt === null ? null : { at: task.value.dueAt };
+      if (seriesStartProblem(schedule, { due, start: { at: startAt, tz: startTz } }) !== null) {
+        return err("action/invalid-input");
+      }
+      const template = templateOf(task.value, { seriesId, startAt, startTz });
+      return await emit(deps, [
+        stamp(deps, { type: "series.created", payload: { seriesId, schedule, template } }),
+        stamp(deps, {
+          type: "event.amended",
+          payload: {
+            targetId: created.id,
+            patch: { seriesId, seriesRevision: 0, startAt, startTz },
+          },
+        }),
+      ]);
+    },
+  );
+
 export const seriesActions = (deps: ActionDeps): SeriesActions => ({
   updateSeries: async (seriesId, schedule) => {
     const series = activeSeriesOf(deps.state.store.getState().series, seriesId);
@@ -83,35 +129,5 @@ export const seriesActions = (deps: ActionDeps): SeriesActions => ({
           }),
         ]);
   },
-  startSeriesForTask: async (taskId, schedule) => {
-    const task = taskOf(deps, taskId);
-    // A task whose series ended starts a new one; a task in a running series cannot.
-    if (
-      !task.ok ||
-      activeSeriesOf(deps.state.store.getState().series, task.value.seriesId) !== undefined
-    ) {
-      return err("action/invalid-input");
-    }
-    const created = deps.state.store
-      .getState()
-      .events.find((event) => event.type === "task.created" && event.payload.taskId === taskId);
-    if (created?.type !== "task.created") {
-      return err("action/invalid-input");
-    }
-    const seriesId = newId();
-    const startAt = task.value.startAt ?? deps.clock.now();
-    const startTz = task.value.startTz ?? deps.clock.deviceTz;
-    const due = task.value.dueAt === null ? null : { at: task.value.dueAt };
-    if (seriesStartProblem(schedule, { due, start: { at: startAt, tz: startTz } }) !== null) {
-      return err("action/invalid-input");
-    }
-    const template = templateOf(task.value, { seriesId, startAt, startTz });
-    return await emit(deps, [
-      stamp(deps, { type: "series.created", payload: { seriesId, schedule, template } }),
-      stamp(deps, {
-        type: "event.amended",
-        payload: { targetId: created.id, patch: { seriesId, seriesRevision: 0, startAt, startTz } },
-      }),
-    ]);
-  },
+  startSeriesForTask: startSeriesForTask(deps),
 });

@@ -1,5 +1,25 @@
 /** The server the app talks to: choosing one, and the app and server versions not fitting. */
 export const enServer = {
+  "server.misconfigured":
+    "This server has a configuration problem. Ask whoever runs it to check its settings, then retry.",
+  "server.firebaseAndroidInvalid":
+    "The server's Firebase Android settings are incomplete. Ask its owner to correct them.",
+  "server.firebaseAndroidNotJson":
+    "The server's Firebase Android settings cannot be read. Ask its owner to correct them.",
+  "server.firebaseDuplicatePackage":
+    "The server lists the same Android app more than once. Ask its owner to correct its Firebase settings.",
+  "server.firebasePolicyInvalid":
+    "The server's Firebase configuration policy is invalid. Ask its owner to correct it.",
+  "server.firebaseAccountInvalid":
+    "The server's Firebase service account cannot be read. Ask its owner to correct it.",
+  "server.firebaseAndroidMissing":
+    "The server is missing its Firebase Android settings. Ask its owner to add them.",
+  "server.firebaseAccountMissing":
+    "The server is missing its Firebase service account. Ask its owner to add it.",
+  "server.firebaseNoAndroid":
+    "The server's Firebase settings contain no Android apps. Ask its owner to add one.",
+  "server.firebaseProjectMismatch":
+    "The server's Firebase settings name different projects. Ask its owner to correct them.",
   "server.line": "Server: {host}",
   "server.change": "Change",
   "server.changeLabel": "Change server, now {host}",
@@ -15,6 +35,12 @@ export const enServer = {
   "server.bot": "Telegram bot",
   "server.invalidUrl": "Enter the server's address, like pace.example.dev",
   "server.insecure": "Use an https:// address",
+  "server.restartPending": "Restart to finish changing server",
+  "server.restartExplanation":
+    "The change to {host} is saved. Restart Pace to continue on that server.",
+  "server.restartApp": "Restart Pace",
+  "server.restartFailed": "Couldn't restart Pace. Try again, or close and reopen the app.",
+  "server.moveFailed": "Couldn't change server. Try again.",
   "server.unreachable": "Can't reach this server",
   "server.notPace": "This is not a Pace server",
   "server.serverOutdated": "This server runs an older Pace. Update the server or use another one.",

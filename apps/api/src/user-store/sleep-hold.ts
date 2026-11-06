@@ -9,6 +9,8 @@ import {
   wallClockInstant,
 } from "@pace/core";
 
+import type { ActorStorage } from "../shared/ports/actor-storage.ts";
+
 // How far a sleep pass that read the log holds, so the passes after it load nothing they can decide
 // nothing on (bug-lessons class 55): the store loads the whole log for a pass that decides.
 
@@ -102,7 +104,7 @@ own writes), from the front of the window it decided on, so the next pass within
 nothing.
 */
 export const hold = async (
-  storage: DurableObjectStorage,
+  storage: ActorStorage,
   { decidedOn, input, seq }: { decidedOn: Omit<DecidedOn, "seq">; input: SleepInput; seq: number },
 ): Promise<void> => {
   const digests = await digestsOf({ ...decidedOn, seq });
@@ -131,7 +133,7 @@ export const keptHold = (held: Held | undefined, usesFrom: string): Held | undef
 The hold the last pass that read the log left, if any. One without an anchor (saved by the build
 before it) is dropped here, explicitly: the pass then decides and holds again from its own front.
 */
-export const heldOf = async (storage: DurableObjectStorage): Promise<Held | undefined> => {
+export const heldOf = async (storage: ActorStorage): Promise<Held | undefined> => {
   /** A hold as stored: one the build before the anchor saved has none. */
   type StoredHeld = Omit<Held, "anchor"> & { readonly anchor?: string };
   const held = await storage.get<StoredHeld>(HELD_KEY);

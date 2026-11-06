@@ -1,5 +1,6 @@
 import type { Event } from "@pace/core";
 
+import type { CopyGuard } from "./checkpoint-store-types.ts";
 import type { EventStore } from "./event-store.ts";
 
 import { createMemoryEventStore } from "./adapters/memory-event-store.ts";
@@ -29,26 +30,33 @@ export const createHeldEventStore = (): HeldEventStore => {
   const inner = createMemoryEventStore();
   const writes: HeldWrite[] = [];
   let isHolding = false;
-  const append = async (events: readonly Event[]): Promise<void> => {
-    if (!isHolding) {
-      await inner.append(events);
-      return;
+  const perform = async <T>(events: readonly Event[], operation: () => Promise<T>): Promise<T> => {
+    if (!isHolding || events.length === 0) {
+      return await operation();
     }
-    await new Promise<void>((resolve, reject) => {
+    return await new Promise<T>((resolve, reject) => {
       writes.push({
         events,
         reject: () => {
           reject(new Error("QuotaExceededError"));
         },
         resolve: async () => {
-          await inner.append(events);
-          resolve();
-          // Let the log's continuation run before the test looks again.
+          try {
+            resolve(await operation());
+          } catch (error) {
+            reject(error instanceof Error ? error : new Error(String(error)));
+          }
           await Promise.resolve();
         },
       });
     });
   };
+  const append = async (events: readonly Event[], guard?: CopyGuard): Promise<void> => {
+    await perform(events, async () => {
+      await inner.append(events, guard);
+    });
+  };
+
   return {
     hold: () => {
       isHolding = true;
@@ -56,7 +64,27 @@ export const createHeldEventStore = (): HeldEventStore => {
     release: () => {
       isHolding = false;
     },
-    store: { ...inner, append },
+    store: {
+      ...inner,
+      append,
+      applyLegacyPage: async (input) =>
+        await perform(input.events, async () => await inner.applyLegacyPage(input)),
+      applyRemotePage: async (input) =>
+        await perform(
+          input.records.map((record) => record.event),
+          async () => await inner.applyRemotePage(input),
+        ),
+      installBootstrap: async (input) =>
+        await perform(
+          input.records.map((record) => record.event),
+          async () => await inner.installBootstrap(input),
+        ),
+      installHistory: async (input) =>
+        await perform(
+          input.sourceRecords.map((record) => record.event),
+          async () => await inner.installHistory(input),
+        ),
+    },
     writes,
   };
 };

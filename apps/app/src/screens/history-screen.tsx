@@ -2,9 +2,11 @@ import { ChevronLeft, ChevronRight } from "lucide-react-native";
 import { useState } from "react";
 import { Text, View } from "react-native";
 
-import type { HistoryEntry } from "@pace/client";
+import type { HistoryEntry, HistoryViewModel } from "@pace/client";
+import type { HistoryResource } from "@pace/client/react";
 
 import { usePace, useT } from "#app/app-state.tsx";
+import { errorText } from "#app/format/action-error.ts";
 import { zonedText } from "#app/format/time.ts";
 import { useOpenTask } from "#app/shared/task-opener.tsx";
 import { TaskRow } from "#app/shared/task-row.tsx";
@@ -173,31 +175,49 @@ const DayNav = ({
   );
 };
 
-/**
-The board as it was at a chosen moment (its date in the label), and every change up to then,
-each one undoable.
-*/
-export const HistoryScreen = () => {
+const HistoryPending = ({
+  resource,
+}: {
+  readonly resource: Exclude<HistoryResource, { status: "ready" }>;
+}) => {
   const t = useT();
-  const viewer = useViewer();
+  return (
+    <View className="items-start gap-2 px-5 py-3">
+      <Text
+        accessibilityLiveRegion="polite"
+        className="font-sans text-footnote text-label-secondary"
+      >
+        {resource.status === "loading" ? t("history.loading") : errorText(t, resource.error)}
+      </Text>
+      {resource.status === "failed" ? (
+        <Button onPress={resource.retry} variant="ghost">
+          {t("common.retry")}
+        </Button>
+      ) : null}
+    </View>
+  );
+};
+
+const HistoryContent = ({
+  history,
+  at,
+  instant,
+  when,
+}: {
+  readonly history: HistoryViewModel;
+  readonly at: null | string;
+  readonly instant: string;
+  readonly when: string;
+}) => {
+  const t = useT();
   const openTask = useOpenTask();
-  const { hooks } = usePace();
-  const { now } = hooks.useClock();
-  const [at, setAt] = useState<null | string>(null);
-  const instant = at ?? now;
-  const history = hooks.useHistory(instant);
-  const when = zonedText({ at: instant, mode: "datetime", tz: viewer.deviceTz }, viewer);
-  // At "now" every event shows (the clock ticks by the minute; a fresh undo is not later).
   const events =
     at === null
       ? history.events
       : history.events.filter((entry) => Date.parse(entry.occurredAt) <= Date.parse(at));
   return (
-    <PushedScreen title={t("history.title")}>
-      <DayNav at={at} now={now} onAt={setAt} />
-      <Text className="px-5 pb-1 font-sans text-caption text-label-tertiary">
-        {`${t("history.boardAt")} ${when}`}
-      </Text>
+    <>
+      <Text className="px-5 pb-1 font-sans text-caption text-label-tertiary">{`${t("history.boardAt")} ${when}`}</Text>
       <View className="px-2">
         {history.board.rows.map((row) => (
           <TaskRow
@@ -223,6 +243,28 @@ export const HistoryScreen = () => {
           <EntryRow entry={entry} key={entry.id} />
         ))}
       </View>
+    </>
+  );
+};
+
+/** Past boards and event rows appear only after the complete source has loaded. */
+export const HistoryScreen = () => {
+  const t = useT();
+  const viewer = useViewer();
+  const { hooks } = usePace();
+  const { now } = hooks.useClock();
+  const [at, setAt] = useState<null | string>(null);
+  const instant = at ?? now;
+  const history = hooks.useHistory(instant);
+  const when = zonedText({ at: instant, mode: "datetime", tz: viewer.deviceTz }, viewer);
+  return (
+    <PushedScreen title={t("history.title")}>
+      <DayNav at={at} now={now} onAt={setAt} />
+      {history.status === "ready" ? (
+        <HistoryContent at={at} history={history.value} instant={instant} when={when} />
+      ) : (
+        <HistoryPending resource={history} />
+      )}
     </PushedScreen>
   );
 };

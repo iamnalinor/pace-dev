@@ -1,38 +1,31 @@
 import { describe, expect, it } from "vitest";
 
-import { requestPlace } from "./request-place.ts";
-
-const USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:132.0) Gecko/20100101 Firefox/132.0";
+import { requestPlace, UNKNOWN_PLACE, unknownRequestPlaceReader } from "./request-place.ts";
 
 describe("requestPlace", () => {
-  it("reads the address Cloudflare saw, its country and city, and the User-Agent", () => {
+  it("has no provenance when no host reader was configured", () => {
     const request = new Request("https://pace-api.test/api/auth/nonce", {
-      cf: { city: "Berlin", country: "DE" },
-      // eslint-disable-next-line sonarjs/no-hardcoded-ip -- the address Cloudflare reported is a fixture
-      headers: { "CF-Connecting-IP": "1.2.3.4", "User-Agent": USER_AGENT },
+      headers: { "CF-Connecting-IP": "untrusted", "User-Agent": "untrusted" },
     });
-    expect(requestPlace(request)).toEqual({
-      city: "Berlin",
-      country: "DE",
-      // eslint-disable-next-line sonarjs/no-hardcoded-ip -- the same fixture, read back
-      ip: "1.2.3.4",
-      userAgent: USER_AGENT,
-    });
-  });
-
-  it("is all nulls when nothing is known (no Cloudflare data, no headers)", () => {
-    expect(requestPlace(new Request("https://pace-api.test/api/auth/nonce"))).toEqual({
+    expect(requestPlace(request, unknownRequestPlaceReader)).toEqual({
       city: null,
       country: null,
       ip: null,
       userAgent: null,
     });
   });
-
-  it("keeps at most 512 characters of a User-Agent: anyone may send one, it is stored", () => {
+  it("uses the injected reader with this request instead of interpreting platform data", () => {
     const request = new Request("https://pace-api.test/api/auth/nonce", {
-      headers: { "User-Agent": "x".repeat(5000) },
+      headers: { "User-Agent": "ignored by the injected reader" },
     });
-    expect(requestPlace(request).userAgent).toBe("x".repeat(512));
+    const reader = {
+      read: (input: Request) => ({ ...UNKNOWN_PLACE, city: new URL(input.url).hostname }),
+    };
+    expect(requestPlace(request, reader)).toEqual({
+      city: "pace-api.test",
+      country: null,
+      ip: null,
+      userAgent: null,
+    });
   });
 });

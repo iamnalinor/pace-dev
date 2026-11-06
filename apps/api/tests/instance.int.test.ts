@@ -1,5 +1,6 @@
+import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   CLIENT_OUTDATED,
@@ -9,10 +10,54 @@ import {
   PROTOCOL_HEADER,
 } from "@pace/core";
 
+import worker from "../src/worker.ts";
 import { answerOf, api, call, loginAsDev, readJson } from "./helpers.ts";
 
 /** Calls as an app older than the server serves would make them. */
 const OUTDATED = { headers: { [PROTOCOL_HEADER]: "0" } };
+
+const PROJECT = "instance-test";
+const PUBLIC_FIREBASE = {
+  apps: [{ apiKey: "public-key", appId: "android-app", packageName: "app.example.custom" }],
+  projectId: PROJECT,
+  senderId: "123456789",
+};
+const ANDROID_CONFIG = JSON.stringify({
+  client: [
+    {
+      api_key: [{ current_key: "public-key" }],
+      client_info: {
+        android_client_info: { package_name: "app.example.custom" },
+        mobilesdk_app_id: "android-app",
+      },
+    },
+  ],
+  project_info: {
+    project_id: PROJECT,
+    project_number: "123456789",
+    storage_bucket: "unused-android-json-field",
+  },
+});
+const PRIVATE_KEY = "synthetic-private-service-account-key";
+const ACCOUNT_EMAIL = "synthetic-account@example.test";
+const SERVICE_ACCOUNT = JSON.stringify({
+  client_email: ACCOUNT_EMAIL,
+  private_key: PRIVATE_KEY,
+  project_id: PROJECT,
+});
+
+const withFirebase =
+  (bindings: Partial<Cloudflare.Env>) =>
+  async (path: string, init?: RequestInit): Promise<Response> => {
+    const ctx = createExecutionContext();
+    const response = await worker.fetch(
+      new Request(`https://pace-api.test${path}`, init),
+      { ...env, ...bindings },
+      ctx,
+    );
+    await waitOnExecutionContext(ctx);
+    return response;
+  };
 
 describe("GET /api/instance", () => {
   it("says what this server is, without a token", async () => {
@@ -21,7 +66,8 @@ describe("GET /api/instance", () => {
       apiOrigin: env.API_ORIGIN,
       botUsername: env.TELEGRAM_BOT_USERNAME,
       // The test Worker answers from its built-in fake model (LLM_PROVIDER=fake).
-      features: { assistant: true, mcp: true, push: false },
+      features: { assistant: true, historyCheckpoint: null, mcp: true, push: false },
+      firebase: null,
       loginMethods: ["telegram-widget", "telegram-deeplink"],
       minClientProtocol: MIN_CLIENT_PROTOCOL,
       name: "Pace",
@@ -30,6 +76,121 @@ describe("GET /api/instance", () => {
       webOrigin: env.WEB_ORIGIN,
     });
   });
+
+  it.each([
+    { mode: "off", version: "named-build", expected: null },
+    { mode: "shadow", version: "named-build", expected: null },
+    { mode: "active", version: "dev", expected: null },
+    { mode: "active", version: "named-build", expected: 1 },
+  ])(
+    "advertises checkpoint capability for $mode / $version",
+    async ({ mode, version, expected }) => {
+      const fetchWith = withFirebase({ PACE_HISTORY_CHECKPOINT_MODE: mode, PACE_VERSION: version });
+      const response = await fetchWith("/api/instance");
+      expect(response.status).toBe(200);
+      expect(
+        endpoints.instance.output.parse(await readJson(response)).features.historyCheckpoint,
+      ).toBe(expected);
+    },
+  );
+
+  it("publishes only public Android metadata for a matching pair", async () => {
+    const fetchWith = withFirebase({
+      FIREBASE_ANDROID_CONFIG: ANDROID_CONFIG,
+      FIREBASE_SERVICE_ACCOUNT: SERVICE_ACCOUNT,
+    });
+    const response = await fetchWith("/api/instance");
+    expect(response.status).toBe(200);
+    const raw = await readJson<Record<string, unknown>>(response);
+    expect(raw["firebase"]).toEqual(PUBLIC_FIREBASE);
+    expect(endpoints.instance.output.parse(raw)).toMatchObject({
+      features: { push: true },
+      firebase: PUBLIC_FIREBASE,
+    });
+    const serialized = JSON.stringify(raw);
+    expect(serialized).not.toContain(PRIVATE_KEY);
+    expect(serialized).not.toContain(ACCOUNT_EMAIL);
+    expect(serialized).not.toContain("unused-android-json-field");
+  });
+
+  it.each([
+    {
+      android: "",
+      reason: null,
+      sender: SERVICE_ACCOUNT,
+    },
+    {
+      android: "{synthetic-malformed-client-json",
+      reason: "android-config-not-json",
+      sender: SERVICE_ACCOUNT,
+    },
+    {
+      android: ANDROID_CONFIG.replace(PROJECT, "other-project"),
+      reason: "project-mismatch",
+      sender: SERVICE_ACCOUNT,
+    },
+    {
+      android: ANDROID_CONFIG,
+      reason: "missing-service-account",
+      sender: "",
+    },
+    {
+      android: ANDROID_CONFIG,
+      reason: "invalid-service-account",
+      sender: "{synthetic-malformed-account-json",
+    },
+  ])(
+    "keeps the API available with null metadata ($reason)",
+    async ({ android, reason, sender }) => {
+      const fetchWith = withFirebase({
+        FIREBASE_ANDROID_CONFIG: android,
+        FIREBASE_SERVICE_ACCOUNT: sender,
+      });
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      try {
+        const response = await fetchWith("/api/instance");
+        expect(response.status).toBe(200);
+        const raw = await readJson<Record<string, unknown>>(response);
+        const isFcmAvailable = sender === SERVICE_ACCOUNT;
+        expect(raw["firebase"]).toBeNull();
+        expect(endpoints.instance.output.parse(raw).features.push).toBe(isFcmAvailable);
+        const time = expect.any(String) as unknown;
+        const warnings =
+          reason === null
+            ? []
+            : [
+                {
+                  level: "warn",
+                  message: "Firebase Android metadata is unavailable",
+                  reason,
+                  time,
+                },
+              ];
+        expect(warn.mock.calls.map((args) => JSON.parse(String(args[0])) as unknown)).toEqual(
+          warnings,
+        );
+
+        const health = await fetchWith("/api/health");
+        expect(health.status).toBe(200);
+        expect(endpoints.health.output.parse(await readJson(health))).toEqual({ status: "ok" });
+        const token = await loginAsDev("1001");
+        const headers = { Authorization: `Bearer ${token}` };
+        expect((await fetchWith("/api/me", { headers })).status).toBe(200);
+        const registration = await fetchWith("/api/push/subscription", {
+          // Older APKs do not send a project id; registration still uses the sender account.
+          body: JSON.stringify({ endpoint: "legacy-fcm-token", method: "fcm" }),
+          headers: { ...headers, "Content-Type": "application/json" },
+          method: "PUT",
+        });
+        expect(registration.status).toBe(isFcmAvailable ? 200 : 409);
+        expect(await readJson(registration)).toMatchObject(
+          isFcmAvailable ? { method: "fcm" } : { code: "push/method-unavailable" },
+        );
+      } finally {
+        warn.mockRestore();
+      }
+    },
+  );
 });
 
 describe(`the ${PROTOCOL_HEADER} header`, () => {

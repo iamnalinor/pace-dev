@@ -35,7 +35,7 @@ export const startPhonePush = async (runtime: PaceRuntime): Promise<void> => {
   try {
     await setupNotificationCategories(runtime.state.store.getState().settings.language);
     await startPushTask();
-    if ((await registerPush(runtime.api)) === "poll") {
+    if ((await registerPush(runtime.api, runtime.baseUrl)) === "poll") {
       await pollNow(runtime.api);
     }
   } catch {

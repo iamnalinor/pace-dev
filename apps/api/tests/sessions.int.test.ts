@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { endpoints, type Session } from "@pace/core";
 
 import { findUserIdByTelegramId } from "../src/auth/users.ts";
-import { d1 } from "../src/shared/db/d1.ts";
+import { d1 } from "../src/platform/cloudflare/sqlite.ts";
 import { answerOf, call, json, loginAsDev, nonceLogin, readJson } from "./helpers.ts";
 import { mcpCall, obtainToken } from "./oauth-flow.ts";
 

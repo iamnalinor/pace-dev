@@ -1,5 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 
+import { waitForTransitions } from "./animation-wait.ts";
 import { expect } from "./fixtures.ts";
 
 /** How far a child stuck out of its container in one frame, in px, on each side. */
@@ -119,9 +120,7 @@ export const controlsUnder = async (
   except: readonly string[] = [],
 ): Promise<readonly string[]> => {
   // Measured once it has settled (a toast slides in).
-  await page.waitForFunction(() =>
-    globalThis.document.getAnimations().every((animation) => animation.playState !== "running"),
-  );
+  await waitForTransitions(page);
   return await page.evaluate(
     ({ controls, exceptNames, selector }) => {
       const cover = globalThis.document.querySelector(selector);

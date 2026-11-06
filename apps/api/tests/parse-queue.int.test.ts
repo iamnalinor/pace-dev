@@ -1,11 +1,10 @@
-import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { addMinutesIso, newId } from "@pace/core";
 
 import { queueOf } from "../src/user-store/parse-queue.ts";
-import { UserStore } from "../src/user-store/user-store.ts";
+import { runInUserStore as runInDurableObject, UserStore } from "./host.ts";
 
 /** The store's clock, frozen far ahead of the real one (bug-lessons classes 9 and 54). */
 const NOW = "2099-10-07T19:00:00.000Z";
