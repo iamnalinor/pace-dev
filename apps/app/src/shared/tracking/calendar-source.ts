@@ -1,5 +1,5 @@
 import { calendarAccess, calendarEvents } from "#app/platform/phone-calendar.ts";
-import { addDaysIn, addMinutesIso, type MessageKey, startOfDayIn } from "@pace/core";
+import { addMinutesIso, type MessageKey, nextDayStartIn, startOfDayIn } from "@pace/core";
 
 import type { CalendarSource, CalendarToday } from "./calendar-today.ts";
 
@@ -14,7 +14,7 @@ export const calendarToday = async ({ now, zone }: CalendarSource): Promise<Cale
       return { access, events: [] };
     }
     const from = startOfDayIn(now, zone);
-    const events = await calendarEvents(from, addDaysIn(from, 1, zone));
+    const events = await calendarEvents(from, nextDayStartIn(from, zone));
     return {
       access,
       events: events.filter((event) => event.endAt > addMinutesIso(now, -RECENT_MINUTES)),

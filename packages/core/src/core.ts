@@ -279,12 +279,19 @@ export {
   isoWeekKey,
   isValidTimeZone,
   minutesBetween,
+  nextDayStartIn,
   startOfDayIn,
   startOfWeekIn,
   wallClockInstant,
   type ZonedInstant,
   zonesDiffer,
 } from "./time.ts";
+export {
+  type DailyUsageError,
+  type DailyUsagePiece,
+  splitDailyUsage,
+} from "./tracking/daily-usage.ts";
+
 export {
   FUTURE_TOLERANCE_MINUTES,
   type RetroError,

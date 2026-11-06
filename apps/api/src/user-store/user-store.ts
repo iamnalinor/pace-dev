@@ -32,7 +32,7 @@ import type { ActorContext } from "../shared/ports/live-channel.ts";
 import type { SqliteDatabase } from "../shared/ports/sqlite.ts";
 import type * as schema from "./schema.ts";
 
-import { UNNAMED_VERSION, versionOf } from "../shared/config.ts";
+import { historyCheckpointModeOf, UNNAMED_VERSION, versionOf } from "../shared/config.ts";
 import { llmHealthOf } from "../shared/llm/health-store.ts";
 import { runEach } from "./alarm.ts";
 import { describeTables, runReadOnly, simulate } from "./analytics.ts";
@@ -90,6 +90,7 @@ export class UserStore extends CloudStore {
       isNamed: version !== UNNAMED_VERSION,
       db: this.db,
       storage: ctx.storage,
+      checkpointMode: historyCheckpointModeOf(env.PACE_HISTORY_CHECKPOINT_MODE),
     });
     this.#pool = new NotificationPool({
       chatId: async () => await this.chatId(),

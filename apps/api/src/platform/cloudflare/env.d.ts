@@ -5,6 +5,12 @@ declare global {
     // Secrets (`wrangler secret put`) and optional vars are not in wrangler.jsonc, so
     // `wrangler types` does not know them. Parsed by shared/config.ts.
     interface Env {
+      /** Isolated bucket supplied only by the API test runner. */
+      TEST_HISTORY_ARCHIVE: R2Bucket;
+      /** Optional copy-only history bucket, provisioned separately by the host. */
+      HISTORY_ARCHIVE?: R2Bucket;
+      /** Disabled unless the host explicitly selects checkpoint shadow comparison. */
+      PACE_HISTORY_CHECKPOINT_MODE?: string;
       /** Bot token from @BotFather: verifies Login Widget payloads and sends bot replies. */
       TELEGRAM_BOT_TOKEN?: string;
       /** Shared secret Telegram echoes in `X-Telegram-Bot-Api-Secret-Token` on every webhook call. */

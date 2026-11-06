@@ -67,14 +67,14 @@ OAuth's Cloudflare-specific provider remains in composition, not domain logic.
 replay cutoff, state and correction/deduplication evidence. A loader returns either validated state
 plus cursor tail, or an explicit rebuild requirement. Date cutoff never substitutes for cursor.
 
-- [ ] Expand concrete representation against actual state and dependencies before coding; record
+- [x] Expand concrete representation against actual state and dependencies before coding; record
   retention exceptions (old open entities/correction closure), avoid claims of strict flat memory.
-- [ ] RED properties: full replay equals checkpoint plus tail; same-time ordering, late backdates,
+- [x] RED properties: full replay equals checkpoint plus tail; same-time ordering, late backdates,
   amendments/revocations/chains, duplicate ids, incompatible/corrupt checkpoint and old open tasks.
-- [ ] Implement pure serialization/replay validation; integrate durable checkpoint shadow mode with
+- [x] Implement pure serialization/replay validation; integrate durable checkpoint shadow mode with
   full replay comparison and safe fallback. Source log stays intact.
-- [ ] Generate persistence migration if needed, test cold restart and measured row work with real DO.
-- [ ] Review, lint and checkpoint before archive integration.
+- [x] Generate persistence migration if needed, test cold restart and measured row work with real DO.
+- [x] Review, lint and checkpoint before archive integration.
 
 ## Task 9B: Copy-only archive, raw aggregates and verified recovery
 

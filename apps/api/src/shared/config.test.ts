@@ -182,3 +182,18 @@ describe("loadConfig", () => {
     expect(loadConfig({ ...base, TELEGRAM_WEBHOOK_ALLOWED_CIDRS: "2001:db8::/32" }).ok).toBe(false);
   });
 });
+
+describe("history checkpoint rollout configuration", () => {
+  it("defaults off and validates opt-in modes", () => {
+    expect(loadConfig(base)).toMatchObject({ ok: true, value: { historyCheckpointMode: "off" } });
+    for (const mode of ["shadow", "active"]) {
+      expect(loadConfig({ ...base, PACE_HISTORY_CHECKPOINT_MODE: mode })).toMatchObject({
+        ok: true,
+        value: { historyCheckpointMode: mode },
+      });
+    }
+    expect(loadConfig({ ...base, PACE_HISTORY_CHECKPOINT_MODE: "yes" })).toMatchObject({
+      ok: false,
+    });
+  });
+});

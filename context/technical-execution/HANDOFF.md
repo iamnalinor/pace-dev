@@ -1,16 +1,25 @@
 ## Tasks 8 and 9 — resumed 2026-11-06
 
-Task 8 implementation and independent review are complete; final unified lint is being closed.
+Task 8 is complete in pushed checkpoint `715b0aa`; independent review and unified lint passed.
 Cloudflare SQL, actors, alarms, sockets, KV and OAuth now sit behind portable contracts. The
 full API suite passed (73 files / 679 tests); focused adapter contracts passed 18/18. A deliberate
 RPC queue bypass fails the regression. No schema/epoch or public sync contract change in Task 8.
 
-Task 9A pure checkpoint primitive and canonical equal-time ordering fix are implemented and
-independently reviewed. Full unit checks passed: core 920, client 565, scripts 493 and Python 54.
-Durable API checkpoint integration is next, followed by copy-only archive/restore (9B) and
-checkpoint-aware client sync/history (9C). These are not yet complete. Source events stay intact.
-See [current plan](tasks-8-9-plan.md), [checkpoint design](checkpoint-design.md) and
-[persistence packet](checkpoint-persistence-plan.md). Prior wrap-up evidence below is historical.
+Task 9A durable checkpoint is implemented and independently reviewed: bounded atomic SQL snapshots,
+off/shadow/active modes, retained-source fallback and measured cold reads. Default is off. The
+independent 9B foundation includes immutable raw archive codec/R2 port and daily usage splitting;
+durable archive publication, cleanup/restore (9B) and checkpoint client sync/history (9C) remain.
+
+Foundation verification: full API 78 files / 766 tests; full unit core 938, client 577, scripts 493,
+Python 54. Focused app tests passed 50. Final unified gate runs in the checkpoint commit hook.
+Fixed warm correction-before-target replay on both client/server and midnight-DST daily/weekly
+boundaries. The separate preexisting Week grid wall-clock positioning issue remains deferred.
+
+Measured 12-month cold SQL rows: 7443 → 642 including snapshot chunks. Synthetic Bun CPU was
+slower for snapshot validation/replay (43.91ms vs 24.85ms source parse/replay); no CPU or flat-memory
+claim. See [persistence report](checkpoint-persistence-report.md), [review](foundation-review.md),
+[current plan](tasks-8-9-plan.md), [archive packet](archive-plan.md) and
+[sync packet](checkpoint-sync-plan.md). Source events stay intact. Prior wrap-up below is historical.
 
 # Technical continuation handoff — 2026-11-06
 

@@ -11,6 +11,7 @@ import {
   type Gap,
   type HueName,
   LANGUAGES,
+  nextDayStartIn,
   type QueryContext,
   shownLabel,
   startOfDayIn,
@@ -147,7 +148,7 @@ export const dayModel = (state: CoreState, date: null | string, ctx: QueryContex
   const zone = accountTz(state, ctx);
   const today = startOfDayIn(ctx.now, zone);
   const from = date === null ? today : startOfDayIn(date, zone);
-  const to = addDaysIn(from, 1, zone);
+  const to = nextDayStartIn(from, zone);
   const day = timeline(state.time, { from, now: ctx.now, to });
   const rows: readonly DayEntry[] = [...day.segments, ...day.alongside].map((segment) => {
     const label = shownLabel(
@@ -185,8 +186,8 @@ export const dayModel = (state: CoreState, date: null | string, ctx: QueryContex
     logTarget: { endAt: until, kind: "log", startAt: addMinutesIso(until, -LOG_MINUTES) },
     entries: [...rows, ...gaps].toSorted((a, b) => Date.parse(startOf(a)) - Date.parse(startOf(b))),
     isToday: from === today,
-    next: from >= today ? null : addDaysIn(from, 1, zone),
-    previous: addDaysIn(from, -1, zone),
+    next: from >= today ? null : nextDayStartIn(from, zone),
+    previous: startOfDayIn(addDaysIn(from, -1, zone), zone),
     totals: Object.entries(day.totals)
       .map(([category, minutes]) => ({
         category: category as ActivityCategory,

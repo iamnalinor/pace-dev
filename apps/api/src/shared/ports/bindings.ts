@@ -20,6 +20,7 @@ export type AppBindings = {
   readonly TELEGRAM_BOT_USERNAME: string;
   readonly API_ORIGIN?: string;
   readonly PACE_VERSION?: string;
+  readonly PACE_HISTORY_CHECKPOINT_MODE?: string;
   readonly TELEGRAM_BOT_TOKEN?: string;
   readonly TELEGRAM_WEBHOOK_SECRET?: string;
   readonly TELEGRAM_WEBHOOK_ALLOWED_CIDRS?: string;

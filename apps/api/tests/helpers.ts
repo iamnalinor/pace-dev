@@ -135,7 +135,9 @@ export const meterSql = (
       .reduce((sum, { cursor }) => sum + cursor.rowsWritten, 0);
   return {
     cost: () => ({
-      loads: ran.filter(({ query }) => /^select .* from "events" order by/u.test(query)).length,
+      loads: ran.filter(({ query }) =>
+        /^select .* from "events"(?: where "events"\."seq" <= \?)? order by/u.test(query),
+      ).length,
       projectionRows: written(
         /^(?:insert into|delete from) "(?:tasks|subtasks|projects|presets)"/u,
       ),

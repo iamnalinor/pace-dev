@@ -24,11 +24,11 @@ import { Screen } from "#app/ui/screen.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { useUsageRead } from "@pace/client/react";
 import {
-  addDaysIn,
   formatDuration,
   formatEyebrow,
   type Gap,
   type Language,
+  nextDayStartIn,
   type SatRow,
 } from "@pace/core";
 
@@ -286,7 +286,7 @@ export const DayScreen = () => {
   const { now } = hooks.useClock();
   const phone = useDayPhone(day, now);
   // One read of the day's usage for every part that shows it (QA round 21 L5).
-  const usageRead = useUsageRead(api, day.date, addDaysIn(day.date, 1, day.zone));
+  const usageRead = useUsageRead(api, day.date, nextDayStartIn(day.date, day.zone));
   const usage = usageRead.rows;
   const sat = useWhereSat(usage);
   const header = (

@@ -1,4 +1,4 @@
-import { index, integer, primaryKey, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { blob, index, integer, primaryKey, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 /** The append-only event log: the source of truth for everything the user did. */
 export const events = sqliteTable(
@@ -246,4 +246,25 @@ export const presets = sqliteTable("presets", {
   archived: integer({ mode: "boolean" }).notNull(),
   /** The preset's own definition (what it changes relative to its parent), as JSON. */
   definition: text().notNull(),
+});
+
+/** Derived history cache only; one complete snapshot replaces its predecessor atomically. */
+export const historyCheckpoint = sqliteTable("history_checkpoint", {
+  id: integer().primaryKey(),
+  format: integer().notNull(),
+  build: text().notNull(),
+  storeId: text().notNull(),
+  coveredSeq: integer().notNull(),
+  cutoff: text().notNull(),
+  cutoffTimezone: text().notNull(),
+  eventCount: integer().notNull(),
+  byteCount: integer().notNull(),
+  chunkCount: integer().notNull(),
+  sha256: text().notNull(),
+});
+
+/** UTF-8 bytes, split before SQL binding so growing snapshots never exceed a value limit. */
+export const historyCheckpointChunks = sqliteTable("history_checkpoint_chunks", {
+  chunk: integer().primaryKey(),
+  data: blob({ mode: "buffer" }).notNull(),
 });

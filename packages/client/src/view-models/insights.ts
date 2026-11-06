@@ -16,6 +16,7 @@ import {
   projectById,
   type ProjectColorName,
   type QueryContext,
+  startOfDayIn,
   startOfWeekIn,
   timeByCategory,
   timeByProject,
@@ -98,7 +99,7 @@ export const insightsModel = (
   const zone = accountTz(state, ctx);
   const thisWeek = startOfWeekIn(ctx.now, zone);
   const from = weekOf === null ? thisWeek : startOfWeekIn(weekOf, zone);
-  const range = { from, now: ctx.now, to: addDaysIn(from, 7, zone) };
+  const range = { from, now: ctx.now, to: startOfDayIn(addDaysIn(from, 7, zone), zone) };
   const categories = timeByCategory(state, range);
   const zoned = { ...range, zone };
   const hours = productiveHours(state.time, zoned);
@@ -123,12 +124,12 @@ export const insightsModel = (
     fragmentation: fragmentation(state.time, zoned),
     hours: { minutes: hours, peak: peakOf(hours) },
     zone,
-    next: from >= thisWeek ? null : addDaysIn(from, 7, zone),
+    next: from >= thisWeek ? null : startOfDayIn(addDaysIn(from, 7, zone), zone),
     onTime: onTimeByProject(state, range).map((row) => ({
       ...row,
       ...projectLabel(state, row.projectId),
     })),
-    previous: addDaysIn(from, -7, zone),
+    previous: startOfDayIn(addDaysIn(from, -7, zone), zone),
     totalMinutes: categories.reduce((sum, row) => sum + row.minutes, 0),
     weekStart: from,
   };

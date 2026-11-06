@@ -7,8 +7,10 @@ import {
   type CoreState,
   formatInZone,
   type HueName,
+  nextDayStartIn,
   type QueryContext,
   shownLabel,
+  startOfDayIn,
   startOfWeekIn,
   timeline,
 } from "@pace/core";
@@ -62,7 +64,7 @@ export const placeIn = (
   { fromHour, zone }: { readonly fromHour: number; readonly zone: string },
 ): null | Placement => {
   const dayStart = Date.parse(day) + fromHour * 60 * 60_000;
-  const dayEnd = Date.parse(addDaysIn(day, 1, zone));
+  const dayEnd = Date.parse(nextDayStartIn(day, zone));
   const start = Math.max(Date.parse(stretch.startAt), dayStart);
   const end = Math.min(Date.parse(stretch.endAt), dayEnd);
   // A 0-minute stretch inside the column is a point the screen still draws (QA round 18 L7).
@@ -185,9 +187,11 @@ export const weekModel = (
   const zone = accountTz(state, ctx);
   const thisWeek = startOfWeekIn(ctx.now, zone);
   const weekStart = weekOf === null ? thisWeek : startOfWeekIn(weekOf, zone);
-  const dates = Array.from({ length: 7 }, (_, index) => addDaysIn(weekStart, index, zone));
+  const dates = Array.from({ length: 7 }, (_, index) =>
+    startOfDayIn(addDaysIn(weekStart, index, zone), zone),
+  );
   const lived = dates.map((date) => {
-    const range = { from: date, now: ctx.now, to: addDaysIn(date, 1, zone) };
+    const range = { from: date, now: ctx.now, to: nextDayStartIn(date, zone) };
     const day = timeline(state.time, range);
     return { date, segments: [...day.segments, ...day.alongside, ...pointsIn(state.time, range)] };
   });
@@ -227,9 +231,9 @@ export const weekModel = (
     })),
     fromHour: Math.max(0, Math.min(earliest, HOURS_PER_DAY - 1)),
     isCurrent: weekStart === thisWeek,
-    next: weekStart >= thisWeek ? null : addDaysIn(weekStart, 7, zone),
-    previous: addDaysIn(weekStart, -7, zone),
-    weekEnd: addDaysIn(weekStart, 7, zone),
+    next: weekStart >= thisWeek ? null : startOfDayIn(addDaysIn(weekStart, 7, zone), zone),
+    previous: startOfDayIn(addDaysIn(weekStart, -7, zone), zone),
+    weekEnd: startOfDayIn(addDaysIn(weekStart, 7, zone), zone),
     weekStart,
     zone,
   };

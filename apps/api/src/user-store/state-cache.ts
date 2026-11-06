@@ -1,9 +1,10 @@
-import type { Event } from "@pace/core";
+import { type Event, isCorrection } from "@pace/core";
 
 import type { ActorStorage } from "../shared/ports/actor-storage.ts";
 import type { SqliteDatabase } from "../shared/ports/sqlite.ts";
 import type * as schema from "./schema.ts";
 
+import { CheckpointCache, type CheckpointMode } from "./checkpoint-cache.ts";
 import * as log from "./log-queries.ts";
 import { SERVER_TZ } from "./notifier.ts";
 import {
@@ -35,11 +36,17 @@ from another build, or the build has no version (`dev`), and the zone is read fr
 export class StateCache {
   #cache: Materialized | undefined;
 
+  #checkpoint: CheckpointCache | undefined;
+
+  readonly #checkpointOptions: { readonly mode: CheckpointMode; readonly now: () => string };
+
   /**
   The log as last loaded, kept in step with what goes in: a pass that reads the log and then
   writes, or a write out of order, rebuilds from it without loading the log again.
   */
   #log: Log | undefined;
+
+  #correctionTargets = new Set<string>();
 
   readonly #db: Db;
 
@@ -60,16 +67,35 @@ export class StateCache {
     db,
     isNamed,
     storage,
+    checkpointMode = "off",
+    now = () => new Date().toISOString(),
   }: {
     readonly build: string;
     readonly isNamed: boolean;
     readonly db: Db;
     readonly storage: ActorStorage;
+    readonly checkpointMode?: CheckpointMode;
+    readonly now?: () => string;
   }) {
     this.#build = build;
     this.#isNamed = isNamed;
     this.#db = db;
     this.#storage = storage;
+    this.#checkpointOptions = { mode: checkpointMode, now };
+    this.#checkpoint = this.#newCheckpoint();
+  }
+
+  #newCheckpoint(): CheckpointCache | undefined {
+    const { mode, now } = this.#checkpointOptions;
+    return mode === "off" || !this.#isNamed
+      ? undefined
+      : new CheckpointCache({
+          db: this.#db,
+          storage: this.#storage,
+          build: this.#build,
+          mode,
+          now,
+        });
   }
 
   async #mark({ seq, state }: Materialized): Promise<void> {
@@ -78,7 +104,10 @@ export class StateCache {
 
   async #logAt(seq: number): Promise<Log> {
     if (this.#log?.seq !== seq) {
-      this.#log = { events: await log.loadLog(this.#db), seq };
+      this.#log = { events: await log.loadLog(this.#db, seq), seq };
+      this.#correctionTargets = new Set(
+        this.#log.events.filter(isCorrection).map((event) => event.payload.targetId),
+      );
     }
     return this.#log;
   }
@@ -107,9 +136,13 @@ export class StateCache {
   async current(): Promise<Materialized> {
     const seq = await log.latestSeq(this.#db);
     if (this.#cache?.seq === seq) {
+      await this.#checkpoint?.advance(this.#cache);
       return this.#cache;
     }
-    const rebuilt = rebuild(await this.#logAt(seq));
+    const rebuilt =
+      this.#checkpoint === undefined
+        ? rebuild(await this.#logAt(seq))
+        : await this.#checkpoint.current(seq, async () => await this.#logAt(seq));
     if (!this.#isNamed || !isMarkedAt(await markOf(this.#storage), { build: this.#build, seq })) {
       await rewriteProjections(this.#db, rebuilt.state);
       await this.#mark(rebuilt);
@@ -133,11 +166,20 @@ export class StateCache {
   incrementally when they are in order and from scratch otherwise.
   */
   async fold(before: Materialized, inserted: readonly Event[], seq: number): Promise<void> {
+    for (const event of inserted) {
+      if (isCorrection(event)) {
+        this.#correctionTargets.add(event.payload.targetId);
+      }
+    }
     this.#log =
       this.#log?.seq === before.seq
         ? { events: [...this.#log.events, ...inserted], seq }
         : undefined;
-    if (canApplyInOrder(before, inserted)) {
+    const isFulfillsCorrection = inserted.some(
+      (event) =>
+        this.#correctionTargets.has(event.id) || (this.#checkpoint?.targets(event.id) ?? false),
+    );
+    if (!isFulfillsCorrection && canApplyInOrder(before, inserted)) {
       const next = applyInOrder(before, inserted, seq);
       await updateProjections(this.#db, next.state, touchedBy(inserted));
       await this.#mark(next);
@@ -151,5 +193,7 @@ export class StateCache {
   forget(): void {
     this.#cache = undefined;
     this.#log = undefined;
+    this.#checkpoint = this.#newCheckpoint();
+    this.#correctionTargets = new Set();
   }
 }

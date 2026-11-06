@@ -1,6 +1,6 @@
 import type { StoreApi } from "zustand/vanilla";
 
-import { err, type Event, ok, type Result, shouldRematerialize } from "@pace/core";
+import { err, type Event, isCorrection, ok, type Result, shouldRematerialize } from "@pace/core";
 
 import type { EventStore } from "./event-store.ts";
 
@@ -94,10 +94,21 @@ type Memory = {
   readonly adopt: (copies: readonly Event[]) => void;
 };
 
+const refreshCorrectionTargets = (targets: Set<string>, events: Iterable<Event>): void => {
+  targets.clear();
+  for (const event of events) {
+    if (isCorrection(event)) {
+      targets.add(event.payload.targetId);
+    }
+  }
+};
+
 const createMemory = <S>(store: StoreApi<S>, fold: Fold<S>): Memory => {
   const known = new Map<string, Event>();
   const unsaved = new Set<string>();
+  const correctionTargets = new Set<string>();
   const rebuildAll = (): void => {
+    refreshCorrectionTargets(correctionTargets, known.values());
     store.setState(fold.rebuild(store.getState(), known.values().toArray()));
   };
   return {
@@ -120,12 +131,14 @@ const createMemory = <S>(store: StoreApi<S>, fold: Fold<S>): Memory => {
       }
       const state = store.getState();
       const last = fold.lastAppliedOccurredAt(state);
-      const isNeedsRebuild = fresh.some((event) => shouldRematerialize(last, event));
-      store.setState(
-        isNeedsRebuild
-          ? fold.rebuild(state, known.values().toArray())
-          : fold.applyInOrder(state, fresh),
+      const isNeedsRebuild = fresh.some(
+        (event) => correctionTargets.has(event.id) || shouldRematerialize(last, event),
       );
+      if (isNeedsRebuild) {
+        rebuildAll();
+      } else {
+        store.setState(fold.applyInOrder(state, fresh));
+      }
     },
     known,
     replace: (all) => {
@@ -134,7 +147,7 @@ const createMemory = <S>(store: StoreApi<S>, fold: Fold<S>): Memory => {
       for (const event of all) {
         known.set(event.id, event);
       }
-      store.setState(fold.rebuild(store.getState(), all));
+      rebuildAll();
     },
     rollback: (ids) => {
       for (const id of ids) {

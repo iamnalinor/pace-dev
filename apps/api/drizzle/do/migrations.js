@@ -5,6 +5,7 @@ import m0002 from './0002_parallel_sharon_ventura.sql';
 import m0003 from './0003_handy_stryfe.sql';
 import m0004 from './0004_pale_rachel_grey.sql';
 import m0005 from './0005_striped_natasha_romanoff.sql';
+import m0006 from './0006_amused_silk_fever.sql';
 
   export default {
     journal,
@@ -14,7 +15,8 @@ m0001,
 m0002,
 m0003,
 m0004,
-m0005
+m0005,
+m0006
     }
   }
   

@@ -1,6 +1,6 @@
-import { asc, eq, gt, max } from "drizzle-orm";
+import { and, asc, eq, gt, gte, lt, lte, max, min } from "drizzle-orm";
 
-import { type Event, parseEvent } from "@pace/core";
+import { type Event, parseEvent, type SequencedCheckpointEvent } from "@pace/core";
 
 import type { EventPage, JsonValue, StoredEvent } from "../shared/contract.ts";
 import type { ActorStorage } from "../shared/ports/actor-storage.ts";
@@ -27,8 +27,12 @@ export const latestSeq = async (db: Db): Promise<number> => {
 };
 
 /** Every event of the log as the core sees it; a row the schema no longer accepts is skipped. */
-export const loadLog = async (db: Db): Promise<readonly Event[]> => {
-  const rows = await db.select().from(schema.events).orderBy(asc(schema.events.seq));
+export const loadLog = async (db: Db, through?: number): Promise<readonly Event[]> => {
+  const rows = await db
+    .select()
+    .from(schema.events)
+    .where(through === undefined ? undefined : lte(schema.events.seq, through))
+    .orderBy(asc(schema.events.seq));
   return rows.flatMap((row) => {
     const parsed = parseEvent(toEvent(row));
     return parsed.ok ? [parsed.value] : [];
@@ -92,4 +96,49 @@ export const takeMemo = async (
   const value = await storage.get<JsonValue>(key);
   await storage.delete(key);
   return value;
+};
+
+/** A complete delivery-cursor range; unknown raw rows must never silently disappear from a base. */
+export const loadRecords = async (
+  db: Db,
+  after: number,
+  through: number,
+): Promise<{
+  readonly records: readonly SequencedCheckpointEvent[];
+  readonly complete: boolean;
+}> => {
+  const rows = await db
+    .select()
+    .from(schema.events)
+    .where(and(gt(schema.events.seq, after), lte(schema.events.seq, through)))
+    .orderBy(asc(schema.events.seq));
+  const records = rows.flatMap((row) => {
+    const parsed = parseEvent(toEvent(row));
+    return parsed.ok ? { seq: row.seq, event: parsed.value } : [];
+  });
+  return { records, complete: records.length === rows.length };
+};
+
+/** Stop before the first recent arrival, retaining every later backdate in the cursor tail. */
+export const checkpointPrefix = async (
+  db: Db,
+  cutoff: string,
+  through: number,
+): Promise<number> => {
+  const [recent] = await db
+    .select({ first: min(schema.events.seq) })
+    .from(schema.events)
+    .where(and(gte(schema.events.occurredAt, cutoff), lte(schema.events.seq, through)));
+  const [prefix] = await db
+    .select({ seq: max(schema.events.seq) })
+    .from(schema.events)
+    .where(
+      and(
+        lte(schema.events.seq, through),
+        recent?.first === null || recent?.first === undefined
+          ? undefined
+          : lt(schema.events.seq, recent.first),
+      ),
+    );
+  return prefix?.seq ?? 0;
 };
