@@ -101,6 +101,14 @@ const OPENERS: readonly Opener[] = [
   {
     open: async (page, seeded) => {
       await page.goto(`/task/${seeded.openTaskId}`);
+      await page.getByRole("button", { name: named("task.menu") }).click();
+    },
+    sheet: "task-menu",
+    via: "the task's ⋯ menu",
+  },
+  {
+    open: async (page, seeded) => {
+      await page.goto(`/task/${seeded.openTaskId}`);
       await page.getByRole("button", { name: named("task.doneOther") }).click();
     },
     sheet: "close",

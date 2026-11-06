@@ -138,7 +138,7 @@ for (const size of SIZES) {
       await page.goto("/");
       await addTask(page, `Sheet ${size.name}`);
       await nowTasks(page).getByText(`Sheet ${size.name}`).click();
-      const edit = page.getByRole("button", { name: "Edit details" });
+      const edit = page.getByRole("button", { exact: true, name: "Edit" });
       // Its title and its foot (the buttons), at a phone's slide and a computer's dialog alike.
       for (const child of ['[role="heading"]', "> :last-child"]) {
         await expectStaysInside(page, {

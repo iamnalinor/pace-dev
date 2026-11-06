@@ -1,7 +1,6 @@
-import type { TaskViewModel } from "@pace/client";
-
 import { useLanguage, useT } from "#app/app-state.tsx";
 import { joinList } from "#app/format/numbers.ts";
+import { submitLabel, type TaskViewModel } from "@pace/client";
 
 import { sendingIds, subtaskName } from "./close-model.ts";
 
@@ -15,3 +14,6 @@ export const useSubmitTitle = (view: TaskViewModel): string => {
     .map((subtask) => subtaskName(subtask));
   return t("task.submitSubtasks", { subtasks: joinList(names, language) });
 };
+
+/** The footer's one-line label: the names of a few, the count of many (F-DAT-01). */
+export const useSubmitLabel = (view: TaskViewModel): string => submitLabel(view, useLanguage());

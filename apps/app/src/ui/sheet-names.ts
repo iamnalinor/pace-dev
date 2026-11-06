@@ -14,6 +14,7 @@ export const SHEET_NAMES = [
   "history-undo",
   "move-to-project",
   "task-edit",
+  "task-menu",
   "time-choices",
   "week-pick",
 ] as const;

@@ -1,11 +1,9 @@
 import { useState } from "react";
-import { TextInput } from "react-native";
 
 import { useLanguage, useT } from "#app/app-state.tsx";
 import { Chip } from "#app/ui/chip.tsx";
-import { cx } from "#app/ui/cx.ts";
 import { RadioGroup } from "#app/ui/radio-group.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
+import { TextField } from "#app/ui/text-field.tsx";
 import { formatDuration, typedActivity } from "@pace/core";
 
 /** The estimates offered at one tap; a typed one ("2.5h") stays as it was read. */
@@ -61,16 +59,13 @@ const MAX_MINUTES = 24 * 60;
 /** Any other length, typed: Enter sets it. */
 const TypedEstimate = ({ onEstimate }: { readonly onEstimate: (minutes: number) => void }) => {
   const t = useT();
-  const { palette } = useTheme();
   const [text, setText] = useState("");
   const minutes = typedMinutes(text);
   return (
-    <TextInput
-      accessibilityLabel={t("form.estimateTyped")}
-      className={cx(
-        "h-8 min-w-32 rounded-pill border px-3 font-sans text-footnote text-label-primary",
-        text !== "" && minutes === null ? "border-danger" : "border-outline",
-      )}
+    <TextField
+      inputMode="text"
+      isInvalid={text !== "" && minutes === null}
+      label={t("form.estimateTyped")}
       onChangeText={setText}
       onSubmitEditing={() => {
         if (minutes !== null) {
@@ -78,7 +73,6 @@ const TypedEstimate = ({ onEstimate }: { readonly onEstimate: (minutes: number) 
         }
       }}
       placeholder={t("form.estimateTyped")}
-      placeholderTextColor={palette["label.tertiary"]}
       returnKeyType="done"
       value={text}
     />

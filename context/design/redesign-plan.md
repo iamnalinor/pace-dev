@@ -675,21 +675,31 @@ Deferred (2026-11-06): `PeriodStepper` (`shared/period-stepper.tsx`) is built an
 **Files:** `src/features/task/**` (header, footer, subtasks, progress, description, original
 message, edit sheet, close sheet) (+ tests); `packages/client/src/view-models/task.ts` (submit
 label).
-- [ ] Spec §5 task: header actions as labelled controls (Edit, Close as…, Delete; no Pause — Q4),
+- [x] Spec §5 task: header actions as labelled controls (Edit, Close as…, Delete; no Pause — Q4),
       Focus and Done equal width with shortcuts, submit label «Сдать N» / "Submit N" (F-DAT-01),
       progress slider in % with live value, delete with inline confirm then Undo in place 10 s
       (Q5, F-A11Y-02), project picker as a field, not a pill.
-- [ ] Main's "Other time…" button (`task.doneOther`, QA 20 L3) is a third footer control beside
+- [x] Main's "Other time…" button (`task.doneOther`, QA 20 L3) is a third footer control beside
       Focus and Done (a labelled button on the desktop pane, an icon button on a phone). At 320 with
       a keyboard, Submit's label and its hotkey no longer fit: the F-DAT-01 REALISTIC entry in
       `e2e/worst-case.e2e.ts` (added by the rebase) goes when the footer fits at 320.
-- [ ] PR #48 follow-ups, close sheet (with Task 5.3 for the motion): QA21 L8 copy, L10 one way per
+- [x] PR #48 follow-ups, close sheet (with Task 5.3 for the motion): QA21 L8 copy, L10 one way per
       job, QA20 L5 pickers, the cosmetic tight rule; L2 (its height animates) is Task 5.3's
       (see "PR #48 follow-ups (triage)").
-- [ ] Failing tests: view-model `submitLabel(37 solved) === "Сдать 37"`; delete focus moves to the
+- [x] Failing tests: view-model `submitLabel(37 solved) === "Сдать 37"`; delete focus moves to the
       next row and Escape cancels the confirm (bug-lessons 5, 21); slider `aria-valuetext` "30 %"
       (F-A11Y-16). Bug-lessons F-DAT-01 (new class "Text from data placed in chrome without a length
       policy") and F-A11Y-02. Commit.
+
+Deferred: Undo stays the toast (10 s at most, pauses on hover/focus) instead of "Task deleted · Restore" in
+the next row's place, and focus after a delete is not moved to the next row (the screen leaves; the opener
+owns focus); the ⋯ menu has «Close as…» and «Delete» (no separate «Cancel the task»: it is the same sheet,
+class L10); Save in the description editor has no ⌘↵ hint (Done's global ⌘↵ would clash); stats are 2×2 on
+every width (no 4×1 on the 720 page); the repeat is in the stats group, not the meta line; the
+link is end-and-middle cut by `middleCut`; the list of 100 subtasks is not virtualised; the project is
+still picked from its own sheet (a control in the header, not a field in the page); the footer's «Other
+time…» stays on `Button`/`IconButton` and the 320 check is for the e2e run.
+
 
 ### Task 4.6: Week
 

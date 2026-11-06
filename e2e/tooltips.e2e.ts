@@ -72,7 +72,7 @@ const sweepScreen = async (
 
 /**
 Every icon-only button on the main desktop screens names itself in a tooltip on hover (QA round 17
-M7: the task header's Edit, Pause, Cancel or skip, Delete and Close had none).
+M7: the task header’s icon buttons had none).
 */
 test("every icon-only button on a computer shows its name on hover", async ({ page }) => {
   test.setTimeout(180_000);
@@ -85,7 +85,7 @@ test("every icon-only button on a computer shows its name on hover", async ({ pa
   expect(results.filter((result) => !result.isShown).map((result) => result.name)).toEqual([]);
   // The sweep met the task header's actions (it would pass on a page where it found none).
   expect(results.map((result) => result.name)).toEqual(
-    expect.arrayContaining([expect.stringContaining("Изменить детали")]),
+    expect.arrayContaining([expect.stringContaining("Ещё действия")]),
   );
 });
 

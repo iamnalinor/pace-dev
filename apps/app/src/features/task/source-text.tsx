@@ -1,41 +1,30 @@
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
-import { Icon } from "#app/ui/icon.tsx";
+import { Disclosure } from "#app/ui/disclosure.tsx";
+import { Text } from "#app/ui/text.tsx";
 
-/** The text the task came from, shown verbatim on request. */
+/** The text the task came from, verbatim, in a disclosure that exists only for an assistant's reading. */
 export const SourceText = ({ text }: { readonly text: null | string }) => {
   const t = useT();
-  const [isShown, setIsShown] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   if (text === null) {
     return null;
   }
   return (
-    <View className="mx-4 gap-2">
-      <Pressable
-        accessibilityRole="button"
-        aria-expanded={isShown}
-        className="min-h-hit-web flex-row items-center gap-2"
-        onPress={() => {
-          setIsShown((shown) => !shown);
-        }}
-      >
-        <Text className="font-sans text-footnote text-label-secondary">{t("task.source")}</Text>
-        {isShown ? (
-          <Icon name="chevron-up" size="inline" />
-        ) : (
-          <Icon name="chevron-down" size="inline" />
-        )}
-      </Pressable>
-      {isShown ? (
-        <Text
-          className="rounded-lg bg-cell p-3 font-sans text-subhead font-normal text-label-primary"
-          selectable
-        >
+    <Disclosure
+      label={t("task.source")}
+      onToggle={() => {
+        setIsOpen((open) => !open);
+      }}
+      open={isOpen}
+    >
+      <View className="mx-gutter mt-2 rounded-md bg-inset p-3">
+        <Text role="callout" selectable>
           {text}
         </Text>
-      ) : null}
-    </View>
+      </View>
+    </Disclosure>
   );
 };

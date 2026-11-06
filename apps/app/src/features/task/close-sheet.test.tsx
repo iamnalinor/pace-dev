@@ -23,7 +23,7 @@ describe("CloseSheet — a task without a deadline", () => {
     const [created] = result.ok ? result.value : [];
     const taskId = created?.type === "task.created" ? created.payload.taskId : "";
     await renderScreen(<TaskScreen id={taskId} openClose />, runtime);
-    expect(preview("outcome")).toHaveTextContent(`${en("close.outcome")}${en("outcome.done")}`);
+    expect(preview("outcome")).toHaveTextContent(`${en("close.recordsAs")}${en("outcome.done")}`);
     expect(screen.queryByRole("radio", { name: en("quickTime.at-deadline") })).toBeNull();
   });
 });
@@ -40,7 +40,9 @@ describe("CloseSheet — submitting subtasks", () => {
     }
     // Due tonight: closing "at the deadline" would be refused as the future, so it is not offered.
     expect(screen.queryByRole("radio", { name: en("quickTime.at-deadline") })).toBeNull();
-    expect(preview("outcome")).toHaveTextContent(en("close.beforeDeadline"), { exact: false });
+    expect(preview("outcome")).toHaveTextContent(en("close.submittedBeforeDeadline"), {
+      exact: false,
+    });
     expect(preview("open")).toHaveTextContent("5, 6, 7a Bonus", { exact: false });
     expect(preview("recorded")).toHaveTextContent("12:50", { exact: false });
     expect(screen.queryByText("12:50 · happened 12:50")).toBeNull();

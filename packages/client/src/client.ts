@@ -251,6 +251,7 @@ export { type ListedSessions, signInState } from "./view-models/sign-in-notice.t
 export {
   type OverrideSheet,
   type PrimaryAction,
+  submitLabel,
   type SubtaskRow,
   type SubtaskState,
   type TaskLink,

@@ -296,7 +296,7 @@ test("on a computer the form opens in the right pane and closing it brings the t
   await page.goto("/");
   await addTask(page, "Water the plants");
   await nowTasks(page).getByText("Water the plants").click();
-  const details = page.getByRole("button", { name: "Edit details" });
+  const details = page.getByRole("button", { exact: true, name: "Edit" });
   await expect(details).toBeVisible();
   await page.getByRole("navigation").getByRole("button", { name: "New task" }).click();
   const form = page.getByRole("form", { name: "New task" });
@@ -350,7 +350,7 @@ test("on a computer the form swaps into the pane in place: its title inside the 
   await page.goto("/");
   await addTask(page, "Water the plants");
   await nowTasks(page).getByText("Water the plants").click();
-  await expect(page.getByRole("button", { name: "Edit details" })).toBeVisible();
+  await expect(page.getByRole("button", { exact: true, name: "Edit" })).toBeVisible();
   const list = await nowTasks(page).boundingBox();
   const sampling = samplePaneSwap(page);
   await page.getByRole("navigation").getByRole("button", { name: "New task" }).click();

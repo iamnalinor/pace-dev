@@ -51,7 +51,7 @@ test("a touch screen's sheets put no text field in focus, so no keyboard covers 
       "Edit task",
       async () => {
         await nowTasks(page).getByText(title).click();
-        await page.getByRole("button", { name: "Edit details" }).click();
+        await page.getByRole("button", { exact: true, name: "Edit" }).click();
       },
     ],
     [

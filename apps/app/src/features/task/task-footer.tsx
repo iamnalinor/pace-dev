@@ -12,7 +12,7 @@ import { useIsWide } from "#app/ui/layout.ts";
 import { Tooltip } from "#app/ui/tooltip.tsx";
 
 import { useFinishTask } from "./use-finish-task.ts";
-import { useSubmitTitle } from "./use-submit-title.ts";
+import { useSubmitLabel, useSubmitTitle } from "./use-submit-title.ts";
 
 /** Starts (or stops) an activity on this task: the time lands in the Day ledger. */
 const FocusButton = ({ view }: { readonly view: TaskViewModel }) => {
@@ -23,6 +23,7 @@ const FocusButton = ({ view }: { readonly view: TaskViewModel }) => {
   return (
     <Button
       icon={isFocused ? "square" : "timer"}
+      isIconFilled={isFocused}
       onPress={() => {
         void run(isFocused ? actions.stopActivity() : actions.focusTask(view.id));
       }}
@@ -54,7 +55,8 @@ export const TaskFooter = ({
   const run = useRunAction();
   const insets = useSafeAreaInsets();
   const isWide = useIsWide();
-  const submitTitle = useSubmitTitle(view);
+  const submitLabel = useSubmitLabel(view);
+  const submitList = useSubmitTitle(view);
   const finish = useFinishTask(view);
   const padding = { paddingBottom: Math.max(insets.bottom, 12) + 8 };
   if (view.closed !== null) {
@@ -72,7 +74,9 @@ export const TaskFooter = ({
       </View>
     );
   }
-  const primary = view.primaryAction.kind === "submit" ? submitTitle : t("task.done");
+  // Always one line: the button says how many, the hint and the submit sheet say which.
+  const isSubmit = view.primaryAction.kind === "submit";
+  const primary = isSubmit ? submitLabel : t("task.done");
   return (
     <View
       className="flex-row items-center gap-2 border-t border-separator px-4 pt-3"
@@ -90,7 +94,7 @@ export const TaskFooter = ({
             does; the long press is a shortcut to the button beside it, never taught (QA 20 L3). */}
             <Tooltip label={t("task.doneHint")}>
               <Button
-                hint={t("task.doneHint")}
+                hint={isSubmit ? `${submitList}. ${t("task.doneHint")}` : t("task.doneHint")}
                 onLongPress={onClose}
                 onPress={finish}
                 shortcut={HOTKEYS.primary}

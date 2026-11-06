@@ -61,7 +61,7 @@ for (const size of SIZES) {
       const title = `call the dentist ${size.name} ${unique()}`;
       await add(page, title);
       await nowTasks(page).getByText(title).click();
-      await page.getByRole("button", { exact: true, name: "Edit details" }).click();
+      await page.getByRole("button", { exact: true, name: "Edit" }).click();
       const heading = page.getByRole("heading", { name: "Edit task" });
       await expect(heading).toBeVisible();
       // The sheet's surface is opaque: it once lost its background and showed the page through.

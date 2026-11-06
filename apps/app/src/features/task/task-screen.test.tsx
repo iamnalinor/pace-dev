@@ -243,10 +243,23 @@ describe("TaskScreen — editing subtasks", () => {
   });
 });
 
+const openMenu = async (): Promise<void> => {
+  await fireEvent.press(screen.getByRole("button", { name: en("task.menu") }));
+};
+/** Escape on the web, the system Back on Android: the modal's own close request. */
+const requestClose = async (): Promise<void> => {
+  await act(() => {
+    const modal = screen.getByTestId("overlay-modal", { includeHiddenElements: true });
+    (modal.props as { onRequestClose: () => void }).onRequestClose();
+  });
+};
+
 describe("TaskScreen — work", () => {
   it("shows its link and description, and no ranking card", async () => {
     await trkScreen();
-    expect(screen.getByText("https://tracker.example.com/browse/TRK-231 ↗")).toBeOnTheScreen();
+    expect(
+      screen.getByRole("link", { name: "https://tracker.example.com/browse/TRK-231 ↗" }),
+    ).toBeOnTheScreen();
     expect(
       screen.getByText("p99 check fails ~1 in 5 runs on the shared runner."),
     ).toBeOnTheScreen();
@@ -279,7 +292,7 @@ describe("TaskScreen — work", () => {
 
   it("moves the progress slider in percent, the work left following at once", async () => {
     const runtime = await trkScreen();
-    expect(screen.getByText("40%")).toBeOnTheScreen();
+    expect(screen.getByText("40\u{A0}%")).toBeOnTheScreen();
     const workLeft = (): string => {
       const value = screen.getByLabelText(en("task.workLeft")).props["accessibilityValue"] as
         | undefined
@@ -295,17 +308,18 @@ describe("TaskScreen — work", () => {
       },
     );
     // Shown before the store answers: the thumb never jumps back to where it was.
-    expect(screen.getByText("50%")).toBeOnTheScreen();
+    expect(screen.getByText("50\u{A0}%")).toBeOnTheScreen();
     expect(workLeft()).not.toBe(before);
     await waitFor(() => {
       expect(runtime.state.store.getState().tasks.byId[TRK_ID]?.slider).toBe(5);
     });
-    expect(screen.getByText("50%")).toBeOnTheScreen();
-    await fireEvent.press(screen.getByRole("button", { name: en("task.pause") }));
-    await waitFor(() => {
-      expect(runtime.state.store.getState().tasks.byId[TRK_ID]?.status).toBe("paused");
-    });
-    expect(screen.getByRole("button", { name: en("task.resume") })).toBeOnTheScreen();
+    expect(screen.getByText("50\u{A0}%")).toBeOnTheScreen();
+    // The readout a screen reader hears is the percent, not the step (F-A11Y-16).
+    expect(
+      screen.getByRole("adjustable", { name: en("task.progressAria") }).props["accessibilityValue"],
+    ).toMatchObject({ text: "50\u{A0}%" });
+    // No Pause in the header (Q4): the status is not a header control.
+    expect(screen.queryByRole("button", { name: /^Pause$/u })).toBeNull();
   });
 
   it("edits the title from the header's pencil", async () => {
@@ -506,22 +520,42 @@ describe("TaskScreen — work", () => {
     expect(stat(en("task.finalDue"))).toBeOnTheScreen();
   });
 
-  it("gives up from the header's ⊘: the close sheet opens on Cancelled · Skipped", async () => {
+  it("closes otherwise from the ⋯ menu: the close sheet opens on Cancelled · Skipped", async () => {
     await trkScreen();
-    await fireEvent.press(screen.getByRole("button", { name: en("task.giveUp") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("task.menu") }));
+    await fireEvent.press(await screen.findByRole("button", { name: en("task.closeAs") }));
     expect(screen.getByRole("radio", { name: en("close.skipped") })).toBeOnTheScreen();
   });
 
-  it("deletes from the header's trash at once, goes back, and Undo brings it back", async () => {
-    const runtime = await trkScreen();
-    await fireEvent.press(screen.getByRole("button", { name: en("task.delete") }));
-    await waitFor(() => {
-      expect(runtime.state.store.getState().tasks.byId[TRK_ID]).toBeUndefined();
-    });
-    expect(router.back).toHaveBeenCalled();
-    await fireEvent.press(await screen.findByRole("button", { name: en("common.undo") }));
-    await waitFor(() => {
+  describe("deleting", () => {
+    it("asks first, in place; Escape cancels the question and keeps the menu (F-A11Y-02)", async () => {
+      const runtime = await trkScreen();
+      await openMenu();
+      await fireEvent.press(await screen.findByRole("button", { name: en("task.delete") }));
+      expect(screen.getByText(en("task.deleteAsk"))).toBeOnTheScreen();
       expect(runtime.state.store.getState().tasks.byId[TRK_ID]).toBeDefined();
+      await requestClose();
+      expect(screen.queryByText(en("task.deleteAsk"))).toBeNull();
+      expect(screen.getByRole("button", { name: en("task.delete") })).toBeOnTheScreen();
+      expect(runtime.state.store.getState().tasks.byId[TRK_ID]).toBeDefined();
+    });
+
+    it("Cancel keeps the task; Delete removes it, goes back, and Undo brings it back", async () => {
+      const runtime = await trkScreen();
+      await openMenu();
+      await fireEvent.press(await screen.findByRole("button", { name: en("task.delete") }));
+      await fireEvent.press(screen.getByRole("button", { name: en("common.cancel") }));
+      expect(runtime.state.store.getState().tasks.byId[TRK_ID]).toBeDefined();
+      await fireEvent.press(screen.getByRole("button", { name: en("task.delete") }));
+      await fireEvent.press(screen.getByRole("button", { name: en("common.delete") }));
+      await waitFor(() => {
+        expect(runtime.state.store.getState().tasks.byId[TRK_ID]).toBeUndefined();
+      });
+      expect(router.back).toHaveBeenCalled();
+      await fireEvent.press(await screen.findByRole("button", { name: en("common.undo") }));
+      await waitFor(() => {
+        expect(runtime.state.store.getState().tasks.byId[TRK_ID]).toBeDefined();
+      });
     });
   });
 

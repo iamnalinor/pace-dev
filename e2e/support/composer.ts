@@ -62,7 +62,7 @@ export const addTask = async (page: Page, text: string): Promise<void> => {
   await line.press("Enter");
   await expect(page.getByText(/^The assistant will create /u)).toBeVisible();
   await approve(page);
-  await expect(page.getByRole("button", { name: "Edit details" })).toBeVisible();
+  await expect(page.getByRole("button", { exact: true, name: "Edit" })).toBeVisible();
   // On a computer the line stays beside the task and empties: no reload needed (each one costs
   // a whole start, which under parallel load pushed a journey past its time limit).
   if (await line.isVisible()) {

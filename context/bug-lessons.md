@@ -1419,7 +1419,6 @@ The same rule applies when a previously successful channel is no longer configur
 - **Sweep and guard.** `currentOf(destination, path)` in `ui/sidebar.tsx` serves the sidebar's `NavItem`
   and the rail; the tab bar's current tab is its own route. `nav-item.test.tsx` pins the three looks and
   a table of paths (Settings on `/presets` and `/presets/new`, Now on a task and `/add`).
-
 ## Log
 
 New bugs go here with their class; a new class gets its own section above.
@@ -1881,3 +1880,27 @@ New bugs go here with their class; a new class gets its own section above.
 - **Missed because.** The chips and the check were written apart: the chips from the block's own dates, the check from `now`; tests used a block far in the past, where the two never disagree.
 - **Rule.** Options are derived from the same rule that validates them: if a value can only ever be refused, it is not offered. The test clock sits at the edge (a day that has just begun, one that has not).
 - **Sweep and guard.** Swept the other chip sets built from dates (`DayChoices` start days, Week's detail: none). `activity-draft.test.ts` pins the edge in Moscow time.
+
+### 128. Text from data placed in chrome without a length policy
+- **Bug.** PR B 4.5 (F-DAT-01): the task footer's submit button was built from the names of every solved
+  subtask; with 37 of them it grew to 20 lines and at 320 px the body was 0 px tall.
+- **Missed because.** Fixtures had two or three short subtasks, and jest-expo draws no layout, so a label
+  that wraps looks the same as one that fits.
+- **Rule.** A button, tab, badge or bar title is chrome: its length is set by a policy (`fixed` words plus a
+  `count`, or one truncated line), never by data. The full data goes to the accessibility hint and to the
+  sheet the button opens. The pure function that builds such a label (`submitLabel`) is tested with the
+  worst case (37 items, a 200-character name), not with the typical one.
+- **Sweep and guard.** Swept every `t(...)` call that interpolates a list or a name into a `Button` or an
+  `IconButton` label: the toasts already quote through `toastQuote`; the close sheet's title keeps the
+  full list on purpose (it scrolls). Guard: `submitLabel` tests in `task.test.ts`.
+
+### 129. A control replaced by its own confirm drops the way back
+- **Bug.** PR B 4.5 (F-A11Y-02): the task header's trash deleted at once, the page stayed as «No such
+  task», and Escape did nothing in the confirm that other menus had.
+- **Missed because.** The delete test pressed the button and checked the store; no test pressed Escape or
+  Cancel, so nothing asserted that the question could be refused from the keyboard.
+- **Rule.** A destructive item asks in place (the item turns into «Delete the task?» with Cancel and
+  Delete, focus on Cancel), Escape cancels the question before it closes the menu, and the recovery is
+  offered at once. The test walks Cancel, Escape and Delete in that order.
+- **Sweep and guard.** Swept the other one-tap destructive controls (sessions, History undo, wipe): they
+  already confirm. Guard: the `deleting` tests in `task-screen.test.tsx`.
