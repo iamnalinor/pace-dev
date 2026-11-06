@@ -5,6 +5,7 @@ import { classPx } from "#app/test/class-px.ts";
 import { refusingStore } from "#app/test/refusing-store.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { problem } from "@pace/client/testing";
 import { addMinutesIso, type CalendarEvent } from "@pace/core";
 import { NOW } from "@pace/core/testing";
 
@@ -272,6 +273,46 @@ describe("WeekScreen", () => {
     await renderScreen(<WeekScreen />, runtime);
     await fireEvent.press(await screen.findByRole("button", { name: /, Zero$/u }));
     expect(await screen.findByText("Rest · 0m")).toBeOnTheScreen();
+  });
+});
+
+describe("WeekScreen states (spec §5.6)", () => {
+  it("says what lands here, with a way to Now, when the week holds nothing", async () => {
+    const runtime = await createTestRuntime({
+      routes: {
+        "GET /api/calendar": () => ({ events: [] }),
+        "GET /api/usage": () => ({ sessions: [] }),
+      },
+      world: "empty",
+    });
+    await renderScreen(<WeekScreen />, runtime);
+    expect(await screen.findByText(en("week.empty"))).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: en("week.openNow") })).toBeOnTheScreen();
+  });
+
+  it("shows no empty state over a week with a block in it", async () => {
+    await renderScreen(<WeekScreen />, await world());
+    await screen.findByRole("button", { name: /Lecture notes/u });
+    expect(screen.queryByText(en("week.empty"))).toBeNull();
+  });
+
+  it("says the calendar did not load, and reads it again on Try again", async () => {
+    let calls = 0;
+    const runtime = await createTestRuntime({
+      routes: {
+        "GET /api/calendar": () => {
+          calls += 1;
+          return calls === 1 ? problem(503, "offline") : { events: [] };
+        },
+        "GET /api/usage": () => ({ sessions: [] }),
+      },
+    });
+    await renderScreen(<WeekScreen />, runtime);
+    expect(await screen.findByText(en("week.calendarFailed"))).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: en("common.retry") }));
+    await waitFor(() => {
+      expect(screen.queryByText(en("week.calendarFailed"))).toBeNull();
+    });
   });
 });
 

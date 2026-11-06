@@ -1,3 +1,4 @@
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import { ScrollView, View } from "react-native";
 
@@ -6,8 +7,9 @@ import { useBack } from "#app/shared/use-back.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { WeekPeriod } from "#app/shared/week-period.tsx";
+import { Button } from "#app/ui/button.tsx";
 import { cx } from "#app/ui/cx.ts";
-import { FirstSyncBody } from "#app/ui/empty-state.tsx";
+import { EmptyState, FirstSyncBody } from "#app/ui/empty-state.tsx";
 import { Icon } from "#app/ui/icon.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
 import { OverlayPresence } from "#app/ui/overlay-presence.tsx";
@@ -73,6 +75,44 @@ const NightHoursToggle = () => {
   );
 };
 
+/** The calendar layer could not be read: a line under the day strip's header, with a way to retry. */
+const CalendarFailed = ({ onRetry }: { readonly onRetry: () => void }) => {
+  const t = useT();
+  return (
+    <View className="flex-row items-center gap-2 px-gutter" role="alert">
+      <Text className="flex-1" role="footnote" tone="secondary">
+        {t("week.calendarFailed")}
+      </Text>
+      <Button onPress={onRetry} size="small" variant="plain">
+        {t("common.retry")}
+      </Button>
+    </View>
+  );
+};
+
+/** A week with nothing in it: what lands here, and the way to Now. */
+const EmptyWeek = () => {
+  const t = useT();
+  const router = useRouter();
+  return (
+    <EmptyState
+      action={
+        <Button
+          onPress={() => {
+            router.navigate("/");
+          }}
+          size="small"
+          variant="secondary"
+        >
+          {t("week.openNow")}
+        </Button>
+      }
+      body={t("week.emptyBody")}
+      title={t("week.empty")}
+    />
+  );
+};
+
 type GridArgs = Omit<Parameters<typeof WeekGrid>[0], "hourPx" | "minColumnPx">;
 
 /**
@@ -126,8 +166,13 @@ const WeekPage = ({
   const t = useT();
   const { api } = usePace();
   const { language, now } = useViewer();
-  const calendar = useCalendarRange(api, week.weekStart, week.weekEnd);
+  const calendarRead = useCalendarRange(api, week.weekStart, week.weekEnd);
+  const calendar = calendarRead.rows;
   const usage = useUsage(api, week.weekStart, week.weekEnd);
+  const isEmpty =
+    week.days.every((day) => day.blocks.length === 0) &&
+    calendar.length === 0 &&
+    usage.length === 0;
   const lastDay = addDaysIn(week.weekStart, 6, week.zone);
   // A phone opens Week from More: the chevron goes back there; beside the sidebar there is none.
   const back = useBack();
@@ -153,6 +198,8 @@ const WeekPage = ({
       }
     >
       <FirstSyncBody>
+        {calendarRead.isFailed ? <CalendarFailed onRetry={calendarRead.retry} /> : null}
+        {isEmpty && !calendarRead.isFailed ? <EmptyWeek /> : null}
         <FittedGrid
           calendar={calendar}
           language={language}

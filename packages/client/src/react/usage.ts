@@ -122,9 +122,9 @@ export const useUsageRead = (api: ApiClient, from: string, to: string): RangeRea
 export const useUsage = (api: ApiClient, from: string, to: string): readonly UsageRow[] =>
   useRange(usageOf, api, { from, to });
 
-/** The calendar copy the phone sends, overlapping [from, to) (Week). */
+/** The calendar copy the phone sends, overlapping [from, to), with how the read went (Week). */
 export const useCalendarRange = (
   api: ApiClient,
   from: string,
   to: string,
-): readonly CalendarEvent[] => useRange(calendarOf, api, { from, to });
+): RangeRead<CalendarEvent> => useRangeRead(calendarOf, api, { from, to });

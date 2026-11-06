@@ -1622,6 +1622,11 @@ between a day's blocks in time order, Enter opens the inspector, Escape closes i
 - Day columns named, gutter hidden from AT (F-A11Y-09); moon is a switch with no tap tooltip
   (F-WEB-04).
 
+**Built notes (batch 9).** Runs keep folding past 6 lanes, not 3: the 44 px touch target wins over
+the 3-lane rule (ruling). The empty week shows the `EmptyState` above the grid (not overlaid) with
+«Открыть «Сейчас»»; a calendar read that failed shows «Календарь не загрузился» with «Повторить»
+under the header. Not built yet: the 2 px loading line, the sticky day strip on phone, the edge fade.
+
 ### 5.7 Projects — `projects`
 
 **Layout at 390.** Top-level header «Проекты» (back to More), trailing «Новый проект» text `Button`
