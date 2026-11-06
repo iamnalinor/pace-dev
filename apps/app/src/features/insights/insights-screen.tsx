@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Text, View } from "react-native";
 
-import type { InsightBar, InsightsModel } from "@pace/client";
+import type { InsightBar } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { DestinationScreen } from "#app/screens/destination-screen.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { WeekArrows } from "#app/shared/week-arrows.tsx";
+import { WeekPeriod } from "#app/shared/week-period.tsx";
 import { EmptyText } from "#app/ui/empty-state.tsx";
 import { fillClass } from "#app/ui/hue.ts";
 import { Text as KitText } from "#app/ui/text.tsx";
@@ -77,21 +77,6 @@ const Row = ({ name, value }: { readonly name: string; readonly value: string })
   </View>
 );
 
-/** Previous and next week (none past this one). */
-const WeekNav = ({
-  onWeek,
-  week,
-}: {
-  readonly week: InsightsModel;
-  readonly onWeek: (weekOf: null | string) => void;
-}) => {
-  return (
-    <View className="flex-row items-center gap-1">
-      <WeekArrows next={week.next} onWeek={onWeek} previous={week.previous} />
-    </View>
-  );
-};
-
 /** One week of the ledger: where the time went, what got done on time, plan against fact. */
 export const InsightsScreen = () => {
   const t = useT();
@@ -101,9 +86,16 @@ export const InsightsScreen = () => {
   const week = hooks.useInsights(weekOf);
   return (
     <DestinationScreen
-      period={<WeekNav onWeek={setWeekOf} week={week} />}
+      period={
+        <WeekPeriod
+          isAway={week.next !== null}
+          label={formatWeekRange(week.weekStart, week.zone, language)}
+          next={week.next}
+          onWeek={setWeekOf}
+          previous={week.previous}
+        />
+      }
       scrollLabel={t("insights.body", { title: t("insights.title") })}
-      subtitle={formatWeekRange(week.weekStart, week.zone, language)}
       title={t("insights.title")}
     >
       <View className="gap-3 px-5">

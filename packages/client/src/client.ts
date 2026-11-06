@@ -281,11 +281,11 @@ export {
   type TypedTime,
   typeTime,
 } from "./view-models/time-forms.ts";
+export * from "./view-models/week-layout.ts";
 export {
   fitHourPx,
   gridFromHour,
   type Lane,
-  lanesOf,
   placeIn,
   type Placement,
   type WeekBlock,

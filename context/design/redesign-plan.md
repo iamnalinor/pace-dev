@@ -704,19 +704,26 @@ time…» stays on `Button`/`IconButton` and the 320 check is for the e2e run.
 ### Task 4.6: Week
 
 **Files:** `src/features/week/**` (+ tests).
-- [ ] Spec §5 Week: proportional grid where geometry and lanes come from one function (F-DAT-05,
+- [x] Spec §5 Week: proportional grid where geometry and lanes come from one function (F-DAT-05,
       bug-lessons 1), labels ≥ 11 px, day strip snaps on phone, detail in inspector/sheet, night
       hours option, blocks announce day and time (F-A11Y-09).
-- [ ] Failing tests: `layoutWeek()` (client view-model) — 5 overlapping 20-minute blocks get 5 lanes
+- [x] Failing tests: `layoutWeek()` (client view-model) — 5 overlapping 20-minute blocks get 5 lanes
       and drawn heights equal their lane geometry; a11y labels include the weekday. Commit.
-- [ ] The day's-end block (found by the rebase, bug-lessons log 2026-11-02): an item that ends at
+- [x] The day's-end block (found by the rebase, bug-lessons log 2026-11-02): an item that ends at
       midnight with less than `MIN_TARGET_PX` of time is drawn at the minimum and hangs past the
       column, which the sideways scroller clips (half its target misses). Lifting it into the column
       covers the item before it (axe target-size), so decide the drawing here (e.g. room under the
       last hour, or a joined target), with a test that places a 3-minute item at 23:56 and asserts
       its whole target is inside the scroller and covers no neighbour.
-- [ ] PR #48 follow-up: lanes below 44 px past six on a phone (see "PR #48 follow-ups (triage)").
-- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): `PeriodStepper` in the `ScreenHeader` `period` slot (WeekNav sits there for now).
+- [x] PR #48 follow-up: lanes below 44 px past six on a phone (see "PR #48 follow-ups (triage)").
+- [x] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): `PeriodStepper` in the `ScreenHeader` `period` slot (WeekNav sits there for now).
+
+Deferred: the day strip is not sticky (the headers scroll with the grid, which scrolls only below the 18 px
+hour floor); the edge fade replacing the scroll hint and the overscroll containment are not built (the hint
+text stays); runs fold past six lanes, not past three as the spec says, because the phone column widens for six
+lanes at 44 px; the empty-week `EmptyState`, the loading line and the calendar error line are not built;
+History's period slot is left to its task (Insights took the same `WeekPeriod`).
+
 
 ### Task 4.7: Inbox, Review, Decisions
 
@@ -941,6 +948,10 @@ Deferred (2026-11-06): the rail is an index drawn beside the list and scaled to 
       (no continuous animation: it moves with the minute tick). Week's phone day strip uses the same
       ink/now vocabulary. Failing test: the mark sits at expected / max(expected × 2, elapsed) of the
       width; the line's colour switches at 2×. Commit.
+
+Week's day strip half is done in Task 4.6 (`day-strip.tsx`: a 4 px line of the day's tracked time in category strokes,
+a red 1 px now mark on today); the running card's half was done with Task 4.2.
+
 
 ### Task 7.3: Proposal highlight and the logo
 

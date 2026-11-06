@@ -400,10 +400,10 @@ Stepping a period back and forth: the reset button shows away from the current o
 the way back, so each tap's result is the screen of the other period.
 */
 const timeSteps = async (timeTap: TimeTap, page: Page, unit: "day" | "week") => {
-  // Day's period control says "Today"; Week's still says "Back to today".
+  // Day's period control says "Today"; Week's says "This week".
   const back = page.getByRole("button", {
     exact: true,
-    name: unit === "day" ? "Today" : "Back to today",
+    name: unit === "day" ? "Today" : "This week",
   });
   return await timeTaps(timeTap, (index) => {
     const isBack = index % 2 === 0;
@@ -463,7 +463,7 @@ test.describe("the other frequent taps within 100 ms on a slow phone (p75 of 9)"
       ],
       page.getByRole("button", { name: "Previous week" }),
     );
-    await expect(page.getByRole("button", { name: "Back to today" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "This week" })).toHaveCount(0);
     expectWithinBudget("weekStep", await timeSteps(timeTap, page, "week"));
   });
 

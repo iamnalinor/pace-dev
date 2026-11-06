@@ -1904,3 +1904,16 @@ New bugs go here with their class; a new class gets its own section above.
   offered at once. The test walks Cancel, Escape and Delete in that order.
 - **Sweep and guard.** Swept the other one-tap destructive controls (sessions, History undo, wipe): they
   already confirm. Guard: the `deleting` tests in `task-screen.test.tsx`.
+
+### 130. A box drawn at a minimum size hangs outside the clip that holds it
+- **Bug.** PR B 4.6 (the day's-end block, found by the rebase): a 3-minute item at 23:56 is drawn at the 24 px
+  target and ran past the day column, which the sideways scroller clips, so half of its target missed taps;
+  lifting it into the column would have covered the item before it.
+- **Missed because.** Geometry (drawn height) and lanes were computed in two places and the grid's tests never
+  put an item at the edge of the column; jest draws no clip.
+- **Rule.** One function (`layoutWeek`) returns each box's drawn rectangle, its lane and how far the lowest box
+  reaches below the column (`overhang`); the grid keeps that much room under the last hour, so a minimum-size
+  box never leaves its clip and never moves onto a neighbour. A pure test places the item at the edge.
+- **Sweep and guard.** Swept the other minimum-size boxes (Day's rail, the time bar tiles): none is clipped by an
+  ancestor. Guard: `week-layout.test.ts` (5 lanes, the 23:56 item, folds) and the e2e in `week.e2e.ts` that
+  asserts the target is inside the scroller and covers no neighbour.

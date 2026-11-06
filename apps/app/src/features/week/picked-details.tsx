@@ -8,13 +8,16 @@ import { ActivityApps } from "#app/shared/activity-usage.tsx";
 import { useOpenTask } from "#app/shared/task-opener.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
+import { Group } from "#app/ui/group.tsx";
 import { IconButton } from "#app/ui/icon-button.tsx";
 import { Icon, type IconName } from "#app/ui/icon.tsx";
+import { ListRow } from "#app/ui/list-row.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
 import { type EventDetails, eventDetails, type WeekBlock, type WeekModel } from "@pace/client";
 import { formatDuration, type Language, plural } from "@pace/core";
 
-import { dayLabel, type Picked } from "./week-grid.tsx";
+import { dayLabel } from "./day-strip.tsx";
+import { type Picked, pickedKey } from "./week-picked.ts";
 
 /** Opens an address from the calendar; a refusal (no app for it) leaves the screen as it is. */
 const openAsync = async (url: string): Promise<void> => {
@@ -49,6 +52,13 @@ const useHeading = (
   zone: string,
 ): { readonly title: string; readonly when: string } => {
   const { language } = useViewer();
+  const t = useT();
+  if (picked.kind === "group") {
+    return {
+      title: t("week.foldedTitle", { count: picked.items.length }),
+      when: t("week.foldedHint"),
+    };
+  }
   if (picked.kind === "block") {
     const when = whenText({ ...picked.block, isMultiDay: false }, zone, language);
     return { title: picked.block.label, when };
@@ -202,9 +212,41 @@ const BlockFacts = ({
   );
 };
 
+/** The items of a folded run, each a row that opens its own details. */
+const GroupList = ({
+  items,
+  onPick,
+  week,
+}: {
+  readonly items: readonly Extract<Picked, { kind: "block" | "event" }>[];
+  readonly onPick: (picked: Picked) => void;
+  readonly week: WeekModel;
+}) => {
+  const { language } = useViewer();
+  return (
+    <Group inset={false}>
+      {items.map((item) => {
+        const stretch = item.kind === "event" ? item.event : item.block;
+        return (
+          <ListRow
+            key={pickedKey(item)}
+            onPress={() => {
+              onPick(item);
+            }}
+            subtitle={whenText({ ...stretch, isMultiDay: false }, week.zone, language)}
+            title={item.kind === "event" ? item.event.title : item.block.label}
+            titleLines={2}
+          />
+        );
+      })}
+    </Group>
+  );
+};
+
 /** The facts of a pick, the same in the pane and in the sheet. */
 const PickedFacts = ({
   onLeave,
+  onPick,
   picked,
   week,
 }: {
@@ -212,22 +254,32 @@ const PickedFacts = ({
   readonly week: WeekModel;
   /** The pick is being left for another screen (its task). */
   readonly onLeave: () => void;
-}) =>
-  picked.kind === "block" ? (
-    <BlockFacts block={picked.block} onLeave={onLeave} week={week} />
-  ) : (
-    <EventFacts details={eventDetails(picked.event, week.zone)} />
-  );
+  readonly onPick: (picked: Picked) => void;
+}) => {
+  switch (picked.kind) {
+    case "block": {
+      return <BlockFacts block={picked.block} onLeave={onLeave} week={week} />;
+    }
+    case "event": {
+      return <EventFacts details={eventDetails(picked.event, week.zone)} />;
+    }
+    case "group": {
+      return <GroupList items={picked.items} onPick={onPick} week={week} />;
+    }
+  }
+};
 
 /** A pick, the week it is on, and how to let it go. */
 type PickedProps = {
   readonly picked: Picked;
+  /** Opens one of a folded run's items in its place. */
+  readonly onPick: (picked: Picked) => void;
   readonly week: WeekModel;
   readonly onClose: () => void;
 };
 
 /** A phone's details: the bottom sheet over the grid. */
-export const PickedSheet = ({ onClose, picked, week }: PickedProps) => {
+export const PickedSheet = ({ onClose, onPick, picked, week }: PickedProps) => {
   const t = useT();
   const { title, when } = useHeading(picked, week.zone);
   return (
@@ -239,7 +291,7 @@ export const PickedSheet = ({ onClose, picked, week }: PickedProps) => {
       subtitle={when}
       title={title}
     >
-      <PickedFacts onLeave={onClose} picked={picked} week={week} />
+      <PickedFacts onLeave={onClose} onPick={onPick} picked={picked} week={week} />
     </Sheet>
   );
 };
@@ -248,7 +300,7 @@ export const PickedSheet = ({ onClose, picked, week }: PickedProps) => {
 A wide window's details beside the grid, in the shell's inspector: it is there only while
 something is picked (F-LAY-03).
 */
-export const PickedPane = ({ onClose, picked, week }: PickedProps) => {
+export const PickedPane = ({ onClose, onPick, picked, week }: PickedProps) => {
   const t = useT();
   const { title, when } = useHeading(picked, week.zone);
   return (
@@ -265,7 +317,7 @@ export const PickedPane = ({ onClose, picked, week }: PickedProps) => {
           <IconButton icon={"x"} label={t("common.close")} onPress={onClose} />
         </View>
       </View>
-      <PickedFacts onLeave={onClose} picked={picked} week={week} />
+      <PickedFacts onLeave={onClose} onPick={onPick} picked={picked} week={week} />
     </ScrollView>
   );
 };

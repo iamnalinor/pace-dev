@@ -44,24 +44,24 @@ describe("WeekScreen on a wide window", () => {
     await renderScreen(<WeekScreen />, runtime);
     // Nothing picked: no pane at all, the grid has the width (F-LAY-03).
     expect(pane()).toBeNull();
-    const event = await screen.findByRole("button", { name: "From the calendar: Seminar" });
+    const event = await screen.findByRole("button", { name: /, From the calendar: Seminar$/u });
     expect(event).not.toHaveProp("aria-current", "true");
     await fireEvent.press(event);
     expect(await screen.findByText("Room 214")).toBeOnTheScreen();
     expect(screen.getByText("University")).toBeOnTheScreen();
-    expect(screen.getByRole("button", { name: "From the calendar: Seminar" })).toHaveProp(
+    expect(screen.getByRole("button", { name: /, From the calendar: Seminar$/u })).toHaveProp(
       "aria-current",
       "true",
     );
     // A block next: the pane follows, and the mark moves with it.
-    await fireEvent.press(screen.getByRole("button", { name: /^Lecture notes, / }));
+    await fireEvent.press(screen.getByRole("button", { name: /, Lecture notes$/u }));
     expect(await screen.findByText("Study · 1h")).toBeOnTheScreen();
     expect(screen.queryByText("Room 214")).toBeNull();
-    expect(screen.getByRole("button", { name: /^Lecture notes, / })).toHaveProp(
+    expect(screen.getByRole("button", { name: /, Lecture notes$/u })).toHaveProp(
       "aria-current",
       "true",
     );
-    expect(screen.getByRole("button", { name: "From the calendar: Seminar" })).not.toHaveProp(
+    expect(screen.getByRole("button", { name: /, From the calendar: Seminar$/u })).not.toHaveProp(
       "aria-current",
       "true",
     );
@@ -69,7 +69,7 @@ describe("WeekScreen on a wide window", () => {
     // Closing the pane leaves nothing picked, and the pane goes.
     await fireEvent.press(screen.getByRole("button", { name: "Close" }));
     expect(pane()).toBeNull();
-    expect(screen.getByRole("button", { name: /^Lecture notes, / })).not.toHaveProp(
+    expect(screen.getByRole("button", { name: /, Lecture notes$/u })).not.toHaveProp(
       "aria-current",
       "true",
     );
@@ -84,18 +84,18 @@ describe("WeekScreen on a wide window", () => {
       startAt: addMinutesIso(NOW, -240),
     });
     await renderScreen(<WeekScreen />, runtime);
-    const block = () => screen.getByRole("button", { name: /^Lecture notes, / });
+    const block = () => screen.getByRole("button", { name: /, Lecture notes$/u });
     await fireEvent.press(block());
     expect(await screen.findByText("Study · 1h")).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("button", { name: "Previous week" }));
     expect(pane()).toBeNull();
     expect(screen.queryByText("Study · 1h")).toBeNull();
     // Picked again, then Back to today: the pane goes again, and nothing stays marked.
-    await fireEvent.press(screen.getByRole("button", { name: "Back to today" }));
+    await fireEvent.press(screen.getByRole("button", { name: en("period.thisWeek") }));
     await fireEvent.press(block());
     expect(pane()).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("button", { name: "Previous week" }));
-    await fireEvent.press(screen.getByRole("button", { name: "Back to today" }));
+    await fireEvent.press(screen.getByRole("button", { name: en("period.thisWeek") }));
     expect(pane()).toBeNull();
     expect(block()).not.toHaveProp("aria-current", "true");
   });

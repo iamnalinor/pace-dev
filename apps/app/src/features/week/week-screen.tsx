@@ -1,28 +1,29 @@
 import { useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { ScrollView, View } from "react-native";
 
 import { useIsAccountUnknown, usePace, useSettings, useT } from "#app/app-state.tsx";
-import { BackToToday } from "#app/shared/back-to-today.tsx";
 import { useBack } from "#app/shared/use-back.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { WeekArrows } from "#app/shared/week-arrows.tsx";
+import { WeekPeriod } from "#app/shared/week-period.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { FirstSyncBody } from "#app/ui/empty-state.tsx";
 import { Icon } from "#app/ui/icon.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
 import { OverlayPresence } from "#app/ui/overlay-presence.tsx";
+import { Pressable } from "#app/ui/pressable.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
 import { Shell } from "#app/ui/shell.tsx";
-import { spacePress } from "#app/ui/space-press.ts";
+import { Text } from "#app/ui/text.tsx";
 import { Tooltip } from "#app/ui/tooltip.tsx";
 import { fitHourPx, gridFromHour, type WeekModel } from "@pace/client";
 import { useCalendarRange, useUsage } from "@pace/client/react";
 import { addDaysIn, type Language } from "@pace/core";
 
 import { PickedPane, PickedSheet } from "./picked-details.tsx";
-import { BOTTOM_PX, LABELS_PX, type Picked, pickedKey, WeekGrid } from "./week-grid.tsx";
+import { BOTTOM_PX, LABELS_PX, WeekGrid } from "./week-grid.tsx";
+import { type Picked, pickedKey } from "./week-picked.ts";
 
 /** An hour is never drawn shorter than this; a day that would need less scrolls instead. */
 const HOUR_FLOOR_PX = 18;
@@ -52,47 +53,25 @@ const NightHoursToggle = () => {
     return <View className="h-hit-web w-hit-web" />;
   }
   const label = t("week.nightHours");
-  const toggle = (): void => {
-    void run(actions.setNightHours(!nightHours));
-  };
   return (
     <Tooltip label={label}>
       <Pressable
-        accessibilityLabel={label}
-        accessibilityRole="switch"
-        aria-checked={nightHours}
+        checked={nightHours}
         className={cx(
-          "h-hit-web w-hit-web items-center justify-center rounded-md active:opacity-80",
-          nightHours && "bg-accent-quiet",
+          "h-hit-web w-hit-web items-center justify-center rounded-pill",
+          nightHours && "bg-fill-3",
         )}
-        onPress={toggle}
-        {...spacePress(toggle)}
+        label={label}
+        onPress={() => {
+          void run(actions.setNightHours(!nightHours));
+        }}
+        role="switch"
       >
         <Icon name="moon" tone={nightHours ? "accent" : "secondary"} />
       </Pressable>
     </Tooltip>
   );
 };
-
-/** [moon] [Back to today] [‹] [›]: Back to today only on a week that is not this one. */
-const WeekNav = ({
-  onWeek,
-  week,
-}: {
-  readonly week: WeekModel;
-  readonly onWeek: (weekOf: null | string) => void;
-}) => (
-  <View className="flex-row items-center gap-1">
-    <NightHoursToggle />
-    <BackToToday
-      isAway={!week.isCurrent}
-      onPress={() => {
-        onWeek(null);
-      }}
-    />
-    <WeekArrows next={week.next} onWeek={onWeek} previous={week.previous} />
-  </View>
-);
 
 type GridArgs = Omit<Parameters<typeof WeekGrid>[0], "hourPx" | "minColumnPx">;
 
@@ -123,7 +102,7 @@ const FittedGrid = (props: GridArgs) => {
       </ScrollView>
       {isWide ? null : (
         <View className="h-6 items-end justify-center pr-3">
-          <Text className="font-sans text-caption2 font-normal text-label-tertiary">
+          <Text role="caption" tone="tertiary">
             {t("week.scrollHint")}
           </Text>
         </View>
@@ -158,8 +137,16 @@ const WeekPage = ({
       header={
         <ScreenHeader
           {...(back !== undefined && { backLabel: t("common.back"), onBack: back })}
-          period={<WeekNav onWeek={onWeek} week={week} />}
-          subtitle={`${monthDay(week.weekStart, week.zone, language)} – ${monthDay(lastDay, week.zone, language)}`}
+          actions={<NightHoursToggle />}
+          period={
+            <WeekPeriod
+              isAway={!week.isCurrent}
+              label={`${monthDay(week.weekStart, week.zone, language)} – ${monthDay(lastDay, week.zone, language)}`}
+              next={week.next}
+              onWeek={onWeek}
+              previous={week.previous}
+            />
+          }
           title={t("nav.week")}
           variant="top"
         />
@@ -213,7 +200,9 @@ export const WeekScreen = () => {
       <Shell
         content={grid}
         inspector={
-          picked === null ? undefined : <PickedPane onClose={close} picked={picked} week={week} />
+          picked === null ? undefined : (
+            <PickedPane onClose={close} onPick={setPicked} picked={picked} week={week} />
+          )
         }
         inspectorLabel={t("week.details")}
         inspectorOpen={picked !== null}
@@ -224,7 +213,7 @@ export const WeekScreen = () => {
     <>
       {grid}
       <OverlayPresence value={picked}>
-        {(kept) => <PickedSheet onClose={close} picked={kept} week={week} />}
+        {(kept) => <PickedSheet onClose={close} onPick={setPicked} picked={kept} week={week} />}
       </OverlayPresence>
     </>
   );
