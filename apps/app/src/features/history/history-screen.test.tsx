@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor } from "@testing-library/react-native";
 
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { withWindowWidth } from "#app/test/window.ts";
 
 import { HistoryScreen } from "./history-screen.tsx";
 
@@ -39,5 +40,14 @@ describe("HistoryScreen", () => {
     await renderScreen(<HistoryScreen />, await createTestRuntime({ world: "empty" }));
     expect(await screen.findByText(en("history.emptyAccount"))).toBeOnTheScreen();
     expect(screen.queryByRole("list")).toBeNull();
+  });
+});
+
+describe("HistoryScreen's period at 320", () => {
+  withWindowWidth(320);
+
+  it("shows the short moment so › stays in the pill, the long one at 390", async () => {
+    await renderScreen(<HistoryScreen />, await createTestRuntime({ world: "empty" }));
+    expect(screen.getByText(/^\d{1,2}\/\d{1,2}, /u)).toBeOnTheScreen();
   });
 });

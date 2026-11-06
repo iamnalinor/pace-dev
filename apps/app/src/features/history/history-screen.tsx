@@ -47,11 +47,13 @@ const MomentStepper = ({
   now,
   onAt,
   when,
+  shortWhen,
 }: {
   readonly at: null | string;
   readonly now: string;
   readonly onAt: (at: null | string) => void;
   readonly when: string;
+  readonly shortWhen: string;
 }) => {
   const t = useT();
   const instant = at ?? now;
@@ -75,6 +77,7 @@ const MomentStepper = ({
         onAt(null);
       }}
       previousLabel={t("history.dayBack")}
+      shortLabel={shortWhen}
       todayLabel={t("period.today")}
     />
   );
@@ -95,6 +98,13 @@ export const HistoryScreen = () => {
   const instant = at ?? now;
   const history = hooks.useHistory(instant);
   const when = zonedText({ at: instant, mode: "datetime", tz: viewer.deviceTz }, viewer);
+  const shortWhen = new Intl.DateTimeFormat(viewer.language, {
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "numeric",
+    timeZone: viewer.deviceTz,
+  }).format(new Date(instant));
   // At "now" every event shows (the clock ticks by the minute; a fresh undo is not later).
   const events =
     at === null
@@ -117,7 +127,9 @@ export const HistoryScreen = () => {
       header={
         <ScreenHeader
           {...(back !== undefined && { backLabel: t("common.back"), onBack: back })}
-          period={<MomentStepper at={at} now={now} onAt={setAt} when={when} />}
+          period={
+            <MomentStepper at={at} now={now} onAt={setAt} shortWhen={shortWhen} when={when} />
+          }
           title={t("history.title")}
           variant="top"
         />

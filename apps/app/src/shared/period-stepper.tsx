@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { View } from "react-native";
+import { useWindowDimensions, View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
 import { Button } from "#app/ui/button.tsx";
@@ -10,6 +10,8 @@ import { Text } from "#app/ui/text.tsx";
 export type PeriodStepperProps = {
   /** The period in words ("Sunday, Nov 1"); a polite live region, said once as it changes. */
   readonly label: string;
+  /** The label on a 320 window, where the long form pushes › out of the pill (spec §4.3.4). */
+  readonly shortLabel?: string | undefined;
   /** Makes the label a button that opens a picker, handed the label's node to anchor to. */
   readonly onLabel?: ((anchor: React.RefObject<null | View>) => void) | undefined;
   /** What the label's button says it does ("Pick a day"); with `onLabel`. */
@@ -25,6 +27,9 @@ export type PeriodStepperProps = {
   readonly isAway: boolean;
   readonly onToday: () => void;
 };
+
+/** Windows this narrow (a 320 phone) show the short label. */
+export const SHORT_LABEL_WIDTH = 340;
 
 /** The period's name, a button when it opens a picker. */
 const PeriodLabel = ({
@@ -73,9 +78,12 @@ export const PeriodStepper = ({
   onPrevious,
   onToday,
   previousLabel,
+  shortLabel,
   todayLabel,
 }: PeriodStepperProps) => {
   const t = useT();
+  const { width } = useWindowDimensions();
+  const shown = shortLabel !== undefined && width <= SHORT_LABEL_WIDTH ? shortLabel : label;
   return (
     <View
       aria-label={t("period.group")}
@@ -84,7 +92,7 @@ export const PeriodStepper = ({
     >
       <View className="min-w-0 shrink flex-row items-center rounded-pill bg-fill-2">
         <IconButton icon="chevron-left" label={previousLabel} onPress={onPrevious} />
-        <PeriodLabel label={label} labelAction={labelAction} onLabel={onLabel} />
+        <PeriodLabel label={shown} labelAction={labelAction} onLabel={onLabel} />
         <View
           accessibilityElementsHidden={onNext === null}
           importantForAccessibility={onNext === null ? "no-hide-descendants" : "auto"}
