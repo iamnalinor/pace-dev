@@ -1,9 +1,10 @@
-import { Text, View } from "react-native";
+import { View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { cx } from "#app/ui/cx.ts";
 import { fillClass } from "#app/ui/hue.ts";
+import { Text } from "#app/ui/text.tsx";
 import {
   focusSleepRows,
   fragmentationTiles,
@@ -17,6 +18,8 @@ import { Card } from "./card.tsx";
 
 /** Focus is drawn in the work color, sleep in the sleep category's, as on Day. */
 const FOCUS_FILL = fillClass(CATEGORY_HUES.work);
+/** The hours chart is one series: slate, no accent and no category (spec §5.15). */
+const HOURS_FILL = "bg-hue-slate-stroke";
 const SLEEP_FILL = fillClass(CATEGORY_HUES.sleep);
 
 const percent = (share: number): `${number}%` => `${Math.max(2, Math.round(share * 100))}%`;
@@ -39,7 +42,7 @@ const HoursChart = ({ hours }: { readonly hours: InsightsModel["hours"] }) => {
   return (
     <Card title={t("insights.hours")}>
       {hours.peak === null ? null : (
-        <Text className="font-sans text-caption font-normal text-label-secondary">
+        <Text role="caption" tone="secondary">
           {t("insights.hoursPeak", { from: hourLabel(hours.peak), to: hourLabel(hours.peak + 1) })}
         </Text>
       )}
@@ -52,7 +55,7 @@ const HoursChart = ({ hours }: { readonly hours: InsightsModel["hours"] }) => {
           <View className="h-full flex-1 justify-end" key={hourLabel(hour)}>
             {minutes > 0 ? (
               <View
-                className={cx("w-full rounded-t-xs", FOCUS_FILL)}
+                className={cx("w-full rounded-t-xs", HOURS_FILL)}
                 style={{ height: percent(minutes / most) }}
               />
             ) : null}
@@ -61,10 +64,7 @@ const HoursChart = ({ hours }: { readonly hours: InsightsModel["hours"] }) => {
       </View>
       <View className="flex-row">
         {HOUR_TICKS.map((hour) => (
-          <Text
-            className="flex-1 font-sans text-caption2 font-normal tabular-nums text-label-tertiary"
-            key={hour}
-          >
+          <Text className="flex-1" key={hour} numeric role="caption2" tone="tertiary">
             {hourLabel(hour)}
           </Text>
         ))}
@@ -83,22 +83,20 @@ const FragmentationCard = ({
   const tiles = fragmentationTiles(fragmentation, useViewer().language);
   return tiles === null ? null : (
     <Card title={t("insights.fragmentation")}>
-      {/* A tile keeps room for its longest word ("Переключений"), so a phone wraps the row, not
-          the word (QA round 17 L12). */}
+      {/* Two tiles to a row on a phone, each wide enough for its longest word, so a row wraps
+          between words and never inside one (F-TYP-04; QA round 17 L12). */}
       <View className="flex-row flex-wrap gap-2">
         {tiles.map((tile) => (
           <View
             accessibilityLabel={`${t(tile.key)}: ${tile.value}`}
-            className="min-w-32 flex-1 gap-1 rounded-lg bg-fill-3 p-3"
+            className="min-w-32 flex-1 gap-1 rounded-sm bg-inset p-3"
             key={tile.key}
             role="group"
           >
-            <Text className="font-sans text-caption2 font-normal text-label-secondary">
+            <Text role="footnote" tone="secondary">
               {t(tile.key)}
             </Text>
-            <Text className="font-sans text-numeric-value font-normal tabular-nums text-label-primary">
-              {tile.value}
-            </Text>
+            <Text role="numeric.stat">{tile.value}</Text>
           </View>
         ))}
       </View>
@@ -107,7 +105,7 @@ const FragmentationCard = ({
 };
 
 const Bar = ({ fill, share }: { readonly fill: string; readonly share: number }) => (
-  <View className="h-2 overflow-hidden rounded-r-xs bg-fill-4">
+  <View className="h-2 overflow-hidden rounded-r-xs bg-fill-2">
     {share > 0 ? (
       <View className={cx("h-full rounded-r-xs", fill)} style={{ width: percent(share) }} />
     ) : null}
@@ -128,27 +126,27 @@ const FocusSleepCard = ({
     <Card title={t("insights.focusSleep")}>
       <View className="flex-row gap-3">
         <View className="w-10" />
-        <Text className="flex-1 font-sans text-caption font-normal text-label-secondary">
+        <Text className="flex-1" role="caption" tone="secondary">
           {t("insights.sleepBefore")}
         </Text>
-        <Text className="flex-1 font-sans text-caption font-normal text-label-secondary">
+        <Text className="flex-1" role="caption" tone="secondary">
           {t("insights.focus")}
         </Text>
       </View>
       {rows.map((row) => (
         <View className="flex-row gap-3" key={row.date}>
-          <Text className="w-10 font-sans text-caption font-normal text-label-secondary">
+          <Text className="w-10" role="caption" tone="secondary">
             {row.weekday}
           </Text>
           <View className="flex-1 gap-1">
             <Bar fill={SLEEP_FILL} share={row.sleepShare} />
-            <Text className="font-sans text-caption font-normal tabular-nums text-label-primary">
+            <Text numeric role="caption">
               {row.sleepText ?? t("insights.notLogged")}
             </Text>
           </View>
           <View className="flex-1 gap-1">
             <Bar fill={FOCUS_FILL} share={row.focusShare} />
-            <Text className="font-sans text-caption font-normal tabular-nums text-label-primary">
+            <Text numeric role="caption">
               {row.focusText}
             </Text>
           </View>

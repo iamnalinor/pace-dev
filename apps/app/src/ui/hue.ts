@@ -54,23 +54,6 @@ const TINT: Readonly<Record<HueName, string>> = {
   yellow: "bg-hue-yellow-tint",
 };
 
-/** A washed container's edge: its own tint, so the wash alone marks the boundary. */
-const EDGE: Readonly<Record<HueName, string>> = {
-  amber: "border-hue-amber-tint",
-  blue: "border-hue-blue-tint",
-  cyan: "border-hue-cyan-tint",
-  green: "border-hue-green-tint",
-  indigo: "border-hue-indigo-tint",
-  lime: "border-hue-lime-tint",
-  orange: "border-hue-orange-tint",
-  pink: "border-hue-pink-tint",
-  red: "border-hue-red-tint",
-  slate: "border-hue-slate-tint",
-  teal: "border-hue-teal-tint",
-  violet: "border-hue-violet-tint",
-  yellow: "border-hue-yellow-tint",
-};
-
 /** A chip's or a button's outline in the hue. */
 const STROKE_EDGE: Readonly<Record<HueName, string>> = {
   amber: "border-hue-amber-stroke",
@@ -128,10 +111,6 @@ export const outlineClass = (color: TagColor): string => STROKE_EDGE[hueOf(color
 
 /** The colour's wash: a selected chip, a tag. */
 export const tintClass = (color: TagColor): string => TINT[hueOf(color)];
-
-/** A washed container in the colour (its edge drawn in the same wash); neutral without a colour. */
-export const washClass = (color: null | TagColor): string =>
-  color === null ? "bg-fill-3" : `${TINT[hueOf(color)]} ${EDGE[hueOf(color)]}`;
 
 /** The text colour on a wash; neutral without a colour. */
 export const inkClass = (color: null | TagColor): string =>

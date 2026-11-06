@@ -2,13 +2,12 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react-nativ
 
 import { HistoryScreen } from "#app/features/history/history-screen.tsx";
 import { InboxScreen } from "#app/features/inbox/inbox-screen.tsx";
+import { ProjectScreen } from "#app/features/projects/project-screen.tsx";
+import { ProjectsScreen } from "#app/features/projects/projects-screen.tsx";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { ALGEBRA_ID, HW_ID, INBOX_CABLE_ID, INBOX_TEXTS } from "@pace/core/testing";
-
-import { ProjectScreen } from "./project-screen.tsx";
-import { ProjectsScreen } from "./projects-screen.tsx";
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -73,7 +72,9 @@ describe("ProjectsScreen and ProjectScreen", () => {
   it("shows a project's figures and open tasks", async () => {
     await renderScreen(<ProjectScreen id={ALGEBRA_ID} />, await createTestRuntime());
     expect(screen.getByRole("header", { name: "Algebra" })).toBeOnTheScreen();
-    expect(screen.getByLabelText(`${en("project.stat.onTime")}: 9/11`)).toBeOnTheScreen();
+    expect(screen.getByText("2 open · 9/11 on time · 2 late")).toBeOnTheScreen();
+    // The figures are one quiet line, not a strip of tiles (F-CMP-16).
+    expect(screen.queryByLabelText(/^On time: /u)).toBeNull();
     await fireEvent.press(screen.getByText("Algebra HW 6"));
     expect(router.push).toHaveBeenCalledWith(`/task/${HW_ID}`);
   });

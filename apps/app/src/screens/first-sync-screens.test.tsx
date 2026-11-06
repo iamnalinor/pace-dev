@@ -8,14 +8,14 @@ import { HistoryScreen } from "#app/features/history/history-screen.tsx";
 import { InboxScreen } from "#app/features/inbox/inbox-screen.tsx";
 import { InsightsScreen } from "#app/features/insights/insights-screen.tsx";
 import { NotificationsScreen } from "#app/features/notifications/notifications-screen.tsx";
+import { PresetsScreen } from "#app/features/presets/presets-screen.tsx";
+import { ProjectsScreen } from "#app/features/projects/projects-screen.tsx";
 import { WeekScreen } from "#app/features/week/week-screen.tsx";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { fakeUser } from "@pace/client/testing";
 
 import { NowScreen } from "./now-screen.tsx";
-import { PresetsScreen } from "./presets-screen.tsx";
-import { ProjectsScreen } from "./projects-screen.tsx";
 import { SettingsScreen } from "./settings-screen.tsx";
 
 /*

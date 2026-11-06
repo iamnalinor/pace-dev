@@ -43,6 +43,9 @@ make CI green (e2e is first run there).
 
 | 7.3 | an activity created by a typed start is not highlighted (its row is the running card); `ActionCards` → `ProposalCard` rewrite still unbuilt; PNG icons regenerated here, check on a device | §7.3 |
 
+| 4.8 | Projects: no «Archive · n» fold, no skeleton; project edit stays an inline form (no `Sheet`); no «Add task» in the project's empty state; presets: no drag handle / ⌥↑⌥↓, Save at the foot of the preset page (not the header), parent picked by chips | §4.8 |
+| 4.9 | charts in one padded cell (not a `Group`); no 960 column / two-column grid; no tile → `ListRow` fallback; no «Start tracking» action; value column measured after first layout; `insights.e2e.ts` written, not run | §4.9 |
+
 Later batches append their rows here.
 
 ## 0. Current session (2026-11-03, fork Hentrixz/pace-dev, branch `claude/vigilant-archimedes-kq5d4w`)

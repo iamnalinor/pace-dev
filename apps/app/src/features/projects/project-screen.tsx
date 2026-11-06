@@ -1,34 +1,21 @@
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 
 import type { ProjectViewModel } from "@pace/client";
 
 import { useAppState, useLanguage, usePace, useT } from "#app/app-state.tsx";
-import { ProjectForm } from "#app/features/projects/project-form.tsx";
 import { FoldedSection, TaskRows } from "#app/shared/task-list.tsx";
+import { useBack } from "#app/shared/use-back.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button } from "#app/ui/button.tsx";
-import { cx } from "#app/ui/cx.ts";
 import { EmptyState } from "#app/ui/empty-state.tsx";
-import { washClass } from "#app/ui/hue.ts";
-import { IconButton } from "#app/ui/icon-button.tsx";
+import { ScreenHeader } from "#app/ui/screen-header.tsx";
+import { Screen } from "#app/ui/screen.tsx";
+import { SectionHeader } from "#app/ui/section-header.tsx";
+import { Text } from "#app/ui/text.tsx";
 import { formatCount, projectById } from "@pace/core";
 
-import { PushedScreen } from "./pushed-screen.tsx";
-
-const Figure = ({ label, value }: { readonly label: string; readonly value: string }) => (
-  <View
-    accessibilityLabel={`${label}: ${value}`}
-    accessible
-    className="flex-1 gap-0.5"
-    role="group"
-  >
-    <Text className="font-sans text-caption2 font-normal text-label-secondary">{label}</Text>
-    <Text className="font-sans text-headline font-normal tabular-nums text-label-primary">
-      {value}
-    </Text>
-  </View>
-);
+import { ProjectForm } from "./project-form.tsx";
 
 /** Name, color and description, plus archive / restore. */
 const EditProject = ({
@@ -45,7 +32,7 @@ const EditProject = ({
     (state) => projectById(state.projects, project.id)?.archived ?? false,
   );
   return (
-    <View className="mx-4 mb-4">
+    <View className="mx-gutter mb-4">
       <ProjectForm
         extra={
           <Button
@@ -77,54 +64,73 @@ const EditProject = ({
   );
 };
 
-/** Open, on time and late, on the project's own wash. */
-const Stats = ({ project }: { readonly project: ProjectViewModel }) => {
+/** «3 open · 1 on time · 0 late»: the figures as one quiet line, not a strip of tiles (F-CMP-16). */
+const StatsLine = ({ project }: { readonly project: ProjectViewModel }) => {
   const t = useT();
   const language = useLanguage();
   const { stats } = project;
   return (
-    <View
-      className={cx(
-        "mx-4 mb-4 flex-row gap-2 rounded-xl border p-4",
-        project.color === null ? "border-separator bg-cell" : washClass(project.color),
-      )}
-    >
-      <Figure label={t("project.stat.open")} value={formatCount(stats.open, language)} />
-      <Figure
-        label={t("project.stat.onTime")}
-        value={`${formatCount(stats.onTime.done, language)}/${formatCount(stats.onTime.total, language)}`}
-      />
-      <Figure label={t("project.stat.late")} value={formatCount(stats.late, language)} />
-    </View>
+    <Text numeric role="footnote" tone="secondary">
+      {t("project.statsLine", {
+        late: formatCount(stats.late, language),
+        onTime: `${formatCount(stats.onTime.done, language)}/${formatCount(stats.onTime.total, language)}`,
+        open: formatCount(stats.open, language),
+      })}
+    </Text>
   );
 };
 
-/** A project: its figures, then its tasks as on Now: open, in future, done (each one opens). */
+/** The name as the page's heading, its figures line and its description. */
+const ProjectTitle = ({ project }: { readonly project: ProjectViewModel }) => (
+  <View className="mx-gutter mb-2 gap-1 px-row-x">
+    <Text level={1} role="title1">
+      {project.name}
+    </Text>
+    <StatsLine project={project} />
+    {project.description === null ? null : (
+      <Text lines={3} policy="clamp" role="callout" tone="secondary">
+        {project.description}
+      </Text>
+    )}
+  </View>
+);
+
+/** A project: its name and figures, then its tasks as on Now: open, in future, done (each one opens). */
 export const ProjectScreen = ({ id }: { readonly id: string }) => {
   const t = useT();
+  const back = useBack();
   const view = usePace().hooks.useProjectView(id);
   const [isEditing, setIsEditing] = useState(false);
+  const backProps = { backLabel: t("common.back"), onBack: back };
   if (!view.ok) {
     return (
-      <PushedScreen title={t("nav.projects")}>
+      <Screen header={<ScreenHeader {...backProps} title={t("nav.projects")} variant="pushed" />}>
         <EmptyState title={t("project.notFound")} />
-      </PushedScreen>
+      </Screen>
     );
   }
   const project = view.value;
   return (
-    <PushedScreen
-      actions={
-        <IconButton
-          icon={"pencil"}
-          label={t("project.edit")}
-          onPress={() => {
-            setIsEditing(!isEditing);
-          }}
+    <Screen
+      header={
+        <ScreenHeader
+          {...backProps}
+          actions={
+            <Button
+              onPress={() => {
+                setIsEditing(!isEditing);
+              }}
+              size="small"
+              variant="plain"
+            >
+              {t("project.edit")}
+            </Button>
+          }
+          variant="pushed"
         />
       }
-      title={project.name}
     >
+      <ProjectTitle project={project} />
       {isEditing ? (
         <EditProject
           onDone={() => {
@@ -133,22 +139,21 @@ export const ProjectScreen = ({ id }: { readonly id: string }) => {
           project={project}
         />
       ) : null}
-      {project.description === null ? null : (
-        <Text className="mx-5 mb-3 font-sans text-subhead font-normal text-label-secondary">
-          {project.description}
-        </Text>
-      )}
-      <Stats project={project} />
       {project.open.length + project.future.length + project.done.length === 0 ? (
         <EmptyState title={t("project.empty")} />
       ) : null}
-      <TaskRows label={t("now.tasks")} rows={project.open} withTag={false} />
+      {project.open.length === 0 ? null : (
+        <>
+          <SectionHeader count={project.open.length} title={t("now.tasks")} />
+          <TaskRows label={t("now.tasks")} rows={project.open} withTag={false} />
+        </>
+      )}
       <FoldedSection count={project.future.length} title={t("now.future")}>
         <TaskRows label={t("now.future")} rows={project.future} withTag={false} />
       </FoldedSection>
       <FoldedSection count={project.done.length} initiallyOpen title={t("project.done")}>
         <TaskRows checked label={t("project.done")} rows={project.done} withTag={false} />
       </FoldedSection>
-    </PushedScreen>
+    </Screen>
   );
 };

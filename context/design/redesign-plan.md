@@ -740,23 +740,27 @@ Deferred (2026-11-06): the details sheet is the kit `Sheet` (no medium detent ex
 ### Task 4.8: Projects, project page, presets
 
 **Files:** `src/features/projects/**`, `presets/**` (+ tests).
-- [ ] Projects as a grouped list with hue dot + name + "3 tasks" (plural i18n), no hero strip
+- [x] Projects as a grouped list with hue dot + name + "3 tasks" (plural i18n), no hero strip
       (F-CMP-16); project page = the Now task list grouped Open / In future / Done (F-LAY-07);
       presets as grouped rows; New project button hugs (F-CMP-06). Commit.
-- [ ] PR #48 follow-up (cosmetic): the Presets "Start from" chips say what they do (a verb) (see "PR #48 follow-ups (triage)").
-- [ ] QA round 23 R23-05: the preset form's name error is shown on the Name field (marked and
+- [x] PR #48 follow-up (cosmetic): the Presets "Start from" chips say what they do (a verb) (see "PR #48 follow-ups (triage)").
+- [x] QA round 23 R23-05: the preset form's name error is shown on the Name field (marked and
       focused, as the Day sheet does), not a screen below; it clears once the name is changed to a
       free one (with Task 3.8's `showErrorWhen`). (c) the URL losing `?from=` after a refused save
       did not reproduce on the rebased tree and is pinned by `round6-minors.e2e.ts`; (d) is QA21 M1.
 
+Deferred (2026-11-06): Projects has no «Archive · n» Disclosure (the view model lists active projects only) and no skeleton rows; the project edit form stays inline on the page (the spec's `Sheet` would need a sheet name and e2e opener); no «Add task» in the project's empty state; presets: no ▲▼ → drag handle, no ⌥↑/⌥↓, the preset page keeps its Save at the foot (not in the header), the parent picker is the chip row of the form; the form's other card-in-card groups are Task 4.11's look. R23-05 done on the Name field (`error` + cursor back; clears on edit).
+
 ### Task 4.9: Insights
 
 **Files:** `src/features/insights/**` (+ tests).
-- [ ] Tiles use `numeric.stat` + a label that wraps words (no mid-word breaks in RU; F-TYP-04),
+- [x] Tiles use `numeric.stat` + a label that wraps words (no mid-word breaks in RU; F-TYP-04),
       bars share one value column (F-LAY-14), period control as Day (F-CMP-05), charts use the hue
       family. Failing test: RU tile labels at 390 have no hyphenless word split (e2e text-metrics
       check). Commit.
-- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): `PeriodStepper` in the `ScreenHeader` `period` slot (WeekNav sits there for now).
+- [x] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): `PeriodStepper` in the `ScreenHeader` `period` slot (WeekNav sits there for now).
+
+Deferred (2026-11-06): sections are `SectionHeader` over one padded cell (not a `Group` of rows) for charts; no two-column grid at 1440 and no 960 column; the tile falls back to a label/value `ListRow` nowhere (tiles stay 2-up with `min-w-32`); no `EmptyState` action «Start tracking» and no code-split skeletons; the value column is measured (one layout pass after the first), not computed; RU decimals not re-checked; e2e `insights.e2e.ts` (RU tile words, one value column) written, not run.
 
 ### Task 4.10: History and Notifications
 
@@ -1129,6 +1133,8 @@ once review, QA and CI are green.
 | C "Polish" | 5 + 6 + 8 | motion and the 100 ms render budget, web/PWA, close-out | M–L |
 
 ## Lint baseline
+
+Tasks 4.8 + 4.9 (2026-11-06): `DESIGN_VALUE_WARNINGS` 26 (from 29), `BARE_PRESSABLE_WARNINGS` 7 (from 8): Projects, Presets list and Insights moved to the kit.
 
 Tasks 4.7 + 4.10 + 7.3 (2026-11-06): `DESIGN_VALUE_WARNINGS` 29 (from 32), `BARE_PRESSABLE_WARNINGS` 8 (from 9): the Inbox, Decisions, History and Notifications rows moved to the kit (`active:opacity-*` and a bare `Pressable` went). `KIT_PRIMITIVE_WARNINGS` unchanged.
 

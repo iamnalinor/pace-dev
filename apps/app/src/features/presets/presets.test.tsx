@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor } from "@testing-library/react-native";
 
 import type { PaceRuntime } from "#app/runtime.ts";
 
-import { PresetScreen } from "#app/screens/preset-screen.tsx";
+import { PresetScreen } from "#app/features/presets/preset-screen.tsx";
 import { isControl } from "#app/test/focus-target.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
@@ -54,7 +54,9 @@ describe("PresetsList", () => {
     expect(screen.queryByRole("button", { name: en("presets.new") })).toBeNull();
     // "Start from" lists actions, not a choice: buttons, none of them drawn as picked (QA 19 L7).
     expect(screen.queryAllByRole("radio")).toHaveLength(0);
-    await fireEvent.press(screen.getByRole("button", { name: "Work" }));
+    await fireEvent.press(
+      screen.getByRole("button", { name: en("presets.startFromName", { name: "Work" }) }),
+    );
     expect(router.push).toHaveBeenCalledWith({
       params: { from: "work", id: "new" },
       pathname: "/presets/[id]",
@@ -118,8 +120,10 @@ describe("PresetScreen", () => {
     expect(screen.getByLabelText(en("presets.name")).props).toMatchObject({ autoFocus: true });
     expect(screen.queryByLabelText("Id")).toBeNull();
     await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
-    expect(screen.getByRole("alert")).toHaveTextContent(en("presets.nameRequired"));
+    expect(screen.getByText(en("presets.nameRequired"))).toBeOnTheScreen();
     await fireEvent.changeText(screen.getByLabelText(en("presets.name")), "Linear Algebra");
+    // The refusal belonged to the old name: it goes once the name changes.
+    expect(screen.queryByText(en("presets.nameRequired"))).toBeNull();
     await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
     await waitFor(() => {
       expect(linearAlgebra(runtime)).toMatchObject({ extends: "hw" });
@@ -140,8 +144,12 @@ describe("PresetScreen", () => {
     await renderScreen(<PresetScreen from="hw" id="new" />, runtime);
     await fireEvent.changeText(screen.getByLabelText(en("presets.name")), "алгебра ");
     await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(en("actionError.preset/name-taken"));
+    // The sentence sits on the Name field, which takes the cursor back (R23-05).
+    expect(await screen.findByText(en("actionError.preset/name-taken"))).toBeOnTheScreen();
+    expect(screen.getByLabelText(en("presets.name"))).toHaveProp("aria-invalid", true);
     expect(runtime.state.store.getState().events).toHaveLength(before);
+    await fireEvent.changeText(screen.getByLabelText(en("presets.name")), "Algebra II");
+    expect(screen.queryByText(en("actionError.preset/name-taken"))).toBeNull();
   });
 
   it("keeps an existing preset's id and names the edit by the preset", async () => {

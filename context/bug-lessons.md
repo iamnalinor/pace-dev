@@ -1940,3 +1940,14 @@ New bugs go here with their class; a new class gets its own section above.
   repeat per row name their row («Accept: <text>»).
 - **Sweep and guard.** Swept the lists: Day's rows, Projects and the task rows keep one control per row.
   Guard: the Inbox and History tests press the row and the button separately by name.
+
+### 133. A refusal said a screen below the field it is about
+- **Bug.** QA round 23 R23-05, closed in PR B 4.8: a taken or empty preset name was refused in a line at the
+  foot of a long form; the Name field showed nothing and kept no cursor.
+- **Missed because.** The test read the alert anywhere on the screen (`findByRole("alert")`), so a message far
+  from its field passed; jest has no viewport.
+- **Rule.** A refusal about one field is that field's `error` (marked, announced, with the cursor sent back
+  to it) and goes when the field's value changes; only a refusal about the whole form uses the form's line.
+- **Sweep and guard.** Swept the forms: Day's sheet, the project form and the close sheet already attach
+  theirs (the project form's name error stays a form line, by its single field). Guard: the preset tests
+  assert the sentence, `aria-invalid` on the field and that editing the name clears it.
