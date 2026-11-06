@@ -211,12 +211,27 @@ describe("the sessions list", () => {
       expect(
         rowOf({
           kind: "app",
+          name: "Android",
           device: { brand: "samsung", model: "Galaxy S23", os: "Android", osVersion: "14" },
         })?.name,
       ).toBe("Samsung Galaxy S23");
       expect(
-        rowOf({ kind: "app", device: { brand: "Google", model: "Google Pixel 8" } })?.name,
+        rowOf({
+          kind: "app",
+          name: "Android",
+          device: { brand: "Google", model: "Google Pixel 8" },
+        })?.name,
       ).toBe("Google Pixel 8");
+    });
+
+    it("keeps the name the person gave their phone as the title, the model under it", () => {
+      const device = { brand: "samsung", model: "Galaxy S23", os: "Android", osVersion: "14" };
+      const row = rowOf({ device, kind: "app", name: "Ada's phone" });
+      expect(row?.name).toBe("Ada's phone");
+      expect(row?.meta.slice(0, 3)).toEqual(["Phone app", "Samsung Galaxy S23", "Android 14"]);
+      const same = rowOf({ device, kind: "app", name: "Galaxy S23" });
+      expect(same?.name).toBe("Galaxy S23");
+      expect(same?.meta.slice(0, 2)).toEqual(["Phone app", "Android 14"]);
     });
 
     it("titles a browser by itself and its system, in both languages", () => {

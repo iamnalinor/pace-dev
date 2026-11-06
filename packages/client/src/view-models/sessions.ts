@@ -89,6 +89,9 @@ const metaOf = (session: Session, context: SessionRowsContext): readonly string[
   ];
 };
 
+/** What the Worker calls a phone that sent no name (`UNNAMED_APP`): not a name the person gave. */
+const UNNAMED_PHONE = "Android";
+
 type Device = NonNullable<Session["device"]>;
 
 const withVersion = (name: string, version: string | undefined): string =>
@@ -105,6 +108,26 @@ const deviceModelName = ({ brand, model }: Device, language: Language): string |
   return `${capitalize(brand, language)} ${model}`;
 };
 
+/** A device with no model: a browser titles itself (with its system), else a bare system line. */
+const browserDetails = (
+  os: string | undefined,
+  browser: string | undefined,
+  language: Language,
+): { readonly title?: string; readonly parts: readonly string[] } => {
+  if (browser === undefined) {
+    return { parts: os === undefined ? [] : [os] };
+  }
+  return {
+    parts: [],
+    title: os === undefined ? browser : t(language, "sessions.browserOn", { browser, os }),
+  };
+};
+
+const isNamedAfter = (name: string, device: Device, model: string): boolean => {
+  const lower = name.toLowerCase();
+  return lower.includes(model.toLowerCase()) || lower.includes((device.model ?? "").toLowerCase());
+};
+
 /**
 What the device details make of the row: its title (a phone's name, else "Chrome 131 on macOS")
 and the parts under it that the title does not already say. Nothing known: nothing here, and the
@@ -113,6 +136,7 @@ name as the session came stays.
 const detailsOf = (
   device: Device | undefined,
   { language }: SessionRowsContext,
+  named?: string,
 ): { readonly title?: string; readonly parts: readonly string[] } => {
   if (device === undefined) {
     return { parts: [] };
@@ -122,15 +146,14 @@ const detailsOf = (
     device.browser === undefined ? undefined : withVersion(device.browser, device.browserVersion);
   const model = deviceModelName(device, language);
   if (model !== undefined) {
-    return { parts: [os, browser].filter((part) => part !== undefined), title: model };
+    // The name the person gave the phone stays the title; the model goes under it unless it is the name.
+    const extra = named === undefined || isNamedAfter(named, device, model) ? undefined : model;
+    return {
+      parts: [extra, os, browser].filter((part) => part !== undefined),
+      title: named ?? model,
+    };
   }
-  if (browser === undefined) {
-    return { parts: os === undefined ? [] : [os] };
-  }
-  return {
-    parts: [],
-    title: os === undefined ? browser : t(language, "sessions.browserOn", { browser, os }),
-  };
+  return browserDetails(os, browser, language);
 };
 
 /** The current session first, then the most recently seen; never seen (an MCP app) last. */
@@ -148,7 +171,11 @@ export const sessionRows = (
   context: SessionRowsContext,
 ): readonly SessionRow[] =>
   sessions.toSorted(byRecency).map((session) => {
-    const details = detailsOf(session.device, context);
+    const details = detailsOf(
+      session.device,
+      context,
+      session.kind === "app" && session.name !== UNNAMED_PHONE ? session.name : undefined,
+    );
     const [kind = "", ...rest] = metaOf(session, context);
     return {
       action: session.kind === "agent" ? "disconnect" : "revoke",

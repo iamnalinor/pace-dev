@@ -87,6 +87,18 @@ describe("userAgentDetails", () => {
     });
   });
 
+  it("never reads a locale as the model of an old Android", () => {
+    const old =
+      "Mozilla/5.0 (Linux; U; Android 4.0.3; en-us; GT-I9100 Build/IML74K) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30";
+    expect(userAgentDetails(old).model).toBe("GT-I9100");
+    const bare =
+      "Mozilla/5.0 (Linux; U; Android 4.0; ru-RU) AppleWebKit/534.30 Mobile Safari/534.30";
+    expect(userAgentDetails(bare).model).toBeUndefined();
+    const noModel =
+      "Mozilla/5.0 (Linux; U; Android 2.3; ru-RU; ) AppleWebKit/534.30 Mobile Safari/534.30";
+    expect(userAgentDetails(noModel).model).toBeUndefined();
+  });
+
   it("reads a Pixel as Google's", () => {
     const pixel =
       "Mozilla/5.0 (Linux; Android 15; Pixel 8 Build/AP3A) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36";

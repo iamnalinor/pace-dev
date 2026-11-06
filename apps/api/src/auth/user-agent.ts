@@ -85,14 +85,24 @@ const BRANDS: ReadonlySet<string> = new Set([
   "xiaomi",
 ]);
 
+const LOCALE = /^[a-z]{2}[-_][a-z]{2}$/iu;
+
 const capitalized = (word: string): string =>
   word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
 
+/** The model token of an Android UA, without its "Build/…" tail; none for the reduced "K" and the like. */
+const modelToken = (userAgent: string): string | undefined => {
+  // Old Androids put their locale before the model ("Linux; U; Android 4.0; en-us; GT-I9100"): skipped.
+  const tokens = /\bAndroid [\d.]+; ([^)]+)/u.exec(userAgent)?.[1]?.split(";") ?? [];
+  const token = tokens.map((part) => part.trim()).find((part) => part !== "" && !LOCALE.test(part));
+  const raw = token?.split(" Build/", 1)[0]?.trim();
+  return raw === undefined || /^(?:.|Android|Mobile|Tablet)$/iu.test(raw) ? undefined : raw;
+};
+
 /** The model an Android UA carries ("Pixel 8"); the reduced "K" and "Build/…" tails are no model. */
 const androidDevice = (userAgent: string): Pick<UserAgentDetails, "brand" | "model"> => {
-  const token = /\bAndroid [\d.]+; ([^;)]+)/u.exec(userAgent)?.[1];
-  const raw = token?.split(" Build/", 1)[0]?.trim();
-  if (raw === undefined || /^(?:.|Android|Mobile|Tablet)$/iu.test(raw)) {
+  const raw = modelToken(userAgent);
+  if (raw === undefined) {
     return {};
   }
   const [word = "", ...rest] = raw.split(/\s+/u);
