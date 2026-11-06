@@ -85,15 +85,15 @@ migrations, raw usage aggregation, account wipe/export paths and isolated worker
 versioned manifest with schema, cursor coverage, event/raw counts and SHA-256. Durable operation
 states prepared → uploaded → verified → committed; retry identity is stable. Pruning is disabled.
 
-- [ ] RED cases: upload/read failure, altered bytes/count, restart at every stage, concurrent append,
+- [x] RED cases: upload/read failure, altered bytes/count, restart at every stage, concurrent append,
   repeated operation, old correction, cross-owner keys and generation change.
-- [ ] Implement archive encoding/validation and R2 port adapter; publish manifests only after actual
+- [x] Implement archive encoding/validation and R2 port adapter; publish manifests only after actual
   read-back verifies content. Save new versions for changed months; preserve originals.
-- [ ] Derive daily raw-usage aggregates without deleting source rows; verify interval boundaries and
+- [x] Derive daily raw-usage aggregates without deleting source rows; verify interval boundaries and
   repeated/shrinking uploads. Provide full-history reads/export without duplicates.
-- [ ] Implement isolated restore verification and account archive cleanup, including superseded
+- [x] Implement isolated restore verification and account archive cleanup, including superseded
   objects. Test failed cleanup/retry and prohibit stale archive jobs after account reset.
-- [ ] Review, lint and checkpoint. No production pruning activation.
+- [x] Review and checkpoint. No production pruning activation. Unified lint is enforced by the commit hook.
 
 ## Task 9C: Checkpoint-aware sync and history consumers
 
@@ -104,15 +104,16 @@ web/native adapters, API sync/live/history/export/MCP consumers, integration and
 and cursor; older history is paginated separately. Store installation is atomic with preserved
 same-generation unsynced outbox. History/export retain access to all events.
 
-- [ ] Expand contract and compatibility rollout after 9A/9B representations are reviewed.
-- [ ] RED: fresh device and stale cursor bootstrap, interrupted local installation, offline outbox,
+- [x] Expand contract and compatibility rollout after 9A/9B representations are reviewed.
+- [x] RED: fresh device and stale cursor bootstrap, interrupted local installation, offline outbox,
   duplicate pull, store reset, unknown checkpoint version, old-client refusal and quiet steady state.
-- [ ] Wire server, HTTP/socket client and durable stores; expose old periods through existing history,
+- [x] Wire server, HTTP/socket client and durable stores; expose old periods through existing history,
   analytics/MCP and export readers with explicit loading/error states where needed.
-- [ ] Compare restored state/history/export to full log; measure year-history cold reads and document
+- [x] Compare restored state/history/export to full log; measure year-history cold reads and document
   exceptions. Verify compatible operation with archive unavailable while source is retained.
-- [ ] Run appropriate full suites, independent cross-contract review, lint and final checkpoint;
-  update handoff/PR and wait for green CI. Leave merge and production activation undone.
+- [x] Run appropriate full suites, independent cross-contract review and final checkpoint (lint is enforced by its hook);
+  update handoff/PR and trigger CI. Owner amendment on 2026-11-06: stop after CI starts;
+  do not wait for its result. Leave merge and production activation undone.
 
 ## Execution notes
 

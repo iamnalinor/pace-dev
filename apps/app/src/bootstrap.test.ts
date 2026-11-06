@@ -41,3 +41,29 @@ it("awaits the watcher's discovery before push without a second discovery reques
   expect(check).toHaveBeenCalledTimes(1);
   expect(startPhonePush).toHaveBeenCalledTimes(1);
 });
+
+it("loads persisted checkpoint ids before generating recurring instances", async () => {
+  const runtime = await createTestRuntime({ world: "empty" });
+  const loaded = Promise.withResolvers<null>();
+  const delayed = {
+    ...runtime,
+    state: {
+      ...runtime.state,
+      ready: (async () => {
+        await loaded.promise;
+      })(),
+    },
+  };
+  const instances = jest.spyOn(runtime.actions, "ensureInstances").mockResolvedValue(0);
+  jest.spyOn(runtime.sync, "syncNow").mockResolvedValue(ok({ pulled: 0, pushed: 0 }));
+  const running = bootstrap(delayed, {
+    pool: { refresh: async () => undefined, isFresh: () => false },
+    session: undefined,
+    zoneSettled: async () => undefined,
+  });
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  expect(instances).not.toHaveBeenCalled();
+  loaded.resolve(null);
+  await running;
+  expect(instances).toHaveBeenCalledTimes(1);
+});

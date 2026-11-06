@@ -9,7 +9,7 @@ import {
 
 const compareText = (left: string, right: string): number =>
   left < right ? -1 : Number(left > right);
-const rawKey = (record: Exclude<ArchiveRecord, { kind: "event" }>): string =>
+export const rawIdentity = (record: Exclude<ArchiveRecord, { kind: "event" }>): string =>
   JSON.stringify(
     record.kind === "usage"
       ? [record.row.deviceId, record.row.app, record.row.startAt]
@@ -21,7 +21,7 @@ const compareRecord = (left: ArchiveRecord, right: ArchiveRecord): number => {
     return left.seq - right.seq;
   }
   if (left.kind !== "event" && left.kind === right.kind) {
-    return compareText(rawKey(left), rawKey(right));
+    return compareText(rawIdentity(left), rawIdentity(right));
   }
   const rank = { event: 0, usage: 1, "phone-use": 2 };
   return rank[left.kind] - rank[right.kind];
@@ -46,7 +46,7 @@ const hasUniqueRecords = (records: readonly ArchiveRecord[]): boolean => {
       ids.add(record.row.id);
       seqs.add(record.seq);
     } else {
-      const key = `${record.kind}:${rawKey(record)}`;
+      const key = `${record.kind}:${rawIdentity(record)}`;
       if (keys.has(key)) {
         return false;
       }

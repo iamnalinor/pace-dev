@@ -1,4 +1,4 @@
-import { type Event, isCorrection } from "@pace/core";
+import { type Checkpoint, type Event, isCorrection } from "@pace/core";
 
 import type { ActorStorage } from "../shared/ports/actor-storage.ts";
 import type { SqliteDatabase } from "../shared/ports/sqlite.ts";
@@ -187,6 +187,10 @@ export class StateCache {
     } else {
       await this.#rebuildAfter(before, seq);
     }
+  }
+
+  checkpointPublished(checkpoint: Checkpoint): void {
+    this.#checkpoint?.adopt(checkpoint);
   }
 
   /** Drops what is in memory (the store was wiped). */

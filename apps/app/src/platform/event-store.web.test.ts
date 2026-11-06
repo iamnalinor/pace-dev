@@ -1,9 +1,19 @@
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
+import { openDB } from "idb";
 
-import type { EventStore } from "@pace/client";
+import type { PaceDb } from "#app/platform/idb-event-database.ts";
+import type { EventStore, Sha256Text } from "@pace/client";
 import type { Event } from "@pace/core";
 
+import { checkpointIntegrityContract } from "#app/platform/checkpoint-integrity-contract.fake.ts";
+
+import {
+  baseEvent,
+  checkpointStoreContract,
+  checkpointTestHash,
+  pendingEvent,
+} from "./checkpoint-store-contract.fake.ts";
 import { createEventStore } from "./event-store.web.ts";
 
 /**
@@ -27,11 +37,88 @@ const settingsEvent = (id: string, occurredAt: string): Event => ({
 const a = settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(9));
 
 /** A tab's copy, checked to be in IndexedDB: the memory fallback would make every case vacuous. */
-const openTab = async (): Promise<EventStore> => {
-  const local = createEventStore();
+const openTab = async (hash: Sha256Text = checkpointTestHash): Promise<EventStore> => {
+  const local = createEventStore(hash);
   await expect(local.isShared()).resolves.toBe(true);
   return local.store;
 };
+
+describe("IndexedDB checkpoint transactions", () => {
+  checkpointStoreContract(openTab);
+});
+
+describe("IndexedDB persisted checkpoint integrity", () => {
+  checkpointIntegrityContract({
+    open: openTab,
+    readMeta: async () => {
+      const db = await openDB<PaceDb>("pace", 2);
+      return Object.fromEntries(
+        (await db.getAll("meta")).map((row) => [row.key, String(row.value)]),
+      );
+    },
+    writeMeta: async (meta) => {
+      const db = await openDB<PaceDb>("pace", 2);
+      const tx = db.transaction("meta", "readwrite");
+      for (const [key, value] of Object.entries(meta)) {
+        await tx.store.put({ key, value });
+      }
+      await tx.done;
+    },
+  });
+
+  it("upgrades the existing version-one database without recreating or dropping its log", async () => {
+    const legacy = await openDB<PaceDb>("pace", 1, {
+      upgrade(db) {
+        const events = db.createObjectStore("events", { keyPath: "id" });
+        events.createIndex("byOccurredAt", "occurredAt");
+        db.createObjectStore("pending", { keyPath: "id" });
+        db.createObjectStore("meta", { keyPath: "key" });
+      },
+    });
+    await legacy.put("events", pendingEvent);
+    await legacy.put("pending", { id: pendingEvent.id });
+    await legacy.put("meta", { key: "owner", value: "legacy-owner" });
+    await legacy.put("meta", { key: "cursor", value: 7 });
+    legacy.close();
+    const store = await openTab();
+    expect(await store.readSnapshot()).toMatchObject({
+      owner: "legacy-owner",
+      cursor: 7,
+      coverage: "full",
+      checkpoint: null,
+      records: [{ seq: null, event: pendingEvent }],
+      pendingIds: [pendingEvent.id],
+    });
+  });
+
+  it("rolls back event, outbox and cursor mutations when a write transaction fails", async () => {
+    const store = await openTab();
+    await store.append([pendingEvent]);
+    const before = await store.readSnapshot();
+    const failure = jest.spyOn(IDBObjectStore.prototype, "put");
+    const original = failure.getMockImplementation();
+    if (original === undefined) {
+      throw new Error("missing IndexedDB implementation");
+    }
+    failure.mockImplementation(function (this: IDBObjectStore, value: unknown, key?: IDBValidKey) {
+      if (this.name === "meta") {
+        throw new Error("injected metadata write failure");
+      }
+      return original.call(this, value, key);
+    });
+    await expect(
+      store.applyRemotePage({
+        guard: before,
+        storeId: "store-a",
+        since: 0,
+        seq: 1,
+        records: [{ seq: 1, event: baseEvent }],
+      }),
+    ).rejects.toThrow("injected metadata write failure");
+    failure.mockRestore();
+    expect(await (await openTab()).readSnapshot()).toEqual(before);
+  });
+});
 
 /** A browser profile per test: the stores of two tests never share a copy. */
 beforeEach(() => {

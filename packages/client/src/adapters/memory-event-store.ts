@@ -1,65 +1,106 @@
 /* eslint-disable @typescript-eslint/require-await -- the in-memory adapter implements the async port synchronously */
-import type { Event } from "@pace/core";
+import { newId, type Result } from "@pace/core";
 
+import type { LocalSnapshot } from "../checkpoint-store-types.ts";
+
+import {
+  appendLocalSnapshot,
+  bootstrapSnapshot,
+  emptySnapshot,
+  historySnapshot,
+  isSameCopy,
+  legacyPageSnapshot,
+  remotePageSnapshot,
+} from "../checkpoint-store.ts";
 import { canClearCopy, type EventStore } from "../event-store.ts";
 
-/** In-memory `EventStore`: the reference implementation, used by tests and as a fallback. */
-export const createMemoryEventStore = (): EventStore => {
-  const events = new Map<string, Event>();
-  const pending = new Set<string>();
-  let cursor = 0;
-  let storeId: null | string = null;
-  let syncVersion = 0;
-  let owner: null | string = null;
+type Memory = {
+  readonly get: () => LocalSnapshot;
+  readonly set: (snapshot: LocalSnapshot) => void;
+};
+const queries = (get: Memory["get"]) => ({
+  readSnapshot: async () => get(),
+  getCursor: async () => get().cursor,
+  getStoreId: async () => get().storeId,
+  getSyncVersion: async () => get().syncVersion,
+  listAll: async () => get().records.map((record) => record.event),
+  listPending: async () => {
+    const image = get();
+    return image.records
+      .filter((record) => image.pendingIds.includes(record.event.id))
+      .map((record) => record.event);
+  },
+});
+const writes = ({
+  get,
+  set,
+}: Memory): Pick<
+  EventStore,
+  "append" | "clear" | "markSynced" | "setCursor" | "setOwner" | "setStoreId" | "setSyncVersion"
+> => ({
+  append: async (events, guard) => {
+    const result = appendLocalSnapshot(get(), { events, ...(guard !== undefined && { guard }) });
+    if (!result.ok) {
+      throw new Error(result.error);
+    }
+    set(result.value);
+  },
+  clear: async (ifOwner) => {
+    if (canClearCopy(get().owner, ifOwner)) {
+      set(emptySnapshot());
+    }
+  },
+  markSynced: async (ids, guard) => {
+    const current = get();
+    if (guard !== undefined && !isSameCopy(current, guard)) {
+      throw new Error("sync/copy-changed");
+    }
+    const received = new Set(ids);
+    set({ ...current, pendingIds: current.pendingIds.filter((id) => !received.has(id)) });
+  },
+  setOwner: async (owner) => {
+    const current = get();
+    set({ ...current, owner, copyToken: current.owner === owner ? current.copyToken : newId() });
+  },
+  setCursor: async (cursor) => {
+    set({ ...get(), cursor });
+  },
+  setStoreId: async (storeId) => {
+    set({ ...get(), storeId });
+  },
+  setSyncVersion: async (syncVersion) => {
+    set({ ...get(), syncVersion });
+  },
+});
+const checkpointWrites = ({
+  get,
+  set,
+}: Memory): Pick<
+  EventStore,
+  "applyLegacyPage" | "applyRemotePage" | "installBootstrap" | "installHistory"
+> => {
+  const change = <E>(result: Result<LocalSnapshot, E>): Result<LocalSnapshot, E> => {
+    if (result.ok) {
+      set(result.value);
+    }
+    return result;
+  };
   return {
-    append: async (incoming) => {
-      for (const event of incoming) {
-        if (events.has(event.id)) {
-          continue;
-        }
-
-        events.set(event.id, event);
-        pending.add(event.id);
-      }
-    },
-    clear: async (ifOwner) => {
-      if (!canClearCopy(owner, ifOwner)) {
-        return;
-      }
-      owner = null;
-      events.clear();
-      pending.clear();
-      cursor = 0;
-      storeId = null;
-      syncVersion = 0;
-    },
-    getCursor: async () => cursor,
-    getStoreId: async () => storeId,
-    getSyncVersion: async () => syncVersion,
-    listAll: async () => events.values().toArray(),
-    listPending: async () =>
-      events
-        .values()
-        .filter((event) => pending.has(event.id))
-        .toArray(),
-    markSynced: async (ids) => {
-      for (const id of ids) {
-        pending.delete(id);
-      }
-    },
-    setOwner: async (mark) => {
-      owner = mark;
-    },
-    setCursor: async (seq) => {
-      cursor = seq;
-    },
-    setStoreId: async (id) => {
-      storeId = id;
-    },
-    setSyncVersion: async (version) => {
-      syncVersion = version;
-    },
+    installBootstrap: async (input) => change(bootstrapSnapshot(get(), input)),
+    applyRemotePage: async (input) => change(remotePageSnapshot(get(), input)),
+    applyLegacyPage: async (input) => change(legacyPageSnapshot(get(), input)),
+    installHistory: async (input) => change(historySnapshot(get(), input)),
   };
 };
-
+/** In-memory EventStore, sharing exactly the persistent adapters' guarded transitions. */
+export const createMemoryEventStore = (): EventStore => {
+  let image = emptySnapshot();
+  const memory: Memory = {
+    get: () => image,
+    set: (next) => {
+      image = next;
+    },
+  };
+  return { ...queries(memory.get), ...writes(memory), ...checkpointWrites(memory) };
+};
 /* eslint-enable @typescript-eslint/require-await -- end of the synchronous adapter */

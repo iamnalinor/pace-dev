@@ -1339,6 +1339,9 @@ describe("createSyncClient's offline flag (QA round 17 review m3, I2)", () => {
     const store = createMemoryEventStore();
     const full: EventStore = {
       ...store,
+      applyLegacyPage: async () => {
+        throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+      },
       append: async () => {
         throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
       },

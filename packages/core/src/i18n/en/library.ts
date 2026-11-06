@@ -16,6 +16,7 @@ export const enLibrary = {
   "history.dayForward": "A day later",
   "history.now": "Now",
   "history.title": "History",
+  "history.loading": "Loading history…",
   "history.boardAt": "Tasks as they were at",
   "history.events": "Events",
   "history.eventsUntil": "Events up to {when}",

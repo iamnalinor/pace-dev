@@ -16,6 +16,7 @@ export type FakeSqlite = {
   readonly reset: () => void;
   readonly tables: () => readonly string[];
   readonly userVersion: () => number;
+  readonly failAfterWrites: (writes: number) => void;
 };
 
 const toParams = (params: SQLiteBindParams): Readonly<Record<string, SQLInputValue>> =>
@@ -29,6 +30,18 @@ export const createFakeSqlite = (): FakeSqlite => {
   const prepared: string[] = [];
   const count = { opens: 0, transactions: 0 };
   let engine = new DatabaseSync(":memory:");
+  let writesUntilFailure: number | undefined;
+  let tail = Promise.resolve(null);
+  const afterWrite = () => {
+    if (writesUntilFailure === undefined) {
+      return;
+    }
+    if (writesUntilFailure === 0) {
+      writesUntilFailure = undefined;
+      throw new Error("injected SQL write failure");
+    }
+    writesUntilFailure--;
+  };
 
   const database = {
     execAsync: async (source: string) => {
@@ -45,6 +58,7 @@ export const createFakeSqlite = (): FakeSqlite => {
       return {
         executeAsync: async (params: SQLiteBindParams = []) => {
           const result = statement.run(toParams(params));
+          afterWrite();
           return { changes: result.changes, lastInsertRowId: result.lastInsertRowid };
         },
         finalizeAsync: async () => undefined,
@@ -52,9 +66,14 @@ export const createFakeSqlite = (): FakeSqlite => {
     },
     runAsync: async (source: string, params: SQLiteBindParams = []) => {
       const result = engine.prepare(source).run(toParams(params));
+      afterWrite();
       return { changes: result.changes, lastInsertRowId: result.lastInsertRowid };
     },
     withExclusiveTransactionAsync: async (task: (txn: SQLiteDatabase) => Promise<void>) => {
+      const previous = tail;
+      const release = Promise.withResolvers<null>();
+      tail = release.promise;
+      await previous;
       count.transactions += 1;
       engine.exec("BEGIN");
       try {
@@ -63,12 +82,17 @@ export const createFakeSqlite = (): FakeSqlite => {
       } catch (error) {
         engine.exec("ROLLBACK");
         throw error;
+      } finally {
+        release.resolve(null);
       }
     },
   };
 
   return {
     executed,
+    failAfterWrites: (writes) => {
+      writesUntilFailure = writes;
+    },
     open: () => {
       count.opens += 1;
       return database as unknown as SQLiteDatabase;
@@ -84,6 +108,8 @@ export const createFakeSqlite = (): FakeSqlite => {
       prepared.length = 0;
       count.opens = 0;
       count.transactions = 0;
+      writesUntilFailure = undefined;
+      tail = Promise.resolve(null);
     },
     tables: () =>
       engine

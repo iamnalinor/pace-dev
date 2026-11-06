@@ -160,6 +160,7 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "onboarding.notNow": "Не сейчас",
   "onboarding.step": "{index} из {total}",
   "settings.export.action": "Экспорт данных",
+  "settings.export.failed": "Не удалось скачать экспорт. Попробуйте снова.",
   "settings.export.done": "Скачан файл {file}",
   "settings.digestWindows": "Время сводок",
   "settings.quietHours": "Тихие часы",

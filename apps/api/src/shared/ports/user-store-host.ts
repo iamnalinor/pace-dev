@@ -2,6 +2,7 @@ import type { z } from "zod";
 
 import type { endpoints, PoolNotification, Result, STORE_CHANGED } from "@pace/core";
 
+import type { CleanupError } from "../account-cleanup-types.ts";
 import type {
   BotStoreApi,
   EventPage,
@@ -9,6 +10,12 @@ import type {
   UsageUpload,
   UserStoreApi,
 } from "../contract.ts";
+import type {
+  CheckpointBootstrap,
+  HistoryPull,
+  HistoryPullError,
+  HistoryPullInput,
+} from "../history-sync-types.ts";
 import type { PollEntry } from "../push/poll-transport.ts";
 
 type AppendResult = {
@@ -20,6 +27,19 @@ type AppendResult = {
 /** The existing typed RPC surface consumed outside the actor, independent of its host. */
 export type UserStoreRpc = Omit<UserStoreApi, "list"> &
   BotStoreApi & {
+    readonly bootstrap: (limit: number) => Promise<CheckpointBootstrap>;
+    readonly pull: (input: HistoryPullInput) => Promise<Result<HistoryPull, HistoryPullError>>;
+    readonly beginCleanup: (
+      operationId: string,
+    ) => Promise<
+      Result<{ readonly sourceStoreId: string; readonly archiveRequired: boolean }, CleanupError>
+    >;
+    readonly resetForCleanup: (input: {
+      readonly operationId: string;
+      readonly expectedStoreId: string;
+    }) => Promise<Result<{ readonly storeId: string }, CleanupError>>;
+    readonly finishCleanup: (operationId: string) => Promise<Result<void, CleanupError>>;
+    readonly archiveHistory: (now: string) => Promise<void>;
     readonly storeId: () => Promise<string>;
     readonly wipe: () => Promise<void>;
     readonly fetch: (request: Request) => Promise<Response>;

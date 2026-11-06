@@ -1,4 +1,5 @@
 import type { EventStore } from "./event-store.ts";
+import type { AppStateHandle } from "./state.ts";
 
 /**
 What this client can read of the server's log. A client below it skipped events it could not
@@ -8,19 +9,33 @@ client update starts accepting events older clients dropped.
 */
 export const SYNC_SCHEMA_VERSION = 1;
 
-/**
-Once per update that lets this client read more of the log (`SYNC_SCHEMA_VERSION`): the cursor
-goes back to 0 so the next pull reads everything again; the log and the outbox stay, so nothing
-written here and not yet sent is lost, and what the log already holds is skipped on the way in.
-The cursor moves first: a run cut off between the two writes re-pulls again rather than never.
-A log without a store id is left alone: its pull drops it anyway (`isSameStore`).
-*/
-export const upgradeCursor = async (store: EventStore): Promise<void> => {
-  if ((await store.getSyncVersion()) >= SYNC_SCHEMA_VERSION) {
-    return;
+/** A schema upgrade rewinds only the same guarded full-source copy, in one metadata transaction. */
+export const upgradeCursor = async (store: EventStore, state: AppStateHandle): Promise<void> => {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const guard = await store.readSnapshot();
+    if (state.localCopy()?.owner !== guard.owner) {
+      throw new Error("sync/copy-changed");
+    }
+    if (guard.syncVersion >= SYNC_SCHEMA_VERSION || guard.storeId === null) {
+      return;
+    }
+    const result = await state.commitSnapshot(
+      async () =>
+        await store.applyLegacyPage({
+          guard,
+          storeId: guard.storeId ?? "",
+          since: 0,
+          seq: 0,
+          events: [],
+          syncVersion: SYNC_SCHEMA_VERSION,
+        }),
+    );
+    if (result.ok) {
+      return;
+    }
+    if (result.error !== "history/rebuild-required") {
+      throw new Error(result.error);
+    }
   }
-  if ((await store.getStoreId()) !== null) {
-    await store.setCursor(0);
-  }
-  await store.setSyncVersion(SYNC_SCHEMA_VERSION);
+  throw new Error("history/rebuild-required");
 };

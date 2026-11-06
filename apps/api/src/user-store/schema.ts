@@ -1,4 +1,5 @@
-import { blob, index, integer, primaryKey, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
+import { index, integer, primaryKey, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 /** The append-only event log: the source of truth for everything the user did. */
 export const events = sqliteTable(
@@ -40,6 +41,7 @@ export const calendarEvents = sqliteTable(
     index("calendar_events_start_idx").on(table.startAt),
     // Reads of a range go through the end: the start would reach back over all history.
     index("calendar_events_end_idx").on(table.endAt),
+    index("calendar_events_end_instant_idx").on(sql`julianday(${table.endAt})`),
   ],
 );
 
@@ -58,6 +60,7 @@ export const usageSessions = sqliteTable(
     index("usage_sessions_start_idx").on(table.startAt),
     // Reads of a range (automatic sleep's, every pass) go through the end, not over all history.
     index("usage_sessions_end_idx").on(table.endAt),
+    index("usage_sessions_end_instant_idx").on(sql`julianday(${table.endAt})`),
   ],
 );
 
@@ -76,6 +79,7 @@ export const phoneUses = sqliteTable(
   (table) => [
     primaryKey({ columns: [table.deviceId, table.startAt] }),
     index("phone_uses_end_idx").on(table.endAt),
+    index("phone_uses_end_instant_idx").on(sql`julianday(${table.endAt})`),
   ],
 );
 
@@ -248,23 +252,17 @@ export const presets = sqliteTable("presets", {
   definition: text().notNull(),
 });
 
-/** Derived history cache only; one complete snapshot replaces its predecessor atomically. */
-export const historyCheckpoint = sqliteTable("history_checkpoint", {
-  id: integer().primaryKey(),
-  format: integer().notNull(),
-  build: text().notNull(),
-  storeId: text().notNull(),
-  coveredSeq: integer().notNull(),
-  cutoff: text().notNull(),
-  cutoffTimezone: text().notNull(),
-  eventCount: integer().notNull(),
-  byteCount: integer().notNull(),
-  chunkCount: integer().notNull(),
-  sha256: text().notNull(),
-});
-
-/** UTF-8 bytes, split before SQL binding so growing snapshots never exceed a value limit. */
-export const historyCheckpointChunks = sqliteTable("history_checkpoint_chunks", {
-  chunk: integer().primaryKey(),
-  data: blob({ mode: "buffer" }).notNull(),
-});
+export {
+  historyArchiveChunks,
+  historyArchiveManifests,
+  historyArchiveMonths,
+  historyArchiveOperations,
+  historyCheckpoint,
+  historyCheckpointChunks,
+  historyPhoneDaily,
+  historyRawRevisions,
+  historyRawState,
+  historyUsageState,
+  usageDailyApps,
+  usageDailyDevices,
+} from "./history-schema.ts";

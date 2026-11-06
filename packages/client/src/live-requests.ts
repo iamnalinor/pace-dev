@@ -28,16 +28,26 @@ export type Requests = {
   readonly open: (id: string, send: () => void) => Promise<LiveServerMessage>;
   /** Settles the request a message answers; false when it answers none open. */
   readonly settle: (message: LiveServerMessage) => boolean;
+  readonly invalid: (id: string) => void;
 };
 
 export const createRequests = (onTimeout: () => void): Requests => {
   type Pending = {
     readonly resolve: (message: LiveServerMessage) => void;
-    readonly reject: (error: LiveUnavailable) => void;
+    readonly reject: (error: Error) => void;
     readonly timer: ReturnType<typeof setTimeout>;
   };
   const pending = new Map<string, Pending>();
   return {
+    invalid: (id) => {
+      const request = pending.get(id);
+      if (request === undefined) {
+        return;
+      }
+      pending.delete(id);
+      clearTimeout(request.timer);
+      request.reject(new Error("sync/invalid-response"));
+    },
     failAll: (): void => {
       for (const [id, request] of pending) {
         pending.delete(id);

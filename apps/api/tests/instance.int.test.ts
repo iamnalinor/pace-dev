@@ -66,7 +66,7 @@ describe("GET /api/instance", () => {
       apiOrigin: env.API_ORIGIN,
       botUsername: env.TELEGRAM_BOT_USERNAME,
       // The test Worker answers from its built-in fake model (LLM_PROVIDER=fake).
-      features: { assistant: true, mcp: true, push: false },
+      features: { assistant: true, historyCheckpoint: null, mcp: true, push: false },
       firebase: null,
       loginMethods: ["telegram-widget", "telegram-deeplink"],
       minClientProtocol: MIN_CLIENT_PROTOCOL,
@@ -76,6 +76,23 @@ describe("GET /api/instance", () => {
       webOrigin: env.WEB_ORIGIN,
     });
   });
+
+  it.each([
+    { mode: "off", version: "named-build", expected: null },
+    { mode: "shadow", version: "named-build", expected: null },
+    { mode: "active", version: "dev", expected: null },
+    { mode: "active", version: "named-build", expected: 1 },
+  ])(
+    "advertises checkpoint capability for $mode / $version",
+    async ({ mode, version, expected }) => {
+      const fetchWith = withFirebase({ PACE_HISTORY_CHECKPOINT_MODE: mode, PACE_VERSION: version });
+      const response = await fetchWith("/api/instance");
+      expect(response.status).toBe(200);
+      expect(
+        endpoints.instance.output.parse(await readJson(response)).features.historyCheckpoint,
+      ).toBe(expected);
+    },
+  );
 
   it("publishes only public Android metadata for a matching pair", async () => {
     const fetchWith = withFirebase({

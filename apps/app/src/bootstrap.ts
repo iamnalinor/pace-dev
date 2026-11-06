@@ -15,6 +15,23 @@ const checkRuntimeServer = async (runtime: PaceRuntime): Promise<void> => {
   }
 };
 
+const canStartAfterPreparation = async (
+  runtime: PaceRuntime,
+  input: { readonly session: string | undefined; readonly canContinue: () => boolean },
+): Promise<boolean> => {
+  if (!input.canContinue()) {
+    return false;
+  }
+  await runtime.state.ready;
+  if (!input.canContinue()) {
+    return false;
+  }
+  // The copy is claimed before startup can write derived events.
+  await claimLocalCopy(runtime, input.session);
+  await checkRuntimeServer(runtime);
+  return input.canContinue();
+};
+
 /**
 A signed-in start: the local copy claimed, this week's homework instances, a first sync, then the time zone that sync
 allowed (`createZoneStep`, run by the sync's own end), before the senders push it.
@@ -34,13 +51,7 @@ export const bootstrap = async (
   },
 ): Promise<void> => {
   const canContinue = () => isActive() && canStartSenders(runtime);
-  if (!canContinue()) {
-    return;
-  }
-  // The copy is this session's before anything is written into it (re-review N3).
-  await claimLocalCopy(runtime, session);
-  await checkRuntimeServer(runtime);
-  if (!canContinue()) {
+  if (!(await canStartAfterPreparation(runtime, { session, canContinue }))) {
     return;
   }
   if (IS_PHONE) {

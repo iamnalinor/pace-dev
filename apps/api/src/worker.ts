@@ -7,6 +7,7 @@ import { MCP_RESOURCE_METADATA_PATH, mcpHandler } from "./mcp/server.ts";
 import { mountOAuthRoutes } from "./oauth/oauth-routes.ts";
 import { cloudflareBindings } from "./platform/cloudflare/bindings.ts";
 import { cloudflareRequestPlaceReader } from "./platform/cloudflare/request-place.ts";
+import { sweepAccountCleanups } from "./shared/account-cleanup-reconciliation.ts";
 import { oauthOrigin } from "./shared/config.ts";
 import { createLogger } from "./shared/logger.ts";
 
@@ -110,6 +111,18 @@ const noOAuth = (): Response =>
 const noOAuthLog = { isDone: false };
 
 export default {
+  scheduled: async (
+    _controller: ScheduledController,
+    env: Cloudflare.Env,
+    _ctx: ExecutionContext,
+  ): Promise<void> => {
+    const result = await sweepAccountCleanups(cloudflareBindings(env));
+    if (!result.ok) {
+      log.error("Account cleanup maintenance failed", { code: result.error });
+    } else if (result.value.failed > 0) {
+      log.error("Account cleanup remains pending", { failed: result.value.failed });
+    }
+  },
   fetch: async (
     request: Request,
     env: Cloudflare.Env,

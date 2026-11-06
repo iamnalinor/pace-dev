@@ -20,6 +20,7 @@ import {
   NoncePollSchema,
   TelegramLoginSchema,
 } from "./schemas/auth.ts";
+import { SyncBootstrapOutputSchema, SyncBootstrapQuerySchema } from "./schemas/bootstrap.ts";
 import {
   CalendarOutputSchema,
   CalendarSyncSchema,
@@ -157,6 +158,13 @@ export const endpoints = {
     }),
   },
   sync: {
+    bootstrap: endpoint({
+      auth: true,
+      method: "GET",
+      output: SyncBootstrapOutputSchema,
+      path: "/api/sync/bootstrap",
+      query: SyncBootstrapQuerySchema,
+    }),
     push: endpoint({
       auth: true,
       body: SyncPushBodySchema,

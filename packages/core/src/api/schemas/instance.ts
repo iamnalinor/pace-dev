@@ -1,7 +1,10 @@
 import { z } from "zod";
 
+import { CHECKPOINT_VERSION } from "../../checkpoint/version.ts";
 import { FirebaseAndroidConfigSchema } from "../../firebase/config.ts";
 import { knownOrNull, knownValues } from "../tolerant.ts";
+
+const HistoryCheckpointFeatureSchema = knownOrNull(z.literal(CHECKPOINT_VERSION));
 
 /** The ways a person can sign in on this server. */
 const LOGIN_METHODS = ["telegram-widget", "telegram-deeplink"] as const;
@@ -32,6 +35,7 @@ export const InstanceSchema = z.object({
   */
   features: z
     .object({
+      historyCheckpoint: HistoryCheckpointFeatureSchema,
       push: z.boolean().default(false),
       assistant: z.boolean().default(false),
       /** False when no origin the OAuth provider accepts fits (plain http on a LAN): no MCP. */

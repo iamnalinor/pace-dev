@@ -127,6 +127,12 @@ export class CheckpointCache {
     this.#targets = new Set(snapshot.value.correctionTargets);
   }
 
+  adopt(checkpoint: Checkpoint): void {
+    this.#snapshot = checkpoint;
+    this.#targets = new Set(checkpoint.correctionTargets);
+    this.#checkedCutoff = undefined;
+  }
+
   targets(id: string): boolean {
     return this.#targets.has(id);
   }
@@ -157,16 +163,16 @@ export class CheckpointCache {
 
   /** Once per local day, capture an exact cursor prefix before any hashing await. */
   async advance(current: Materialized): Promise<void> {
+    if (current.seq === 0) {
+      return;
+    }
     const timezone = current.state.settings.timezone ?? SERVER_TZ;
     const cutoff = checkpointCutoff(this.#now(), timezone);
     if (!cutoff.ok || !this.#shouldAdvance(timezone, cutoff.value)) {
       return;
     }
     const coveredSeq = await checkpointPrefix(this.#db, cutoff.value, current.seq);
-    if (
-      coveredSeq === 0 ||
-      (this.#snapshot?.coveredSeq === coveredSeq && this.#snapshot.cutoffTimezone === timezone)
-    ) {
+    if (coveredSeq <= (this.#snapshot?.coveredSeq ?? 0)) {
       return;
     }
     await this.#publishPrefix(current, { timezone, cutoff: cutoff.value, coveredSeq });

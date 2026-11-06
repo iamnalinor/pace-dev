@@ -1,5 +1,12 @@
 import type { Event } from "@pace/core";
 
+import { checkpointIntegrityContract } from "#app/platform/checkpoint-integrity-contract.fake.ts";
+
+import {
+  checkpointStoreContract,
+  checkpointTestHash,
+  pendingEvent,
+} from "./checkpoint-store-contract.fake.ts";
 import { createSqliteEventStore, SCHEMA_VERSION } from "./sqlite-event-store.ts";
 import { createFakeSqlite } from "./sqlite.fake.ts";
 
@@ -27,6 +34,87 @@ const b = settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAB", at(10), "en");
 
 beforeEach(() => {
   mockSqlite.reset();
+});
+
+describe("SQLite checkpoint transactions", () => {
+  checkpointStoreContract(async (hash = checkpointTestHash) => createSqliteEventStore(hash));
+});
+
+describe("SQLite persisted checkpoint integrity", () => {
+  checkpointIntegrityContract({
+    open: async (hash = checkpointTestHash) => createSqliteEventStore(hash),
+    readMeta: async () =>
+      Object.fromEntries(
+        (
+          await mockSqlite
+            .open()
+            .getAllAsync<{ key: string; value: string }>("SELECT key,value FROM meta")
+        ).map((row) => [row.key, row.value]),
+      ),
+    writeMeta: async (meta) => {
+      for (const [key, value] of Object.entries(meta)) {
+        await mockSqlite
+          .open()
+          .runAsync(
+            "INSERT INTO meta (key,value) VALUES ($key,$value) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            { $key: key, $value: value },
+          );
+      }
+    },
+  });
+
+  it("upgrades a version-one copy without dropping its existing source or pending ownership", async () => {
+    const raw = mockSqlite.open();
+    await raw.execAsync(
+      "CREATE TABLE events (id TEXT PRIMARY KEY, occurred_at TEXT NOT NULL, json TEXT NOT NULL); CREATE INDEX events_occurred_at ON events(occurred_at,id); CREATE TABLE pending (id TEXT PRIMARY KEY); CREATE TABLE meta (key TEXT PRIMARY KEY,value TEXT NOT NULL); PRAGMA user_version=1;",
+    );
+    await raw.runAsync("INSERT INTO events VALUES ($id,$at,$json)", {
+      $id: pendingEvent.id,
+      $at: pendingEvent.occurredAt,
+      $json: JSON.stringify(pendingEvent),
+    });
+    await raw.runAsync("INSERT INTO pending VALUES ($id)", { $id: pendingEvent.id });
+    await raw.execAsync(
+      "INSERT INTO meta VALUES ('owner','legacy-owner'); INSERT INTO meta VALUES ('cursor','7');",
+    );
+    const store = createSqliteEventStore(checkpointTestHash);
+    expect(await store.readSnapshot()).toMatchObject({
+      owner: "legacy-owner",
+      cursor: 7,
+      coverage: "full",
+      checkpoint: null,
+      records: [{ seq: null, event: pendingEvent }],
+      pendingIds: [pendingEvent.id],
+    });
+  });
+
+  it.each([0, 1, 2])("rolls back an interrupted remote write after mutation %s", async (after) => {
+    const store = createSqliteEventStore(checkpointTestHash);
+    await store.setStoreId("store-a");
+    await store.setCursor(0);
+    await store.setSyncVersion(2);
+    await store.append([pendingEvent]);
+    await mockSqlite.open().runAsync("INSERT INTO meta (key,value) VALUES ('coverage','full')");
+    const before = await store.readSnapshot();
+    mockSqlite.failAfterWrites(after);
+    await expect(
+      store.applyRemotePage({
+        guard: before,
+        storeId: "store-a",
+        since: 0,
+        seq: 1,
+        records: [{ seq: 1, event: { ...pendingEvent, recordedAt: "2026-10-06T10:00:01.000Z" } }],
+      }),
+    ).rejects.toThrow("injected SQL write failure");
+    expect(await createSqliteEventStore(checkpointTestHash).readSnapshot()).toEqual(before);
+  });
+
+  it("serializes concurrent first opens without applying additive migrations twice", async () => {
+    const one = createSqliteEventStore(checkpointTestHash);
+    const two = createSqliteEventStore(checkpointTestHash);
+    const snapshots = await Promise.all([one.readSnapshot(), two.readSnapshot()]);
+    expect(snapshots[0].copyToken).toBe(snapshots[1].copyToken);
+  });
 });
 
 describe("createSqliteEventStore", () => {

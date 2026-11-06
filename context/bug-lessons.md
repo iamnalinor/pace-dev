@@ -1785,3 +1785,107 @@ A preexisting review item for Task9B raw revision work (not changed here): cloud
 Ownership keys need a total encoding boundary: encodeURIComponent throws on lone UTF-16 surrogates. Identity schemas now reject malformed UTF-16 before key generation and return archive/invalid; a RED→GREEN test pins that behavior. Raw source strings remain JSON-escaped losslessly, including opaque historical payloads.
 
 | 2026-11-06 | The first immutable daily splitter recursively consumed one day and spread the entire remaining tail, overflowing on a valid 1900–2026 source interval | Input cardinality becomes call-stack depth and quadratic array copying | Replaced the splitter with balanced splits on actual local-day boundaries: logarithmic stack depth and O(days log days) copying, without a new input cap or local mutation exceptions. Preserves skipped-midnight and skipped-date behavior | The initial property only generated intervals up to seven days. A 46,021-day regression was RED with stack overflow, then GREEN; Apia's entirely skipped date is covered separately |
+
+
+### 2026-11-06 — checkpoint sync must preserve source and transport evidence
+
+A current projection is not the source envelope needed for undo, correction or historical export.
+The previous complete-log-only tests did not expose origin lookups performed before hydration.
+The checkpoint client now hydrates before source-origin lookups and gates unsafe direct staging;
+full-history guards protect History/export. The sweep covers task, series, inbox, work and activity
+origin actions, recurrence IDs and empty-account detection. Focused checkpoint/action cases pin
+ordinary offline actions versus explicit source-dependent refusal.
+
+The first enhanced socket integration dropped actual sequence records from proactive events and
+treated malformed known replies as unanswered requests. This could lose cursor evidence or time
+out and repeat the request over HTTP. Legacy-only transport tests had no enhanced envelope.
+The client now preserves sequence records and rejects malformed known replies immediately as
+sync/invalid-response; it does not use a second transport to hide corrupt responses. Both requested
+and proactive paths are covered by the new RED→GREEN transport tests.
+
+A captured high-water cursor is not a count: SQLite AUTOINCREMENT conflict attempts can leave
+unallocated sequence numbers. Archive restore must compare the captured source inventory digest
+and counts, preserving original sequences and all allocated lower-cursor records. A gaplessness
+assumption in the implementation plan was corrected before restore implementation.
+
+### 2026-11-06 — session tests must wait for the outbox, not just the screen
+
+PR55 CI run 42199912608 passed 197 browser tests but the stale-tab logout case
+stopped on the legitimate unsynced-change confirmation. Its captured page showed
+one pending change: startup settings can still be syncing after Settings renders.
+Previous fast runs happened to acknowledge that write before the logout click.
+The shared two-tab setup now waits for live sender startup (which follows timezone
+persistence), then the existing outboxSent condition before session-only assertions.
+Review caught that waiting only for zero can succeed before startup creates its
+first write. The logout traffic test also waits for this condition:
+zero outstanding HTTP requests does not prove a socket-delivered outbox is empty.
+The sweep leaves intentional unsynced-logout and incompatible-server tests intact.
+Validation is the existing live/login browser regression suite; no fixed sleep or
+automatic acceptance of the data-loss confirmation is added.
+
+### 2026-11-06 — archive inventories need canonical field order
+
+The first real remote restore rehearsal rejected identical raw records because
+SQL capture and schema-parsed archive records inserted object keys in different
+orders. JSON.stringify is deterministic only after representation normalization.
+Normalize both sides through the archive record schema before inventory hashing;
+leave every opaque SQL string unchanged. Earlier codec tests round-tripped one
+representation and did not combine freshly captured rows with independently
+decoded monthly objects. The restore regression now mixes a selected remote
+month, its superseded raw revision and retained source, then compares inventory,
+state and export. Equal-revision conflict checks run on schema-normalized records.
+
+The same rehearsal work exposed local day labels passed as UTC instants during
+daily aggregate rebuilding. In negative-offset zones that selects the previous
+local date. Resolve the label at local noon before startOfDayIn, then use the
+shared nextDayStartIn boundary. Tests must include both positive and negative
+offsets and timezone changes; UTC-only aggregate fixtures cannot expose this.
+
+### 2026-11-06 — bind asynchronous work to the copy that started it
+
+Checkpoint review found that reading identity after a network response does not
+protect the original request. A pending batch could also be captured before an
+account replacement and sent with the next copy's storeId. Checking identity then
+acknowledging in a separate transaction leaves another replacement window. Earlier
+single-owner sync tests did not pause these boundaries. The sweep covers enhanced
+and legacy pages, pending batches, acknowledgements, version upgrades, history and
+export. Capture copyToken/owner/generation before the await, retain that guard for
+every batch, and check it inside each persistent mutation. Legacy pages now apply
+source, acknowledgements and cursor together without inventing source sequences.
+Held-operation regressions replace the owner mid-flight and require no foreign
+write, acknowledgement, download or stale resource-status update.
+
+### 2026-11-06 — resource demand must follow coverage transitions
+
+History could mount while the initial local copy was still full/empty, finish its
+first demand immediately, then remain loading after bootstrap installed partial
+coverage. An effect keyed only by manual retry missed this transition. Existing
+tests mounted History after bootstrap. Demand now follows coverage and copy
+identity, while failure and clock ticks do not trigger repeated requests. The app
+regression mounts History first, installs a checkpoint later and asserts exactly
+one hydration. Storage acquisition errors also belong inside the declared Result
+boundary so consumers receive a retryable failure rather than a rejected promise.
+
+### 2026-11-06 — empty cache checks must not consume a later useful attempt
+
+The first real checkpoint browser run received source mode because a warm actor
+checked an empty log and recorded its once-per-day advancement marker. Old source
+arriving afterward could not create its eligible checkpoint until the next day.
+Earlier bootstrap fixtures inserted source before constructing their cache, so
+they missed the warm-empty lifecycle. A zero-sequence state now returns before
+consuming the day marker. Nonempty negative prefix checks remain cached: a later
+backdate cannot move ahead of an already recent first delivery row. The real-actor
+regression was RED then GREEN; the same browser assertion subsequently passed
+without relaxing its requirement for actual checkpoint coverage.
+
+### 2026-11-06 — lifecycle fences and optional work must preserve cold-alarm behavior
+
+The full API suite caught two alarm integration mistakes that the focused archive
+packet omitted. A cold domain service checked its cleanup fence before awaiting
+readiness, so it treated initialization as a busy cleanup and returned early.
+Also, archiveHistory evaluated the current timezone (loading the log) before the
+archive service could reject an absent optional binding. Await readiness before
+checking the fence, and reject absent optional services before evaluating expensive
+arguments. The existing night-cost suite supplies the guard: cold direct alarms
+must process due work, and unrelated/off-feature alarms must not load the log.
+Include that suite whenever lifecycle wrappers or optional alarm branches change.

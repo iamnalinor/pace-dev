@@ -5,7 +5,7 @@ import { serverInfoOf } from "./server-store.ts";
 const instance = (apiOrigin: string): Instance => ({
   apiOrigin,
   botUsername: "PaceTestBot",
-  features: { assistant: false, mcp: true, push: false },
+  features: { assistant: false, historyCheckpoint: null, mcp: true, push: false },
   firebase: null,
   loginMethods: ["telegram-deeplink"],
   minClientProtocol: 1,

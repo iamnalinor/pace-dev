@@ -22,6 +22,8 @@ calendar and each device's usage (names and times, never contents). A usage uplo
 automatic sleep on what is then known.
 */
 export abstract class CloudStore extends PoolStore {
+  protected abstract readonly assertCloudWritable: () => Promise<void>;
+
   abstract readonly db: SqliteDatabase<"sync", typeof schema>;
 
   /** One pass of automatic sleep at `now` (see `runSleepPass`), through the store's write path. */
@@ -37,6 +39,7 @@ export abstract class CloudStore extends PoolStore {
   many events came.
   */
   async syncCalendar(upload: cloud.CalendarUpload, now: string): Promise<number> {
+    await this.assertCloudWritable();
     const { storage } = this.ctx;
     const changes = await cloud.calendarChanges(this.db, upload);
     const series = await ruledSeriesChange(storage, upload.ruledSeries);
@@ -64,6 +67,7 @@ export abstract class CloudStore extends PoolStore {
 
   /** Forgets one phone's calendar copy (it stopped sending it). */
   async clearCalendar(deviceId: string): Promise<void> {
+    await this.assertCloudWritable();
     await cloud.clearCalendar(this.db, deviceId);
   }
 
@@ -74,6 +78,7 @@ export abstract class CloudStore extends PoolStore {
   pass that fails is logged and left to the alarm: the upload is stored and answered all the same.
   */
   async addUsage(upload: cloud.UsageUpload, now: string): Promise<number> {
+    await this.assertCloudWritable();
     const stored = await cloud.addUsage({ db: this.db, storage: this.ctx.storage }, upload, now);
     if (upload.isPhone) {
       try {

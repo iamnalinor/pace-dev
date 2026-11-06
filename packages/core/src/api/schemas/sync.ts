@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { CHECKPOINT_VERSION } from "../../checkpoint/version.ts";
 import { EVENT_ID_MAX, PrecisionSchema, SourceSchema } from "../../events/event-schema.ts";
 import { knownValue, knownValues } from "../tolerant.ts";
 
@@ -57,12 +58,23 @@ export const SyncPushOutputSchema = z.object({
   seq: z.number().int().nonnegative(),
 });
 
+export const SequencedSyncRecordSchema = z.strictObject({
+  seq: z.int().positive(),
+  event: SyncEventSchema,
+});
+export type SequencedSyncRecord = z.output<typeof SequencedSyncRecordSchema>;
+
 export const SyncPullQuerySchema = z.object({
+  storeId: StoreIdSchema.optional(),
+  through: z.coerce.number().int().nonnegative().optional(),
+  checkpointVersion: z.coerce.number().pipe(z.literal(CHECKPOINT_VERSION)).optional(),
   since: z.coerce.number().int().nonnegative().default(0),
   limit: z.coerce.number().int().min(1).max(500).default(200),
 });
 
 export const SyncPullOutputSchema = z.object({
+  records: z.array(SequencedSyncRecordSchema).optional(),
+  bootstrapRequired: z.boolean().optional(),
   events: knownValues(PulledEventSchema),
   /** Cursor for the next pull: the sequence number of the last event returned. */
   seq: z.number().int().nonnegative(),

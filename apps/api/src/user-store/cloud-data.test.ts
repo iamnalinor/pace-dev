@@ -64,8 +64,8 @@ describe("what the store reads of a range of its usage and calendar", () => {
         range: lastDay,
       });
       for (const [query, index] of [
-        [statements.otherUses, "usage_sessions_end_idx"],
-        [statements.phoneUses, "phone_uses_end_idx"],
+        [statements.otherUses, "usage_sessions_end_instant_idx"],
+        [statements.phoneUses, "phone_uses_end_instant_idx"],
       ] as const) {
         const cost = costOf(state.storage.sql, query);
         expect(cost.plan).toContain(`USING INDEX ${index}`);
@@ -75,7 +75,7 @@ describe("what the store reads of a range of its usage and calendar", () => {
       }
       // The same holds for the person's usage list over the last day (the API, the AI apps).
       const listed = costOf(state.storage.sql, statements.usage);
-      expect(listed.plan).toContain("USING INDEX usage_sessions_end_idx");
+      expect(listed.plan).toContain("USING INDEX usage_sessions_end_instant_idx");
       expect(listed.rows).toBe(recent.length);
       expect(listed.rowsRead).toBeLessThanOrEqual(recent.length + 1);
     });
@@ -102,7 +102,7 @@ describe("what the store reads of a range of its usage and calendar", () => {
       );
       const { calendar } = rangeStatements(instance.db, { from: FROM, phoneIds: [], range: today });
       const cost = costOf(state.storage.sql, calendar);
-      expect(cost.plan).toContain("USING INDEX calendar_events_end_idx");
+      expect(cost.plan).toContain("USING INDEX calendar_events_end_instant_idx");
       expect(cost.rows).toBe(recent.length);
       expect(cost.rowsRead).toBeLessThanOrEqual(recent.length + 1);
       expect(await instance.calendar(today)).toHaveLength(recent.length);

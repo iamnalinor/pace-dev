@@ -14,6 +14,7 @@ import {
   sessionOf,
   sessionTags,
 } from "./live-sessions.ts";
+import { storedPage } from "./log-queries.ts";
 import { storeIdOf } from "./store-identity.ts";
 
 /** A device id is a tag on its socket; tags are short. */
@@ -83,6 +84,9 @@ export const announceChange = async (ctx: ActorContext, change: LogChange): Prom
   const isTooBig = inserted.length > LIVE_PAGE;
   const events: KnownLiveServerMessage = {
     events: isTooBig ? [] : [...inserted],
+    records: isTooBig
+      ? []
+      : [...storedPage(ctx.storage, { after: since, through: seq, limit: LIVE_PAGE }).records],
     more: isTooBig,
     seq,
     since,

@@ -1,11 +1,13 @@
 import type { Db } from "../db/d1.ts";
 import type { Health, Verdict } from "../llm/health.ts";
+import type { ArchiveStore } from "./archive-store.ts";
 import type { KeyValue } from "./key-value.ts";
 import type { OAuth } from "./oauth.ts";
 import type { UserStoreHost } from "./user-store-host.ts";
 
 /** Parsed configuration still comes from strings; runtime services are already adapted. */
 export type AppBindings = {
+  readonly HISTORY_ARCHIVE?: ArchiveStore;
   readonly OAUTH_PROVIDER?: OAuth | undefined;
   readonly DB: Db;
   readonly USER_STORE: UserStoreHost;

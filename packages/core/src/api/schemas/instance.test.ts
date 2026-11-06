@@ -44,7 +44,12 @@ describe("the instance answer", () => {
       webOrigin: 42,
     });
     expect(read.loginMethods).toEqual(["telegram-deeplink"]);
-    expect(read.features).toEqual({ assistant: false, mcp: true, push: true });
+    expect(read.features).toEqual({
+      assistant: false,
+      mcp: true,
+      push: true,
+      historyCheckpoint: null,
+    });
     expect(read.webOrigin).toBeNull();
     expect(read).not.toHaveProperty("region");
   });
@@ -55,6 +60,7 @@ describe("the instance answer", () => {
     // one that does not say has it.
     expect(endpoints.instance.output.parse(withoutFeatures).features).toEqual({
       assistant: false,
+      historyCheckpoint: null,
       mcp: true,
       push: false,
     });

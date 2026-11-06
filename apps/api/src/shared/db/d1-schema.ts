@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 /** One row per person allowed in; `telegramId` is the identity, `id` is what everything else references. */
@@ -154,3 +155,48 @@ export const loginNonces = sqliteTable("login_nonces", {
   replyChatId: text(),
   replyMessageId: integer(),
 });
+
+/** Cleanup retry evidence survives actor reset and user deletion; it contains no user content. */
+export const accountCleanupOperations = sqliteTable(
+  "account_cleanup_operations",
+  {
+    id: text().primaryKey(),
+    userId: text().notNull(),
+    action: text({ enum: ["wipe", "delete"] }).notNull(),
+    sourceStoreId: text(),
+    nextStoreId: text().notNull(),
+    archiveRequired: integer({ mode: "boolean" }),
+    stage: text({
+      enum: [
+        "prepared",
+        "fenced",
+        "grants-cleared",
+        "archives-cleared",
+        "reset",
+        "identity-cleared",
+        "sockets-closed",
+        "complete",
+      ],
+    }).notNull(),
+    createdAt: integer({ mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer({ mode: "timestamp_ms" }).notNull(),
+    nextAttemptAt: integer({ mode: "timestamp_ms" }).notNull(),
+    attempts: integer().notNull().default(0),
+    leaseToken: text(),
+    leaseUntil: integer({ mode: "timestamp_ms" }),
+    lastError: text({
+      enum: [
+        "cleanup/invalid",
+        "cleanup/busy",
+        "cleanup/unavailable",
+        "cleanup/archive-unavailable",
+      ],
+    }),
+  },
+  (table) => [
+    uniqueIndex("account_cleanup_active_owner_idx")
+      .on(table.userId)
+      .where(sql`${table.stage} <> 'complete'`),
+    index("account_cleanup_retry_idx").on(table.stage, table.nextAttemptAt, table.leaseUntil),
+  ],
+);

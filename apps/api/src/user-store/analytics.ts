@@ -36,7 +36,12 @@ Tables no query reads and the schema does not list: when the phone was unlocked,
 is for automatic sleep only, never for a connected AI app. Matched anywhere in the text, string
 literals included (SQLite takes `FROM 'phone_uses'` for the table) and in any case.
 */
-const PRIVATE_TABLES = ["phone_uses", "history_checkpoint", "history_checkpoint_chunks"] as const;
+const PRIVATE_TABLES = [
+  "phone_uses",
+  "history_checkpoint",
+  "history_checkpoint_chunks",
+  "_history_",
+] as const;
 
 const privateTableIn = (sql: string): string | undefined =>
   PRIVATE_TABLES.find((table) => sql.toLowerCase().includes(table));

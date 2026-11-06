@@ -32,14 +32,13 @@ import type { ActorContext } from "../shared/ports/live-channel.ts";
 import type { SqliteDatabase } from "../shared/ports/sqlite.ts";
 import type * as schema from "./schema.ts";
 
-import { historyCheckpointModeOf, UNNAMED_VERSION, versionOf } from "../shared/config.ts";
 import { llmHealthOf } from "../shared/llm/health-store.ts";
 import { runEach } from "./alarm.ts";
 import { describeTables, runReadOnly, simulate } from "./analytics.ts";
-import { CloudStore } from "./cloud-store.ts";
 import { insertDecisions, listDecisions, resolveDecisions } from "./decision-log.ts";
 import { DERIVE_STEPS } from "./derive-steps.ts";
 import * as eventLog from "./event-log.ts";
+import { HistoryStore } from "./history-store.ts";
 import { announceChange } from "./live-sockets.ts";
 import * as log from "./log-queries.ts";
 import * as notifier from "./notifier.ts";
@@ -47,9 +46,8 @@ import * as parseQueue from "./parse-queue.ts";
 import { poolAtAlarm } from "./pool-retry-alarm.ts";
 import { NotificationPool } from "./pool-service.ts";
 import { runSleepPass, sleepAtAlarm } from "./sleep-pass.ts";
-import { StateCache } from "./state-cache.ts";
 import { prepareBatch, toRpcState } from "./state.ts";
-import { openStore, resetStore, SCHEMA_TAG, storeIdOf } from "./store-identity.ts";
+import { storeIdOf } from "./store-identity.ts";
 
 type Db = SqliteDatabase<"sync", typeof schema>;
 
@@ -66,45 +64,24 @@ another epoch is emptied (see `STORE_EPOCH`) and migrations run. The state is ca
 memory with the log sequence it was built at and rebuilt when the cache is stale or a batch
 cannot be applied in order (`StateCache`).
 */
-export class UserStore extends CloudStore {
-  readonly #state: StateCache;
-
+export class UserStore extends HistoryStore {
   readonly #pool: NotificationPool;
-
-  readonly #migrate: () => Promise<void>;
-
-  readonly db: Db;
 
   constructor(
     ctx: ActorContext,
     env: AppBindings,
     options: { readonly db: Db; readonly migrate: () => Promise<void> },
   ) {
-    const { db, migrate } = options;
-    super(ctx, env);
-    this.db = db;
-    this.#migrate = migrate;
-    const version = versionOf(env.PACE_VERSION);
-    this.#state = new StateCache({
-      build: `${version}+${SCHEMA_TAG}`,
-      isNamed: version !== UNNAMED_VERSION,
-      db: this.db,
-      storage: ctx.storage,
-      checkpointMode: historyCheckpointModeOf(env.PACE_HISTORY_CHECKPOINT_MODE),
-    });
+    super(ctx, env, options);
     this.#pool = new NotificationPool({
       chatId: async () => await this.chatId(),
       ctx,
-      current: async () => await this.#state.current(),
+      current: async () => await this.state.current(),
       db: this.db,
       derive: async (now) => await this.derive(now),
       deviceId: SERVER_DEVICE_ID,
       env,
       insert: async (events) => await this.#insert(events),
-    });
-    // eslint-disable-next-line sonarjs/no-async-constructor -- blockConcurrencyWhile is the documented way to migrate before the first request
-    void ctx.blockConcurrencyWhile(async () => {
-      await openStore(ctx.storage, migrate);
     });
   }
 
@@ -117,13 +94,16 @@ export class UserStore extends CloudStore {
     if (events.length === 0) {
       return events;
     }
-    const before = await this.#state.current();
+    await this.ready;
+    await this.cleanup.assertWritable();
+    const before = await this.state.current();
     const inserted = await log.insertNew(this.db, events, before.ids);
     if (inserted.length > 0) {
       const seq = await log.latestSeq(this.db);
       await announceChange(this.ctx, { inserted, seq, since: before.seq });
-      await this.#state.fold(before, inserted, seq);
+      await this.state.fold(before, inserted, seq);
     }
+    await this.refreshUsageZone(events);
     return inserted;
   }
 
@@ -136,16 +116,6 @@ export class UserStore extends CloudStore {
   }
   protected override get pool(): NotificationPool {
     return this.#pool;
-  }
-
-  /**
-  Deletes the account's data: the event log, every projection, reminders and the alarm.
-  The empty store migrates again under a new store id, so it serves the next login of the
-  same person from scratch and a device still holding the old copy drops it.
-  */
-  async wipe(): Promise<void> {
-    this.#state.forget();
-    await resetStore(this.ctx.storage, this.#migrate);
   }
 
   /** The store's id (see `storeIdOf`): it changes only when the store is wiped. */
@@ -212,7 +182,7 @@ export class UserStore extends CloudStore {
   /** The materialized state as of `now`, with the system events due by then derived first. */
   async read(now: string): Promise<ReadResult> {
     await this.derive(now);
-    const current = await this.#state.current();
+    const current = await this.state.current();
     return { state: toRpcState(current.state), seq: current.seq };
   }
 
@@ -227,14 +197,14 @@ export class UserStore extends CloudStore {
     meta: ApplyMeta,
   ): Promise<Result<ApplyResult, ApplyError>> {
     await this.derive(meta.now);
-    const prepared = prepareBatch(await this.#state.current(), inputs, meta);
+    const prepared = prepareBatch(await this.state.current(), inputs, meta);
     if (!prepared.ok) {
       return prepared;
     }
     const inserted = await this.#insert(prepared.value.events);
     await this.derive(meta.now);
     await this.#pool.afterWrite(meta.now);
-    const current = await this.#state.current();
+    const current = await this.state.current();
     return ok({
       events: inserted.map((event) => toStored(event)),
       state: toRpcState(current.state),
@@ -250,7 +220,7 @@ export class UserStore extends CloudStore {
     inputs: readonly EventInput[],
     meta: ApplyMeta,
   ): Promise<Result<DryRunResult, ApplyError>> {
-    const prepared = prepareBatch(await this.#state.current(), inputs, meta);
+    const prepared = prepareBatch(await this.state.current(), inputs, meta);
     return prepared.ok
       ? ok({
           events: prepared.value.events.map((event) => toStored(event)),
@@ -286,14 +256,14 @@ export class UserStore extends CloudStore {
           }
           return made;
         },
-        log: async () => await this.#state.log(),
+        log: async () => await this.state.log(),
         seq: async () => await log.latestSeq(this.db),
         logDecisions: async (entries, at) => {
           await this.logDecisions(entries, at);
         },
         storage: this.ctx.storage,
         usageForSleep: async (from, at) => await this.usageForSleep(from, at),
-        zone: async () => await this.#state.zone(),
+        zone: async () => await this.state.zone(),
       },
       now,
     );
@@ -318,13 +288,13 @@ export class UserStore extends CloudStore {
   run in a transaction that always rolls back.
   */
   async querySql(sql: string): Promise<Result<SqlRows, SqlError>> {
-    await this.#state.current();
+    await this.state.current();
     return runReadOnly(this.ctx.storage, sql);
   }
 
   /** The tables `querySql` can read and their CREATE statements. */
   async describeSchema(): Promise<readonly TableSchema[]> {
-    await this.#state.current();
+    await this.state.current();
     return describeTables(this.ctx.storage);
   }
 
@@ -351,8 +321,15 @@ export class UserStore extends CloudStore {
   others.
   */
   async alarm(): Promise<void> {
+    await this.ready;
+    if (!this.cleanup.canWrite()) {
+      return;
+    }
     const now = new Date().toISOString();
     await runEach([
+      async () => {
+        await this.archiveHistory(now);
+      },
       async () => {
         await poolAtAlarm(this.ctx.storage, {
           now,
@@ -408,7 +385,7 @@ export class UserStore extends CloudStore {
   async derive(now: string): Promise<readonly string[]> {
     const made: string[] = [];
     for (const step of DERIVE_STEPS) {
-      const current = await this.#state.current();
+      const current = await this.state.current();
       const events = step({ ...current.state, existingEventIds: current.ids, now });
       const appended = await this.#system(events, now);
       made.push(...appended.map((event) => event.id));

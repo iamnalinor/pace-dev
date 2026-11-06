@@ -18,8 +18,11 @@ import {
 } from "@pace/core";
 
 import type { Clock } from "../clock.ts";
+import type { HistoryError } from "../history-types.ts";
 import type { PersistError } from "../local-log.ts";
 import type { AppStateHandle } from "../state.ts";
+
+import { requiresSourceForEvent } from "../checkpoint-validation.ts";
 
 /**
 Every action answers with the events it appended or one of these codes: the core's own
@@ -40,6 +43,7 @@ export type ActionError =
   | "event/not-found"
   | "undo/nothing"
   | `dispatch/${string}`
+  | HistoryError
   | PersistError
   | PlannedActionError
   | PresetError
@@ -92,6 +96,11 @@ const STORE_ERRORS = [
   "event/not-found",
   "persist_failed",
   "undo/nothing",
+  "history/not-loaded",
+  "history/offline",
+  "history/unavailable",
+  "history/incomplete",
+  "sync/copy-changed",
 ] satisfies readonly ActionError[];
 
 type StoreError = (typeof STORE_ERRORS)[number];
@@ -119,8 +128,30 @@ export const stageEmit = async (
   deps: ActionDeps,
   inputs: readonly EventInput[],
 ): Promise<StagedResult> => {
-  const snapshot = deps.state.store.getState();
+  let snapshot = deps.state.store.getState();
   const now = deps.clock.now();
+  if (
+    snapshot.checkpoint !== null &&
+    inputs.some((input) => {
+      const parsed = parseEvent({
+        ...input,
+        id: input.id ?? newId(),
+        recordedAt: input.recordedAt ?? now,
+        deviceId: input.deviceId ?? "validation",
+      });
+      return (
+        parsed.ok &&
+        snapshot.checkpoint !== null &&
+        requiresSourceForEvent(snapshot.checkpoint, parsed.value)
+      );
+    })
+  ) {
+    const history = await deps.state.ensureHistory();
+    if (!history.ok) {
+      return history;
+    }
+    snapshot = deps.state.store.getState();
+  }
   const malformed = inputs
     .map((input) =>
       parseEvent({
@@ -177,3 +208,10 @@ export const taskOf = (deps: ActionDeps, taskId: string): Result<Task, "task/unk
 /** The task's preset chain with its own overrides on top, shaped by its subtasks. */
 export const presetOf = (deps: ActionDeps, task: Task): Result<ResolvedPreset, PresetError> =>
   taskPreset(deps.state.store.getState().presets, task);
+
+export const withCompleteHistory =
+  <A extends readonly unknown[]>(deps: ActionDeps, run: (...args: A) => ActionResult) =>
+  async (...args: A): ActionResult => {
+    const history = await deps.state.ensureHistory();
+    return history.ok ? await run(...args) : history;
+  };

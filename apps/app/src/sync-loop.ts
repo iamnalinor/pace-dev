@@ -35,8 +35,12 @@ const followForeground = (runtime: PaceRuntime, pool: Pool, isActive: () => bool
     }
     runtime.live.start();
 
-    void actions.ensureInstances();
     void (async () => {
+      await runtime.state.ready;
+      if (!canContinue()) {
+        return;
+      }
+      await actions.ensureInstances();
       await sync.syncNow();
       if (!canContinue()) {
         return;

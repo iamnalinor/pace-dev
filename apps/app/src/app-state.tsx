@@ -157,7 +157,7 @@ const useIsEmptyCopyUntil = (isDone: boolean): boolean => {
   const { hooks } = usePace();
   const isLoading = hooks.useAppState((state) => state.status === "loading");
   const isEmpty = hooks.useAppState(
-    (state) => state.status === "ready" && state.events.length === 0,
+    (state) => state.status === "ready" && state.knownEventIds.size === 0,
   );
   const isWaiting = status === "signed-in" && !isDone;
   const [wasEmpty, setWasEmpty] = useState(false);

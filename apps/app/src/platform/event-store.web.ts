@@ -1,43 +1,26 @@
-import { type DBSchema, type IDBPDatabase, openDB } from "idb";
-
+import type { LocalEventStore } from "#app/platform/event-store.ts";
 import type { Event } from "@pace/core";
 
-import { canClearCopy, createMemoryEventStore, type EventStore } from "@pace/client";
+import { isStoredCopy, newCopyToken, storedCounter } from "#app/platform/checkpoint-persistence.ts";
+import { appendIdbEvents, idbCheckpointStore } from "#app/platform/idb-checkpoint-store.ts";
+import {
+  type EventDatabase as Db,
+  EVENT_STORES,
+  openEventDatabase,
+} from "#app/platform/idb-event-database.ts";
+import {
+  canClearCopy,
+  type CopyGuard,
+  createMemoryEventStore,
+  type EventStore,
+  type Sha256Text,
+  sha256Text,
+} from "@pace/client";
 
-import type { LocalEventStore } from "./event-store.ts";
-
-const DB_NAME = "pace";
-const DB_VERSION = 1;
 const CURSOR_KEY = "cursor";
 const STORE_ID_KEY = "storeId";
 const SYNC_VERSION_KEY = "syncVersion";
 const OWNER_KEY = "owner";
-
-type PaceDb = DBSchema & {
-  readonly events: {
-    readonly key: string;
-    readonly value: Event;
-    readonly indexes: { readonly byOccurredAt: string };
-  };
-  /** The outbox: ids of local events the server has not acknowledged. */
-  readonly pending: { readonly key: string; readonly value: { readonly id: string } };
-  readonly meta: {
-    readonly key: string;
-    readonly value: { readonly key: string; readonly value: number | string };
-  };
-};
-
-type Db = IDBPDatabase<PaceDb>;
-
-const open = async (): Promise<Db> =>
-  await openDB<PaceDb>(DB_NAME, DB_VERSION, {
-    upgrade(db) {
-      const events = db.createObjectStore("events", { keyPath: "id" });
-      events.createIndex("byOccurredAt", "occurredAt");
-      db.createObjectStore("pending", { keyPath: "id" });
-      db.createObjectStore("meta", { keyPath: "key" });
-    },
-  });
 
 const append = async (db: Db, events: readonly Event[]): Promise<void> => {
   const tx = db.transaction(["events", "pending"], "readwrite");
@@ -63,11 +46,16 @@ const listPending = async (db: Db): Promise<readonly Event[]> => {
   return found.filter((event): event is Event => event !== undefined);
 };
 
-const markSynced = async (db: Db, ids: readonly string[]): Promise<void> => {
-  const tx = db.transaction("pending", "readwrite");
+const markSynced = async (db: Db, ids: readonly string[], guard?: CopyGuard): Promise<void> => {
+  const tx = db.transaction(["pending", "meta"], "readwrite");
+  const metadata = await tx.objectStore("meta").getAll();
+  const meta = Object.fromEntries(metadata.map((row) => [row.key, String(row.value)]));
+  if (guard !== undefined && !isStoredCopy(meta, guard)) {
+    throw new Error("sync/copy-changed");
+  }
   await Promise.all(
     ids.map(async (id) => {
-      await tx.store.delete(id);
+      await tx.objectStore("pending").delete(id);
     }),
   );
   await tx.done;
@@ -78,7 +66,7 @@ One read-write transaction for the check and the clear: another tab's writes wai
 copy it claimed in the meantime is never wiped by a stale tab (re-review N3).
 */
 const clear = async (db: Db, ifOwner: string | undefined): Promise<void> => {
-  const tx = db.transaction(["events", "pending", "meta"], "readwrite");
+  const tx = db.transaction(EVENT_STORES, "readwrite");
   const row = await tx.objectStore("meta").get(OWNER_KEY);
   const owner = row?.value ?? null;
   if (!canClearCopy(typeof owner === "string" ? owner : null, ifOwner)) {
@@ -89,12 +77,29 @@ const clear = async (db: Db, ifOwner: string | undefined): Promise<void> => {
     tx.objectStore("events").clear(),
     tx.objectStore("pending").clear(),
     tx.objectStore("meta").clear(),
+    tx.objectStore("sequences").clear(),
   ]);
+  await tx.objectStore("meta").put({ key: "copyToken", value: newCopyToken() });
   await tx.done;
 };
 
-const idbBackend = (db: Db): EventStore => ({
-  append: async (events) => {
+const setOwner = async (db: Db, mark: string): Promise<void> => {
+  const tx = db.transaction("meta", "readwrite");
+  const previous = await tx.store.get(OWNER_KEY);
+  if (previous?.value !== mark) {
+    await tx.store.put({ key: "copyToken", value: newCopyToken() });
+  }
+  await tx.store.put({ key: OWNER_KEY, value: mark });
+  await tx.done;
+};
+
+const idbBackend = (db: Db, hash: Sha256Text): EventStore => ({
+  ...idbCheckpointStore(db, hash),
+  append: async (events, guard) => {
+    if (guard !== undefined) {
+      await appendIdbEvents(db, hash, { events, guard });
+      return;
+    }
     await append(db, events);
   },
   clear: async (ifOwner) => {
@@ -102,7 +107,7 @@ const idbBackend = (db: Db): EventStore => ({
   },
   getCursor: async () => {
     const row = await db.get("meta", CURSOR_KEY);
-    return typeof row?.value === "number" ? row.value : 0;
+    return storedCounter(row?.value);
   },
   getStoreId: async () => {
     const row = await db.get("meta", STORE_ID_KEY);
@@ -110,18 +115,18 @@ const idbBackend = (db: Db): EventStore => ({
   },
   getSyncVersion: async () => {
     const row = await db.get("meta", SYNC_VERSION_KEY);
-    return typeof row?.value === "number" ? row.value : 0;
+    return storedCounter(row?.value);
   },
   listAll: async () => await db.getAllFromIndex("events", "byOccurredAt"),
   listPending: async () => await listPending(db),
-  markSynced: async (ids) => {
-    await markSynced(db, ids);
+  markSynced: async (ids, guard) => {
+    await markSynced(db, ids, guard);
   },
   setCursor: async (seq) => {
     await db.put("meta", { key: CURSOR_KEY, value: seq });
   },
   setOwner: async (mark) => {
-    await db.put("meta", { key: OWNER_KEY, value: mark });
+    await setOwner(db, mark);
   },
   setStoreId: async (storeId) => {
     await db.put("meta", { key: STORE_ID_KEY, value: storeId });
@@ -135,11 +140,17 @@ const idbBackend = (db: Db): EventStore => ({
 Opens IndexedDB once; when it is unavailable (some private windows, blocked site data)
 the log lives in memory for this page load so the app still works, just without persistence.
 */
-const openBackend = async (): Promise<Backend> => {
-  try {
-    return { isShared: true, store: idbBackend(await open()) };
-  } catch {
+const openBackend = async (hash: Sha256Text): Promise<Backend> => {
+  if (typeof indexedDB === "undefined") {
     return { isShared: false, store: createMemoryEventStore() };
+  }
+  try {
+    return { isShared: true, store: idbBackend(await openEventDatabase(), hash) };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "SecurityError") {
+      return { isShared: false, store: createMemoryEventStore() };
+    }
+    throw error;
   }
 };
 
@@ -150,17 +161,25 @@ type Backend = { readonly isShared: boolean; readonly store: EventStore };
 The local event log in IndexedDB (database `pace`): events, the outbox, and in `meta` the cursor,
 the store id, the sync version and the owner.
 */
-export const createEventStore = (): LocalEventStore => {
+export const createEventStore = (hash: Sha256Text = sha256Text): LocalEventStore => {
   let backendPromise: Promise<Backend> | undefined;
   const call = async <T>(run: (store: EventStore) => Promise<T>): Promise<T> => {
-    backendPromise ??= openBackend();
+    backendPromise ??= openBackend(hash);
     const { store } = await backendPromise;
     return await run(store);
   };
   const store: EventStore = {
-    append: async (events) => {
+    readSnapshot: async () => await call(async (store) => await store.readSnapshot()),
+    installBootstrap: async (input) =>
+      await call(async (store) => await store.installBootstrap(input)),
+    applyLegacyPage: async (input) =>
+      await call(async (store) => await store.applyLegacyPage(input)),
+    applyRemotePage: async (input) =>
+      await call(async (store) => await store.applyRemotePage(input)),
+    installHistory: async (input) => await call(async (store) => await store.installHistory(input)),
+    append: async (events, guard) => {
       await call(async (store) => {
-        await store.append(events);
+        await store.append(events, guard);
       });
     },
     clear: async (ifOwner) => {
@@ -173,9 +192,9 @@ export const createEventStore = (): LocalEventStore => {
     getSyncVersion: async () => await call(async (store) => await store.getSyncVersion()),
     listAll: async () => await call(async (store) => await store.listAll()),
     listPending: async () => await call(async (store) => await store.listPending()),
-    markSynced: async (ids) => {
+    markSynced: async (ids, guard) => {
       await call(async (store) => {
-        await store.markSynced(ids);
+        await store.markSynced(ids, guard);
       });
     },
     setCursor: async (seq) => {
@@ -201,7 +220,7 @@ export const createEventStore = (): LocalEventStore => {
   };
   return {
     isShared: async () => {
-      backendPromise ??= openBackend();
+      backendPromise ??= openBackend(hash);
       const backend = await backendPromise;
       return backend.isShared;
     },

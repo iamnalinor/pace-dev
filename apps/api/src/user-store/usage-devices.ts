@@ -1,4 +1,4 @@
-import { max } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 
 import type { SqliteDatabase } from "../shared/ports/sqlite.ts";
 
@@ -15,8 +15,13 @@ export const usageDevices = async (
 ): Promise<readonly { readonly deviceId: string; readonly at: string }[]> => {
   const { usageSessions } = schema;
   const rows = await db
-    .select({ at: max(usageSessions.endAt), deviceId: usageSessions.deviceId })
+    .select({
+      at: usageSessions.endAt,
+      deviceId: usageSessions.deviceId,
+      latest: sql<null | number>`max(julianday(${usageSessions.endAt}))`,
+    })
     .from(usageSessions)
     .groupBy(usageSessions.deviceId);
-  return rows.filter((row): row is { at: string; deviceId: string } => row.at !== null);
+  // SQLite's single MAX selects companion bare columns from the winning source row.
+  return rows.filter((row) => row.latest !== null).map(({ at, deviceId }) => ({ at, deviceId }));
 };

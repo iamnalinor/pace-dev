@@ -1,4 +1,48 @@
-## Tasks 8 and 9 — resumed 2026-11-06
+## Tasks 8 and 9 — CI handoff, 2026-11-06
+
+The owner requested wrap-up and explicitly changed the stopping condition: push
+the finished packet, confirm CI starts, then stop without waiting for its results.
+Do not merge. Task8 and9A were completed in earlier checkpoints;9B and9C are
+implemented and independently reviewed. This checkpoint closes their local work;
+final CI remains pending and must be inspected at the next session.
+Foundation checkpoint: `d40e454`; the integration commit contains this handoff.
+
+Delivered integration includes immutable verified archive publication, raw usage
+revisions/aggregates, recoverable account cleanup and isolated restore; guarded
+checkpoint bootstrap, HTTP/live sync, IDB/SQLite persistence and full History/export.
+The restore rehearsal matches source, state, aggregates and all five client export
+sheets. The opt-in browser test passed with real partial checkpoint coverage,
+outbox preservation, two-page history, complete XLSX export and quiet network.
+
+Final verification status:
+
+- Full unit: scripts493, core941, client630, Python54 passed.
+- Full API: 833 tests in87 files passed.
+- Full app: 1112 tests in143 suites passed.
+- Final extraction regressions: API27 and persistent-adapter60 passed.
+- Cold-alarm readiness and absent-archive short-circuit: night-cost 14 and sleep 11
+  passed serially, without changing thresholds.
+- Unified lint is enforced by this checkpoint's mandatory commit hook, including
+  types, unused exports, duplication, architecture, workflows and migration drift.
+  Existing design warnings remain74; no threshold or rule was weakened.
+- Full suites passed serially: simultaneous API and unit runs previously
+  distorted timing assertions. No performance threshold was weakened.
+- Session fixture startup barriers fixed the diagnosed CI logout race; fresh browser
+  confirmation is delegated to CI on the new head; no green result is claimed.
+
+PR run42199912608 on d40e454 passed combined checks and197/198 browser tests.
+The new head is not claimed green until its own CI completes. See [integration review](checkpoint-integration-review.md),
+[restore evidence](archive-restore-report.md), and [current plan](tasks-8-9-plan.md).
+
+Next session: inspect the CI run for this commit first; address only any failing
+checks before discussing new scope. The opt-in checkpoint browser test runs in its
+own named/active test server step. No additional local Android or QA round is needed
+to recover this handoff.
+
+Defaults and follow-up: checkpoint activation remains off; no archive binding or
+production cron was enabled, no source was pruned, and no deployment or merge was
+performed. CPU improvement is not proven. Minor deferred items are Telegram cleanup
+reply localization and the preexisting Week grid wall-clock positioning issue.
 
 Task 8 is complete in pushed checkpoint `715b0aa`; independent review and unified lint passed.
 Cloudflare SQL, actors, alarms, sockets, KV and OAuth now sit behind portable contracts. The
@@ -8,7 +52,7 @@ RPC queue bypass fails the regression. No schema/epoch or public sync contract c
 Task 9A durable checkpoint is implemented and independently reviewed: bounded atomic SQL snapshots,
 off/shadow/active modes, retained-source fallback and measured cold reads. Default is off. The
 independent 9B foundation includes immutable raw archive codec/R2 port and daily usage splitting;
-durable archive publication, cleanup/restore (9B) and checkpoint client sync/history (9C) remain.
+the subsequent 9B/9C integration is described above.
 
 Foundation verification: full API 78 files / 766 tests; full unit core 938, client 577, scripts 493,
 Python 54. Focused app tests passed 50. Final unified gate runs in the checkpoint commit hook.

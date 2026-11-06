@@ -25,6 +25,7 @@ export {
   type User,
   UserSchema,
 } from "./api/schemas/auth.ts";
+export * from "./api/schemas/bootstrap.ts";
 export {
   CALENDAR_LIMITS,
   type CalendarEvent,
@@ -53,6 +54,8 @@ export {
 } from "./api/schemas/oauth.ts";
 export { type Session, SessionSchema, SessionsOutputSchema } from "./api/schemas/sessions.ts";
 export {
+  type SequencedSyncRecord,
+  SequencedSyncRecordSchema,
   STORE_CHANGED,
   StoreIdSchema,
   type SyncEvent,
@@ -62,6 +65,7 @@ export {
   SyncPushBodySchema,
   SyncPushOutputSchema,
 } from "./api/schemas/sync.ts";
+
 export * from "./automation.ts";
 export * from "./checkpoint/checkpoint.ts";
 export * from "./design.ts";
@@ -87,7 +91,7 @@ export {
   TaskStatusSchema,
   TimeZoneSchema,
 } from "./events/payloads.ts";
-export { mergeEvents, sortEvents } from "./events/sort.ts";
+export { compareEvents, mergeEvents, sortEvents } from "./events/sort.ts";
 export * from "./firebase/config.ts";
 export { capitalize, clipText, clipWords, initials, splitGraphemes } from "./format/initials.ts";
 export { formatCount, formatNumber, formatPercent, type NumberOptions } from "./format/numbers.ts";
@@ -271,6 +275,7 @@ export {
 } from "./review/to-sort.ts";
 export { normalizeServerUrl, type ServerUrlError } from "./server-url.ts";
 export * from "./time-tracking.ts";
+
 export {
   addDaysIn,
   addMinutesIso,
@@ -286,12 +291,8 @@ export {
   type ZonedInstant,
   zonesDiffer,
 } from "./time.ts";
-export {
-  type DailyUsageError,
-  type DailyUsagePiece,
-  splitDailyUsage,
-} from "./tracking/daily-usage.ts";
 
+export * from "./tracking/daily-usage.ts";
 export {
   FUTURE_TOLERANCE_MINUTES,
   type RetroError,

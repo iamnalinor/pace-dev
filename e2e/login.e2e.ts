@@ -110,6 +110,7 @@ test("after Log out the network goes quiet: no request names the session, nothin
   // The start has had its answers (sync, calendar, notifications) and the socket is open.
   await expect.poll(() => pending.size).toBe(0);
   expect(sockets.length).toBeGreaterThan(0);
+  await outboxSent(page);
   const logOut = page.getByRole("button", { name: "Log out" });
   await logOut.evaluate((button) => {
     button.addEventListener(

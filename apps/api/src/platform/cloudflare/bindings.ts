@@ -1,6 +1,7 @@
 import type { AppBindings } from "../../shared/ports/bindings.ts";
 
 import { objectHealth } from "../../shared/llm/health-store.ts";
+import { archiveStore } from "./archive-store.ts";
 import { keyValue } from "./key-value.ts";
 import { oauth } from "./oauth.ts";
 import { d1 } from "./sqlite.ts";
@@ -26,6 +27,7 @@ export const cloudflareBindings = (env: Cloudflare.Env): AppBindings => ({
   ...(env.CF_VERSION_METADATA !== undefined && {
     CF_VERSION_METADATA: { id: env.CF_VERSION_METADATA.id },
   }),
+  ...(env.HISTORY_ARCHIVE !== undefined && { HISTORY_ARCHIVE: archiveStore(env.HISTORY_ARCHIVE) }),
   DB: d1(env.DB),
   LLM_HEALTH: objectHealth(() => env.LLM_HEALTH.get(env.LLM_HEALTH.idFromName("global"))),
   OAUTH_KV: keyValue(env.OAUTH_KV),

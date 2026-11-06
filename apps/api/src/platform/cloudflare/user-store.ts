@@ -8,7 +8,13 @@ import { actorContext } from "./live-channel.ts";
 
 /** Cloudflare RPC hosting only. Domain calls within the service do not re-enter the queue. */
 export class UserStore extends DurableObject {
-  readonly #run = actorCalls();
+  readonly #queue = actorCalls();
+  readonly #run = async <T>(operation: () => T): Promise<Awaited<T>> =>
+    await this.#queue(async () => {
+      await this.service.ready;
+      await this.service.assertAvailable();
+      return await operation();
+    });
 
   readonly service: StoreService;
 
@@ -19,6 +25,38 @@ export class UserStore extends DurableObject {
       migrate: async () => {
         await migrateActor(ctx.storage);
       },
+    });
+  }
+
+  async beginCleanup(
+    ...args: Parameters<StoreService["beginCleanup"]>
+  ): ReturnType<StoreService["beginCleanup"]> {
+    return await this.#queue(async () => {
+      await this.service.ready;
+      return await this.service.beginCleanup(...args);
+    });
+  }
+  async resetForCleanup(
+    ...args: Parameters<StoreService["resetForCleanup"]>
+  ): ReturnType<StoreService["resetForCleanup"]> {
+    return await this.#queue(async () => {
+      await this.service.ready;
+      return await this.service.resetForCleanup(...args);
+    });
+  }
+  async finishCleanup(
+    ...args: Parameters<StoreService["finishCleanup"]>
+  ): ReturnType<StoreService["finishCleanup"]> {
+    return await this.#queue(async () => {
+      await this.service.ready;
+      return await this.service.finishCleanup(...args);
+    });
+  }
+  async archiveHistory(
+    ...args: Parameters<StoreService["archiveHistory"]>
+  ): ReturnType<StoreService["archiveHistory"]> {
+    await this.#run(async () => {
+      await this.service.archiveHistory(...args);
     });
   }
 
@@ -44,6 +82,15 @@ export class UserStore extends DurableObject {
 
   async push(...args: Parameters<StoreService["push"]>): ReturnType<StoreService["push"]> {
     return await this.#run(async () => await this.service.push(...args));
+  }
+
+  async bootstrap(
+    ...args: Parameters<StoreService["bootstrap"]>
+  ): ReturnType<StoreService["bootstrap"]> {
+    return await this.#run(async () => await this.service.bootstrap(...args));
+  }
+  async pull(...args: Parameters<StoreService["pull"]>): ReturnType<StoreService["pull"]> {
+    return await this.#run(async () => await this.service.pull(...args));
   }
 
   async list(...args: Parameters<StoreService["list"]>): ReturnType<StoreService["list"]> {
@@ -267,7 +314,7 @@ export class UserStore extends DurableObject {
   async endLiveSessions(
     ...args: Parameters<StoreService["endLiveSessions"]>
   ): ReturnType<StoreService["endLiveSessions"]> {
-    await this.#run(async () => {
+    await this.#queue(async () => {
       await this.service.endLiveSessions(...args);
     });
   }

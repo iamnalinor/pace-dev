@@ -41,7 +41,7 @@ it("clears the configuration failure when the same server recovers", () => {
     value: {
       apiOrigin: origin,
       botUsername: "PaceBot",
-      features: { assistant: false, mcp: false, push: false },
+      features: { assistant: false, historyCheckpoint: null, mcp: false, push: false },
       firebase: null,
       loginMethods: ["telegram-deeplink"],
       minClientProtocol: 1,

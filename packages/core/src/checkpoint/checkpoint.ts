@@ -9,8 +9,9 @@ import { effectiveInOrder, foldEffective, isCorrection } from "../materialize/ma
 import { err, ok, type Result } from "../result.ts";
 import { addDaysIn, startOfDayIn } from "../time.ts";
 import { CoreStateSchema } from "./state-schema.ts";
+import { CHECKPOINT_VERSION } from "./version.ts";
 
-export const CHECKPOINT_VERSION = 1;
+export { CHECKPOINT_VERSION } from "./version.ts";
 export type CheckpointEventKey = { readonly occurredAt: string; readonly id: string };
 export type SequencedCheckpointEvent = { readonly seq: number; readonly event: Event };
 export type CheckpointValidationError =

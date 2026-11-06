@@ -3,6 +3,7 @@ import { and, asc, eq, gt, gte, lt, lte, max, min } from "drizzle-orm";
 import { type Event, parseEvent, type SequencedCheckpointEvent } from "@pace/core";
 
 import type { EventPage, JsonValue, StoredEvent } from "../shared/contract.ts";
+import type { StoredSyncRecord } from "../shared/history-sync-types.ts";
 import type { ActorStorage } from "../shared/ports/actor-storage.ts";
 import type { SqliteDatabase } from "../shared/ports/sqlite.ts";
 
@@ -141,4 +142,29 @@ export const checkpointPrefix = async (
       ),
     );
   return prefix?.seq ?? 0;
+};
+
+/** Original SQLite cursors are transferred explicitly; AUTOINCREMENT can leave allocated gaps. */
+export const storedPage = (
+  storage: ActorStorage,
+  input: { readonly after: number; readonly through: number; readonly limit: number },
+): EventPage & {
+  readonly records: readonly StoredSyncRecord[];
+} => {
+  const rows = storage.sql
+    .exec<typeof schema.events.$inferSelect>(
+      "SELECT seq,id,type,occurred_at AS occurredAt,recorded_at AS recordedAt,device_id AS deviceId,precision,source,payload FROM events WHERE seq > ? AND seq <= ? ORDER BY seq LIMIT ?",
+      input.after,
+      input.through,
+      input.limit + 1,
+    )
+    .toArray();
+  const page = rows.slice(0, input.limit);
+  const records = page.map((row) => ({ seq: row.seq, event: toEvent(row) }));
+  return {
+    events: records.map((record) => record.event),
+    records,
+    more: rows.length > input.limit,
+    seq: page.at(-1)?.seq ?? input.after,
+  };
 };

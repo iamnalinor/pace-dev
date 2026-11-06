@@ -37,28 +37,40 @@ const clear = async (storage: ActorStorage): Promise<void> => {
 };
 
 /** Migrates, then stamps the current epoch and the store id (a new one after a clear). */
-const prepare = async (storage: ActorStorage, migrate: () => Promise<void>): Promise<void> => {
+type ReadyOptions = { readonly storeId?: string; readonly beforeReady?: () => Promise<void> };
+const prepare = async (
+  storage: ActorStorage,
+  migrate: () => Promise<void>,
+  options: ReadyOptions,
+): Promise<void> => {
   await migrate();
-  await storage.put(EPOCH_KEY, STORE_EPOCH);
+  if (options.storeId !== undefined) {
+    await storage.put(STORE_ID_KEY, options.storeId);
+  }
   await storeIdOf(storage);
+  await options.beforeReady?.();
+  // The final readiness stamp must never precede restoring an in-progress cleanup fence.
+  await storage.put(EPOCH_KEY, STORE_EPOCH);
 };
 
 /** Readies a starting store: one from another epoch is emptied before it migrates. */
 export const openStore = async (
   storage: ActorStorage,
   migrate: () => Promise<void>,
+  options: ReadyOptions = {},
 ): Promise<void> => {
   if ((await storage.get<number>(EPOCH_KEY)) !== STORE_EPOCH) {
     await clear(storage);
   }
-  await prepare(storage, migrate);
+  await prepare(storage, migrate, options);
 };
 
 /** Empties the store and readies it again under a new store id. */
 export const resetStore = async (
   storage: ActorStorage,
   migrate: () => Promise<void>,
+  options: ReadyOptions = {},
 ): Promise<void> => {
   await clear(storage);
-  await prepare(storage, migrate);
+  await prepare(storage, migrate, options);
 };

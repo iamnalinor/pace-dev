@@ -3,6 +3,7 @@ import type { Page } from "@playwright/test";
 import { approve, nowTasks } from "./support/composer.ts";
 import { expect, type OpenContext, test } from "./support/fixtures.ts";
 import { API_URL, createDevSession, freshTelegramId, resetAccount } from "./support/login.ts";
+import { outboxSent } from "./support/outbox.ts";
 import { pushAsClient, ulid } from "./support/seed.ts";
 
 /** Same key as apps/app/src/platform/secure-session.ts. */
@@ -169,11 +170,18 @@ const twoTabsSignedIn = async (openContext: OpenContext) => {
     { key: SESSION_KEY, value: token },
   );
   const first = await context.newPage();
+  const firstLiveStarted = first.waitForEvent("websocket");
   await first.goto("/");
   await expect(first.getByRole("heading", { name: "Now" })).toBeVisible();
+  await firstLiveStarted;
   const second = await context.newPage();
+  // Senders start only after initial timezone persistence has settled.
+  const liveStarted = second.waitForEvent("websocket");
   await second.goto("/settings");
   await expect(second.getByRole("button", { name: "Log out" })).toBeVisible();
+  await liveStarted;
+  // Startup settings must be acknowledged before a session-only logout test begins.
+  await outboxSent(second);
   return { context, first, second, telegramId };
 };
 

@@ -54,6 +54,8 @@ export {
   type LoginDevice,
   SESSION_CHANGED,
 } from "./auth.ts";
+
+export * from "./client-checkpoint.ts";
 export {
   type Clock,
   queryContext,
@@ -64,6 +66,7 @@ export {
 } from "./clock.ts";
 export { createPaceClient, type PaceClient, type PaceClientOptions } from "./create-client.ts";
 export { REQUEST_DEADLINE_MS, withinDeadline } from "./deadline.ts";
+
 export { canClearCopy, type EventStore } from "./event-store.ts";
 export { checkInstance, type InstanceError } from "./instance.ts";
 export { createLiveChannel, type LiveChannel, type LiveStatus, type SocketLike } from "./live.ts";
@@ -240,6 +243,7 @@ export {
   type SessionRowsContext,
 } from "./view-models/sessions.ts";
 export { type ListedSessions, signInState } from "./view-models/sign-in-notice.ts";
+
 export {
   type OverrideSheet,
   type PrimaryAction,
@@ -261,6 +265,7 @@ export {
   timeBarModel,
   type TimeButtonView,
 } from "./view-models/time-bar.ts";
+
 export {
   type ActivityForm,
   activityFormOf,
@@ -284,6 +289,7 @@ export {
   type WeekModel,
   weekModel,
 } from "./view-models/week.ts";
+
 // The one answer to "attended already?" lives in core; the app reads it from here too.
 export {
   activityLabel,

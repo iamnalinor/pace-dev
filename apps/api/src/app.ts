@@ -2,7 +2,14 @@ import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 
-import { endpoints, MIN_CLIENT_PROTOCOL, ok, PROTOCOL, PROTOCOL_HEADER } from "@pace/core";
+import {
+  CHECKPOINT_VERSION,
+  endpoints,
+  MIN_CLIENT_PROTOCOL,
+  ok,
+  PROTOCOL,
+  PROTOCOL_HEADER,
+} from "@pace/core";
 
 import type { AppEnv } from "./shared/app-env.ts";
 import type { ParseProvider } from "./shared/llm/llm.ts";
@@ -18,7 +25,13 @@ import { mountCloudRoutes } from "./cloud/cloud-routes.ts";
 import { mountLinkRoutes } from "./links/link-routes.ts";
 import { mountNotifyRoutes } from "./notify/notify-routes.ts";
 import { mountParseRoutes } from "./parse/parse-routes.ts";
-import { type Config, loadConfig, oauthOrigin, ownOrigin } from "./shared/config.ts";
+import {
+  type Config,
+  loadConfig,
+  oauthOrigin,
+  ownOrigin,
+  UNNAMED_VERSION,
+} from "./shared/config.ts";
 import { deploymentReadinessOf } from "./shared/deployment-readiness.ts";
 import { publicFirebaseConfigOf, refuseMisconfiguredFirebase } from "./shared/firebase-config.ts";
 import { parseProviders } from "./shared/llm/providers.ts";
@@ -75,6 +88,10 @@ const mountPublicRoutes = (app: Hono<AppEnv>, deps: AppDeps): void => {
       apiOrigin: ownOrigin(config.apiOrigin, c.req.url),
       botUsername: config.telegramBotUsername,
       features: {
+        historyCheckpoint:
+          config.historyCheckpointMode === "active" && config.version !== UNNAMED_VERSION
+            ? CHECKPOINT_VERSION
+            : null,
         // The skipped slots were already logged by the calls that use the models; not again here.
         assistant: deps.parseProviders({ ...config, llmSkipped: [] }).length > 0,
         // OAuth and MCP answer 503 without an origin the provider accepts (`worker.ts`).
