@@ -1,6 +1,7 @@
 import type { NowRow } from "@pace/client";
 
 import { useT } from "#app/app-state.tsx";
+import { AcceptedHighlight } from "#app/shared/assistant/accepted-highlight.tsx";
 import { CheckCircle } from "#app/ui/check-circle.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { Dissolve } from "#app/ui/dissolve.tsx";
@@ -50,30 +51,32 @@ export const TaskRow = ({
   const { palette } = useTheme();
   const isSelected = useSelectedTask() === row.id;
   return (
-    <Dissolve
-      color={palette["label.secondary"]}
-      isActive={isDissolving}
-      onDone={onDissolved ?? NOTHING}
-    >
-      <ListRow
-        control={
-          <CheckCircle
-            checked={checked || isDissolving}
-            label={t("now.markDone", { title: row.title })}
-            {...(onCheck !== undefined && { onPress: onCheck })}
-          />
-        }
-        meta={
-          <MetaLine asOf={asOf} parts={row.meta} showRepeat={false} tag={withTag ? row : null} />
-        }
-        onPress={onOpen}
-        role="link"
-        selected={isSelected}
-        title={row.title}
-        titleLines={2}
-        titleLook={titleLook(checked, row.dimmed)}
-        trailing={row.meta.some((part) => part.kind === "repeats") ? <RepeatMark /> : undefined}
-      />
-    </Dissolve>
+    <AcceptedHighlight id={row.id}>
+      <Dissolve
+        color={palette["label.secondary"]}
+        isActive={isDissolving}
+        onDone={onDissolved ?? NOTHING}
+      >
+        <ListRow
+          control={
+            <CheckCircle
+              checked={checked || isDissolving}
+              label={t("now.markDone", { title: row.title })}
+              {...(onCheck !== undefined && { onPress: onCheck })}
+            />
+          }
+          meta={
+            <MetaLine asOf={asOf} parts={row.meta} showRepeat={false} tag={withTag ? row : null} />
+          }
+          onPress={onOpen}
+          role="link"
+          selected={isSelected}
+          title={row.title}
+          titleLines={2}
+          titleLook={titleLook(checked, row.dimmed)}
+          trailing={row.meta.some((part) => part.kind === "repeats") ? <RepeatMark /> : undefined}
+        />
+      </Dissolve>
+    </AcceptedHighlight>
   );
 };

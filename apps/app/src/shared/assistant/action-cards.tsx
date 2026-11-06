@@ -73,9 +73,7 @@ const RulesNote = ({
   return (
     <View className="items-start gap-2">
       <Text className="font-sans text-footnote text-label-secondary">
-        {t(
-          unread.reason === "unreadable" ? "assistant.rulesUsedUnreadable" : "assistant.rulesUsed",
-        )}
+        {t(`assistant.rulesUsed.${unread.reason}`)}
       </Text>
       {onLater !== undefined && unread.canReadLater ? (
         <Chip onPress={onLater}>{t("composer.aiLater")}</Chip>

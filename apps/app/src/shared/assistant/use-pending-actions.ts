@@ -9,6 +9,7 @@ import type {
 } from "@pace/core";
 
 import { usePace, useT } from "#app/app-state.tsx";
+import { markAccepted } from "#app/shared/assistant/accepted-highlight.tsx";
 import { type ReadingIssue, readingIssue } from "#app/shared/assistant/reading-issue.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
@@ -122,6 +123,16 @@ const revise = (
 type Thread = Pending["thread"];
 type Ids = Pending["decisionIds"];
 
+const createdTaskIds = (written: readonly Event[]): readonly string[] => {
+  const ids: string[] = [];
+  for (const event of written) {
+    if (event.type === "task.created") {
+      ids.push(event.payload.taskId);
+    }
+  }
+  return ids;
+};
+
 /**
 Tells the assistant log what became of the conversation (best effort, not awaited); answers
 the task an approval created, if any (the last, as the screen opens it).
@@ -138,6 +149,9 @@ const tellLog = (
   const taskId = created?.type === "task.created" ? created.payload.taskId : null;
   if (pending !== null) {
     void assistant.resolve(pending.decisionIds, resolution, taskId);
+  }
+  if (resolution === "approved") {
+    markAccepted(createdTaskIds(written));
   }
   return taskId;
 };

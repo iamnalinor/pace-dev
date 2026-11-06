@@ -622,7 +622,7 @@ describe("TimeBar", () => {
     await renderScreen(<TimeBar />, runtime);
     await fireEvent.changeText(screen.getByLabelText("What are you doing?"), "ем");
     await fireEvent.press(screen.getByRole("button", { name: "Review assistant actions" }));
-    expect(await screen.findByText(en("assistant.rulesUsed"))).toBeOnTheScreen();
+    expect(await screen.findByText(en("assistant.rulesUsed.unreachable"))).toBeOnTheScreen();
     expect(activities(runtime)).toEqual([]);
     await fireEvent.press(screen.getByRole("button", { name: "Approve" }));
     await waitFor(() => {

@@ -576,7 +576,7 @@ describe("Composer", () => {
     await fireEvent.changeText(line(), "синк по дашборду");
     await fireEvent.changeText(line(), "синк по дашборду завтра 15:00 1ч");
     await enter();
-    expect(await screen.findByText(en("assistant.rulesUsed"))).toBeOnTheScreen();
+    expect(await screen.findByText(en("assistant.rulesUsed.unreachable"))).toBeOnTheScreen();
     expect(screen.getByText(/синк по дашборду/u)).toBeOnTheScreen();
     expect(created(runtime, "синк по дашборду")).toBeUndefined();
     await fireEvent.press(screen.getByRole("button", { name: en("assistant.approve") }));
@@ -611,10 +611,10 @@ describe("Composer", () => {
     await renderComposer(runtime);
     await fireEvent.changeText(line(), "оплатить связь");
     await enter();
-    expect(await screen.findByText(en("assistant.rulesUsed"))).toBeOnTheScreen();
+    expect(await screen.findByText(en("assistant.rulesUsed.unreachable"))).toBeOnTheScreen();
     await fireEvent.press(button("composer.aiLater"));
     expect(await screen.findByText(en("composer.aiQueuedSoon"))).toBeOnTheScreen();
-    expect(screen.queryByText(en("assistant.rulesUsed"))).toBeNull();
+    expect(screen.queryByText(en("assistant.rulesUsed.unreachable"))).toBeNull();
     expect(line()).toHaveDisplayValue("");
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 300));
@@ -666,10 +666,26 @@ describe("Composer", () => {
     await renderComposer(runtime);
     await fireEvent.changeText(line(), "оплатить связь");
     await enter();
-    expect(await screen.findByText(en("assistant.rulesUsedUnreadable"))).toBeOnTheScreen();
+    expect(await screen.findByText(en("assistant.rulesUsed.unreadable"))).toBeOnTheScreen();
     expect(screen.queryByRole("button", { name: en("composer.aiLater") })).toBeNull();
     expect(calls).toBe(1);
   });
+
+  it.each([
+    ["limited", "assistant.rulesUsed.limited"],
+    ["off", "assistant.rulesUsed.off"],
+  ] as const)(
+    "names the reason on the rules' preview card: %s (QA round 21 L7)",
+    async (reason, key) => {
+      const runtime = await createTestRuntime({
+        routes: { "POST /api/parse": () => unavailable(reason) },
+      });
+      await renderComposer(runtime);
+      await fireEvent.changeText(line(), "оплатить связь");
+      await enter();
+      expect(await screen.findByText(en(key))).toBeOnTheScreen();
+    },
+  );
 
   it("says why when the server could not keep the line after all, and does not offer it again", async () => {
     const bodies: unknown[] = [];
