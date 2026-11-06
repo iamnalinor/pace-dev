@@ -11,6 +11,7 @@ import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
 import { EmptyText } from "#app/ui/empty-state.tsx";
+import { Group } from "#app/ui/group.tsx";
 import { IconButton } from "#app/ui/icon-button.tsx";
 import { OverlayPresence } from "#app/ui/overlay-presence.tsx";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
@@ -198,7 +199,7 @@ export const HistoryScreen = () => {
       <Text className="px-5 pb-1 font-sans text-caption text-label-tertiary">
         {`${t("history.boardAt")} ${when}`}
       </Text>
-      <View className="px-2">
+      <Group separatorInset="check">
         {history.board.rows.map((row) => (
           <TaskRow
             asOf={instant}
@@ -209,7 +210,7 @@ export const HistoryScreen = () => {
             row={row}
           />
         ))}
-      </View>
+      </Group>
       <View className="px-5 pt-4">
         <Text className="pb-1 font-sans text-caption text-label-tertiary">
           {at === null ? t("history.events") : t("history.eventsUntil", { when })}

@@ -9,9 +9,10 @@ Where a separator starts (spec §4.1.1: inset to the text start): `row` at the r
 (rows without a leading slot), `icon` past a leading `icon.control` (16 + 20 + 12 = 48), `none`
 edge to edge. A row type with another leading width (the task row's check) adds its own here.
 */
-export type SeparatorInset = "icon" | "none" | "row";
+export type SeparatorInset = "check" | "icon" | "none" | "row";
 
 const INSET_CLASS: Readonly<Record<SeparatorInset, string>> = {
+  check: "ml-16",
   icon: "ml-12",
   none: "",
   row: "ml-row-x",

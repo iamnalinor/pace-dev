@@ -17,6 +17,7 @@ export const enBoard = {
   "now.expandGroup": "Expand {title}",
   "now.collapseGroup": "Collapse {title}",
   "now.future": "In future",
+  "now.showMore": "Show {count} more",
   "now.markDone": "Mark {title} done",
   "now.doneToast": "Done: {title}",
   "meta.due": "Due {when}",

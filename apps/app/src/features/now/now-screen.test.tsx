@@ -175,9 +175,9 @@ describe("NowBoard", () => {
     expect(
       screen.getByText("Due tomorrow 23:59 · 1d 8h left · 4/7 solved · 2 sent"),
     ).toBeOnTheScreen();
-    // The project (else the category) and the importance are coloured tags before the meta text.
+    // The project (else the category) is a tag and a non-Normal importance a word; Normal says nothing.
     expect(screen.getAllByText("ASAP").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Normal").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Normal")).not.toBeOnTheScreen();
     expect(screen.getByText("15h late · 2 subtasks left")).toBeOnTheScreen();
     expect(screen.getByText("12d old")).toBeOnTheScreen();
     expect(screen.getAllByText("Nice-to-have").length).toBeGreaterThan(0);

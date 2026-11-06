@@ -4,9 +4,11 @@ import Animated from "react-native-reanimated";
 
 import type { NowRow } from "@pace/client";
 
+import { useT } from "#app/app-state.tsx";
+import { Button } from "#app/ui/button.tsx";
 import { Disclosure } from "#app/ui/disclosure.tsx";
+import { Group } from "#app/ui/group.tsx";
 import { ROW_ENTER, ROW_EXIT, ROW_LAYOUT } from "#app/ui/motion.ts";
-import { RowList } from "#app/ui/row-list.tsx";
 
 import { useOpenTask } from "./task-opener.tsx";
 import { TaskRow } from "./task-row.tsx";
@@ -21,22 +23,14 @@ const keeping = (
   return kept.length === ids.size ? ids : new Set(kept);
 };
 
-/** A list of task rows: tap to open, the check to close. */
-export const TaskRows = ({
-  animateLayout = true,
-  checked = false,
-  label,
-  rows,
-  withTag = true,
-}: {
-  readonly animateLayout?: boolean;
-  /** Closed tasks: checked rows that open the task (reopen is there). */
-  readonly checked?: boolean;
-  readonly label: string;
-  readonly rows: readonly NowRow[];
-  readonly withTag?: boolean;
-}) => {
-  const openTask = useOpenTask();
+/**
+Rows drawn at once (spec 4.3.1 Scale): a long list shows this many and a "Show more" row adds as
+many again, so a 1 284-task fold mounts a page, not the lot, inside the screen's own scroll.
+*/
+export const PAGE_SIZE = 30;
+
+/** The rows turning to dust after their check, and the ones whose dust has gone. */
+const useSettling = (rows: readonly NowRow[]) => {
   const { check, doesOpenSheet } = useCheckTask();
   // Rows turning to dust after their check; each closes once its dust has gone.
   const [dissolving, setDissolving] = useState<ReadonlySet<string>>(() => new Set());
@@ -63,17 +57,42 @@ export const TaskRows = ({
     setGone((current) => keeping(current, (id) => id !== row.id));
     setDissolving((current) => keeping(current, (id) => id !== row.id));
   };
+  return { check, doesOpenSheet, dissolving, gone, setDissolving, settle };
+};
+
+/** A list of task rows: tap to open, the check to close. */
+export const TaskRows = ({
+  animateLayout = true,
+  checked = false,
+  label,
+  rows,
+  withTag = true,
+}: {
+  readonly animateLayout?: boolean;
+  /** Closed tasks: checked rows that open the task (reopen is there). */
+  readonly checked?: boolean;
+  readonly label: string;
+  readonly rows: readonly NowRow[];
+  readonly withTag?: boolean;
+}) => {
+  const t = useT();
+  const openTask = useOpenTask();
+  const [shownCount, setShownCount] = useState(PAGE_SIZE);
+  const { check, dissolving, doesOpenSheet, gone, setDissolving, settle } = useSettling(rows);
+  const open = rows.filter((row) => !gone.has(row.id));
+  const hidden = Math.max(0, open.length - shownCount);
+  // A long list turns the layout animation off: sliding a page of rows is not worth the frames.
+  const isAnimated = animateLayout && open.length <= PAGE_SIZE;
   return (
-    <RowList aria-label={label} className="px-2" role="list">
-      {rows
-        .filter((row) => !gone.has(row.id))
-        .map((row) => (
+    <>
+      <Group aria-label={label} role="list" separatorInset="check">
+        {open.slice(0, shownCount).map((row) => (
           <Animated.View
             entering={ROW_ENTER}
             key={row.id}
             // The dust is the exit of a checked row; the fade would only bring it back for a moment.
             {...(!dissolving.has(row.id) && { exiting: ROW_EXIT })}
-            {...(animateLayout && { layout: ROW_LAYOUT })}
+            {...(isAnimated && { layout: ROW_LAYOUT })}
             role="listitem"
           >
             <TaskRow
@@ -99,7 +118,18 @@ export const TaskRows = ({
             />
           </Animated.View>
         ))}
-    </RowList>
+      </Group>
+      {hidden === 0 ? null : (
+        <Button
+          onPress={() => {
+            setShownCount((current) => current + PAGE_SIZE);
+          }}
+          variant="plain"
+        >
+          {t("now.showMore", { count: Math.min(hidden, PAGE_SIZE) })}
+        </Button>
+      )}
+    </>
   );
 };
 

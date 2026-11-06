@@ -19,6 +19,7 @@ export const ruBoard: { readonly [K in keyof typeof enBoard]: string } = {
   "now.expandGroup": "Развернуть «{title}»",
   "now.collapseGroup": "Свернуть «{title}»",
   "now.future": "В будущем",
+  "now.showMore": "Показать ещё {count}",
   "now.markDone": "Отметить «{title}» сделанной",
   "now.doneToast": "Готово: {title}",
   "meta.due": "Срок {when}",
