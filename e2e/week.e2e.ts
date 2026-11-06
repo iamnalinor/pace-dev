@@ -411,6 +411,16 @@ test("a 3-minute item at 23:56 is wholly inside the sideways scroller and covers
   const midnight = new Date(lastWednesday);
   midnight.setUTCHours(24, 0, 0, 0);
   const pushed = await pushAsClient(token, [
+    {
+      deviceId: "e2e-seed",
+      id: ulid(lastWednesday.getTime() - DAY),
+      occurredAt: new Date(lastWednesday.getTime() - DAY).toISOString(),
+      payload: { language: "en", timezone: "UTC" },
+      precision: "exact",
+      recordedAt: new Date().toISOString(),
+      source: "web",
+      type: "settings.updated",
+    },
     loggedBeforeMidnight(midnight, { from: 30, index: 1, label: "Before", to: 5 }),
     loggedBeforeMidnight(midnight, { from: 4, index: 2, label: "Last", to: 1 }),
   ]);

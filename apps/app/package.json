@@ -10,7 +10,7 @@
     "dev": "expo start",
     "android": "expo run:android",
     "prebuild": "expo prebuild --platform android --no-install",
-    "test": "jest",
+    "test": "TZ=America/Los_Angeles jest",
     "build:web": "bun ../../scripts/build-web.ts",
     "serve:web": "bun ../../scripts/serve-web.ts",
     "deploy:web": "wrangler deploy --config wrangler.web.jsonc"

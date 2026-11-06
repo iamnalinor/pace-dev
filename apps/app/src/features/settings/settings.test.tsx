@@ -643,4 +643,8 @@ describe("Settings sections (spec §5.17)", () => {
     await renderScreen(<SettingsScreen />, await createTestRuntime({ world: "empty" }));
     expect(screen.getByText(en("settings.server.hint"))).toBeOnTheScreen();
   });
+
+  it("runs in a zone that is not UTC, so a host-zone assumption fails here (bug-lessons class 135)", () => {
+    expect(new Date(2026, 0, 1).getTimezoneOffset()).not.toBe(0);
+  });
 });
