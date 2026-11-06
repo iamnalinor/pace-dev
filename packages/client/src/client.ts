@@ -121,6 +121,14 @@ export {
   taskFormOptions,
 } from "./view-models/composer.ts";
 export {
+  dayRail,
+  type DayRail,
+  GAP_CAP_MINUTES,
+  type RailBlock,
+  type RailGap,
+  type RailItem,
+} from "./view-models/day-rail.ts";
+export {
   type DayEntry,
   type DayModel,
   dayModel,

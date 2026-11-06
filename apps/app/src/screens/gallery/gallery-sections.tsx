@@ -5,7 +5,7 @@ import { Text, View } from "react-native";
 import type { GalleryData } from "@pace/core/testing";
 
 import { useT } from "#app/app-state.tsx";
-import { ActivityRow } from "#app/features/day/day-screen.tsx";
+import { ActivityRow } from "#app/features/day/day-rows.tsx";
 import { Item as NotificationItem } from "#app/features/notifications/notifications-screen.tsx";
 import { ProjectChips } from "#app/features/now/project-chips.tsx";
 import { SessionRow } from "#app/features/sessions/session-row.tsx";

@@ -197,7 +197,7 @@ for (const size of SIZES) {
       await page.goto("/settings");
       await expect(page.getByText("Account: UTC")).toBeVisible();
       await page.goto("/day");
-      const back = page.getByRole("button", { name: "Back to today" });
+      const back = page.getByRole("button", { exact: true, name: "Today" });
       await expect(back).toHaveCount(0);
       // Back to last week's Wednesday, one day at a time.
       const days = Math.round((todayMidnight() - wednesday) / DAY);
@@ -208,14 +208,13 @@ for (const size of SIZES) {
       const gap = page.getByRole("button", { name: /10:00 – 12:00.*2h not logged/u });
       await expect(gap).toBeVisible();
       await expect(gap.getByText("Log", { exact: true })).toBeVisible();
-      // A hairline between every two rows and none above the first (the web drops class names
-      // on animated views, so this is checked where it is drawn).
-      const borders = await page
-        .getByTestId("day-entry")
-        .evaluateAll((rows) => rows.map((row) => getComputedStyle(row).borderTopWidth));
-      expect(borders.length).toBeGreaterThan(2);
-      expect(borders[0]).toBe("0px");
-      expect(borders.slice(1).filter((width) => width === "0px")).toEqual([]);
+      // One divider rule: the list's own separator between every two rows (entries and the
+      // Log past activity row), none above the first.
+      const entries = await page.getByTestId("day-entry").count();
+      expect(entries).toBeGreaterThan(2);
+      await expect(page.getByTestId("day-timeline").getByTestId("group-separator")).toHaveCount(
+        entries,
+      );
       await shoot(page, `day-gaps-${size.name}`, (name) => info.outputPath(name));
       await expectNoA11yViolations(page);
       await gap.click();

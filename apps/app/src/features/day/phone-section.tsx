@@ -29,7 +29,7 @@ What sits under a block (its task, apps, prompts) starts at the block's words: a
 the time column and the row's gap, so the indent follows the scale on every platform.
 */
 export const UnderBlock = ({ children }: { readonly children: ReactNode }) => (
-  <View className="flex-row gap-3">
+  <View className="flex-row gap-row-gap px-row-x">
     <View className={TIME_WIDTH} />
     <View className="min-w-0 flex-1">{children}</View>
   </View>

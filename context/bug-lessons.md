@@ -1846,6 +1846,7 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-06 | PR B 4.2 (F-A11Y-10): the running row sat in `accessibilityLiveRegion="polite"` around a value that changes every minute, so a screen reader spoke the whole row at each tick; no test asserted what is *not* announced | 125 (live region around a ticking value) | yes: the time bar's reading-line status stays one announcement; no other live region wraps a clock (swept `accessibilityLiveRegion` in `apps/app/src`) | `running-card.test.tsx` "is not a live region" and "ticks on Stop, and says a start, a stop and the past-expected once each" (`useRunningAnnouncements`); QA checklist: a value that changes while the screen is idle gets no live region, only a one-off announcement of its transitions |
 | 2026-11-06 | PR B 4.1: a check (a control) inside a pressable row is a nested interactive (axe `nested-interactive`); the first `ListRow`-based task row would have put `CheckCircle` inside the row's Pressable | 10 (a control whose structure disagrees with its role) | yes: `ListRow` takes `control`, rendered beside the press area, never inside it | `task-row.test.tsx` "keeps the check beside the press area, never inside it" |
 | 2026-11-06 | R23-12 / QA21 M2: bare `/add` left the cursor on `BODY` (title focus asked for under the first-sync cover) | 126 (new) | yes: every focus-on-arrival caller | `add-focus.test.tsx` (held first pull), e2e at 390 and 1440 |
+| 2026-11-06 | QA21 L3: Day's activity sheet offered tomorrow as an end day, which the "still ahead" check always refused | 127 (new) | yes: the day chips derive from the same `now` the validation uses; Week's detail has no day chips | `activity-draft.test.ts` (no end day ahead of now; midnight edge) and `activity-sheet.test.tsx` |
 
 ### 125. A live region around a ticking value
 - **Bug.** PR B 4.2 (F-A11Y-10): the running row sat in `accessibilityLiveRegion="polite"` around the
@@ -1875,3 +1876,8 @@ New bugs go here with their class; a new class gets its own section above.
   pull and asserts no focus before the cover lifts and one after; `e2e/composer.e2e.ts` checks the
   title is focused on a direct load of `/add` at 390 and 1440.
 
+### 127. A choice offered that the validation always refuses
+- **Bug.** QA round 21 L3: the activity sheet's "End day" chips ran to the day after the old end; for a block that ended today that was tomorrow, and any time on it was answered "That is still ahead".
+- **Missed because.** The chips and the check were written apart: the chips from the block's own dates, the check from `now`; tests used a block far in the past, where the two never disagree.
+- **Rule.** Options are derived from the same rule that validates them: if a value can only ever be refused, it is not offered. The test clock sits at the edge (a day that has just begun, one that has not).
+- **Sweep and guard.** Swept the other chip sets built from dates (`DayChoices` start days, Week's detail: none). `activity-draft.test.ts` pins the edge in Moscow time.

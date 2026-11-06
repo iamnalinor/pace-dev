@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
+import { Group } from "#app/ui/group.tsx";
+import { SectionHeader } from "#app/ui/section-header.tsx";
 import { Text as KitText } from "#app/ui/text.tsx";
 import { appsDuring, type AppTime, screenTime } from "@pace/client";
 import { useSessions, useUsage } from "@pace/client/react";
@@ -101,22 +103,20 @@ export const ActivityApps = ({
 const ScreenTimeFailed = ({ onRetry }: { readonly onRetry: () => void }) => {
   const t = useT();
   return (
-    <View className="mx-5 mt-5 gap-3 border-t border-separator pb-8 pt-5">
-      <Text accessibilityRole="header" className="font-sans text-headline text-label-primary">
-        {t("day.screenTime")}
-      </Text>
-      {/* A quiet line and a text button flush with it, as Devices and the decision log say a
-          failed read: a filled full-width button was the loudest thing on Day for a footer. */}
-      <View className="items-start">
-        <Text className="font-sans text-footnote text-label-secondary" role="status">
-          {t("day.screenTimeFailed")}
-        </Text>
-        <View className="-ml-4">
-          <Button onPress={onRetry} variant="plain">
-            {t("common.retry")}
-          </Button>
+    <View className="pb-8">
+      <SectionHeader title={t("day.screenTime")} />
+      <Group>
+        <View className="items-start px-row-x py-row-y">
+          <KitText role="footnote" tone="secondary">
+            {t("day.screenTimeFailed")}
+          </KitText>
+          <View className="-ml-4">
+            <Button onPress={onRetry} variant="plain">
+              {t("common.retry")}
+            </Button>
+          </View>
         </View>
-      </View>
+      </Group>
     </View>
   );
 };
@@ -138,73 +138,94 @@ export const ScreenTimeSection = ({
 }) =>
   onRetry === null ? <ScreenTimeReport {...report} /> : <ScreenTimeFailed onRetry={onRetry} />;
 
+/** "First 09:12, last 21:40": when the day's apps were first and last used. */
+const FirstLast = ({
+  report,
+  zone,
+}: {
+  readonly report: ReturnType<typeof screenTime>;
+  readonly zone: string;
+}) => {
+  const t = useT();
+  const first = report.apps.map((app) => app.firstAt).toSorted((a, b) => a.localeCompare(b))[0];
+  const last = report.apps
+    .map((app) => app.lastAt)
+    .toSorted((a, b) => a.localeCompare(b))
+    .at(-1);
+  return (
+    <View className="px-row-x py-row-y">
+      <KitText role="caption2" tone="tertiary">
+        {t("day.firstLast", {
+          from: clockTime(first ?? report.from, zone),
+          to: clockTime(last ?? report.to, zone),
+        })}
+      </KitText>
+    </View>
+  );
+};
+
+/** Each device's time, or that nothing was recorded. */
+const DeviceTimes = ({ report }: { readonly report: ReturnType<typeof screenTime> }) => {
+  const t = useT();
+  const { language } = useViewer();
+  return (
+    <View className="flex-row flex-wrap gap-x-4 gap-y-1 px-row-x py-row-y">
+      {report.devices.map((device) => (
+        <KitText key={device.id} role="caption" tone="secondary">
+          {t("day.deviceTime", {
+            device: device.name,
+            duration: formatDuration(device.minutes, language),
+          })}
+        </KitText>
+      ))}
+    </View>
+  );
+};
+
 const ScreenTimeReport = ({ date, usage, zone }: ScreenTimeProps) => {
   const t = useT();
   const { language } = useViewer();
   const [isExpanded, setIsExpanded] = useState(false);
   const report = screenTime(usage, date, zone);
   const shown = isExpanded ? report.apps : report.apps.slice(0, TOP_APPS);
+  const max = report.apps[0]?.minutes ?? 1;
   return (
-    <View className="mx-5 mt-5 gap-3 border-t border-separator pb-8 pt-5">
-      <View className="flex-row items-baseline justify-between gap-3">
-        <Text accessibilityRole="header" className="font-sans text-headline text-label-primary">
-          {t("day.screenTime")}
-        </Text>
-        <Text className="font-sans text-footnote tabular-nums text-label-secondary">
-          {formatDuration(report.totalMinutes, language)}
-        </Text>
-      </View>
-      {report.devices.length === 0 ? (
-        <Text className="font-sans text-footnote text-label-secondary">{t("day.noApps")}</Text>
-      ) : (
-        <>
-          <View className="flex-row flex-wrap gap-x-4 gap-y-1">
-            {report.devices.map((device) => (
-              <Text
-                className="font-sans text-caption font-normal text-label-secondary"
-                key={device.id}
-              >
-                {t("day.deviceTime", {
-                  device: device.name,
-                  duration: formatDuration(device.minutes, language),
-                })}
-              </Text>
-            ))}
+    <View className="pb-8">
+      <SectionHeader
+        action={
+          <KitText numeric role="footnote" tone="secondary">
+            {formatDuration(report.totalMinutes, language)}
+          </KitText>
+        }
+        title={t("day.screenTime")}
+      />
+      <Group>
+        {report.devices.length === 0 ? (
+          <View className="px-row-x py-row-y">
+            <KitText role="footnote" tone="secondary">
+              {t("day.noApps")}
+            </KitText>
           </View>
-          <AppList apps={shown} />
-          {report.apps.length > TOP_APPS ? (
-            <Pressable
-              accessibilityRole="button"
-              className="self-start py-2"
-              onPress={() => {
-                setIsExpanded(!isExpanded);
-              }}
-            >
-              <Text className="font-sans text-footnote text-accent-text">
-                {isExpanded ? t("day.showLess") : t("day.showAll", { count: report.apps.length })}
-              </Text>
-            </Pressable>
-          ) : null}
-          {report.apps.length > 0 ? (
-            <Text className="font-sans text-caption2 font-normal text-label-tertiary">
-              {t("day.firstLast", {
-                from: clockTime(
-                  report.apps.map((app) => app.firstAt).toSorted((a, b) => a.localeCompare(b))[0] ??
-                    report.from,
-                  zone,
-                ),
-                to: clockTime(
-                  report.apps
-                    .map((app) => app.lastAt)
-                    .toSorted((a, b) => a.localeCompare(b))
-                    .at(-1) ?? report.to,
-                  zone,
-                ),
-              })}
-            </Text>
-          ) : null}
-        </>
-      )}
+        ) : (
+          <DeviceTimes report={report} />
+        )}
+        {shown.map((app) => (
+          <View className="px-row-x" key={app.app}>
+            <AppRow app={app} max={max} />
+          </View>
+        ))}
+        {report.apps.length > TOP_APPS ? (
+          <Button
+            onPress={() => {
+              setIsExpanded(!isExpanded);
+            }}
+            variant="plain"
+          >
+            {isExpanded ? t("day.showLess") : t("day.showAll", { count: report.apps.length })}
+          </Button>
+        ) : null}
+        {report.apps.length > 0 ? <FirstLast report={report} zone={zone} /> : null}
+      </Group>
     </View>
   );
 };

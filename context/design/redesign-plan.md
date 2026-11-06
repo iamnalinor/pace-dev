@@ -659,13 +659,16 @@ Deferred (2026-11-06): the medium window still pushes a picked task as a screen 
 ### Task 4.4: Day (structure; the line signature is Task 7.1)
 
 **Files:** `src/features/day/**` (+ tests).
-- [ ] Spec §5 Day: page template, `PeriodStepper` ‹ date › with Today only away from today
+- [x] Spec §5 Day: page template, `PeriodStepper` ‹ date › with Today only away from today
       (F-CMP-05), the inspector on desktop when a block or gap is selected (collapsed otherwise), grouped rows with one divider rule, gaps as rows with Log, Log past as a row action,
       screen-time section in the same list system.
-- [ ] Failing tests: Today button absent on today, present on another day; day switch replaces
+- [x] Failing tests: Today button absent on today, present on another day; day switch replaces
       content with no crossfade (F-MOT-07). Commit.
-- [ ] PR #48 follow-up: QA21 L3, the activity sheet offers no end on the next day (see "PR #48 follow-ups (triage)").
-- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): `PeriodStepper` in the `ScreenHeader` `period` slot (DayNav sits there for now).
+- [x] PR #48 follow-up: QA21 L3, the activity sheet offers no end on the next day (see "PR #48 follow-ups (triage)").
+- [x] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): `PeriodStepper` in the `ScreenHeader` `period` slot (DayNav sits there for now).
+
+Deferred (2026-11-06): `PeriodStepper` (`shared/period-stepper.tsx`) is built and used by Day only; Week, History and Insights keep `WeekArrows`/`BackToToday` until their tasks (4.6, 4.10, 4.11), and the 320 short label form is not done (the label is the long `formatEyebrow`). The summary cell (stacked 24 h bar, legend) is not built: `Totals` stays a line of tags on the kit `Tag`. The phone's calendar and usage-access sections keep their own look. The sleep suggestion card is untouched. e2e: the day-line separators check in `week.e2e.ts`, the "Today" label in `latency.e2e.ts`; not run locally.
+
 
 ### Task 4.5: Task detail (screen and inspector)
 
@@ -908,14 +911,17 @@ Only what spec §2 names for the chosen direction (A · Тетрадь).
 (rail geometry).
 **Interfaces:** `dayRail(blocks, gaps, now, zone): { items: { from; to; hue; kind: "block" | "gap" |
 "parallel"; open }[]; nowAt }` (proportional, long gaps capped at 3 h with a scale break).
-- [ ] Spec §2 A signature: a faint dot grid (`grid` token, 16 px pitch, only behind the timeline)
+- [x] Spec §2 A signature: a faint dot grid (`grid` token, 16 px pitch, only behind the timeline)
       under a proportional rail beside the editable rows; each block a tinted band with a 1 px
       "pen" line in its category stroke at its leading edge; a gap a dashed band with Log; a parallel
       activity a narrower band beside the main one; overlaps hatched, not red; **now = the red margin
       line** (`status.danger`, 1 px, with a dot and the time in `caption`).
-- [ ] Failing tests: view-model — a 2 h gap is twice a 1 h block's length, a 15 h gap is capped at 3 h
+- [x] Failing tests: view-model — a 2 h gap is twice a 1 h block's length, a 15 h gap is capped at 3 h
       with `scaleBreak: true`; overlapping blocks yield `parallel`; app — the rail is
       `accessibilityElementsHidden` (the rows carry the semantics). Commit.
+
+Deferred (2026-11-06): the rail is an index drawn beside the list and scaled to the list's own height (percent positions from `dayRail`), not row-aligned: the rows keep their natural heights, so a band and its row line up in order, not in y. The rail's geometry lives in `view-models/day-rail.ts` (exported from `@pace/client`), not in `day.ts`; `dayRail` takes `(blocks, gaps, now)` — no zone, the entries are already the day's. Dot grid on the rail only (the rows are opaque cells). The branch for a parallel block is a narrower band beside the main one; the "+1" for a third is not drawn. Overlap hatching is on the parallel band's overlapping stretch only.
+
 
 ### Task 7.2: The running activity's ink line and the Week day strip
 
