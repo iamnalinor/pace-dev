@@ -1,7 +1,8 @@
 import { LIVE_V1, LIVE_V2 } from "@pace/core";
 
+import type { AppBindings } from "./ports/bindings.ts";
+
 import { findSession, type SessionAccess } from "../auth/sessions.ts";
-import { d1 } from "./db/d1.ts";
 
 const AUTH_PREFIX = "pace.auth.";
 
@@ -34,13 +35,13 @@ export const liveProtocolOf = (header: null | string): typeof LIVE_V1 | typeof L
 
 /** The signed-in session behind a socket's token; a device token (a computer's) is refused. */
 export const socketSession = async (
-  env: Cloudflare.Env,
+  env: AppBindings,
   token: string | undefined,
 ): Promise<null | Pick<SessionAccess, "expiresAt" | "sessionId" | "user">> => {
   if (token === undefined || token === "") {
     return null;
   }
-  const access = await findSession(d1(env.DB), token, Date.now());
+  const access = await findSession(env.DB, token, Date.now());
   // A computer's token (with a scope) may only upload its usage.
   return access?.scope === null ? access : null;
 };

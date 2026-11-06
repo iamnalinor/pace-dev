@@ -1,7 +1,7 @@
-import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
-
 import type { Event } from "@pace/core";
 
+import type { ActorStorage } from "../shared/ports/actor-storage.ts";
+import type { SqliteDatabase } from "../shared/ports/sqlite.ts";
 import type * as schema from "./schema.ts";
 
 import * as log from "./log-queries.ts";
@@ -23,7 +23,7 @@ import {
   touchedBy,
 } from "./state.ts";
 
-type Db = DrizzleSqliteDODatabase<typeof schema>;
+type Db = SqliteDatabase<"sync", typeof schema>;
 
 /**
 A store's materialized state, cached in memory with the log sequence it was built at, and the
@@ -43,7 +43,7 @@ export class StateCache {
 
   readonly #db: Db;
 
-  readonly #storage: DurableObjectStorage;
+  readonly #storage: ActorStorage;
 
   /** What writes the rows: the deploy's version and the tables' newest migration. */
   readonly #build: string;
@@ -64,7 +64,7 @@ export class StateCache {
     readonly build: string;
     readonly isNamed: boolean;
     readonly db: Db;
-    readonly storage: DurableObjectStorage;
+    readonly storage: ActorStorage;
   }) {
     this.#build = build;
     this.#isNamed = isNamed;

@@ -1,10 +1,9 @@
-import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createLogger } from "../src/shared/logger.ts";
-import { UserStore } from "../src/user-store/user-store.ts";
 import { coldUserStore } from "./helpers.ts";
+import { runInUserStore as runInDurableObject, UserStore } from "./host.ts";
 import { COST_START, storageCostFixture } from "./storage-cost-fixture.ts";
 import {
   measuredSql,

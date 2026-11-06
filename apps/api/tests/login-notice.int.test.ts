@@ -1,15 +1,13 @@
-import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { endpoints, newId, type PoolNotification } from "@pace/core";
 
-import type { UserStore } from "../src/user-store/user-store.ts";
-
 import { findUserIdByTelegramId } from "../src/auth/users.ts";
+import { d1 } from "../src/platform/cloudflare/sqlite.ts";
 import { hmacSha256Hex } from "../src/shared/crypto.ts";
-import { d1 } from "../src/shared/db/d1.ts";
 import { answerOf, call, json, loginAsDev, pushEvents, readJson } from "./helpers.ts";
+import { runInUserStore as runInDurableObject, type UserStore } from "./host.ts";
 import { obtainToken } from "./oauth-flow.ts";
 
 /* eslint-disable sonarjs/no-hardcoded-ip -- the addresses Cloudflare and Telegram report are these tests' fixture */

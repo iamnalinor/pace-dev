@@ -88,7 +88,15 @@ const config = {
       comment:
         "Converted API consumers and ports depend on abstractions; the host composes adapters.",
       severity: "error",
-      from: { path: "^apps/api/src/shared/(ports/|request-place[.]ts$)" },
+      from: {
+        path: "^apps/api/src/",
+        pathNot: [
+          "^apps/api/src/platform/",
+          "^apps/api/src/worker[.]ts$",
+          "[.]test[.]ts$",
+          "[.]d[.]ts$",
+        ],
+      },
       to: { path: "^apps/api/src/platform/" },
     },
     {

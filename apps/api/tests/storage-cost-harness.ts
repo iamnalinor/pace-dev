@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { vi } from "vitest";
 
-import type { UserStore } from "../src/user-store/user-store.ts";
+import type { UserStore } from "./host.ts";
 
 import { coldUserStore, meterSql, type SqlCost } from "./helpers.ts";
 import {

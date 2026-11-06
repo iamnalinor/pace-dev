@@ -1,14 +1,14 @@
-import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
-
 import { asc, eq, gt, max } from "drizzle-orm";
 
 import { type Event, parseEvent } from "@pace/core";
 
 import type { EventPage, JsonValue, StoredEvent } from "../shared/contract.ts";
+import type { ActorStorage } from "../shared/ports/actor-storage.ts";
+import type { SqliteDatabase } from "../shared/ports/sqlite.ts";
 
 import * as schema from "./schema.ts";
 
-type Db = DrizzleSqliteDODatabase<typeof schema>;
+type Db = SqliteDatabase<"sync", typeof schema>;
 
 export const toEvent = (row: typeof schema.events.$inferSelect): StoredEvent => ({
   id: row.id,
@@ -86,7 +86,7 @@ export const findEvent = async (db: Db, id: string): Promise<StoredEvent | undef
 
 /** A stored value, taken out: a second read finds nothing. */
 export const takeMemo = async (
-  storage: DurableObjectStorage,
+  storage: ActorStorage,
   key: string,
 ): Promise<JsonValue | undefined> => {
   const value = await storage.get<JsonValue>(key);

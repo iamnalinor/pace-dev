@@ -1,7 +1,7 @@
-import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
+import { runInUserStore as runInDurableObject } from "../../tests/host.ts";
 import {
   armAfterWrite,
   armIfPoolUnplanned,

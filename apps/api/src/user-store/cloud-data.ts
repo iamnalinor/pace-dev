@@ -1,13 +1,18 @@
-import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
 import type { SQLiteColumn } from "drizzle-orm/sqlite-core";
 
 import { and, eq, gt, notInArray, type Query, type SQL, sql } from "drizzle-orm";
 
 import type { CalendarEvent, DeviceUse, Interval, UsageRow } from "@pace/core";
 
+import type { UsageUpload } from "../shared/contract.ts";
+import type { ActorStorage } from "../shared/ports/actor-storage.ts";
+import type { SqliteDatabase } from "../shared/ports/sqlite.ts";
+
 import * as schema from "./schema.ts";
 
-type Db = DrizzleSqliteDODatabase<typeof schema>;
+export type { UsageUpload } from "../shared/contract.ts";
+
+type Db = SqliteDatabase<"sync", typeof schema>;
 
 /** [from, to): the rows of a table that overlap it. */
 export type Range = { readonly from: string; readonly to: string };
@@ -187,17 +192,6 @@ export const clearCalendar = async (db: Db, deviceId: string): Promise<void> => 
   await db.delete(schema.calendarEvents).where(eq(schema.calendarEvents.deviceId, deviceId));
 };
 
-/** One device's upload: its app sessions and, from a phone, its uses and how far it read. */
-export type UsageUpload = {
-  readonly deviceId: string;
-  readonly deviceName: string;
-  readonly sessions: readonly Omit<UsageRow, "deviceId" | "deviceName">[];
-  readonly uses?: readonly Interval[] | undefined;
-  readonly until?: string | undefined;
-  /** Sent by a phone (a full sign-in), not by a computer's agent token. */
-  readonly isPhone: boolean;
-};
-
 /** How far a device's usage is known, as its latest upload said. */
 type KnownUsage = {
   /** The end of what it read: quiet up to here is known quiet. */
@@ -218,7 +212,7 @@ as it was, so an older app never makes a quiet it did not read look known. A com
 counts up to when it arrived. Never past that moment: a phone clock running ahead claims nothing.
 */
 const noteKnown = async (
-  storage: DurableObjectStorage,
+  storage: ActorStorage,
   upload: UsageUpload,
   now: string,
 ): Promise<void> => {
@@ -257,7 +251,7 @@ A device's sessions (a session seen again, same app and start, keeps the later e
 uses, and how far the device's usage is known. Rows stored.
 */
 export const addUsage = async (
-  { db, storage }: { readonly db: Db; readonly storage: DurableObjectStorage },
+  { db, storage }: { readonly db: Db; readonly storage: ActorStorage },
   upload: UsageUpload,
   now: string,
 ): Promise<number> => {
@@ -337,7 +331,7 @@ that uploaded within a day (`null` when none did: nothing can be decided). A com
 nothing: switched off at night it stops sending.
 */
 export const usageForSleep = async (
-  { db, storage }: { readonly db: Db; readonly storage: DurableObjectStorage },
+  { db, storage }: { readonly db: Db; readonly storage: ActorStorage },
   { from, now }: { readonly from: string; readonly now: string },
 ): Promise<SleepUsage> => {
   const known = [...(await storage.list<KnownUsage>({ prefix: KNOWN_PREFIX }))];

@@ -1,5 +1,3 @@
-import { drizzle, type DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
-
 import {
   err,
   type Event,
@@ -29,6 +27,10 @@ import type {
   TableSchema,
 } from "../shared/contract.ts";
 import type { Cooldowns } from "../shared/llm/llm.ts";
+import type { AppBindings } from "../shared/ports/bindings.ts";
+import type { ActorContext } from "../shared/ports/live-channel.ts";
+import type { SqliteDatabase } from "../shared/ports/sqlite.ts";
+import type * as schema from "./schema.ts";
 
 import { UNNAMED_VERSION, versionOf } from "../shared/config.ts";
 import { llmHealthOf } from "../shared/llm/health-store.ts";
@@ -44,13 +46,12 @@ import * as notifier from "./notifier.ts";
 import * as parseQueue from "./parse-queue.ts";
 import { poolAtAlarm } from "./pool-retry-alarm.ts";
 import { NotificationPool } from "./pool-service.ts";
-import * as schema from "./schema.ts";
 import { runSleepPass, sleepAtAlarm } from "./sleep-pass.ts";
 import { StateCache } from "./state-cache.ts";
 import { prepareBatch, toRpcState } from "./state.ts";
 import { openStore, resetStore, SCHEMA_TAG, storeIdOf } from "./store-identity.ts";
 
-type Db = DrizzleSqliteDODatabase<typeof schema>;
+type Db = SqliteDatabase<"sync", typeof schema>;
 
 /** System events are the server's own: this is their device. */
 const SERVER_DEVICE_ID = "server";
@@ -70,11 +71,19 @@ export class UserStore extends CloudStore {
 
   readonly #pool: NotificationPool;
 
+  readonly #migrate: () => Promise<void>;
+
   readonly db: Db;
 
-  constructor(ctx: DurableObjectState, env: Cloudflare.Env) {
+  constructor(
+    ctx: ActorContext,
+    env: AppBindings,
+    options: { readonly db: Db; readonly migrate: () => Promise<void> },
+  ) {
+    const { db, migrate } = options;
     super(ctx, env);
-    this.db = drizzle(ctx.storage, { casing: "snake_case", schema });
+    this.db = db;
+    this.#migrate = migrate;
     const version = versionOf(env.PACE_VERSION);
     this.#state = new StateCache({
       build: `${version}+${SCHEMA_TAG}`,
@@ -94,7 +103,7 @@ export class UserStore extends CloudStore {
     });
     // eslint-disable-next-line sonarjs/no-async-constructor -- blockConcurrencyWhile is the documented way to migrate before the first request
     void ctx.blockConcurrencyWhile(async () => {
-      await openStore(this.db, ctx.storage);
+      await openStore(ctx.storage, migrate);
     });
   }
 
@@ -135,7 +144,7 @@ export class UserStore extends CloudStore {
   */
   async wipe(): Promise<void> {
     this.#state.forget();
-    await resetStore(this.db, this.ctx.storage);
+    await resetStore(this.ctx.storage, this.#migrate);
   }
 
   /** The store's id (see `storeIdOf`): it changes only when the store is wiped. */
@@ -340,7 +349,7 @@ export class UserStore extends CloudStore {
   come (`poolAtAlarm`, the queue's due texts, `sleepAtAlarm`): an alarm for one loads no log for the
   others.
   */
-  override async alarm(): Promise<void> {
+  async alarm(): Promise<void> {
     const now = new Date().toISOString();
     await runEach([
       async () => {

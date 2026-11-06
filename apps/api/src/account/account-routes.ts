@@ -5,10 +5,10 @@ import { and, eq } from "drizzle-orm";
 import { endpoints, err, ok, t } from "@pace/core";
 
 import type { AppEnv } from "../shared/app-env.ts";
+import type { Db } from "../shared/db/d1.ts";
 
 import { requireUser } from "../shared/current-user.ts";
 import { accountConfirmations } from "../shared/db/d1-schema.ts";
-import { d1 } from "../shared/db/d1.ts";
 import { mount } from "../shared/mount.ts";
 import {
   editTelegramMessage,
@@ -33,34 +33,29 @@ const visibleStatus = (row: Confirmation): VisibleStatus => {
   return row.status === "processing" ? "pending" : row.status;
 };
 
-export const expireConfirmation = async (
-  binding: D1Database,
-  row: Confirmation,
-): Promise<Confirmation> => {
+export const expireConfirmation = async (binding: Db, row: Confirmation): Promise<Confirmation> => {
   if (row.status !== "pending" || row.expiresAt.getTime() > Date.now()) {
     return row;
   }
-  const claimed = await d1(binding)
+  const claimed = await binding
     .update(accountConfirmations)
     .set({ status: "expired" })
     .where(and(eq(accountConfirmations.id, row.id), eq(accountConfirmations.status, "pending")))
     .returning({ id: accountConfirmations.id });
   return claimed.length > 0
     ? { ...row, status: "expired" }
-    : ((await d1(binding).query.accountConfirmations.findFirst({
+    : ((await binding.query.accountConfirmations.findFirst({
         where: eq(accountConfirmations.id, row.id),
       })) ?? row);
 };
 
 const confirmationOf = async (c: Context<AppEnv>, id: string): Promise<Confirmation | undefined> =>
-  await d1(c.env.DB).query.accountConfirmations.findFirst({
+  await c.env.DB.query.accountConfirmations.findFirst({
     where: eq(accountConfirmations.id, id),
   });
 
 const languageOf = async (c: Context<AppEnv>, userId: string): Promise<"en" | "ru"> => {
-  const read = await c.env.USER_STORE.get(c.env.USER_STORE.idFromName(userId)).read(
-    new Date().toISOString(),
-  );
+  const read = await c.env.USER_STORE.of(userId).read(new Date().toISOString());
   return read.state.settings.language;
 };
 
@@ -106,7 +101,7 @@ const wasRequestDelivered = async (
   if (messageId === null) {
     return false;
   }
-  const db = d1(c.env.DB);
+  const db = c.env.DB;
   const active = and(
     eq(accountConfirmations.userId, row.userId),
     eq(accountConfirmations.action, row.action),
@@ -187,8 +182,7 @@ const wasPendingClaimed = async (
   row: Confirmation,
   status: "cancelled" | "processing",
 ): Promise<boolean> => {
-  const claimed = await d1(c.env.DB)
-    .update(accountConfirmations)
+  const claimed = await c.env.DB.update(accountConfirmations)
     .set({ status })
     .where(and(eq(accountConfirmations.id, row.id), eq(accountConfirmations.status, "pending")))
     .returning({ id: accountConfirmations.id });
@@ -207,7 +201,7 @@ const cancelFromBot = async (
 
 const performConfirmedAction = async (c: Context<AppEnv>, row: Confirmation): Promise<void> => {
   if (row.action === "wipe") {
-    await c.env.USER_STORE.get(c.env.USER_STORE.idFromName(row.userId)).wipe();
+    await c.env.USER_STORE.of(row.userId).wipe();
   } else {
     await deleteAccount(c, row.userId);
   }
@@ -223,14 +217,12 @@ const confirmFromBot = async (
   }
   try {
     await performConfirmedAction(c, row);
-    await d1(c.env.DB)
-      .update(accountConfirmations)
+    await c.env.DB.update(accountConfirmations)
       .set({ status: "confirmed" })
       .where(eq(accountConfirmations.id, row.id));
     return { text: t(language, row.action === "wipe" ? "account.wiped" : "account.deleted") };
   } catch {
-    await d1(c.env.DB)
-      .update(accountConfirmations)
+    await c.env.DB.update(accountConfirmations)
       .set({ status: "pending" })
       .where(
         and(eq(accountConfirmations.id, row.id), eq(accountConfirmations.status, "processing")),

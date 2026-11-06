@@ -12,10 +12,11 @@ import {
 
 import type { AppEnv } from "../shared/app-env.ts";
 import type { Config } from "../shared/config.ts";
+import type { Db } from "../shared/db/d1.ts";
+import type { AppBindings } from "../shared/ports/bindings.ts";
 import type { TelegramTransport } from "../shared/telegram-api.ts";
 
 import { requireUser } from "../shared/current-user.ts";
-import { d1, type Db } from "../shared/db/d1.ts";
 import { createLogger } from "../shared/logger.ts";
 import { loginPayload, returnUrl } from "../shared/login-link.ts";
 import { type Handler, mount, type Problem } from "../shared/mount.ts";
@@ -109,7 +110,7 @@ for (an agent token or an MCP app the person made in Settings is not announced).
 login's notice takes over the bot's reply and keeps its "Return to Pace". The sign-in does not
 fail when telling fails: the pool retries a failed send itself; this only logs.
 */
-const announceSignIn = async (env: Cloudflare.Env, input: OpenedSignIn): Promise<void> => {
+const announceSignIn = async (env: AppBindings, input: OpenedSignIn): Promise<void> => {
   const { reply = null } = input;
   try {
     await storeOfUser(env, input.userId).notify(
@@ -129,7 +130,7 @@ const signIn = async (
   db: Db,
   config: Config,
   input: {
-    readonly env: Cloudflare.Env;
+    readonly env: AppBindings;
     readonly profile: TelegramProfile;
     readonly kind: SessionKind;
     readonly name: string;
@@ -179,7 +180,7 @@ const telegramLogin =
     );
     if (verified.ok) {
       const place = requestPlace(c.req.raw, c.get("requestPlaceReader"));
-      return await signIn(d1(c.env.DB), config, {
+      return await signIn(c.env.DB, config, {
         env: c.env,
         kind: "browser",
         name: clientName(place.userAgent),
@@ -207,7 +208,7 @@ const telegramLogin =
 const pollNonce =
   (telegramFetch: TelegramTransport): Handler<typeof endpoints.auth.noncePoll> =>
   async ({ c, params }) => {
-    const db = d1(c.env.DB);
+    const db = c.env.DB;
     const now = Date.now();
     const state = await consumeNonce(db, params.nonce, now);
     switch (state.status) {
@@ -241,7 +242,7 @@ const openNonceSession = async (
     readonly telegramFetch: TelegramTransport;
   },
 ): Promise<Result<NoncePoll, Problem>> => {
-  const db = d1(c.env.DB);
+  const db = c.env.DB;
   const stored = await findUserById(db, state.userId);
   if (stored === null) {
     return err(NONCE_NOT_FOUND);
@@ -283,7 +284,7 @@ const devLogin: Handler<typeof endpoints.auth.dev> = async ({ c, body }) => {
     telegramId: body.telegramId,
     username: null,
   };
-  return await signIn(d1(c.env.DB), config, {
+  return await signIn(c.env.DB, config, {
     env: c.env,
     kind: "dev",
     name: "Dev login",
@@ -298,7 +299,7 @@ export const mountAuthRoutes = (app: Hono<AppEnv>, telegramFetch: TelegramTransp
   mount(app, endpoints.auth.telegram, telegramLogin(telegramFetch));
   mount(app, endpoints.auth.nonceCreate, async ({ body, c, query }) => {
     const from = query.from ?? "app";
-    const { nonce } = await createNonce(d1(c.env.DB), {
+    const { nonce } = await createNonce(c.env.DB, {
       deviceId: body?.deviceId,
       deviceName: body?.deviceName,
       from,
@@ -313,7 +314,7 @@ export const mountAuthRoutes = (app: Hono<AppEnv>, telegramFetch: TelegramTransp
   mount(app, endpoints.auth.logout, async ({ c }) => {
     const sessionId = c.get("sessionId");
     if (sessionId !== undefined) {
-      await deleteSession(d1(c.env.DB), { sessionId, userId: requireUser(c).id }, userStoreOf(c));
+      await deleteSession(c.env.DB, { sessionId, userId: requireUser(c).id }, userStoreOf(c));
     }
     return ok({ ok: true as const });
   });
@@ -327,7 +328,7 @@ export const mountAuthRoutes = (app: Hono<AppEnv>, telegramFetch: TelegramTransp
     if (!isUlid(userId)) {
       return await c.notFound();
     }
-    const avatar = await cachedAvatar(d1(c.env.DB), userId);
+    const avatar = await cachedAvatar(c.env.DB, userId);
     return avatar === null
       ? await c.notFound()
       : new Response(new Uint8Array(avatar.bytes).buffer, {

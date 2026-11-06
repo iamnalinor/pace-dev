@@ -1,3 +1,5 @@
+import type { ActorStorage } from "../shared/ports/actor-storage.ts";
+
 import { armEarliest } from "./alarm.ts";
 
 /** How soon a delivery that did not go through is tried again. */
@@ -35,7 +37,7 @@ pass takes the pool's time and removed as it ends, so a pass cut short is found 
 export const POOL_LEASE_KEY = "pool:lease";
 
 /** Asks for a pass at `at`, never later than one the pool already waits for. */
-const armPool = async (storage: DurableObjectStorage, at: number): Promise<void> => {
+const armPool = async (storage: ActorStorage, at: number): Promise<void> => {
   const known = await storage.get<null | number>(POOL_NEXT_AT_KEY);
   if (known !== undefined && (known === null || at < known)) {
     await storage.put(POOL_NEXT_AT_KEY, at);
@@ -51,17 +53,14 @@ copy wakes nothing, and a write arms only what the pool finds coming. Any alarm 
 the pool when it fires (no key reads as due), and that pass records the key, so after it this
 reads one value and arms nothing.
 */
-export const armIfPoolUnplanned = async (
-  storage: DurableObjectStorage,
-  now: string,
-): Promise<void> => {
+export const armIfPoolUnplanned = async (storage: ActorStorage, now: string): Promise<void> => {
   if ((await storage.get(POOL_NEXT_AT_KEY)) === undefined && (await storage.getAlarm()) === null) {
     await storage.setAlarm(Date.parse(now));
   }
 };
 
 /** Arms a retry without replacing an earlier alarm. */
-export const armRetry = async (storage: DurableObjectStorage, now: string): Promise<void> => {
+export const armRetry = async (storage: ActorStorage, now: string): Promise<void> => {
   await armPool(storage, Date.parse(now) + RETRY_MS);
 };
 
@@ -70,7 +69,7 @@ After a write at `now`: arms the pass it calls for at `at` (an earlier one alrea
 and one at once when the pool has no time and the store no alarm (`armIfPoolUnplanned`).
 */
 export const armAfterWrite = async (
-  storage: DurableObjectStorage,
+  storage: ActorStorage,
   { at, now }: { readonly at: null | string; readonly now: string },
 ): Promise<void> => {
   if (at !== null) {
@@ -87,7 +86,7 @@ stands. It never deletes or postpones the alarm: the store's other waits (the as
 automatic sleep) share it, and the pass's lease may wake it sooner, to read only the gate.
 */
 export const scheduleNextPass = async (
-  storage: DurableObjectStorage,
+  storage: ActorStorage,
   {
     now,
     nextAt,
@@ -106,7 +105,7 @@ export const scheduleNextPass = async (
 };
 
 /** Removes the lease `lease` if it is still the one held (a later pass may hold its own). */
-const release = async (storage: DurableObjectStorage, lease: number): Promise<void> => {
+const release = async (storage: ActorStorage, lease: number): Promise<void> => {
   if ((await storage.get<number>(POOL_LEASE_KEY)) === lease) {
     await storage.delete(POOL_LEASE_KEY);
   }
@@ -131,7 +130,7 @@ Arms the pass after the `attempt`th in a row, which failed at `now`: a minute on
 passes keep failing, up to four hours, or an earlier time a write asked for meanwhile.
 */
 const retryAfterFailure = async (
-  storage: DurableObjectStorage,
+  storage: ActorStorage,
   { attempt, now }: { readonly attempt: number; readonly now: number },
 ): Promise<void> => {
   const again = now + backoff(RETRY_MS, attempt);
@@ -142,7 +141,7 @@ const retryAfterFailure = async (
 };
 
 /** A pass completed: the next pass is the first in a row again. */
-const completed = async (storage: DurableObjectStorage): Promise<void> => {
+const completed = async (storage: ActorStorage): Promise<void> => {
   await storage.delete(FAILURES_KEY);
 };
 
@@ -158,7 +157,7 @@ doubling to four hours, and one that keeps failing looks again later and later
 hours, never at every lease's end.
 */
 export const takingPoolTime = async <T>(
-  storage: DurableObjectStorage,
+  storage: ActorStorage,
   { now, pass }: { readonly now: string; readonly pass: () => Promise<T> },
 ): Promise<T> => {
   const from = Date.parse(now);
@@ -201,7 +200,7 @@ The pool's part of `alarm()`: a pass once it is due (see `dueAtOf`); before that
 again and nothing is read.
 */
 export const poolAtAlarm = async (
-  storage: DurableObjectStorage,
+  storage: ActorStorage,
   { now, pass }: { readonly now: string; readonly pass: () => Promise<unknown> },
 ): Promise<void> => {
   const dueAt = dueAtOf({

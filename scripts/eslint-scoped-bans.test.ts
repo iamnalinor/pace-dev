@@ -94,6 +94,25 @@ const platformMessages = async (code: string, file = PORTABLE_FILE): Promise<rea
 
 describe("portable API infrastructure boundaries", () => {
   it.each([
+    "apps/api/src/auth/sessions.ts",
+    "apps/api/src/user-store/user-store.ts",
+    "apps/api/src/shared/llm/health-store.ts",
+    "apps/api/src/mcp/server.ts",
+    "apps/api/src/app.ts",
+  ])(
+    "guards every converted domain module: %s",
+    async (file) => {
+      expect(
+        await platformMessages("export type Leak = DurableObjectStub;", file),
+      ).not.toHaveLength(0);
+      expect(
+        await platformMessages('export { drizzle } from "drizzle-orm/durable-sqlite";', file),
+      ).not.toHaveLength(0);
+    },
+    LINT_APP_FILE_MS,
+  );
+
+  it.each([
     "export const leak = (request: Request) => request.cf;",
     'export const leak = (request: Request) => request["cf"];',
     "export const leak = (request: Request) => { const { cf } = request; return cf; };",

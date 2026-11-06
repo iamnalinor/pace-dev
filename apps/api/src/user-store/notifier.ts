@@ -1,3 +1,6 @@
+import type { Db } from "../shared/db/d1.ts";
+import type { ActorStorage } from "../shared/ports/actor-storage.ts";
+
 import { loadConfig } from "../shared/config.ts";
 import { telegramFetch, type TelegramTarget } from "../shared/telegram-api.ts";
 import { telegramIdOf } from "../shared/user-lookup.ts";
@@ -8,7 +11,7 @@ const CHAT_KEY = "notify:chat";
 /** The account zone wins; this only matters before any device reported one. */
 export const SERVER_TZ = "UTC";
 
-const chatOf = async (storage: DurableObjectStorage): Promise<string | undefined> =>
+const chatOf = async (storage: ActorStorage): Promise<string | undefined> =>
   await storage.get<string>(CHAT_KEY);
 
 /**
@@ -17,8 +20,8 @@ is the user's Telegram id (a wipe forgets the stored one). A chat found this way
 again, so D1 is asked once; a store with no user behind it has no chat.
 */
 export const chatFor = async (
-  storage: DurableObjectStorage,
-  db: D1Database,
+  storage: ActorStorage,
+  db: Db,
   userId: string | undefined,
 ): Promise<string | undefined> => {
   const stored = await chatOf(storage);
@@ -32,7 +35,7 @@ export const chatFor = async (
   return telegramId;
 };
 
-export const setChat = async (storage: DurableObjectStorage, chatId: string): Promise<void> => {
+export const setChat = async (storage: ActorStorage, chatId: string): Promise<void> => {
   if ((await chatOf(storage)) !== chatId) {
     await storage.put(CHAT_KEY, chatId);
   }

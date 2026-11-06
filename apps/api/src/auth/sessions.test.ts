@@ -1,8 +1,8 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
+import { d1 } from "../../tests/host.ts";
 import { sha256Hex } from "../shared/crypto.ts";
-import { d1 } from "../shared/db/d1.ts";
 import { deleteSession } from "../shared/session-rows.ts";
 import { createSession, findSession } from "./sessions.ts";
 import { upsertTelegramUser } from "./users.ts";

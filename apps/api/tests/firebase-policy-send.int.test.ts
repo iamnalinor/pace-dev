@@ -1,10 +1,10 @@
-import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it, vi } from "vitest";
 
+import { d1 } from "../src/platform/cloudflare/sqlite.ts";
 import { subscribe } from "../src/shared/push-subscriptions.ts";
-import { UserStore } from "../src/user-store/user-store.ts";
 import { json, loginAsDev } from "./helpers.ts";
+import { runInUserStore as runInDurableObject, UserStore } from "./host.ts";
 
 /** A real signing key ensures a missing policy guard would reach the network. */
 const serviceAccount = async (): Promise<string> => {
@@ -58,7 +58,7 @@ describe("Firebase policy in a real Durable Object notification send", () => {
       throw new Error("Expected the signed-in session");
     }
     await env.DB.prepare("DELETE FROM push_subscriptions WHERE user_id = ?").bind(userId).run();
-    await subscribe(env.DB, {
+    await subscribe(d1(env.DB), {
       endpoint: "policy-test-device",
       now: Date.now(),
       sessionId: session.id,

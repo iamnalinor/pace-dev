@@ -14,6 +14,7 @@ import {
 } from "@pace/core";
 
 import type { DecisionEntry } from "../shared/contract.ts";
+import type { ActorStorage } from "../shared/ports/actor-storage.ts";
 import type { SleepUsage } from "./cloud-data.ts";
 
 import { createLogger } from "../shared/logger.ts";
@@ -43,7 +44,7 @@ const SPELLS_BEFORE_MINUTES = 3 * 60;
 
 /** What the pass needs from the user's store. */
 export type SleepHost = {
-  readonly storage: DurableObjectStorage;
+  readonly storage: ActorStorage;
   readonly usageForSleep: (from: string, now: string) => Promise<SleepUsage>;
   /** The whole event log, corrections included. */
   readonly log: () => Promise<readonly Event[]>;
@@ -151,17 +152,14 @@ const entriesOf = (
 Keeps the highest `knownUntil` decided with, read again just before the write: a pass that
 overlapped this one (an upload's, waiting on a send) may have decided on more. Answers it.
 */
-const keepDecidedUntil = async (
-  storage: DurableObjectStorage,
-  knownUntil: string,
-): Promise<string> => {
+const keepDecidedUntil = async (storage: ActorStorage, knownUntil: string): Promise<string> => {
   const kept = laterOf(knownUntil, (await storage.get<string>(DECIDED_UNTIL_KEY)) ?? null);
   await storage.put(DECIDED_UNTIL_KEY, kept);
   return kept;
 };
 
 /** Arms the next look and remembers it, so `alarm()` knows when sleep's own time has come. */
-const armNextLook = async (storage: DurableObjectStorage, now: string, zone: string) => {
+const armNextLook = async (storage: ActorStorage, now: string, zone: string) => {
   const at = nextSleepCheckAt(now, zone);
   await storage.put(SLEEP_NEXT_AT_KEY, at);
   await armEarliest(storage, at);
@@ -297,7 +295,7 @@ const RETRY_MAX_MINUTES = 4 * 60;
 const FAILURES_KEY = "sleep:failures";
 
 /** A pass completed: the next failure waits the shortest again. */
-const completed = async (storage: DurableObjectStorage): Promise<void> => {
+const completed = async (storage: ActorStorage): Promise<void> => {
   if ((await storage.get(FAILURES_KEY)) !== undefined) {
     await storage.delete(FAILURES_KEY);
   }
@@ -308,7 +306,7 @@ After a pass at the alarm failed: when sleep looks again, an hour on (as after a
 doubling with each failure in a row up to four hours, so a pass that keeps failing (and may load
 the whole log each time) does not run every hour for good.
 */
-const retryAtOf = async (storage: DurableObjectStorage, now: string): Promise<number> => {
+const retryAtOf = async (storage: ActorStorage, now: string): Promise<number> => {
   const failures = ((await storage.get<number>(FAILURES_KEY)) ?? 0) + 1;
   await storage.put(FAILURES_KEY, failures);
   const minutes = Math.min(RETRY_MINUTES * 2 ** (failures - 1), RETRY_MAX_MINUTES);
@@ -322,7 +320,7 @@ that fails is logged and looked at again later (`retryAtOf`): it never fails the
 retries would run the pool and the queue again for it.
 */
 export const sleepAtAlarm = async (
-  storage: DurableObjectStorage,
+  storage: ActorStorage,
   { now, pass }: { readonly now: string; readonly pass: () => Promise<unknown> },
 ): Promise<void> => {
   const nextAt = await storage.get<number>(SLEEP_NEXT_AT_KEY);

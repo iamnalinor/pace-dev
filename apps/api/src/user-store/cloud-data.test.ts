@@ -1,9 +1,7 @@
-import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
-import type { UserStore } from "./user-store.ts";
-
+import { runInUserStore as runInDurableObject, type UserStore } from "../../tests/host.ts";
 import { rangeStatements } from "./cloud-data.ts";
 
 const freshStore = () => env.USER_STORE.get(env.USER_STORE.idFromName(crypto.randomUUID()));

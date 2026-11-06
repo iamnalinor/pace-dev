@@ -24,8 +24,7 @@ const PUSH_PROBLEMS: Readonly<Record<typeof STORE_CHANGED, Problem>> = {
 };
 
 /** The signed-in user's Durable Object: its id is the user id. */
-const userStore = (c: Context<AppEnv>) =>
-  c.env.USER_STORE.get(c.env.USER_STORE.idFromName(requireUser(c).id));
+const userStore = (c: Context<AppEnv>) => c.env.USER_STORE.of(requireUser(c).id);
 
 /**
 The live channel (`GET /api/sync/live`, a WebSocket) to the user's store. On `pace.v1` it says
@@ -56,7 +55,7 @@ const mountLiveRoute = (app: Hono<AppEnv>): void => {
     const headers = new Headers(c.req.raw.headers);
     headers.set(LIVE_SESSION_HEADER, session.sessionId);
     headers.set(LIVE_EXPIRES_HEADER, String(session.expiresAt));
-    const store = c.env.USER_STORE.get(c.env.USER_STORE.idFromName(session.user.id));
+    const store = c.env.USER_STORE.of(session.user.id);
     return await store.fetch(new Request(c.req.raw.url, { headers }));
   });
 };

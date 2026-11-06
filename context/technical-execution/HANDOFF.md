@@ -1,4 +1,22 @@
+## Tasks 8 and 9 — resumed 2026-11-06
+
+Task 8 implementation and independent review are complete; final unified lint is being closed.
+Cloudflare SQL, actors, alarms, sockets, KV and OAuth now sit behind portable contracts. The
+full API suite passed (73 files / 679 tests); focused adapter contracts passed 18/18. A deliberate
+RPC queue bypass fails the regression. No schema/epoch or public sync contract change in Task 8.
+
+Task 9A pure checkpoint primitive and canonical equal-time ordering fix are implemented and
+independently reviewed. Full unit checks passed: core 920, client 565, scripts 493 and Python 54.
+Durable API checkpoint integration is next, followed by copy-only archive/restore (9B) and
+checkpoint-aware client sync/history (9C). These are not yet complete. Source events stay intact.
+See [current plan](tasks-8-9-plan.md), [checkpoint design](checkpoint-design.md) and
+[persistence packet](checkpoint-persistence-plan.md). Prior wrap-up evidence below is historical.
+
 # Technical continuation handoff — 2026-11-06
+
+> New instruction: Tasks 8 and 9 resumed on 2026-11-06. Active work is tracked in
+> [tasks-8-9-plan.md](tasks-8-9-plan.md). The wrap-up record below describes the green
+> `f0bf58c` checkpoint; it is not a claim that the newly resumed tasks are complete.
 
 The owner requested a bounded wrap-up: finish the in-progress packet, record remaining work,
 and get [PR #55](https://github.com/iamnalinor/pace-dev/pull/55) green without merging.

@@ -3,12 +3,12 @@ import { describe, expect, it } from "vitest";
 
 import { endpoints } from "@pace/core";
 
-import { createApp } from "../src/app.ts";
 import { bindNonce } from "../src/auth/nonce.ts";
 import { upsertTelegramUser } from "../src/auth/users.ts";
+import { d1 } from "../src/platform/cloudflare/sqlite.ts";
 import { hmacSha256Hex, sha256Hex } from "../src/shared/crypto.ts";
-import { d1 } from "../src/shared/db/d1.ts";
 import { call, json, loginAsDev, readJson } from "./helpers.ts";
+import { createApp } from "./host.ts";
 
 const nowSeconds = (): number => Math.floor(Date.now() / 1000);
 

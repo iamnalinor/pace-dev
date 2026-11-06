@@ -14,6 +14,7 @@ import {
 } from "@pace/core";
 
 import type { AppEnv } from "./app-env.ts";
+import type { AppBindings } from "./ports/bindings.ts";
 
 import { createLogger } from "./logger.ts";
 
@@ -24,7 +25,7 @@ During the additive rollout, a sender alone is a valid legacy setup. Invalid pai
 metadata get an operator diagnostic, while server discovery and legacy FCM still work as before.
 */
 export const publicFirebaseConfigOf = (
-  env: Pick<Cloudflare.Env, "FIREBASE_ANDROID_CONFIG" | "FIREBASE_SERVICE_ACCOUNT">,
+  env: Pick<AppBindings, "FIREBASE_ANDROID_CONFIG" | "FIREBASE_SERVICE_ACCOUNT">,
 ): FirebaseAndroidConfig | null => {
   if (env.FIREBASE_ANDROID_CONFIG === undefined || env.FIREBASE_ANDROID_CONFIG === "") {
     return null;

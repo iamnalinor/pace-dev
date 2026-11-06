@@ -1,4 +1,3 @@
-import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
@@ -7,6 +6,7 @@ import { endpoints, LIVE_SESSION_ENDED, LiveServerMessageSchema, newId } from "@
 import { LIVE_EXPIRES_HEADER, LIVE_SESSION_HEADER } from "../src/shared/socket-auth.ts";
 import { replyCloseCode } from "../src/user-store/live-sockets.ts";
 import { answerOf, api, call, json, loginAsDev, pushEvents, storeIdOf } from "./helpers.ts";
+import { runInUserStore as runInDurableObject } from "./host.ts";
 
 type LiveMessage = ReturnType<typeof LiveServerMessageSchema.parse>;
 type Events = Extract<LiveMessage, { type: "events" }>;

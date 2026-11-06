@@ -1,5 +1,3 @@
-import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
-
 import {
   INITIAL_POOL_MEMORY,
   isChannelOn,
@@ -11,6 +9,10 @@ import {
 } from "@pace/core";
 
 import type { NotifyOptions } from "../shared/contract.ts";
+import type { Db as SharedDb } from "../shared/db/d1.ts";
+import type { ActorStorage } from "../shared/ports/actor-storage.ts";
+import type { ActorContext } from "../shared/ports/live-channel.ts";
+import type { SqliteDatabase } from "../shared/ports/sqlite.ts";
 import type { PushMessage, PushTransport, SendOutcome } from "../shared/push/transport.ts";
 import type * as schema from "./schema.ts";
 
@@ -45,7 +47,7 @@ import { broadcast, broadcastBySession } from "./live-sockets.ts";
 import { phoneContent, telegramMessage } from "./notify-text.ts";
 import { findNotification, setTelegramCopy, type StoredNotification } from "./pool-rows.ts";
 
-type Db = DrizzleSqliteDODatabase<typeof schema>;
+type Db = SqliteDatabase<"sync", typeof schema>;
 
 /** The outside channels a store delivers through; `null` / unconfigured ones are off. */
 export type Couriers = {
@@ -59,9 +61,9 @@ export type PoolNotifyOptions = NotifyOptions & { readonly couriers?: Couriers |
 /** What delivering needs: the store, the account's settings and chat, the instant. */
 export type PoolDeps = {
   readonly db: Db;
-  readonly ctx: DurableObjectState;
+  readonly ctx: ActorContext;
   /** The global D1 database: the push subscriptions of the user's sessions. */
-  readonly binding: D1Database;
+  readonly binding: SharedDb;
   readonly userId: string | undefined;
   readonly couriers: Couriers;
   readonly settings: Settings;
@@ -73,23 +75,20 @@ export type PoolDeps = {
 const MEMORY_KEY = "pool:memory";
 const RULES_KEY = "calendar:rules";
 
-export const poolMemoryOf = async (storage: DurableObjectStorage): Promise<PoolMemory> =>
+export const poolMemoryOf = async (storage: ActorStorage): Promise<PoolMemory> =>
   (await storage.get<PoolMemory>(MEMORY_KEY)) ?? INITIAL_POOL_MEMORY;
 
-export const savePoolMemory = async (
-  storage: DurableObjectStorage,
-  memory: PoolMemory,
-): Promise<void> => {
+export const savePoolMemory = async (storage: ActorStorage, memory: PoolMemory): Promise<void> => {
   await storage.put(MEMORY_KEY, memory);
 };
 
 /** Series the phone answered "every time" for: never announced as they start. */
-export const ruledSeriesOf = async (storage: DurableObjectStorage): Promise<readonly string[]> =>
+export const ruledSeriesOf = async (storage: ActorStorage): Promise<readonly string[]> =>
   (await storage.get<readonly string[]>(RULES_KEY)) ?? [];
 
 /** The series answered "every time" to keep, when they differ from those kept; else `undefined`. */
 export const ruledSeriesChange = async (
-  storage: DurableObjectStorage,
+  storage: ActorStorage,
   series: readonly string[] | undefined,
 ): Promise<readonly string[] | undefined> => {
   const next = series === undefined ? undefined : [...new Set(series)];
@@ -100,7 +99,7 @@ export const ruledSeriesChange = async (
 
 /** Keeps the series answered "every time" (see `ruledSeriesChange`). */
 export const saveRuledSeries = async (
-  storage: DurableObjectStorage,
+  storage: ActorStorage,
   series: readonly string[],
 ): Promise<void> => {
   await storage.put(RULES_KEY, series);

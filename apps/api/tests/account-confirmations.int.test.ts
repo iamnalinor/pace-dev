@@ -8,10 +8,10 @@ import { endpoints, newId } from "@pace/core";
 import type { TelegramTransport } from "../src/shared/telegram-api.ts";
 
 import { expireConfirmation } from "../src/account/account-routes.ts";
-import { createApp } from "../src/app.ts";
+import { d1 } from "../src/platform/cloudflare/sqlite.ts";
 import { accountConfirmations } from "../src/shared/db/d1-schema.ts";
-import { d1 } from "../src/shared/db/d1.ts";
 import { answerOf, call, json, loginAsDev, pushEvents, storeIdOf } from "./helpers.ts";
+import { createApp } from "./host.ts";
 
 const sent: { method: string; body: Record<string, unknown> }[] = [];
 const telegramFetch: TelegramTransport = async (input, init) => {
@@ -117,7 +117,7 @@ describe("Telegram account confirmations", () => {
     if (stalePending === undefined) {
       throw new Error("missing confirmation");
     }
-    expect((await expireConfirmation(env.DB, stalePending)).status).toBe("processing");
+    expect((await expireConfirmation(d1(env.DB), stalePending)).status).toBe("processing");
     const polling = endpoints.account.confirmationStatus.output.parse(
       await (await request(`/api/account/confirmations/${created.id}`)).json(),
     );

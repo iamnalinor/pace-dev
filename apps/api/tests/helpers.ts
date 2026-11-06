@@ -4,8 +4,8 @@ import { env, exports } from "cloudflare:workers";
 
 import { bindNonce } from "../src/auth/nonce.ts";
 import { findUserIdByTelegramId } from "../src/auth/users.ts";
-import { d1 } from "../src/shared/db/d1.ts";
-import { UserStore } from "../src/user-store/user-store.ts";
+import { d1 } from "../src/platform/cloudflare/sqlite.ts";
+import { UserStore } from "./host.ts";
 
 export const api = exports.default;
 

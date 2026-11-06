@@ -1,8 +1,8 @@
 import { DurableObject } from "cloudflare:workers";
 
-import type { Health, Verdict } from "./health.ts";
+import type { Health, Verdict } from "../../shared/llm/health.ts";
 
-import { createHealthKeeper, type HealthKeeper } from "./health-keeper.ts";
+import { createHealthKeeper, type HealthKeeper } from "../../shared/llm/health-keeper.ts";
 
 /**
 The providers' health shared by every user and isolate: one small Durable Object for the

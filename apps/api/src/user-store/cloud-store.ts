@@ -1,7 +1,6 @@
-import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
-
 import type { CalendarEvent, UsageRow } from "@pace/core";
 
+import type { SqliteDatabase } from "../shared/ports/sqlite.ts";
 import type * as schema from "./schema.ts";
 
 import { createLogger } from "../shared/logger.ts";
@@ -23,7 +22,7 @@ calendar and each device's usage (names and times, never contents). A usage uplo
 automatic sleep on what is then known.
 */
 export abstract class CloudStore extends PoolStore {
-  abstract readonly db: DrizzleSqliteDODatabase<typeof schema>;
+  abstract readonly db: SqliteDatabase<"sync", typeof schema>;
 
   /** One pass of automatic sleep at `now` (see `runSleepPass`), through the store's write path. */
   protected abstract sleepPass(now: string): Promise<readonly string[]>;

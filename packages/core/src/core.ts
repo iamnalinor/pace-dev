@@ -63,6 +63,7 @@ export {
   SyncPushOutputSchema,
 } from "./api/schemas/sync.ts";
 export * from "./automation.ts";
+export * from "./checkpoint/checkpoint.ts";
 export * from "./design.ts";
 export {
   type Event,

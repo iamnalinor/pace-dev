@@ -1,10 +1,8 @@
-import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
-import type { UserStore } from "./user-store.ts";
-
 import { meterSql } from "../../tests/helpers.ts";
+import { runInUserStore as runInDurableObject, type UserStore } from "../../tests/host.ts";
 import { addUsage, type UsageUpload } from "./cloud-data.ts";
 import { phoneUses, usageSessions } from "./schema.ts";
 

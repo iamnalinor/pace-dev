@@ -1,10 +1,10 @@
-import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
-
 import { max } from "drizzle-orm";
+
+import type { SqliteDatabase } from "../shared/ports/sqlite.ts";
 
 import * as schema from "./schema.ts";
 
-type Db = DrizzleSqliteDODatabase<typeof schema>;
+type Db = SqliteDatabase<"sync", typeof schema>;
 
 /**
 Each device that sent usage and the end of its newest session: when the person's sessions list

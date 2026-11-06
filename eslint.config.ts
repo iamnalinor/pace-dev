@@ -60,11 +60,8 @@ const RESTRICTED_SYNTAX = [
   },
 ];
 
-/** Incremental conversion scope; migration inventory lives in ports-implementation-plan.md. */
-const PORTABLE_API_FILES = [
-  "apps/api/src/shared/ports/**/*.ts",
-  "apps/api/src/shared/request-place.ts",
-];
+/** All domain modules consume ports; composition and tests own host APIs. */
+const PORTABLE_API_FILES = ["apps/api/src/**/*.ts"];
 
 const PORTABLE_API_SYNTAX = [
   {
@@ -76,12 +73,12 @@ const PORTABLE_API_SYNTAX = [
     message:
       "Portable API code uses infrastructure ports: Cloudflare runtime types belong in adapters.",
     selector:
-      "TSQualifiedName[left.name='Cloudflare'][right.name='Env'], Identifier[name=/^(D1Database|DurableObjectStorage|DurableObjectState|DurableObjectNamespace|KVNamespace|WebSocketPair)$/]",
+      "TSQualifiedName[left.name='Cloudflare'][right.name='Env'], Identifier[name=/^(D1[A-Za-z]*|DurableObject[A-Za-z]*|KVNamespace[A-Za-z]*|SqlStorage[A-Za-z]*|WebSocketPair|WebSocketRequestResponsePair|ExecutionContext|Fetcher)$/]",
   },
   {
     message: "Portable API code uses infrastructure ports: platform imports belong in adapters.",
     selector:
-      "ImportDeclaration[source.value=/^(cloudflare:|@cloudflare\\/|drizzle-orm\\/d1$)/], ExportNamedDeclaration[source.value=/^(cloudflare:|@cloudflare\\/|drizzle-orm\\/d1$)/], ExportAllDeclaration[source.value=/^(cloudflare:|@cloudflare\\/|drizzle-orm\\/d1$)/]",
+      "ImportDeclaration[source.value=/^(cloudflare:|@cloudflare\\/|drizzle-orm\\/(d1|durable-sqlite)(\\/|$))/], ExportNamedDeclaration[source.value=/^(cloudflare:|@cloudflare\\/|drizzle-orm\\/(d1|durable-sqlite)(\\/|$))/], ExportAllDeclaration[source.value=/^(cloudflare:|@cloudflare\\/|drizzle-orm\\/(d1|durable-sqlite)(\\/|$))/]",
   },
 ];
 
@@ -643,6 +640,7 @@ export default defineConfig([
 
   {
     files: PORTABLE_API_FILES,
+    ignores: ["apps/api/src/platform/**", "apps/api/src/worker.ts", "**/*.test.ts", "**/*.d.ts"],
     rules: {
       "no-restricted-syntax": ["error", ...RESTRICTED_SYNTAX, ...PORTABLE_API_SYNTAX],
     },

@@ -49,19 +49,38 @@ folders (`auth/`, `bot/`, `sync/`, `user-store/`) only reach each other through
 `packages/client/src/view-models/**` additionally run eslint-plugin-functional: no `let`,
 no mutation, no classes, no `throw`.
 
-## Infrastructure ports (migration in progress)
+## Infrastructure ports and adapters
 
-Request provenance is the first extracted host boundary. `shared/ports/request-place.ts`
-defines `RequestPlaceReader`; the Cloudflare adapter alone reads trusted edge headers and
-`request.cf`. `worker.ts` injects it into the application, and authentication consumes the
-injected reader. Direct application instances without a host adapter receive unknown provenance.
-The existing User-Agent bound and stored session fields are unchanged.
+API domain modules consume contracts in `shared/ports`. Cloudflare composition lives in
+`platform/cloudflare` and `worker.ts`; raw bindings and driver construction do not cross into
+routes, notifications, sync or the user-store service.
 
-ESLint tests enforce ambient-type and metadata restrictions on converted files and ports;
-dependency-cruiser prevents those modules from importing adapters. Other database, actor,
-alarm and socket modules are explicitly still platform-bound. Their remaining migration is
-tracked in `context/technical-execution/ports-implementation-plan.md`; this first boundary does
-not claim a second host or portable actor persistence.
+| Contract | Responsibility | Cloudflare adapter |
+| --- | --- | --- |
+| SQLite database | Existing typed SQLite queries; shared database batches commit atomically | `sqlite.ts` (D1), `actor-storage.ts` (DO SQLite and migrations) |
+| ActorStorage / ActorValues | Actor-owned SQLite transactions and durable values | `actor-storage.ts` |
+| Scheduler | Persistent get/set/delete alarm, preserving earliest-wakeup policy | `actor-storage.ts` |
+| ActorContext / LiveChannel | Session-tagged sockets, upgrades, keepalive and actor initialization | `live-channel.ts` |
+| UserStoreHost | Resolve a person's existing typed RPC service | `bindings.ts`, hosted `user-store.ts` |
+| KeyValue / OAuth | Grant storage and provider operations | `key-value.ts`, `oauth.ts` |
+| RequestPlaceReader | Trusted request provenance | `request-place.ts` |
+
+The domain UserStore keeps its current service composition. The Cloudflare Durable Object wraps
+that service and forwards its explicit RPC surface. Each actor serializes top-level calls through
+its own queue, including external awaits; internal service calls do not re-enter it. A slow external
+operation can therefore delay that user's next call, while another user's actor remains independent.
+The adapter owns DO inheritance, migration execution, WebSocket pairs and hibernating keepalive.
+
+The database contract deliberately targets SQLite, not arbitrary SQL dialects. No second runtime
+or production migration is implemented here. The web assets binding already lives exclusively in
+`apps/app/worker.ts`, the web deployment's composition entry; API domain code does not consume it,
+so no unused API Assets abstraction or cross-app import is introduced.
+
+ESLint AST checks reject Cloudflare ambient types and request metadata outside composition;
+dependency-cruiser rejects domain imports of platform modules. Tests exercise the actual workerd
+adapters, atomic batch rollback, repeated migrations, persisted/earliest/past alarms, actor RPC
+serialization across an await, other-user progress, and the existing session-scoped socket tests.
+See [the execution plan](../context/technical-execution/tasks-8-9-plan.md).
 
 ## The event model
 
