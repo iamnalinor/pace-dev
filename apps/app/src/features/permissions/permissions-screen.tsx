@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { Text, View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
 import {
@@ -10,6 +9,10 @@ import {
 } from "#app/platform/phone-memory.ts";
 import { PushedScreen } from "#app/screens/pushed-screen.tsx";
 import { Button } from "#app/ui/button.tsx";
+import { Group } from "#app/ui/group.tsx";
+import { ListRow } from "#app/ui/list-row.tsx";
+import { SectionHeader } from "#app/ui/section-header.tsx";
+import { Text } from "#app/ui/text.tsx";
 
 import { PermissionCard } from "./permission-card.tsx";
 import { usePermissions } from "./use-permissions.ts";
@@ -32,33 +35,30 @@ const SeriesRules = () => {
     return null;
   }
   return (
-    <View
-      accessibilityLabel={t("permissions.rules")}
-      className="gap-1 border-t border-separator px-5 py-4"
-      role="group"
-    >
-      <Text className="font-sans text-caption2 font-normal uppercase tabular-nums text-label-tertiary">
-        {t("permissions.rules")}
-      </Text>
-      {rules.map((rule) => (
-        <View className="flex-row items-center gap-3" key={rule.series}>
-          <Text className="flex-1 font-sans text-subhead font-normal text-label-primary">
-            {t(`permissions.rule.${rule.rule}`, { title: rule.title })}
-          </Text>
-          <Button
-            onPress={() => {
-              void (async () => {
-                await removeSeriesRule(rule.series);
-                reload();
-              })();
-            }}
-            variant="plain"
-          >
-            {t("permissions.rule.remove")}
-          </Button>
-        </View>
-      ))}
-    </View>
+    <>
+      <SectionHeader title={t("permissions.rules")} />
+      <Group>
+        {rules.map((rule) => (
+          <ListRow
+            key={rule.series}
+            title={t(`permissions.rule.${rule.rule}`, { title: rule.title })}
+            trailing={
+              <Button
+                onPress={() => {
+                  void (async () => {
+                    await removeSeriesRule(rule.series);
+                    reload();
+                  })();
+                }}
+                variant="plain"
+              >
+                {t("permissions.rule.remove")}
+              </Button>
+            }
+          />
+        ))}
+      </Group>
+    </>
   );
 };
 
@@ -68,7 +68,7 @@ export const PermissionsScreen = () => {
   const { list, request } = usePermissions();
   return (
     <PushedScreen title={t("permissions.title")}>
-      <Text className="px-5 pb-3 font-sans text-footnote text-label-secondary">
+      <Text className="px-gutter pb-3" role="footnote" tone="secondary">
         {t("permissions.hint")}
       </Text>
       {(list ?? []).map((permission) => (

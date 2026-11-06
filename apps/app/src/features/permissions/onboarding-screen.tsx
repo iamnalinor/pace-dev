@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { Permission, PermissionId } from "#app/platform/permissions.ts";
@@ -8,6 +8,7 @@ import type { Permission, PermissionId } from "#app/platform/permissions.ts";
 import { useT } from "#app/app-state.tsx";
 import { markOnboarded } from "#app/platform/onboarding.ts";
 import { Button } from "#app/ui/button.tsx";
+import { Text } from "#app/ui/text.tsx";
 
 import { PermissionText, type UsageStep, UsageSteps, useUsageGuide } from "./permission-card.tsx";
 import { usePermissions } from "./use-permissions.ts";
@@ -60,10 +61,12 @@ const Intro = ({
         </>
       }
     >
-      <Text accessibilityRole="header" className="font-sans text-title1 text-label-primary">
+      <Text level={1} role="title1">
         {t("onboarding.title")}
       </Text>
-      <Text className="font-sans text-callout text-label-secondary">{t("onboarding.intro")}</Text>
+      <Text role="callout" tone="secondary">
+        {t("onboarding.intro")}
+      </Text>
       {ids.map((id) => (
         <PermissionText id={id} key={id} />
       ))}
@@ -119,12 +122,12 @@ const Step = ({
         </>
       }
     >
-      <Text className="font-sans text-caption font-normal tabular-nums text-label-tertiary">
+      <Text role="caption" tone="tertiary">
         {t("onboarding.step", { index: index + 1, total })}
       </Text>
       <PermissionText id={permission.id} />
       {isOpensSettings && action.guide === null ? (
-        <Text className="font-sans text-footnote text-label-secondary">
+        <Text role="footnote" tone="secondary">
           {t("permissions.settingsHint")}
         </Text>
       ) : null}
@@ -133,10 +136,10 @@ const Step = ({
   );
 };
 
-const STATE_INK: Readonly<Record<Permission["state"], string>> = {
-  blocked: "text-label-secondary",
-  off: "text-label-secondary",
-  on: "text-label-primary",
+const STATE_INK: Readonly<Record<Permission["state"], "primary" | "secondary">> = {
+  blocked: "secondary",
+  off: "secondary",
+  on: "primary",
 };
 
 /** The walk-through's end: what is on now, and where the rest is turned on later. */
@@ -156,10 +159,10 @@ const Summary = ({
         </Button>
       }
     >
-      <Text accessibilityRole="header" className="font-sans text-title1 text-label-primary">
+      <Text level={1} role="title1">
         {t("onboarding.done.title")}
       </Text>
-      <Text className="font-sans text-callout text-label-secondary">
+      <Text role="callout" tone="secondary">
         {t("onboarding.done.body")}
       </Text>
       {list.map((permission) => (
@@ -169,10 +172,8 @@ const Summary = ({
           key={permission.id}
           role="group"
         >
-          <Text className="font-sans text-callout text-label-primary">
-            {t(`permissions.${permission.id}`)}
-          </Text>
-          <Text className={`font-sans text-footnote ${STATE_INK[permission.state]}`}>
+          <Text role="callout">{t(`permissions.${permission.id}`)}</Text>
+          <Text role="footnote" tone={STATE_INK[permission.state]}>
             {t(`permissions.${permission.state}`)}
           </Text>
         </View>
