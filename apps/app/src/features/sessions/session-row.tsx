@@ -38,7 +38,7 @@ it came, whole however long (wrapped, never cut), and the viewer's line. Each pa
 keeps together where it can: an address moves to the next line whole instead of breaking.
 */
 const Identity = ({ row }: { readonly row: Row }) => {
-  const icon = ICON[row.kind];
+  const icon = row.formFactor === "phone" && row.kind === "browser" ? "smartphone" : ICON[row.kind];
   return (
     <>
       <View

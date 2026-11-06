@@ -8,7 +8,7 @@ import { bindNonce } from "../src/auth/nonce.ts";
 import { upsertTelegramUser } from "../src/auth/users.ts";
 import { hmacSha256Hex, sha256Hex } from "../src/shared/crypto.ts";
 import { d1 } from "../src/shared/db/d1.ts";
-import { call, json, loginAsDev, readJson } from "./helpers.ts";
+import { answerOf, call, json, loginAsDev, readJson } from "./helpers.ts";
 
 const nowSeconds = (): number => Math.floor(Date.now() / 1000);
 
@@ -280,6 +280,40 @@ describe("sessions record their kind, a readable name and where they signed in f
       user_agent: OKHTTP,
     });
     expect(await nonceSessionOf(nonce)).toBe(session?.id);
+  });
+
+  it("lists the device an app named and the one a browser's User-Agent tells", async () => {
+    const { nonce } = await json<{ nonce: string }>("/api/auth/nonce?from=app", {
+      body: {
+        deviceBrand: "samsung",
+        deviceId: "dev-2",
+        deviceModel: "Galaxy S23",
+        deviceName: "Galaxy S23",
+        osVersion: "14",
+      },
+      ...from("5.6.7.8", OKHTTP),
+    });
+    const appToken = await finishBotLogin(nonce);
+    const body = await widgetPayload({ auth_date: nowSeconds(), first_name: "Ada", id: 1001 });
+    const web = await json<{ token: string }>("/api/auth/telegram", {
+      body,
+      ...from("1.2.3.4", CHROME_MAC),
+    });
+    const { sessions } = await answerOf(endpoints.sessions.list, "/api/sessions", {
+      token: web.token,
+    });
+    expect(sessions.find((row) => row.kind === "app")?.device).toEqual({
+      brand: "samsung",
+      model: "Galaxy S23",
+      os: "Android",
+      osVersion: "14",
+    });
+    expect(sessions.find((row) => row.current)?.device).toMatchObject({
+      browser: "Chrome",
+      formFactor: "desktop",
+      os: "macOS",
+    });
+    expect(appToken).not.toBe("");
   });
 
   it("a deep-link login from the web is a browser session named after the browser that asked", async () => {

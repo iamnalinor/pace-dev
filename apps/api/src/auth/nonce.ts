@@ -19,6 +19,9 @@ export type NonceLogin = {
   readonly place: RequestPlace;
   readonly deviceName: null | string;
   readonly deviceId: null | string;
+  readonly deviceBrand: null | string;
+  readonly deviceModel: null | string;
+  readonly osVersion: null | string;
 };
 
 export type NewNonce = {
@@ -27,6 +30,9 @@ export type NewNonce = {
   readonly place: RequestPlace;
   readonly deviceName?: string | undefined;
   readonly deviceId?: string | undefined;
+  readonly deviceBrand?: string | undefined;
+  readonly deviceModel?: string | undefined;
+  readonly osVersion?: string | undefined;
 };
 
 /**
@@ -50,6 +56,9 @@ export const createNonce = async (
     ...input.place,
     deviceName: input.deviceName ?? null,
     deviceId: input.deviceId ?? null,
+    deviceBrand: input.deviceBrand ?? null,
+    deviceModel: input.deviceModel ?? null,
+    osVersion: input.osVersion ?? null,
   });
   await db.batch([expired, minted]);
   return { nonce, expiresAt };
@@ -145,7 +154,10 @@ export const consumeNonce = async (db: Db, nonce: string, now: number): Promise<
   return {
     login: {
       deviceId: claimed.deviceId,
+      deviceBrand: claimed.deviceBrand,
+      deviceModel: claimed.deviceModel,
       deviceName: claimed.deviceName,
+      osVersion: claimed.osVersion,
       // A nonce minted before `from` was kept came from the app (the default then and now).
       from: claimed.from === "web" ? "web" : "app",
       place: {

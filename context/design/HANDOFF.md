@@ -23,6 +23,8 @@ the merged tree (`pr-b/s0-greenup-report.md`: eslint report read from a file, ov
 `pr-b/task-*-report.md`. Per-task reviews were skipped on purpose (owner): the import was never reviewed
 in depth either — the final Opus review covers both.
 
+Done 2026-11-06 (owner asked for device details in sessions): Settings sessions show the real device. The server parses the stored User-Agent (`userAgentDetails`: browser + major version, OS + version where the UA carries it, Android model, form factor; unknown parts absent) and the phone app sends brand, model and Android version at login (`expo-device`; optional fields, D1 migration `0009`, old rows null). `GET /api/sessions` returns `device`, with `name` kept for old clients. The row title is the device ("Samsung Galaxy S23", "Chrome 131 on macOS"), the parts the title does not say go under it, and old rows fall back to their name. Left: no tablet icon in the kit (a phone browser gets the smartphone icon), no PWA/standalone detection (the UA does not differ), UA reduction hides macOS/Android model on some Chromes.
+
 **Next:** 4.7 + 4.10 + 7.3, 4.8 + 4.9, 4.11 + 4.12 + 4.13; then B9 "spec completion" (the register below +
 the environment-independence sweep); then the whole-branch Opus review and one fix wave; then push and
 make CI green (e2e is first run there).

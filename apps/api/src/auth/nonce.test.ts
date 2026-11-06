@@ -43,7 +43,15 @@ describe("login nonces", () => {
       value: undefined,
     });
     expect(await consumeNonce(db, nonce, NOW + 2 * MINUTE)).toEqual({
-      login: { deviceId: null, deviceName: null, from: "web", place: NOWHERE },
+      login: {
+        deviceBrand: null,
+        deviceId: null,
+        deviceModel: null,
+        deviceName: null,
+        osVersion: null,
+        from: "web",
+        place: NOWHERE,
+      },
       reply: null,
       status: "ready",
       userId: user.id,
@@ -84,14 +92,25 @@ describe("login nonces", () => {
     const place = { city: "Berlin", country: "DE", ip: "5.6.7.8", userAgent: "okhttp/4.12.0" };
     const { nonce } = await createNonce(db, {
       deviceId: "dev-1",
+      deviceBrand: "google",
+      deviceModel: "Pixel 9a",
       deviceName: "Pixel 9a",
+      osVersion: "15",
       from: "app",
       now: NOW,
       place,
     });
     await bindNonce(db, { nonce, now: NOW, userId: user.id });
     expect(await consumeNonce(db, nonce, NOW)).toEqual({
-      login: { deviceId: "dev-1", deviceName: "Pixel 9a", from: "app", place },
+      login: {
+        deviceBrand: "google",
+        deviceId: "dev-1",
+        deviceModel: "Pixel 9a",
+        deviceName: "Pixel 9a",
+        from: "app",
+        osVersion: "15",
+        place,
+      },
       reply: null,
       status: "ready",
       userId: user.id,

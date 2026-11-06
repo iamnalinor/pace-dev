@@ -1,4 +1,5 @@
 import {
+  capitalize,
   countryName,
   formatDuration,
   formatInZone,
@@ -24,6 +25,8 @@ export type SessionRow = {
   /** An agent is disconnected; everything else is revoked. */
   readonly action: "disconnect" | "revoke";
   readonly isCurrent: boolean;
+  /** What kind of machine it is, when its details say (the icon follows it). */
+  readonly formFactor?: "desktop" | "phone" | "tablet";
 };
 
 export type SessionRowsContext = {
@@ -86,6 +89,50 @@ const metaOf = (session: Session, context: SessionRowsContext): readonly string[
   ];
 };
 
+type Device = NonNullable<Session["device"]>;
+
+const withVersion = (name: string, version: string | undefined): string =>
+  version === undefined ? name : `${name} ${version}`;
+
+/** A brand and model as one name: "Samsung Galaxy S23", not "Samsung Samsung Galaxy S23". */
+const deviceModelName = ({ brand, model }: Device, language: Language): string | undefined => {
+  if (model === undefined) {
+    return undefined;
+  }
+  if (brand === undefined || model.toLowerCase().startsWith(brand.toLowerCase())) {
+    return model;
+  }
+  return `${capitalize(brand, language)} ${model}`;
+};
+
+/**
+What the device details make of the row: its title (a phone's name, else "Chrome 131 on macOS")
+and the parts under it that the title does not already say. Nothing known: nothing here, and the
+name as the session came stays.
+*/
+const detailsOf = (
+  device: Device | undefined,
+  { language }: SessionRowsContext,
+): { readonly title?: string; readonly parts: readonly string[] } => {
+  if (device === undefined) {
+    return { parts: [] };
+  }
+  const os = device.os === undefined ? undefined : withVersion(device.os, device.osVersion);
+  const browser =
+    device.browser === undefined ? undefined : withVersion(device.browser, device.browserVersion);
+  const model = deviceModelName(device, language);
+  if (model !== undefined) {
+    return { parts: [os, browser].filter((part) => part !== undefined), title: model };
+  }
+  if (browser === undefined) {
+    return { parts: os === undefined ? [] : [os] };
+  }
+  return {
+    parts: [],
+    title: os === undefined ? browser : t(language, "sessions.browserOn", { browser, os }),
+  };
+};
+
 /** The current session first, then the most recently seen; never seen (an MCP app) last. */
 const byRecency = (a: Session, b: Session): number => {
   if (a.current !== b.current) {
@@ -100,11 +147,16 @@ export const sessionRows = (
   sessions: readonly Session[],
   context: SessionRowsContext,
 ): readonly SessionRow[] =>
-  sessions.toSorted(byRecency).map((session) => ({
-    action: session.kind === "agent" ? "disconnect" : "revoke",
-    id: session.id,
-    isCurrent: session.current,
-    kind: session.kind,
-    meta: metaOf(session, context),
-    name: session.name,
-  }));
+  sessions.toSorted(byRecency).map((session) => {
+    const details = detailsOf(session.device, context);
+    const [kind = "", ...rest] = metaOf(session, context);
+    return {
+      action: session.kind === "agent" ? "disconnect" : "revoke",
+      ...(session.device?.formFactor !== undefined && { formFactor: session.device.formFactor }),
+      id: session.id,
+      isCurrent: session.current,
+      kind: session.kind,
+      meta: [kind, ...details.parts, ...rest],
+      name: details.title ?? session.name,
+    };
+  });

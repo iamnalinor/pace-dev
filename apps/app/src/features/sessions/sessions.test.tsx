@@ -256,6 +256,31 @@ describe("Settings → Devices and sessions", () => {
     expect(screen.getByLabelText("Chrome on macOS")).toBeOnTheScreen();
   });
 
+  it("titles a row by its device and lists the system and browser under it; old rows keep their name", async () => {
+    const galaxy = session({
+      device: { brand: "samsung", model: "Galaxy S23", os: "Android", osVersion: "14" },
+      id: "01GALAXY",
+      kind: "app",
+      name: "Galaxy S23",
+    });
+    const safari = session({
+      device: {
+        browser: "Safari",
+        browserVersion: "18",
+        formFactor: "phone",
+        os: "iOS",
+        osVersion: "18.1",
+      },
+      id: "01SAFARI",
+      name: "Safari on iPhone",
+    });
+    await renderSettings(sessionsServer([THIS_BROWSER, galaxy, safari]).routes);
+    const phone = await screen.findByLabelText("Samsung Galaxy S23");
+    expect(within(phone).getByText("Android 14")).toBeOnTheScreen();
+    expect(await screen.findByLabelText("Safari 18 on iOS 18.1")).toBeOnTheScreen();
+    expect(screen.getByLabelText("Chrome on macOS")).toBeOnTheScreen();
+  });
+
   it("moves focus into the confirm and says its question, and gives focus back on Cancel", async () => {
     await renderSettings(sessionsServer(ALL).routes);
     const row = await screen.findByLabelText("Firefox on Linux");

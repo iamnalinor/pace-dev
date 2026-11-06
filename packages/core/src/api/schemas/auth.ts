@@ -47,6 +47,10 @@ export const NonceCreateSchema = z
   .strictObject({
     deviceName: z.string().trim().min(1).max(80).optional(),
     deviceId: z.string().min(1).max(64).optional(),
+    /** The phone's maker, model and system version (`expo-device`); older apps send none. */
+    deviceBrand: z.string().trim().min(1).max(40).optional(),
+    deviceModel: z.string().trim().min(1).max(60).optional(),
+    osVersion: z.string().trim().min(1).max(20).optional(),
   })
   .optional();
 

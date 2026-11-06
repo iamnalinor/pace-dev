@@ -11,6 +11,7 @@ import { type Grant, listGrants, revokeGrant } from "../shared/oauth-grants.ts";
 import { deleteSession } from "../shared/session-rows.ts";
 import { userStoreOf } from "../shared/user-store-of.ts";
 import { createSession, type ListedSession, listSessions } from "./sessions.ts";
+import { userAgentDetails } from "./user-agent.ts";
 
 /** An agent's token lasts five years: a computer sends quietly in the background. */
 const AGENT_DAYS = 5 * 365;
@@ -24,6 +25,24 @@ const SESSION_NOT_FOUND: Problem = {
   status: 404,
 };
 
+/** A phone app's own words about itself; a browser's User-Agent; nothing for the rest. */
+const deviceOf = (row: ListedSession): Session["device"] => {
+  if (row.kind === "app") {
+    const { brand, model, osVersion } = row.phone;
+    const known = {
+      ...(brand !== null && { brand }),
+      ...(model !== null && { model }),
+      ...(osVersion !== null && { osVersion }),
+    };
+    return Object.keys(known).length === 0 ? undefined : { ...known, os: "Android" };
+  }
+  if (row.kind === "browser") {
+    const details = userAgentDetails(row.userAgent);
+    return Object.keys(details).length === 0 ? undefined : details;
+  }
+  return undefined;
+};
+
 const fromRow = (
   row: ListedSession,
   context: { readonly currentId: string | undefined; readonly dataAt: ReadonlyMap<string, string> },
@@ -32,6 +51,7 @@ const fromRow = (
   country: row.country,
   createdAt: row.createdAt,
   current: row.id === context.currentId,
+  ...(deviceOf(row) !== undefined && { device: deviceOf(row) }),
   id: row.id,
   ip: row.ip,
   kind: row.kind,

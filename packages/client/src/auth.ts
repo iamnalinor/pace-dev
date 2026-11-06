@@ -36,7 +36,13 @@ export type BotLogin = {
 };
 
 /** The phone a bot login starts on: its model and its install id. */
-export type LoginDevice = { readonly deviceName?: string; readonly deviceId?: string };
+export type LoginDevice = {
+  readonly deviceName?: string;
+  readonly deviceId?: string;
+  readonly deviceBrand?: string;
+  readonly deviceModel?: string;
+  readonly osVersion?: string;
+};
 
 export type BotLoginPoll = {
   readonly nonce: string;

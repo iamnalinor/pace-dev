@@ -149,8 +149,11 @@ describe("LoginScreen", () => {
     // opens is named after this phone and linked to its install id.
     const { loadDeviceId } = jest.requireActual<typeof DeviceIdActual>("../platform/device-id.ts");
     expect(auth.startBotLogin).toHaveBeenCalledWith("app", {
+      deviceBrand: "mock",
       deviceId: await loadDeviceId(),
+      deviceModel: "mock",
       deviceName: "Pixel 9a",
+      osVersion: "mock",
     });
     expect(screen.getByText("Waiting for Telegram…")).toBeOnTheScreen();
     const [options] = waitForToken.mock.calls[0] ?? [];
