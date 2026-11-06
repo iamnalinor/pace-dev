@@ -27,6 +27,8 @@ in depth either — the final Opus review covers both.
 the environment-independence sweep); then the whole-branch Opus review and one fix wave; then push and
 make CI green (e2e is first run there).
 
+Done 2026-11-06 (owner decision, batch 9 item 1b): Now's task groups, their headers and the 3-row preview/«Show all» are replaced by one list with a labelled hairline between dated and undated tasks (`NowTaskGroups`, `Group` `boundaries`). The 4.3 «Show all» deferral about groups no longer applies.
+
 ### Deferred register (every item a screen task left; the plan has the full note under each task)
 | Task | Deferred | Plan note |
 |---|---|---|

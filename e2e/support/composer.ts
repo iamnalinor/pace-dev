@@ -14,11 +14,9 @@ export const formByHand = (page: Page) =>
   page.getByRole("button", { exact: true, name: "New task" }).last();
 
 /**
-Now's task rows: one list while the tasks are all dated or all undated, else the two groups
-"With a deadline" and "No deadline".
+Now's task rows: one list; a hairline separates the tasks with a deadline from those without.
 */
-export const nowTasks = (page: Page) =>
-  page.getByRole("list", { name: /^(?:Tasks|With a deadline|No deadline)$/u });
+export const nowTasks = (page: Page) => page.getByRole("list", { exact: true, name: "Tasks" });
 
 /**
 Whether every box that clips `element` shows all of it, unscrolled: a card that is still unfolding

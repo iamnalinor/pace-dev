@@ -60,15 +60,30 @@ const useSettling = (rows: readonly NowRow[]) => {
   return { check, doesOpenSheet, dissolving, gone, setDissolving, settle };
 };
 
+/** The key of the first row of the second kind, with the boundary's name; none when only one kind is shown. */
+const boundaryOf = (
+  shown: readonly NowRow[],
+  boundary: undefined | { readonly isAfter: (row: NowRow) => boolean; readonly label: string },
+): Readonly<Record<string, string>> | undefined => {
+  const first = shown.findIndex((row) => boundary?.isAfter(row) === true);
+  const row = shown[first];
+  return boundary === undefined || row === undefined || first === 0
+    ? undefined
+    : { [row.id]: boundary.label };
+};
+
 /** A list of task rows: tap to open, the check to close. */
 export const TaskRows = ({
   animateLayout = true,
+  boundary,
   checked = false,
   label,
   rows,
   withTag = true,
 }: {
   readonly animateLayout?: boolean;
+  /** Where the rows change kind: the first open row `isAfter` holds a labelled edge-to-edge rule above it. */
+  readonly boundary?: { readonly isAfter: (row: NowRow) => boolean; readonly label: string };
   /** Closed tasks: checked rows that open the task (reopen is there). */
   readonly checked?: boolean;
   readonly label: string;
@@ -85,7 +100,12 @@ export const TaskRows = ({
   const isAnimated = animateLayout && open.length <= PAGE_SIZE;
   return (
     <>
-      <Group aria-label={label} role="list" separatorInset="check">
+      <Group
+        aria-label={label}
+        boundaries={boundaryOf(open.slice(0, shownCount), boundary)}
+        role="list"
+        separatorInset="check"
+      >
         {open.slice(0, shownCount).map((row) => (
           <Animated.View
             entering={ROW_ENTER}

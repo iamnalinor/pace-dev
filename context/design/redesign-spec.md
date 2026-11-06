@@ -1367,6 +1367,12 @@ after the list in DOM order on desktop, before the nav bar on phone).
 - Toast names the result and sits by the composer / above the bar (F-CPY-02, F-CMP-12, owner
   feedback-4's toast over Rest/Sport).
 
+**Built (owner decision, 2026-11-06).** The task groups, their section headers, the 3-row preview and
+«Показать все» are gone: Now is ONE plain list, the tasks with a deadline first (their order), then
+an edge-to-edge `separator` hairline, then the tasks without one. No divider when only one kind is
+shown. The hairline is a non-focusable `role="separator"` named «Без срока» / "No deadline" for
+screen readers (`Group`'s `boundaries`). «В будущем» stays a fold.
+
 ### 5.2 Day — `(tabs)/day`
 
 The day as a metro line: what happened, what is missing, fix it. The B signature screen.

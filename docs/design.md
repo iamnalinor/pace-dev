@@ -102,3 +102,5 @@ title, Important/ASAP keep their marks; no Pause in the header; delete is an inl
 Undo in the row; Alt+N / Alt+F shortcuts; haptics on; tablet gets the rail and rotation; no
 Material You (our colours on Android too); the time bar's tiles stay visible and only the field
 folds. Sources: spec §12, `context/design/findings.md`.
+
+2026-11-06 (owner): Now's task list is one plain list — tasks with a deadline, one edge-to-edge hairline (a labelled `separator` for screen readers), then tasks without one; no group headers, no preview or «Show all». «In future» stays a fold.

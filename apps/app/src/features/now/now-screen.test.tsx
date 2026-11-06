@@ -121,27 +121,45 @@ const rowLayouts = (node: unknown): readonly unknown[] => {
   ];
 };
 
-/** The first group's "Show all" fold. */
-const showAll = () => screen.getAllByRole("button", { name: /^Show all/u })[0] as never;
+/** The check names and the boundary's label in tree order: where the rule sits among the rows. */
+const flatLabels = (node: unknown): readonly string[] => {
+  if (Array.isArray(node)) {
+    return node.flatMap((child) => flatLabels(child));
+  }
+  if (typeof node !== "object" || node === null) {
+    return [];
+  }
+  const view = node as { children?: unknown; props: Record<string, unknown> };
+  const label = view.props["aria-label"] ?? view.props["accessibilityLabel"];
+  const own =
+    typeof label === "string" &&
+    (view.props["role"] === "separator" || /^Mark .* done$/u.test(label))
+      ? [label]
+      : [];
+  return [...own, ...flatLabels(view.children)];
+};
 
 describe("NowBoard", () => {
-  it("shows two compact groups when both dated and undated tasks exist", async () => {
-    await renderScreen(<Board />, await createTestRuntime());
-    expect(screen.getByText(en("now.withDeadline"))).toBeOnTheScreen();
-    expect(screen.getByText(en("now.withoutDeadline"))).toBeOnTheScreen();
-    expect(checks()).toHaveLength(6);
-    // The first group's rest folds open under "Show all", the same button closes it.
-    await fireEvent.press(showAll());
-    expect(checks()).toHaveLength(9);
-    expect(showAll()).toBeExpanded();
-  });
-
-  it("uses a plain list when filtering leaves only one type of task", async () => {
-    await renderScreen(<Board />, await createTestRuntime());
-    const chips = screen.getByLabelText("Filter by project");
-    await fireEvent.press(within(chips).getByRole("radio", { name: "Algebra" }));
+  it("is one list: dated tasks first, one labelled hairline, then the undated; no headers or folds", async () => {
+    const rendered = await renderScreen(<Board />, await createTestRuntime());
     expect(screen.queryByText(en("now.withDeadline"))).toBeNull();
     expect(screen.queryByText(en("now.withoutDeadline"))).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Show all/u })).toBeNull();
+    expect(checks()).toHaveLength(9);
+    // The rule sits between rows: dated ones above it, the undated below.
+    const marks = flatLabels(rendered.toJSON());
+    const boundary = en("now.withoutDeadline");
+    const at = marks.indexOf(boundary);
+    expect(at).toBeGreaterThan(0);
+    expect(at).toBeLessThan(marks.length - 1);
+    expect(marks.filter((mark) => mark === boundary)).toHaveLength(1);
+  });
+
+  it("has no hairline when filtering leaves only one kind of task", async () => {
+    const rendered = await renderScreen(<Board />, await createTestRuntime());
+    const chips = screen.getByLabelText("Filter by project");
+    await fireEvent.press(within(chips).getByRole("radio", { name: "Algebra" }));
+    expect(flatLabels(rendered.toJSON())).not.toContain(en("now.withoutDeadline"));
     expect(checks()).toEqual(["Mark Algebra HW 6 done"]);
   });
 
@@ -158,7 +176,6 @@ describe("NowBoard", () => {
     await renderScreen(<Board />, await createTestRuntime());
     expect(screen.getByText("Tuesday · Oct 6")).toBeOnTheScreen();
     expect(screen.getByText("Now")).toBeOnTheScreen();
-    await fireEvent.press(showAll());
     expect(checks()).toEqual([
       "Mark Calculus HW 5 done",
       "Mark Algebra HW 6 done",
@@ -189,7 +206,6 @@ describe("NowBoard", () => {
     const runtime = await createTestRuntime({ now: late });
     await runtime.state.ingest(rentSeriesEvents());
     await renderScreen(<Board />, runtime);
-    await fireEvent.press(showAll());
     const repeats = en("meta.repeats");
     const rent = screen.getByRole("link", { name: /^Rent/u });
     expect(within(rent).getByRole("image", { name: repeats })).toBeOnTheScreen();
@@ -202,7 +218,6 @@ describe("NowBoard", () => {
     const runtime = await createTestRuntime({ now: "2026-11-10T12:00:00.000Z" });
     await runtime.state.ingest(rentSeriesEvents());
     await renderScreen(<Board />, runtime);
-    await fireEvent.press(showAll());
     const rent = screen.getByRole("link", { name: /^Rent/u });
     expect(within(rent).getByText("9d late")).toBeOnTheScreen();
     expect(within(rent).getByText("final deadline passed Nov 7 23:59")).toBeOnTheScreen();
@@ -347,7 +362,7 @@ describe("NowBoard", () => {
       "Mark RFC: dedicated runner pool done",
     ]);
     await fireEvent.press(screen.getByRole("radio", { name: "All" }));
-    expect(checks()).toHaveLength(6);
+    expect(checks()).toHaveLength(9);
     const fold = screen.getByRole("button", { name: "In future · 4" });
     // A hairline sets the fold apart from the list above it (as before the kit Disclosure).
     expect(String(screen.getByTestId("fold-hairline").props["className"])).toContain(

@@ -25,12 +25,18 @@ group sits inside the screen's gutter (`inset`). It is a `RowList`, so Android k
 its own and its rows slide as one (bug-lessons 11).
 */
 export const Group = ({
+  boundaries,
   children,
   className,
   inset = true,
   separatorInset = "row",
   ...rest
 }: ViewProps & {
+  /**
+  Row keys that start a new kind of row, each with the name of what starts there: the hairline
+  above such a row runs edge to edge and is a labelled separator (Now: the tasks without a deadline).
+  */
+  readonly boundaries?: Readonly<Record<string, string>> | undefined;
   readonly children: ReactNode;
   /** Inside the screen's gutter (the default), or edge to edge in a pane that has its own. */
   readonly inset?: boolean;
@@ -48,17 +54,23 @@ export const Group = ({
       {...rest}
       className={cx("overflow-hidden rounded-lg bg-cell", inset && "mx-gutter", className)}
     >
-      {rows.map((row) => (
-        <Fragment key={row.key}>
-          {row === rows[0] ? null : (
-            <View
-              className={cx("border-t border-separator", INSET_CLASS[separatorInset])}
-              testID="group-separator"
-            />
-          )}
-          {row}
-        </Fragment>
-      ))}
+      {rows.map((row) => {
+        // `Children.toArray` prefixes every key with ".$".
+        const boundary = boundaries?.[String(row.key).replace(/^\.\$/u, "")];
+        const inset: SeparatorInset = boundary === undefined ? separatorInset : "none";
+        return (
+          <Fragment key={row.key}>
+            {row === rows[0] ? null : (
+              <View
+                className={cx("border-t border-separator", INSET_CLASS[inset])}
+                testID="group-separator"
+                {...(boundary !== undefined && { "aria-label": boundary, role: "separator" })}
+              />
+            )}
+            {row}
+          </Fragment>
+        );
+      })}
     </RowList>
   );
 };
