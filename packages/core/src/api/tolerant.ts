@@ -51,3 +51,18 @@ export const knownValue = <const V extends string>(
     .transform(
       (value): V => ((values as readonly string[]).includes(value) ? (value as V) : fallback),
     );
+
+/**
+An optional value of a request body that is dropped when it does not fit (too long, blank, not
+the right type): it is descriptive only, and must not make the whole request fail.
+*/
+export const droppedIfInvalid = <T extends z.ZodType>(
+  schema: T,
+): Reading<z.ZodOptional<z.ZodUnknown>, undefined | z.output<T>> =>
+  z
+    .unknown()
+    .optional()
+    .transform((value): undefined | z.output<T> => {
+      const parsed = schema.safeParse(value);
+      return parsed.success ? parsed.data : undefined;
+    });

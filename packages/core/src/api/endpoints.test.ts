@@ -209,7 +209,7 @@ describe("endpoints", () => {
     expect(() => endpoints.auth.telegram.body.parse({ ...payload, id: "42" })).toThrow();
   });
 
-  it("takes an optional, strict device in the nonce request: the app names the phone, the web sends none", () => {
+  it("takes an optional device in the nonce request: the app names the phone, the web sends none", () => {
     const body = endpoints.auth.nonceCreate.body;
     expect(body.parse(undefined)).toBeUndefined();
     expect(body.parse({})).toEqual({});
@@ -217,11 +217,23 @@ describe("endpoints", () => {
       deviceId: "dev-1",
       deviceName: "Pixel 9a",
     });
-    expect(() => body.parse({ extra: 1 })).toThrow();
-    expect(() => body.parse({ deviceName: " " })).toThrow();
-    expect(() => body.parse({ deviceName: "x".repeat(81) })).toThrow();
-    expect(() => body.parse({ deviceId: "" })).toThrow();
-    expect(() => body.parse({ deviceId: "x".repeat(65) })).toThrow();
+  });
+
+  it("ignores keys a newer app adds and drops each descriptive field that does not fit (class 136)", () => {
+    const body = endpoints.auth.nonceCreate.body;
+    expect(body.parse({ deviceName: "Pixel", futureField: 1 })).toEqual({ deviceName: "Pixel" });
+    expect(
+      body.parse({
+        deviceBrand: "x".repeat(41),
+        deviceId: "x".repeat(65),
+        deviceModel: "  ",
+        deviceName: "x".repeat(81),
+        osVersion: 14,
+      }),
+    ).toEqual({});
+    expect(body.parse({ deviceModel: "Pixel 9a", osVersion: "1".repeat(21) })).toEqual({
+      deviceModel: "Pixel 9a",
+    });
   });
 
   it("parses the nonce poll output as a discriminated union", () => {

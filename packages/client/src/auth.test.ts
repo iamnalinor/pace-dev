@@ -148,6 +148,8 @@ describe("createAuth login", () => {
   });
 });
 
+const graphemes = (text = ""): number => [...new Intl.Segmenter().segment(text)].length;
+
 const NONCE_CREATED = {
   deepLink: "https://t.me/PaceTaskTrackerBot?start=login_n1",
   nonce: "n1",
@@ -181,6 +183,45 @@ describe("createAuth bot login", () => {
       { deviceId: "dev-1", deviceName: "Pixel 9a" },
       undefined,
     ]);
+  });
+
+  it("cuts what the phone says to the server's limits and drops blanks, so a long model cannot block the sign-in", async () => {
+    const { auth, calls } = await setup({ "POST /api/auth/nonce": () => NONCE_CREATED });
+    await auth.startBotLogin("app", {
+      deviceBrand: " ".repeat(3),
+      deviceId: "dev-1",
+      deviceModel: `  ${"👨‍👩‍👧".repeat(100)}  `,
+      deviceName: "x".repeat(200),
+      osVersion: "1".repeat(50),
+    });
+    const body = calls[0]?.body as Record<string, string>;
+    expect(body["deviceBrand"]).toBeUndefined();
+    expect(body["deviceId"]).toBe("dev-1");
+    expect(graphemes(body["deviceModel"])).toBe(60);
+    expect(body["deviceModel"]?.endsWith("…")).toBe(true);
+    expect(graphemes(body["deviceName"])).toBe(80);
+    expect(graphemes(body["osVersion"])).toBe(20);
+  });
+
+  it("signs in against an older Worker that refuses the phone's newer fields: asks again with the old ones", async () => {
+    let asked = 0;
+    const { auth, calls } = await setup({
+      "POST /api/auth/nonce": () => {
+        asked += 1;
+        const isKnown = Object.keys(calls.at(-1)?.body as object).every((key) =>
+          ["deviceId", "deviceName"].includes(key),
+        );
+        return isKnown ? NONCE_CREATED : problem(422, "validation");
+      },
+    });
+    const login = await auth.startBotLogin("app", {
+      deviceId: "dev-1",
+      deviceModel: "Pixel 9a",
+      deviceName: "Pixel 9a",
+    });
+    expect(login.nonce).toBe("n1");
+    expect(asked).toBe(2);
+    expect(calls.at(-1)?.body).toEqual({ deviceId: "dev-1", deviceName: "Pixel 9a" });
   });
 
   it("polls until the nonce is ready and stores the token", async () => {

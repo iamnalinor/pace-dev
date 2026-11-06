@@ -353,17 +353,53 @@ describe("sessions record their kind, a readable name and where they signed in f
     expect(row?.user_agent).toBe("x".repeat(512));
   });
 
-  it("refuses a nonce request body with fields it does not know", async () => {
+  it("ignores fields it does not know, so a newer app's body still opens a login", async () => {
     const response = await call("/api/auth/nonce?from=app", { body: { extra: 1 } });
-    expect(response.status).toBe(422);
-    expect(await response.json()).toMatchObject({ code: "validation" });
+    expect(response.status).toBe(200);
   });
 
-  it.each([{ deviceName: "" }, { deviceId: "x".repeat(65) }, { deviceName: "x".repeat(81) }])(
-    "refuses an out-of-range device in the nonce request (%o)",
-    async (body) => {
-      expect((await call("/api/auth/nonce?from=app", { body })).status).toBe(422);
-    },
-  );
+  it.each([
+    { deviceName: "" },
+    { deviceName: " ".repeat(3) },
+    { deviceName: "x".repeat(81) },
+    { deviceBrand: "x".repeat(41) },
+    { deviceModel: "x".repeat(200) },
+    { osVersion: "1".repeat(21) },
+    { deviceModel: 5 },
+    { deviceId: "x".repeat(65) },
+  ])("drops an invalid optional device field instead of refusing the login (%o)", async (body) => {
+    const response = await call("/api/auth/nonce?from=app", { body });
+    expect(response.status).toBe(200);
+    const { nonce } = await readJson<{ nonce: string }>(response);
+    const token = await finishBotLogin(nonce);
+    const session = await sessionOf(token);
+    expect(session).toMatchObject({ kind: "app", name: "Android" });
+    expect(session?.device_id).toBeNull();
+    const { sessions } = await answerOf(endpoints.sessions.list, "/api/sessions", { token });
+    expect(sessions.find((row) => row.current)?.device).toBeUndefined();
+  });
+
+  it("keeps the valid fields when another one of the body is dropped", async () => {
+    const { nonce } = await json<{ nonce: string }>("/api/auth/nonce?from=app", {
+      body: { deviceModel: "x".repeat(200), deviceName: "Pixel 9a", osVersion: "15" },
+      ...from("5.6.7.8", OKHTTP),
+    });
+    const token = await finishBotLogin(nonce);
+    expect(await sessionOf(token)).toMatchObject({ name: "Pixel 9a" });
+    const { sessions } = await answerOf(endpoints.sessions.list, "/api/sessions", { token });
+    expect(sessions.find((row) => row.current)?.device).toEqual({ os: "Android", osVersion: "15" });
+  });
+
+  it("an app that sends none of the new fields lists no device for its row", async () => {
+    const { nonce } = await json<{ nonce: string }>("/api/auth/nonce?from=app", {
+      body: { deviceId: "dev-old", deviceName: "Pixel 9a" },
+      ...from("5.6.7.8", OKHTTP),
+    });
+    const token = await finishBotLogin(nonce);
+    const { sessions } = await answerOf(endpoints.sessions.list, "/api/sessions", { token });
+    const row = sessions.find((entry) => entry.current);
+    expect(row?.name).toBe("Pixel 9a");
+    expect(row).not.toHaveProperty("device");
+  });
 });
 /* eslint-enable sonarjs/no-hardcoded-ip -- the fixtures above end here */

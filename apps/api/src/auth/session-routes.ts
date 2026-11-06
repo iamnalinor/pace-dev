@@ -46,19 +46,22 @@ const deviceOf = (row: ListedSession): Session["device"] => {
 const fromRow = (
   row: ListedSession,
   context: { readonly currentId: string | undefined; readonly dataAt: ReadonlyMap<string, string> },
-): Session => ({
-  city: row.city,
-  country: row.country,
-  createdAt: row.createdAt,
-  current: row.id === context.currentId,
-  ...(deviceOf(row) !== undefined && { device: deviceOf(row) }),
-  id: row.id,
-  ip: row.ip,
-  kind: row.kind,
-  lastDataAt: row.usageDevice === null ? null : (context.dataAt.get(row.usageDevice) ?? null),
-  lastSeenAt: row.lastSeenAt,
-  name: row.name,
-});
+): Session => {
+  const device = deviceOf(row);
+  return {
+    city: row.city,
+    country: row.country,
+    createdAt: row.createdAt,
+    current: row.id === context.currentId,
+    ...(device !== undefined && { device }),
+    id: row.id,
+    ip: row.ip,
+    kind: row.kind,
+    lastDataAt: row.usageDevice === null ? null : (context.dataAt.get(row.usageDevice) ?? null),
+    lastSeenAt: row.lastSeenAt,
+    name: row.name,
+  };
+};
 
 const fromGrant = (grant: Grant): Session => ({
   city: null,

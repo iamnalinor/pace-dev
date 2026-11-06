@@ -14,8 +14,10 @@ import type { SessionStore, SignOutNotes } from "./session.ts";
 
 import { type ApiClient, ApiError } from "./api-client.ts";
 import { type AuthState, createSession, type Granted, type Session } from "./auth-session.ts";
+import { cleanLoginDevice, createNonce, type LoginDevice } from "./login-device.ts";
 
 export type { AuthState } from "./auth-session.ts";
+export type { LoginDevice } from "./login-device.ts";
 
 export type BotLoginError = "cancelled" | "not-allowed" | "timeout";
 
@@ -33,15 +35,6 @@ export type BotLogin = {
   readonly nonce: string;
   /** Polls until the bot bound the nonce; the token is stored before it resolves. */
   readonly waitForToken: BotLoginPoll["waitForToken"];
-};
-
-/** The phone a bot login starts on: its model and its install id. */
-export type LoginDevice = {
-  readonly deviceName?: string;
-  readonly deviceId?: string;
-  readonly deviceBrand?: string;
-  readonly deviceModel?: string;
-  readonly osVersion?: string;
 };
 
 export type BotLoginPoll = {
@@ -353,7 +346,8 @@ export const createAuth = (options: {
     ready: session.ready,
     resumeBotLogin: (nonce) => ({ nonce, waitForToken: waitForToken(api, session, nonce) }),
     startBotLogin: async (from, device) => {
-      const created = await api.call(endpoints.auth.nonceCreate, { body: device, query: { from } });
+      const body = cleanLoginDevice(device);
+      const created = await createNonce(api, from, body);
       return { ...created, waitForToken: waitForToken(api, session, created.nonce) };
     },
     hasEnded: session.hasEnded,
