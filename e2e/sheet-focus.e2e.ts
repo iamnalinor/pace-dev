@@ -56,7 +56,7 @@ const named = (key: keyof typeof ru): RegExp =>
 
 const DAY_PICK_TEXT = ru["day.pick"].replaceAll(/[$()*+.?[\\\]^{|}]/gu, String.raw`\$&`);
 // eslint-disable-next-line security/detect-non-literal-regexp -- the catalog's own text, escaped
-const dayPick = new RegExp(`${DAY_PICK_TEXT  }$`, "u");
+const dayPick = new RegExp(`${DAY_PICK_TEXT}$`, "u");
 
 type Opener = {
   readonly sheet: string;
