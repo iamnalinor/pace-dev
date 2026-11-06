@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 
-import { addTask, formByHand, nowTasks, taskForm } from "./support/composer.ts";
+import { addTask, deleteOpenTask, formByHand, nowTasks, taskForm } from "./support/composer.ts";
 import { expect, test } from "./support/fixtures.ts";
 import {
   controlsUnder,
@@ -46,7 +46,7 @@ const raiseToast = async (page: Page, title: string): Promise<void> => {
   await page.goto("/");
   await addTask(page, title);
   await nowTasks(page).getByText(title).click();
-  await page.getByRole("button", { name: "Delete the task" }).click();
+  await deleteOpenTask(page);
   await expect(page.getByTestId("toast-card")).toBeVisible();
 };
 
@@ -368,7 +368,7 @@ test.describe("tooltips and toasts on Now, Day and a task (Task 3.7, bug class 6
     // Deleting another task leaves its toast (with Undo) up while the first one opens.
     await raiseToast(page, "Toast on a task");
     await nowTasks(page).getByText("Open me after").click();
-    await expect(page.getByRole("button", { name: "Delete the task" })).toBeVisible();
+    await expect(page.getByRole("button", { exact: true, name: "More actions" })).toBeVisible();
     await expect(page.getByTestId("toast-card")).toBeVisible();
     expect(await stuckUnderToast(page)).toEqual([]);
   });

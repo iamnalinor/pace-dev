@@ -1,6 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 
-import { addTask, approve, nowTasks } from "./support/composer.ts";
+import { addTask, approve, deleteOpenTask, nowTasks } from "./support/composer.ts";
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { controlsUnder } from "./support/geometry.ts";
 import { API_URL, loginViaApi } from "./support/login.ts";
@@ -68,9 +68,9 @@ for (const size of SIZES) {
       await expect(
         tasks.getByRole("button", { name: `Write the lab report ${size.name}` }),
       ).toBeVisible();
-      await page.getByRole("textbox", { name: "Find a task" }).fill("zzz");
+      await page.getByRole("searchbox", { name: "Find a task" }).fill("zzz");
       await expect(page.getByText("No open task matches.")).toBeVisible();
-      await page.getByRole("textbox", { name: "Find a task" }).fill("lab report");
+      await page.getByRole("searchbox", { name: "Find a task" }).fill("lab report");
       await shoot(page, `day-picker-task-${size.name}`, (name) => info.outputPath(name));
       await expectNoA11yViolations(page);
       await tasks.getByRole("button", { name: `Write the lab report ${size.name}` }).click();
@@ -215,7 +215,7 @@ for (const size of SIZES) {
     // Deleting a task says so in a toast (with Undo); the bar is below it on Now.
     await addTask(page, `Toast ${size.name}`);
     await nowTasks(page).getByText(`Toast ${size.name}`).click();
-    await page.getByRole("button", { name: "Delete the task" }).click();
+    await deleteOpenTask(page);
     const toast = page.getByTestId("toast-card");
     await expect(toast).toBeVisible();
     // In the app, not a reload: a reload would drop the toast.
@@ -257,7 +257,7 @@ test("the Calendar picker on the web offers no phone calendar to set up (QA 19 L
   await page.setViewportSize({ height: 900, width: 1280 });
   await page.goto("/");
   await timeBar(page).getByRole("button", { exact: true, name: "Calendar" }).click();
-  const sheet = page.locator('[data-pace-surface="sheet"]');
+  const sheet = page.locator('[data-pace-surface="sheet"], [data-testid="popover-surface"]');
   await expect(
     sheet.getByRole("button", { name: "Start a meeting without an event" }),
   ).toBeVisible();

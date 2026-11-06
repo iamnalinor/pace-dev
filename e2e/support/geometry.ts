@@ -134,7 +134,14 @@ export const expectDescendantsStayInside = async (
             };
             const drawn = [...box.querySelectorAll("*")]
               .map((element) => ({ a: element.getBoundingClientRect(), element }))
-              .filter(({ a, element }) => a.width > 0 && a.height > 0 && isSeen(element));
+              .filter(
+                ({ a, element }) =>
+                  a.width > 0 &&
+                  a.height > 0 &&
+                  // A focused field's ring is drawn 4 px outside its box on purpose (spec §4.2.28).
+                  element.closest('[data-testid="text-field-ring"]') === null &&
+                  isSeen(element),
+              );
             const worst = drawn
               .map(({ a, element }) => ({
                 px: Math.max(

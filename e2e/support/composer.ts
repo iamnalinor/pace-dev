@@ -83,3 +83,13 @@ export const settledLine = async (page: Page): Promise<Locator> => {
   await expect(line).toBeEditable();
   return line;
 };
+
+/**
+Deletes the task that is open: the ⋯ menu's «Delete the task», then its confirm in place
+(the task page has no direct Delete button any more).
+*/
+export const deleteOpenTask = async (page: Page): Promise<void> => {
+  await page.getByRole("button", { exact: true, name: "More actions" }).click();
+  await page.getByRole("button", { name: "Delete the task" }).click();
+  await page.getByRole("button", { exact: true, name: "Delete" }).click();
+};

@@ -61,8 +61,10 @@ test("the keyboard ring is the focus role on a switch and on the range slider", 
   await page.keyboard.press("Shift+Tab");
   await page.keyboard.press("Tab");
   await expect(toggle).toBeFocused();
-  expect(await ringOf(toggle)).toEqual({
-    color: await focusColor(toggle),
+  // A switch's ring is on the drawn track (the kit's small visual), not on its 44 px target.
+  const visual = toggle.locator("[data-pace-visual]");
+  expect(await ringOf(visual)).toEqual({
+    color: await focusColor(visual),
     style: "solid",
     width: "2px",
   });

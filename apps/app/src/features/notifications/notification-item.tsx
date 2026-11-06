@@ -244,6 +244,7 @@ export const Item = ({
               accessibilityLabel={t("notifications.unread")}
               accessible
               className="size-2 rounded-pill bg-danger"
+              role="img"
               testID="unread-dot"
             />
           ) : null}

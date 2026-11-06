@@ -353,9 +353,16 @@ export const axeFaults = async (
   page: Page,
   { isColourOnly }: { readonly isColourOnly: boolean },
 ): Promise<readonly string[]> => {
-  // What the person sees once things settle, not a toast halfway through fading in.
+  // What the person sees once things settle, not a toast halfway through fading in. A loop (a
+  // skeleton's breathing) never ends: only the animations that do are waited for.
   await page.waitForFunction(() =>
-    globalThis.document.getAnimations().every((animation) => animation.playState !== "running"),
+    globalThis.document
+      .getAnimations()
+      .every(
+        (animation) =>
+          animation.playState !== "running" ||
+          animation.effect?.getComputedTiming().iterations === Infinity,
+      ),
   );
   const builder = new AxeBuilder({ page });
   const results = await (isColourOnly

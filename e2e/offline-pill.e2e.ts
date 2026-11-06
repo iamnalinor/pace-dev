@@ -1,6 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 
-import { addTask, nowTasks } from "./support/composer.ts";
+import { addTask, deleteOpenTask, nowTasks } from "./support/composer.ts";
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { controlsUnder } from "./support/geometry.ts";
 import { loginViaApi } from "./support/login.ts";
@@ -222,7 +222,7 @@ for (const [width, height] of [
     await nowTasks(page)
       .getByText(`Stacked ${String(width)}`)
       .click();
-    await page.getByRole("button", { name: "Delete the task" }).click();
+    await deleteOpenTask(page);
     const toast = page.getByTestId("toast-card");
     await expect(toast).toBeVisible();
     await page.waitForFunction(() =>
@@ -248,7 +248,7 @@ test("at 1440 the pill floats inside the content column, clear of the sidebar an
   await context.setOffline(true);
   const pill = page.getByTestId("sync-strip");
   await expect(pill).toBeVisible();
-  const [pillBox, contentBox] = [await boxOf(pill), await boxOf(page.getByTestId("shell-content"))];
+  const [pillBox, contentBox] = [await boxOf(pill), await boxOf(page.getByRole("main"))];
   // Wholly in the content region: it no longer straddles the sidebar's edge.
   expect(pillBox.x).toBeGreaterThanOrEqual(contentBox.x);
   expect(pillBox.x + pillBox.width).toBeLessThanOrEqual(contentBox.x + contentBox.width);

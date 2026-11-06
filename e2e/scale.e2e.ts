@@ -3,6 +3,7 @@ import { loginViaApi } from "./support/login.ts";
 import { pushAsClient, ulid } from "./support/seed.ts";
 
 const FUTURE_TASKS = 1050;
+const PUSH_MAX = 500;
 const DAY = 24 * 60 * 60_000;
 
 /** A long list (F-DAT-03): a fold of 1 050 tasks opens fast and keeps the frames short. */
@@ -28,8 +29,11 @@ test.describe("a long fold on a phone (Task 4.1, F-DAT-03)", () => {
       source: "web",
       type: "task.created",
     }));
-    const response = await pushAsClient(token, envelopes);
-    expect(response.ok).toBe(true);
+    // A push takes at most 500 events (`SyncPushInputSchema`).
+    for (let from = 0; from < envelopes.length; from += PUSH_MAX) {
+      const response = await pushAsClient(token, envelopes.slice(from, from + PUSH_MAX));
+      expect(response.ok).toBe(true);
+    }
     await page.setViewportSize({ height: 844, width: 390 });
     await page.goto("/");
     const fold = page.getByRole("button", { name: /^(In future|В будущем)/u });

@@ -66,7 +66,7 @@ export type PopoverProps = {
   readonly open: boolean;
   /** `dialog` for a picker with its own controls; `menu` for a list of actions (`ListRow`s). */
   readonly role?: "dialog" | "menu" | undefined;
-  /** Its height when known (a list's rows): placed above the anchor when it would not fit below. */
+  /** Its height when known (a list's rows); else the height it is drawn at. Placed above the anchor when it would not fit below. */
   readonly height?: number | undefined;
 };
 
@@ -93,6 +93,9 @@ export const Popover = ({
   const style = usePopoverMotion(phase.isOpen, phase.letGo);
   const box = useAnchorBox(anchor, phase.isOpen);
   const surfaceRef = useSheetFocusRef({ closeLabel: label });
+  // Its height as drawn when the caller does not know it: a popover on the bottom edge (the time
+  // bar's) must open above its trigger, whatever its list holds.
+  const [measured, setMeasured] = useState(0);
   const close = (): void => {
     if (phase.isOpen) {
       onClose();
@@ -101,7 +104,11 @@ export const Popover = ({
   const place =
     box === null
       ? null
-      : placePopover({ anchor: box, size: { height, width: layout.popover }, window });
+      : placePopover({
+          anchor: box,
+          size: { height: height > 0 ? height : measured, width: layout.popover },
+          window,
+        });
   return (
     <Modal
       animationType="none"
@@ -126,6 +133,9 @@ export const Popover = ({
             testID="popover-outside"
           />
           <Animated.View
+            onLayout={(event) => {
+              setMeasured(event.nativeEvent.layout.height);
+            }}
             style={[style, place === null ? UNPLACED : placedAt(place)]}
             testID="popover-frame"
           >

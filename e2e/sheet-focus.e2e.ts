@@ -65,17 +65,11 @@ type Opener = {
   readonly open: (page: Page, seeded: LivedIn) => Promise<void>;
 };
 
-/** One of the time bar's buttons on Now; with something running, behind "Start another". */
+/** One of the time bar's four fixed tiles on Now (they never fold; only the typed field does). */
 const timeBarButton = async (page: Page, key: keyof typeof ru): Promise<void> => {
   await page.goto("/");
   const bar = page.getByRole("region", { name: ru["time.bar"] });
-  const button = bar.getByRole("button", { exact: true, name: ru[key] });
-  const another = bar.getByRole("button", { name: ru["time.startOther"] });
-  await expect(button.or(another)).toBeVisible();
-  if (await another.isVisible()) {
-    await another.click();
-  }
-  await button.click();
+  await bar.getByRole("button", { exact: true, name: ru[key] }).click();
 };
 
 /** Every way into every sheet the test knows; the registry must not hold one it lacks. */
@@ -86,7 +80,9 @@ const OPENERS: readonly Opener[] = [
     open: async (page: Page) => {
       await timeBarButton(page, key);
     },
+    // A computer's pickers are popovers under their tile, not sheets.
     sheet: "time-choices",
+    sizes: ["phone"] as const,
     via: `the time bar's ${key}`,
   })),
   {
@@ -103,7 +99,9 @@ const OPENERS: readonly Opener[] = [
       await page.goto(`/task/${seeded.openTaskId}`);
       await page.getByRole("button", { name: named("task.menu") }).click();
     },
+    // A popover under the button on a computer.
     sheet: "task-menu",
+    sizes: ["phone"],
     via: "the task's ⋯ menu",
   },
   {
