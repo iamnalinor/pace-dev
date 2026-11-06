@@ -44,6 +44,8 @@ export const approve = async (scope: Locator | Page): Promise<void> => {
   const button = scope.getByRole("button", { name: "Approve" });
   await expect(button).toBeVisible();
   await expect.poll(async () => await isUnclipped(button)).toBe(true);
+  // The time bar's cards scroll inside their budget (40 % of the window): bring it into view.
+  await button.scrollIntoViewIfNeeded();
   // Unfolded, it may still be scrolling into place: the press waits for its box to hold still.
   await clickWhenSettled(button);
 };

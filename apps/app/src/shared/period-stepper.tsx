@@ -95,6 +95,7 @@ export const PeriodStepper = ({
         <PeriodLabel label={shown} labelAction={labelAction} onLabel={onLabel} />
         <View
           accessibilityElementsHidden={onNext === null}
+          aria-hidden={onNext === null}
           importantForAccessibility={onNext === null ? "no-hide-descendants" : "auto"}
           pointerEvents={onNext === null ? "none" : "auto"}
           style={onNext === null ? HIDDEN : undefined}
@@ -109,6 +110,7 @@ export const PeriodStepper = ({
       </View>
       <View
         accessibilityElementsHidden={!isAway}
+        aria-hidden={!isAway}
         className="shrink-0"
         importantForAccessibility={isAway ? "auto" : "no-hide-descendants"}
         pointerEvents={isAway ? "auto" : "none"}

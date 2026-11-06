@@ -54,6 +54,10 @@ const named = (key: keyof typeof ru): RegExp =>
     "u",
   );
 
+const DAY_PICK_TEXT = ru["day.pick"].replaceAll(/[$()*+.?[\\\]^{|}]/gu, String.raw`\$&`);
+// eslint-disable-next-line security/detect-non-literal-regexp -- the catalog's own text, escaped
+const dayPick = new RegExp(`${DAY_PICK_TEXT  }$`, "u");
+
 type Opener = {
   readonly sheet: string;
   /** What opens it, for the report (one sheet may have several ways in). */
@@ -132,9 +136,12 @@ const OPENERS: readonly Opener[] = [
   {
     open: async (page) => {
       await page.goto("/day");
-      await page.getByRole("button", { name: named("day.pick") }).click();
+      // The date's button is named "<the day>. <Pick a day>".
+      await page.getByRole("button", { name: dayPick }).click();
     },
+    // A popover under the date on a computer.
     sheet: "day-picker",
+    sizes: ["phone"] as const,
     via: "Day's date",
   },
   {

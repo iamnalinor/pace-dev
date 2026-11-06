@@ -183,13 +183,15 @@ const NotificationSection = ({ data }: { readonly data: GalleryData }) => {
         </Text>
       ) : (
         <View aria-label={t("dev.gallery.section.notification")} role="list">
-          <NotificationItem
-            asking={{ id: null, set: NOTHING }}
-            deliveries={[]}
-            item={notification}
-            listed={{ current: undefined, ids: new Set(), loadedAt: null }}
-            zoned={{ language: data.language, now: GALLERY_NOW, zone: GALLERY_ZONE }}
-          />
+          <View role="listitem">
+            <NotificationItem
+              asking={{ id: null, set: NOTHING }}
+              deliveries={[]}
+              item={notification}
+              listed={{ current: undefined, ids: new Set(), loadedAt: null }}
+              zoned={{ language: data.language, now: GALLERY_NOW, zone: GALLERY_ZONE }}
+            />
+          </View>
         </View>
       )}
     </Section>

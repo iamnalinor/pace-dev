@@ -345,6 +345,8 @@ export const TextField = ({ onBlur, onFocus, ...props }: TextFieldProps) => {
             submit,
           })}
           accessibilityLabel={label}
+          // A field that takes no text is disabled to a screen reader and to a contrast check.
+          {...(isDisabled && { "aria-disabled": true })}
           className={cx(
             "min-w-0 flex-1 py-2 font-sans text-body",
             isDisabled ? "text-label-quaternary" : "text-label-primary",

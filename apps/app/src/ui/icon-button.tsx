@@ -46,7 +46,7 @@ export const IconButton = ({
   const { palette } = useTheme();
   const isBlocked = disabled || busy;
   const glyph = busy ? (
-    <ActivityIndicator color={palette["label.secondary"]} size="small" />
+    <ActivityIndicator aria-hidden color={palette["label.secondary"]} size="small" />
   ) : (
     <Icon name={icon} size={size} tone={disabled ? "quaternary" : "primary"} />
   );

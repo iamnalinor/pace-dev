@@ -133,7 +133,7 @@ const LineButton = ({
           )}
         >
           {isBusy ? (
-            <ActivityIndicator color={iconColor} size="small" />
+            <ActivityIndicator aria-hidden color={iconColor} size="small" />
           ) : (
             <Icon name={icon} tone={iconTone(disabled, isAccent)} />
           )}

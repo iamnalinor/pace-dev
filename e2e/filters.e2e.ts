@@ -61,11 +61,10 @@ test.describe("the project filter row", () => {
     await page.mouse.move((box?.x ?? 0) + 100, (box?.y ?? 0) + 20);
     await page.mouse.wheel(0, 300);
     await expect(page.getByTestId("chip-scroller-cue-start")).toBeVisible();
-    // The last chip is reachable by wheel alone.
+    // The last chip is reachable by wheel alone. The chips run by name, so "Project number 9" is
+    // the last of "Project number 0" to "Project number 13".
     await page.mouse.wheel(0, 5000);
-    await expect(
-      chips.getByRole("radio", { name: `Project number ${String(PROJECTS - 1)}` }),
-    ).toBeInViewport();
+    await expect(chips.getByRole("radio", { name: "Project number 9" })).toBeInViewport();
     await expect(page.getByTestId("chip-scroller-cue-end")).toBeHidden();
   });
 });

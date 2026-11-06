@@ -19,6 +19,27 @@ const INSET_CLASS: Readonly<Record<SeparatorInset, string>> = {
 };
 
 /**
+The hairline between two rows. A labelled one (a boundary) is a `separator` in a list, which a list
+may only hold inside a list item (axe `aria-required-children`).
+*/
+const Separator = ({
+  boundary,
+  inset,
+}: {
+  readonly boundary: string | undefined;
+  readonly inset: SeparatorInset;
+}) => {
+  const line = (
+    <View
+      className={cx("border-t border-separator", INSET_CLASS[inset])}
+      testID="group-separator"
+      {...(boundary !== undefined && { "aria-label": boundary, role: "separator" })}
+    />
+  );
+  return boundary === undefined ? line : <View role="listitem">{line}</View>;
+};
+
+/**
 An inset grouped list (spec §4.1.1, §5.0.3): rows on the cell ground with the large radius and no
 border, a hairline in `separator` only between two rows, inset to the text start. On a phone the
 group sits inside the screen's gutter (`inset`). It is a `RowList`, so Android keeps it a view of
@@ -60,13 +81,7 @@ export const Group = ({
         const inset: SeparatorInset = boundary === undefined ? separatorInset : "none";
         return (
           <Fragment key={row.key}>
-            {row === rows[0] ? null : (
-              <View
-                className={cx("border-t border-separator", INSET_CLASS[inset])}
-                testID="group-separator"
-                {...(boundary !== undefined && { "aria-label": boundary, role: "separator" })}
-              />
-            )}
+            {row === rows[0] ? null : <Separator boundary={boundary} inset={inset} />}
             {row}
           </Fragment>
         );

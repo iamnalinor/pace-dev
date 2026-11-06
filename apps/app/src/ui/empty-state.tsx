@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { Text as NativeText, View } from "react-native";
+import { View } from "react-native";
 
 import { useIsAccountUnknown, useT } from "#app/app-state.tsx";
 
@@ -65,7 +65,9 @@ export const EmptyText = ({
   return isUnknown ? (
     <Skeleton label={t("sync.loadingData")} rows={1} shape="text" />
   ) : (
-    <NativeText className={className}>{children}</NativeText>
+    <Text className={className} role="callout" tone="secondary">
+      {children}
+    </Text>
   );
 };
 

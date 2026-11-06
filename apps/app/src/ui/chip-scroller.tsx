@@ -22,6 +22,7 @@ export const edgesOf = ({
 const Cue = ({ side }: { readonly side: "end" | "start" }) => (
   <View
     accessibilityElementsHidden
+    aria-hidden
     className={cx(
       "absolute inset-y-0 w-6 items-center justify-center bg-app",
       side === "start" ? "left-0" : "right-0",

@@ -178,7 +178,8 @@ const Lead = ({
 }) => {
   const { palette } = useTheme();
   if (busy) {
-    return <ActivityIndicator color={palette[look.spinner]} size="small" />;
+    // The button is named by its label: the spinner is no second, unnamed progress bar.
+    return <ActivityIndicator aria-hidden color={palette[look.spinner]} size="small" />;
   }
   return icon === undefined ? null : <Icon filled={isIconFilled} name={icon} tone={look.icon} />;
 };
