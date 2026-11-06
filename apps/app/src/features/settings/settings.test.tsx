@@ -117,7 +117,7 @@ describe("SettingsScreen", () => {
     });
     const presetsLink = `${en("settings.presets")} ${en("settings.presets.hint")}`;
     await fireEvent.press(screen.getByRole("link", { name: presetsLink }));
-    expect(router.push).toHaveBeenCalledWith("/presets");
+    expect(router.navigate).toHaveBeenCalledWith("/presets");
   });
 
   it("turns Week's night hours on and off", async () => {
@@ -627,5 +627,20 @@ describe("SettingsScreen", () => {
     await fireEvent.press(screen.getByRole("button", { name: en("common.cancel") }));
     expect(screen.getByText(en("settings.confirmation.waiting"))).toBeOnTheScreen();
     expect(mockPendingConfirmation.current?.request.id).toBe(id);
+  });
+});
+
+describe("Settings sections (spec §5.17)", () => {
+  it("groups the settings under headings, destructive actions last in the danger style", async () => {
+    await renderScreen(<SettingsScreen />, await createTestRuntime({ world: "empty" }));
+    for (const key of ["settings.account", "settings.notifications", "settings.tasks"] as const) {
+      expect(screen.getByRole("header", { name: en(key) })).toBeOnTheScreen();
+    }
+    expect(screen.getAllByTestId("group-separator").length).toBeGreaterThan(0);
+  });
+
+  it("shows the server read-only with its host on a phone", async () => {
+    await renderScreen(<SettingsScreen />, await createTestRuntime({ world: "empty" }));
+    expect(screen.getByText(en("settings.server.hint"))).toBeOnTheScreen();
   });
 });

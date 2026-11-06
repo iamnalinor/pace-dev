@@ -162,7 +162,7 @@ const DangerOpeners = ({
           flow.setNotice(null);
         }}
         ref={focus.openerRef("wipe")}
-        variant="secondary"
+        variant="destructive"
       >
         {t("settings.wipe")}
       </Button>
@@ -173,7 +173,7 @@ const DangerOpeners = ({
           flow.setNotice(null);
         }}
         ref={focus.openerRef("delete")}
-        variant="secondary"
+        variant="destructive"
       >
         {t("settings.deleteAccount")}
       </Button>
@@ -251,7 +251,10 @@ export const DangerZone = () => {
   return (
     // Set apart from the account's actions: a rule and room above it (QA round 15 L6).
     <View className="mt-3 gap-3 border-t border-separator pt-5">
-      <Text accessibilityRole="header" className="font-sans text-subhead font-semibold text-danger">
+      <Text
+        accessibilityRole="header"
+        className="font-sans text-subhead font-semibold text-label-secondary"
+      >
         {t("settings.danger")}
       </Text>
       <DangerPrompt flow={flow} />

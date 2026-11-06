@@ -191,7 +191,7 @@ export const SessionRow = ({
     }
   };
   return (
-    <View aria-label={row.name} className="gap-2 py-1" role="group">
+    <View aria-label={row.name} className="gap-2" role="group">
       <View className="min-h-12 flex-row items-center gap-3">
         <Identity row={row} />
         {isConfirming ? null : (
@@ -204,7 +204,7 @@ export const SessionRow = ({
               toOpener(node);
               openerRef?.(node);
             }}
-            variant="secondary"
+            variant="plain"
           >
             {actionLabel}
           </Button>

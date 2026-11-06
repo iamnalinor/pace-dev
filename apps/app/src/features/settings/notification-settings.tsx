@@ -32,7 +32,7 @@ export const NotificationChannels = () => {
   const run = useRunAction();
   const settings = useSettings();
   return (
-    <View className="gap-1" role="table">
+    <View aria-label={t("settings.notifications")} className="gap-1" role="table">
       <Text className="font-sans text-footnote text-label-secondary">
         {t("settings.notifications.hint")}
       </Text>
@@ -204,9 +204,8 @@ export const DigestWindows = () => {
       {digestWindows.map((time, index) => (
         // The row is its position: keyed by value, editing a time would remount the input.
         // eslint-disable-next-line @eslint-react/no-array-index-key -- see above
-        <View className="flex-row items-center gap-2" key={index}>
+        <View className="min-h-hit-web flex-row items-center justify-between gap-2" key={index}>
           <TimeInput
-            className="flex-1"
             label={t("settings.digestWindows.time", { index: index + 1 })}
             onTime={(next) => {
               save(digestWindows.with(index, next));
@@ -241,7 +240,7 @@ export const QuietHours = () => {
   const run = useRunAction();
   const { quietHours } = useSettings();
   const edge = (side: "from" | "to") => (
-    <View className="flex-1 gap-2">
+    <View className="gap-2">
       <Text className="font-sans text-caption font-normal text-label-tertiary">
         {t(`settings.quietHours.${side}`)}
       </Text>
@@ -259,7 +258,7 @@ export const QuietHours = () => {
       <Text className="font-sans text-footnote text-label-secondary">
         {t("settings.quietHours.hint")}
       </Text>
-      <View className="flex-row gap-3">
+      <View className="flex-row flex-wrap gap-6">
         {edge("from")}
         {edge("to")}
       </View>

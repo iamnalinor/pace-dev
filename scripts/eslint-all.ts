@@ -25,14 +25,14 @@ The `pace/no-raw-design-values` backlog (redesign-plan, "Lint baseline"). An exa
 warnings fail, fewer fail too until this number is lowered to the new count. At 0 the rule
 becomes an error and this allowance goes away.
 */
-const DESIGN_VALUE_WARNINGS = 26;
+const DESIGN_VALUE_WARNINGS = 24;
 
 /**
 The bare-pressable backlog (bug-lessons F-CMP-01: a React Native `Pressable`/`Touchable*` in
 `src/features` or `src/shared` instead of `#app/ui/pressable`). Exact, like the one above; the kit
 tasks migrate the callers and lower it; at 0 the rule becomes an error.
 */
-const BARE_PRESSABLE_WARNINGS = 7;
+const BARE_PRESSABLE_WARNINGS = 6;
 
 /**
 The kit-primitive backlog (bug-lessons 109; spec §4.1.2 rule 9): a lucide icon outside the kit's

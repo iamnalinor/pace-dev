@@ -836,17 +836,13 @@ describe("Settings' order", () => {
     await renderSettings(sessionsServer([THIS_BROWSER]).routes);
     await screen.findByLabelText("Chrome on macOS");
     expect(settingsOutline().filter((text) => text !== "Settings")).toEqual([
-      "Theme",
-      "Language",
-      "Week",
-      "Time zone",
-      "Permissions",
+      "Account and language",
       "Notifications",
-      "Digest times",
-      "Quiet hours",
-      "Activity estimates",
-      "More",
+      "Tasks",
       "Devices and sessions",
+      "Appearance",
+      "Permissions",
+      "Server",
       // Export data is the web build's (a download); a phone has none.
       "Log out",
       "Danger zone",
@@ -858,7 +854,7 @@ describe("Settings' order", () => {
     await renderSettings(sessionsServer([THIS_BROWSER]).routes);
     await screen.findByLabelText("Chrome on macOS");
     expect(settingsOutline().slice(-4)).toEqual([
-      "Devices and sessions",
+      "Appearance",
       "Export data",
       "Log out",
       "Danger zone",

@@ -1,14 +1,14 @@
-import { type Href, useRouter } from "expo-router";
-import { Pressable, Text, View } from "react-native";
+import type { Href } from "expo-router";
 
 import type { MessageKey } from "@pace/core";
 
 import { useOwnerName, useT } from "#app/app-state.tsx";
 import { UserAvatar } from "#app/shared/user-avatar.tsx";
+import { Group } from "#app/ui/group.tsx";
 import { Icon, type IconName } from "#app/ui/icon.tsx";
+import { ListRow } from "#app/ui/list-row.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
-import { Text as KitText } from "#app/ui/text.tsx";
 
 type Row = {
   readonly href: Href;
@@ -27,31 +27,19 @@ const ROWS: readonly Row[] = [
 
 const MoreRow = ({ href, icon, label }: Row) => {
   const t = useT();
-  const router = useRouter();
-  return (
-    <Pressable
-      accessibilityLabel={t(label)}
-      accessibilityRole="link"
-      className="min-h-row flex-row items-center gap-3 border-b border-separator px-5 active:opacity-70"
-      onPress={() => {
-        router.push(href);
-      }}
-    >
-      <Icon name={icon} />
-      <Text className="flex-1 font-sans text-body text-label-primary">{t(label)}</Text>
-      <Icon name="chevron-right" size="inline" tone="tertiary" />
-    </Pressable>
-  );
+  return <ListRow href={href} leading={<Icon name={icon} />} title={t(label)} />;
 };
 
-/** The owner's first name from Telegram, with an initial in the quiet accent. */
+/** The owner's name from Telegram beside a neutral avatar, in a group of its own. */
 const Owner = ({ name }: { readonly name: string }) => (
-  <View className="mx-5 mb-3 flex-row items-center gap-3">
-    <UserAvatar />
-    <KitText className="flex-1 font-medium" policy="truncate" role="headline">
-      {name}
-    </KitText>
-  </View>
+  <Group className="mt-4">
+    <ListRow
+      leading={<UserAvatar />}
+      title={name}
+      titleLines={1}
+      titleLook={{ className: "font-medium" }}
+    />
+  </Group>
 );
 
 /**
@@ -61,14 +49,20 @@ A wide window has them all in the sidebar and never shows this.
 export const MoreScreen = () => {
   const t = useT();
   const owner = useOwnerName();
+  const [destinations, settings] = [ROWS.slice(0, -1), ROWS.slice(-1)];
   return (
     <Screen header={<ScreenHeader title={t("nav.more")} variant="top" />}>
       {owner === null ? null : <Owner name={owner} />}
-      <View className="border-t border-separator">
-        {ROWS.map((row) => (
+      <Group className="mt-4">
+        {destinations.map((row) => (
           <MoreRow key={row.label} {...row} />
         ))}
-      </View>
+      </Group>
+      <Group className="mt-4">
+        {settings.map((row) => (
+          <MoreRow key={row.label} {...row} />
+        ))}
+      </Group>
     </Screen>
   );
 };
