@@ -1,16 +1,13 @@
 import { useEffect, useState } from "react";
-import { Pressable, Text } from "react-native";
 
-import { useT } from "#app/app-state.tsx";
-import { Icon } from "#app/ui/icon.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
 
 /** A start this soon after the bar was used came from it: the bar stays as the finger left it. */
 const BAR_USE_MS = 5000;
 
 /**
-Whether the field and the buttons show: always on a wide window or with nothing running.
-On a phone they fold when something starts that the bar did not start (Now opened on it, the
+Whether the typed field shows (the four tiles always do, Q12): always on a wide window or with
+nothing running. On a phone it folds under «Start something else» (the kit's `Disclosure`) when something starts that the bar did not start (Now opened on it, the
 store loaded it late, the bot or another device started it), until a tap unfolds them or that
 activity stops. A start made in the open bar never folds it under the finger.
 */
@@ -38,29 +35,4 @@ export const useFold = (
       setFoldedFor(isUnfolded ? runningId : null);
     },
   };
-};
-
-export const HIDDEN = { display: "none" } as const;
-
-/** The one line a phone's bar folds the field and the buttons into while something runs. */
-export const FoldToggle = ({
-  isOpen,
-  onToggle,
-}: {
-  readonly isOpen: boolean;
-  readonly onToggle: () => void;
-}) => {
-  const t = useT();
-  const chevron = isOpen ? "chevron-down" : "chevron-up";
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ expanded: isOpen }}
-      className="min-h-hit-web flex-row items-center justify-center gap-2 rounded-lg border border-outline px-3 active:opacity-70"
-      onPress={onToggle}
-    >
-      <Text className="font-sans text-footnote text-label-secondary">{t("time.startOther")}</Text>
-      <Icon name={chevron} size="inline" />
-    </Pressable>
-  );
 };

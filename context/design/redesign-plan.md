@@ -609,11 +609,13 @@ due as one formatted string).
 **Interfaces:** `TaskRow` = `ListRow` with `CheckCircle` leading, title `clamp(2)`, meta line
 (project `Tag`, importance word, due/left in `numeric`), trailing repeat icon; `TaskList` virtualised
 (`FlatList` with `getItemLayout` from fixed row heights per density, windowing) and section headers.
-- [ ] Failing tests: view-model — Normal importance yields no meta part; app — 1 284 rows render
+- [x] Failing tests: view-model — Normal importance yields no meta part; app — 1 284 rows render
       ≤ 40 row components initially; e2e — expanding a 1 050-row fold renders in < 500 ms and p95
       frame < 32 ms at 390 (F-DAT-03).
-- [ ] Commit.
-- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): `SectionHeader collapsible` (a `Disclosure` trigger), TaskRow on `ListRow`, the task folds on `Disclosure`.
+- [x] Commit.
+- [x] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): `SectionHeader collapsible` (a `Disclosure` trigger), TaskRow on `ListRow`, the task folds on `Disclosure`.
+
+Deferred (2026-11-06): `TaskList` is paged (30 rows and a «Show 30 more» row, spec 4.3.1 Scale), not a `FlatList`: the lists live inside the screens' own scroll, where a nested `FlatList` does not window. `SectionHeader collapsible` and the folds' hairline stay on `FoldedSection` → `Disclosure` (no new SectionHeader prop). Due and "left" stay two meta parts, joined into one line by `MetaLine`. The e2e for the 1 050-row fold is `e2e/scale.e2e.ts` (not run locally).
 
 ### Task 4.2: Running card, time bar, pickers
 
@@ -624,14 +626,16 @@ bar: four fixed tiles Calendar / Task / Chores / Rest (neutral at rest; running 
 category stroke), typed field with a dashed-outline draft while parsing; phone (Q12 default): the
 tiles stay visible while something runs, only the typed field folds under «Начать другое», and the
 whole bar folds only past the 40 % region budget (§3.3).
-- [ ] Failing tests: tiles keep identical size and position with any label length (RU); the running
+- [x] Failing tests: tiles keep identical size and position with any label length (RU); the running
       name is not a tag; a long name truncates before Stop (F-DAT-02); region budget — with two
       proposals open the list keeps ≥ 50 % height (Review Focus 2, e2e in `overlays.e2e.ts`);
       start/stop calls `haptic("tick")`; the running row is not a live region and announces only
       start, stop and "past expected" once (F-A11Y-10, new bug-lessons class "Live region around a
       ticking value").
-- [ ] Commit.
+- [x] Commit.
 - [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): the time bar's fold (`time-bar-fold.tsx`) merges in on the kit `Disclosure`/`Presence`.
+
+Deferred (2026-11-06): the typed start's Approve (in `ActionCards`, Task 4.3's) plays no `tick`; Stop and picks do. The region budget is a scroll cap of 40 % of the window less the tiles on the bar's cards and the field, not a one-line card variant (the compact running card, IconButton Stop, and the desktop shell indicator are Task 4.x's shell work). e2e budget case in `overlays.e2e.ts` runs with a running activity (two proposals need the assistant's fake). The Disclosure trigger keeps its own `mx-gutter`.
 
 ### Task 4.3: Now
 
@@ -914,7 +918,7 @@ Only what spec §2 names for the chosen direction (A · Тетрадь).
 ### Task 7.2: The running activity's ink line and the Week day strip
 
 **Files:** `shared/tracking/running-card.tsx`, `src/features/week/day-strip.tsx`.
-- [ ] Spec §2 A: under the running activity, a 2 px ink line (`accent`) from start to now with a red
+- [x] Spec §2 A: under the running activity, a 2 px ink line (`accent`) from start to now with a red
       1 px mark at the expected length; past 2× the line turns `status.warn` with "Ещё занимаетесь?"
       (no continuous animation: it moves with the minute tick). Week's phone day strip uses the same
       ink/now vocabulary. Failing test: the mark sits at expected / max(expected × 2, elapsed) of the

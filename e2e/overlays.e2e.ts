@@ -230,6 +230,22 @@ test.describe("motion and overlays at one width", () => {
     expect(await sampled).toBe(0);
   });
 
+  test("the time bar keeps the list at least half the window while something runs (region budget, Task 4.2)", async ({
+    page,
+  }) => {
+    await loginViaApi(page);
+    await page.setViewportSize({ height: 844, width: 390 });
+    await page.goto("/");
+    const bar = page.getByRole("region", { name: "Time" });
+    await bar.getByRole("button", { exact: true, name: "Rest" }).click();
+    await page.getByRole("button", { exact: true, name: "Walk" }).click();
+    await expect(bar.getByRole("button", { name: /^Stop: Walk/u })).toBeVisible();
+    const box = await bar.boundingBox();
+    expect(box?.height ?? Infinity).toBeLessThanOrEqual(844 * 0.5);
+    // The four tiles stay on screen with the field folded.
+    await expect(bar.getByRole("button", { exact: true, name: "Chores" })).toBeInViewport();
+  });
+
   test("the greyed Calendar button's tooltip covers no other control (bug class 6)", async ({
     page,
   }) => {

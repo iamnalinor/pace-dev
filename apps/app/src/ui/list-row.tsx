@@ -47,6 +47,8 @@ type RowProps = {
   /** A value, a control or a chevron, aligned to the first title line. */
   readonly trailing?: ReactNode;
   readonly density?: RowDensity | undefined;
+  /** The name said for a pressable row when it differs from what it shows (its state, "running"). */
+  readonly label?: string | undefined;
   /**
   The row is the current or picked one: the selection fill and an accent bar at its leading edge
   (a cue that is not colour alone, F-COL-02). A tab says `selected`; a button row
@@ -160,7 +162,7 @@ const withChevron = (trailing: ReactNode, isLink: boolean): ReactNode =>
 
 type FrameProps = Pick<
   ListRowProps,
-  "disabled" | "haptic" | "href" | "onPress" | "role" | "selected" | "testID"
+  "disabled" | "haptic" | "href" | "label" | "onPress" | "role" | "selected" | "testID"
 > & { readonly children: ReactNode; readonly className: string };
 
 /** What the row is: a link (`href`), a control (`onPress`), or a static view. */
@@ -170,6 +172,7 @@ const Frame = ({
   disabled,
   haptic,
   href,
+  label,
   onPress,
   role = "button",
   selected = false,
@@ -202,7 +205,7 @@ const Frame = ({
       </View>
     );
   }
-  const shared = { className, disabled, haptic, onPress, testID };
+  const shared = { className, disabled, haptic, label, onPress, testID };
   return role === "button" || role === "link" ? (
     <Pressable {...shared} aria-current={current} role={role}>
       {children}

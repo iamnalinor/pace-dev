@@ -168,17 +168,19 @@ const useFocusThroughBusy = (isBusy: boolean) => {
 const Lead = ({
   busy,
   icon,
+  isIconFilled,
   look,
 }: {
   readonly busy: boolean;
   readonly icon: IconName | undefined;
+  readonly isIconFilled: boolean | undefined;
   readonly look: Look;
 }) => {
   const { palette } = useTheme();
   if (busy) {
     return <ActivityIndicator color={palette[look.spinner]} size="small" />;
   }
-  return icon === undefined ? null : <Icon name={icon} tone={look.icon} />;
+  return icon === undefined ? null : <Icon filled={isIconFilled} name={icon} tone={look.icon} />;
 };
 
 /**
@@ -197,6 +199,7 @@ export const Button = ({
   haptic,
   hint,
   icon,
+  isIconFilled,
   label = children,
   onLongPress,
   onPress,
@@ -215,6 +218,8 @@ export const Button = ({
   /** What a press does beyond the label (a long press, say), for screen readers. */
   readonly hint?: string;
   readonly icon?: IconName;
+  /** The icon drawn solid (Stop's square, never an outline that reads as a checkbox; F-CMP-04). */
+  readonly isIconFilled?: boolean;
   /** The name said for it when the visible text is a short form of it (it must start with it). */
   readonly label?: string;
   readonly shortcut?: Hotkey | undefined;
@@ -252,7 +257,7 @@ export const Button = ({
       style={widthStyle}
       visual={cx(VISUAL, HEIGHT[size], look.fill)}
     >
-      <Lead busy={busy} icon={icon} look={look} />
+      <Lead busy={busy} icon={icon} isIconFilled={isIconFilled} look={look} />
       <Text className="text-center font-semibold" role="callout" tone={look.text}>
         {children}
       </Text>

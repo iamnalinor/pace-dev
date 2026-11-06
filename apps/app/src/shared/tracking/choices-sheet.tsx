@@ -1,12 +1,13 @@
-import { useState } from "react";
-import { Pressable, Text } from "react-native";
+import { type RefObject, useState } from "react";
+import { ScrollView, View } from "react-native";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { MetaLine } from "#app/shared/meta-line.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { Icon } from "#app/ui/icon.tsx";
+import { Button } from "#app/ui/button.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
+import { Popover } from "#app/ui/popover.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
 import { SwitchRow } from "#app/ui/switch-row.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
@@ -119,23 +120,52 @@ const TaskSearch = ({
 };
 
 /**
-The running button's way out, first in its picker: Stop is one tap away. Filled, centred and
-without an outline, it reads as an action, not as one more thing to start.
+The running button's way out, first in its picker: Stop is one tap away, a secondary button with
+a filled square (never an outline that reads as a checkbox; F-CMP-04).
 */
 const StopRow = ({ onStop }: { readonly onStop: () => void }) => {
   const t = useT();
   return (
-    <Pressable
-      accessibilityLabel={t("time.stop")}
-      accessibilityRole="button"
-      className="min-h-12 flex-row items-center justify-center gap-2 rounded-lg bg-fill-4 px-4 active:opacity-70"
+    <Button
+      haptic="tick"
+      icon="square"
+      isIconFilled
       onPress={onStop}
+      variant="secondary"
+      width="fill"
     >
-      <Icon name="square" size="inline" tone="primary" />
-      <Text className="font-sans text-callout font-medium text-label-primary">
-        {t("time.stop")}
-      </Text>
-    </Pressable>
+      {t("time.stop")}
+    </Button>
+  );
+};
+
+/** A picker's header: Stop when the button's own activity runs, "alongside" when another does, Task's search. */
+const PickerHeader = ({
+  button,
+  canGoAlongside,
+  isAlongside,
+  onAlongside,
+  onQuery,
+  onStop,
+  query,
+}: {
+  readonly button: TimeButtonView;
+  readonly canGoAlongside: boolean;
+  readonly isAlongside: boolean;
+  readonly onAlongside: (isOn: boolean) => void;
+  readonly onQuery: (query: string) => void;
+  readonly onStop: () => void;
+  readonly query: string;
+}) => {
+  const t = useT();
+  return (
+    <>
+      {button.isRunning ? <StopRow onStop={onStop} /> : null}
+      {canGoAlongside ? (
+        <SwitchRow isOn={isAlongside} label={t("time.alongside")} onChange={onAlongside} />
+      ) : null}
+      {button.kind === "task" ? <TaskSearch onChange={onQuery} query={query} /> : null}
+    </>
   );
 };
 
@@ -173,10 +203,13 @@ Behind every button of the time bar: what it can start. Its header holds Stop wh
 own activity runs, the "alongside" switch when something else runs, and Task's search.
 */
 export const ChoicesSheet = ({
+  anchor,
   calendar,
   onClose,
   ...live
 }: {
+  /** The bar button it opens from: on a wide window the picker is a popover anchored to it. */
+  readonly anchor: RefObject<null | View>;
   readonly button: TimeButtonView;
   readonly calendar: CalendarToday | null;
   readonly canGoAlongside: boolean;
@@ -184,6 +217,7 @@ export const ChoicesSheet = ({
 }) => {
   const t = useT();
   const { actions, hooks } = usePace();
+  const isWide = useIsWide();
   const [isAlongside, setIsAlongside] = useState(false);
   const [query, setQuery] = useState("");
   const { shown, start } = useShownWhileWriting(
@@ -200,20 +234,39 @@ export const ChoicesSheet = ({
   };
   const hasHeader = button.isRunning || canGoAlongside || button.kind === "task";
   const header = (
+    <PickerHeader
+      button={button}
+      canGoAlongside={canGoAlongside}
+      isAlongside={isAlongside}
+      onAlongside={setIsAlongside}
+      onQuery={setQuery}
+      onStop={() => {
+        start(actions.stopActivity());
+      }}
+      query={query}
+    />
+  );
+  const body = (
     <>
-      {button.isRunning ? (
-        <StopRow
-          onStop={() => {
-            start(actions.stopActivity());
-          }}
-        />
+      {button.kind === "calendar" ? <CalendarChoices {...props} /> : null}
+      {button.kind === "task" ? (
+        <TaskChoices {...props} focused={shown.focused} query={query} />
       ) : null}
-      {canGoAlongside ? (
-        <SwitchRow isOn={isAlongside} label={t("time.alongside")} onChange={setIsAlongside} />
-      ) : null}
-      {button.kind === "task" ? <TaskSearch onChange={setQuery} query={query} /> : null}
+      {button.kind === "choices" ? <ButtonChoices {...props} /> : null}
     </>
   );
+  if (isWide) {
+    return (
+      <Popover anchor={anchor} label={t(button.labelKey)} onClose={onClose} open>
+        <ScrollView>
+          <View className="gap-3 px-2 pb-2">
+            {hasHeader ? <View className="gap-3 px-2">{header}</View> : null}
+            {body}
+          </View>
+        </ScrollView>
+      </Popover>
+    );
+  }
   return (
     <Sheet
       closeLabel={t("common.close")}
@@ -223,11 +276,7 @@ export const ChoicesSheet = ({
       open
       title={t(button.labelKey)}
     >
-      {button.kind === "calendar" ? <CalendarChoices {...props} /> : null}
-      {button.kind === "task" ? (
-        <TaskChoices {...props} focused={shown.focused} query={query} />
-      ) : null}
-      {button.kind === "choices" ? <ButtonChoices {...props} /> : null}
+      {body}
     </Sheet>
   );
 };

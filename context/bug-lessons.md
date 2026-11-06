@@ -1843,3 +1843,19 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-03 | PR B parked N4: the inspector took presses during its 160 ms exit (a second row press acted on the pane on its way out) | 5 | yes: the fix is in `Presence`, so every exit it keeps (inspector, composer, gallery) takes no touches; `Disclosure` already set `pointerEvents="none"` while closing | `presence.test.tsx` "takes no touches while it leaves" |
 | 2026-11-03 | PR B 3.1 re-review: the kit Pressable's Space for checkbox/radio/switch/tab skipped its own press only when the caller's key handler had called `preventDefault`; a caller that pressed on Space without it would press twice | 113 (a guard that relies on what a caller happens to do) | yes: the kit now owns Space for those roles outright (the caller never sees a Space aimed at the control); the 9 callers still spreading `spacePress` cannot double-fire | `pressable.web.test.tsx` "presses once when a caller presses on Space without preventing the default" |
 | 2026-11-03 | PR B 3.2 re-review: a kit `Link` (and any kit Pressable) handed `aria-disabled` looked disabled to assistive tech and still pressed, and on the web kept its live `href`; a hyphenated JSX attribute passes every prop type, so the type could not refuse it | 10 (a control whose state and behaviour disagree) | yes: `usePressableProps` reads `aria-disabled` as `disabled` for every kit control; the web Link drops `href` on either | `link.web.test.tsx` "is disabled by aria-disabled as by disabled" |
+| 2026-11-06 | PR B 4.2 (F-A11Y-10): the running row sat in `accessibilityLiveRegion="polite"` around a value that changes every minute, so a screen reader spoke the whole row at each tick; no test asserted what is *not* announced | 125 (live region around a ticking value) | yes: the time bar's reading-line status stays one announcement; no other live region wraps a clock (swept `accessibilityLiveRegion` in `apps/app/src`) | `running-card.test.tsx` "is not a live region" and "ticks on Stop, and says a start, a stop and the past-expected once each" (`useRunningAnnouncements`); QA checklist: a value that changes while the screen is idle gets no live region, only a one-off announcement of its transitions |
+| 2026-11-06 | PR B 4.1: a check (a control) inside a pressable row is a nested interactive (axe `nested-interactive`); the first `ListRow`-based task row would have put `CheckCircle` inside the row's Pressable | 10 (a control whose structure disagrees with its role) | yes: `ListRow` takes `control`, rendered beside the press area, never inside it | `task-row.test.tsx` "keeps the check beside the press area, never inside it" |
+
+### 125. A live region around a ticking value
+- **Bug.** PR B 4.2 (F-A11Y-10): the running row sat in `accessibilityLiveRegion="polite"` around the
+  elapsed time, which changes every minute: a screen reader read the whole row at each tick.
+- **Missed because.** Tests asserted what was shown, never what is *announced*; a live region looks
+  like a feature ("polite") and nothing counts how often it speaks.
+- **Rule.** A value that changes while the screen is idle (a clock, a counter, a progress) is never
+  inside a live region. Its transitions that matter (started, stopped, past the Expect) are announced
+  once each with `AccessibilityInfo.announceForAccessibility`; what is on screen at mount is not news.
+- **Sweep and guard.** Swept every `accessibilityLiveRegion` in `apps/app/src`: the remaining ones wrap
+  one-off messages (a reading status, an error). `running-card.test.tsx` pins "not a live region" and
+  "announces a start, a stop and past-expected once each"; QA checklist line in `docs/qa.md` scope:
+  "does anything that ticks speak?".
+

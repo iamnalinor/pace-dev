@@ -1,12 +1,14 @@
 import type { ReactNode } from "react";
 
-import { Pressable, Text, View } from "react-native";
+import { View } from "react-native";
 
 import type { ActionResult, StartOptions, TimeButtonView } from "@pace/client";
 
 import { useT } from "#app/app-state.tsx";
+import { Group } from "#app/ui/group.tsx";
 import { Icon } from "#app/ui/icon.tsx";
-import { Text as KitText } from "#app/ui/text.tsx";
+import { ListRow } from "#app/ui/list-row.tsx";
+import { Text } from "#app/ui/text.tsx";
 
 import type { CalendarToday } from "./calendar-today.ts";
 
@@ -36,25 +38,28 @@ export const ChoiceRow = ({
   readonly onPress: () => void;
 }) => {
   const t = useT();
-  return (
-    <Pressable
-      // The check says it runs on the screen; the name says it to a screen reader.
-      accessibilityLabel={isRunning ? t("time.buttonRunning", { label }) : label}
-      accessibilityRole="button"
-      className="min-h-12 flex-row items-center gap-3 rounded-lg border border-outline bg-cell px-4 py-2 active:opacity-70"
-      onPress={onPress}
-    >
-      <View className="flex-1 gap-1">
-        <KitText lines={2} policy="clamp" role="callout">
-          {label}
-        </KitText>
-        {children}
+  const trailing =
+    aside === null && !isRunning ? undefined : (
+      <View className="flex-row items-center gap-2">
+        {aside === null ? null : (
+          <Text numeric role="footnote" tone="secondary">
+            {aside}
+          </Text>
+        )}
+        {isRunning ? <Icon name="check" size="inline" tone="primary" /> : null}
       </View>
-      {aside === null ? null : (
-        <Text className="font-sans text-footnote tabular-nums text-label-secondary">{aside}</Text>
-      )}
-      {isRunning ? <Icon name="check" size="inline" tone="primary" /> : null}
-    </Pressable>
+    );
+  return (
+    <ListRow
+      // The check says it runs on the screen; the name says it to a screen reader.
+      haptic={isRunning ? undefined : "tick"}
+      label={isRunning ? t("time.buttonRunning", { label }) : label}
+      meta={children}
+      onPress={onPress}
+      title={label}
+      titleLines={2}
+      trailing={trailing}
+    />
   );
 };
 
@@ -65,7 +70,7 @@ export const ChoiceItem = (props: Parameters<typeof ChoiceRow>[0]) => (
   </View>
 );
 
-/** A picker's choices as a list named after what they are, so each picker reads as its own. */
+/** A picker's choices as one group named after what they are, so each picker reads as its own. */
 export const ChoiceList = ({
   children,
   label,
@@ -73,12 +78,14 @@ export const ChoiceList = ({
   readonly children: ReactNode;
   readonly label: string;
 }) => (
-  <View aria-label={label} className="gap-2" role="list">
+  <Group aria-label={label} inset={false} role="list" separatorInset="row">
     {children}
-  </View>
+  </Group>
 );
 
 /** Quiet words where a list would be: why there is nothing to pick. */
 export const Nothing = ({ children }: { readonly children: string }) => (
-  <Text className="font-sans text-subhead font-normal text-label-secondary">{children}</Text>
+  <Text role="subhead" tone="secondary">
+    {children}
+  </Text>
 );

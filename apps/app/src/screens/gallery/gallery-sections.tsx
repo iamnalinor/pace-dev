@@ -15,7 +15,7 @@ import { TaskHeader } from "#app/features/task/task-header.tsx";
 import { WeekGrid } from "#app/features/week/week-grid.tsx";
 import { CardView } from "#app/screens/inbox-card.tsx";
 import { TaskRows } from "#app/shared/task-list.tsx";
-import { RunningRow } from "#app/shared/tracking/running-row.tsx";
+import { RunningCard } from "#app/shared/tracking/running-card.tsx";
 import { CountBadge } from "#app/ui/count-badge.tsx";
 import { IMPORTANCE_HUES } from "#app/ui/hue.ts";
 import { useIsWide } from "#app/ui/layout.ts";
@@ -123,9 +123,9 @@ export const TimeSections = ({ data }: { readonly data: GalleryData }) => {
             {t("dev.gallery.nothing")}
           </Text>
         ) : (
-          <View className="gap-3 rounded-xl border border-separator bg-cell p-4">
+          <View className="gap-3">
             {running.map((view) => (
-              <RunningRow key={view.activityId} running={view} />
+              <RunningCard key={view.activityId} running={view} />
             ))}
           </View>
         )}

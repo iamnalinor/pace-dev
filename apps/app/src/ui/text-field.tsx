@@ -88,10 +88,12 @@ export const isErrorShown = ({
 /** The field's frame: rest, focused (the ring), errored, disabled (spec §4.2.28 states). */
 export const boxClass = ({
   isDisabled,
+  isDraft = false,
   isErrored,
   multiline,
 }: {
   readonly isDisabled: boolean;
+  readonly isDraft?: boolean;
   readonly isErrored: boolean;
   readonly multiline: boolean;
 }): string =>
@@ -100,6 +102,7 @@ export const boxClass = ({
     multiline ? "min-h-24 py-3" : "min-h-hit lg:min-h-hit-web",
     isDisabled ? "bg-fill-1" : "border bg-cell",
     !isDisabled && (isErrored ? "border-danger" : "border-outline"),
+    isDraft && !isDisabled && "border-dashed",
   );
 
 /** The ring of a focused field (any input method, not only the keyboard's; F-A11Y-01): 2 + 2 px. */
@@ -154,6 +157,8 @@ export type TextFieldProps = Omit<
   readonly isLabelHidden?: boolean | undefined;
   /** The value cannot be read, said by the danger border alone (the message sits elsewhere). */
   readonly isInvalid?: boolean | undefined;
+  /** What is typed is a draft being read (the time bar's assistant): a dashed outline, not a final value. */
+  readonly isDraft?: boolean | undefined;
 };
 
 /** A multiline field grows to 8 lines of `body`, then scrolls (spec §4.2.28). */
@@ -290,6 +295,7 @@ export const TextField = ({ onBlur, onFocus, ...props }: TextFieldProps) => {
     editable,
     error: _error,
     hint,
+    isDraft,
     isInvalid,
     isLabelHidden,
     isMultiline,
@@ -312,6 +318,7 @@ export const TextField = ({ onBlur, onFocus, ...props }: TextFieldProps) => {
       <View
         className={boxClass({
           isDisabled,
+          isDraft: isDraft === true,
           isErrored: shownError !== null || isInvalid,
           multiline: isMultiline,
         })}
