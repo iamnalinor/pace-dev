@@ -237,7 +237,7 @@ describe("LoginScreen", () => {
     });
     auth.adoptToken.mockResolvedValue(ok(fakeUser));
     await renderScreen();
-    await fireEvent.press(screen.getByText("Log in on the web instead"));
+    await fireEvent.press(screen.getByText("Sign in on the web instead"));
     await waitFor(() => {
       expect(auth.adoptToken).toHaveBeenCalledWith("tok_web");
     });
@@ -258,7 +258,7 @@ describe("LoginScreen", () => {
       });
       auth.adoptToken.mockResolvedValueOnce(answer);
       const { unmount } = await renderScreen();
-      await fireEvent.press(screen.getByText("Log in on the web instead"));
+      await fireEvent.press(screen.getByText("Sign in on the web instead"));
       await waitFor(() => {
         expect(auth.adoptToken).toHaveBeenCalledWith("tok_web");
       });

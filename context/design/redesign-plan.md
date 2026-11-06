@@ -775,30 +775,34 @@ Deferred (2026-11-06): a "group" for the single Undo is a task (an event of no t
 ### Task 4.11: Settings
 
 **Files:** `src/features/settings/**`, `sessions/**`, `devices/**`, `server/**` (+ tests).
-- [ ] Inset grouped sections in the order of spec §5 Settings; notifications as per-channel rows or
+- [x] Inset grouped sections in the order of spec §5 Settings; notifications as per-channel rows or
       the compact matrix with named groups (F-LAY-09); time fields sized to content; sessions list
       with inline revoke confirm (focus to successor); danger zone with `Button destructive`
       (F-CMP-07); shortcuts listed under Settings › Keyboard (no switch: there are no single-key shortcuts any more; Q6); server line middle-ellipsizes the host
       (F-DAT-11).
-- [ ] Failing tests: `deadControls()` at phone width; revoke confirm Escape returns focus. Commit.
-- [ ] PR #48 follow-up (cosmetic): Devices' Revoke sits 8 px off its row (see "PR #48 follow-ups (triage)").
+- [x] Failing tests: `deadControls()` at phone width; revoke confirm Escape returns focus. Commit.
+- [x] PR #48 follow-up (cosmetic): Devices' Revoke sits 8 px off its row (see "PR #48 follow-ups (triage)").
+
+Deferred (batch 8): phone per-kind notification rows with a channel sheet (the compact matrix stays at every width); time-zone, estimates and Devices rows keep their own blocks inside a cell (not one ListRow per value); «Выйти» as a centred row; Escape-on-confirm is the Button shortcut (web, e2e); the Keyboard row lists today's single-key N and F (Alt+N/Alt+F of Q6 is not built).
 
 ### Task 4.12: More and the signed-out screens
 
 **Files:** `app/(tabs)/more.tsx`, `src/screens/login-screen*.tsx`, `app/oauth/authorize.tsx`,
 `app/onboarding.tsx`, `app/permissions.tsx`, `app/+not-found.tsx` (+ tests).
-- [ ] More as a grouped list; pushed destinations keep the tab bar (F-AND-03 residue); login with a
+- [x] More as a grouped list; pushed destinations keep the tab bar (F-AND-03 residue); login with a
       graceful Telegram-widget failure state (F-CMP-17); onboarding/permissions in the template;
       not-found with a way home. Commit.
+
+Deferred (batch 8): `app/oauth/authorize.tsx` and the login card were not restyled (the widget's failure state already exists: `login.widgetFailed`); onboarding's per-permission cards keep their layout.
 
 ### Task 4.13: Copy fixes and the glossary test
 
 **Files:** `packages/core/src/i18n/{en,ru}/*.ts`, `packages/core/src/i18n/glossary.test.ts` (new).
-- [ ] Failing test `glossary.test.ts`: banned phrases absent ("We changed a few things", "Settings →
+- [x] Failing test `glossary.test.ts`: banned phrases absent ("We changed a few things", "Settings →
       Devices"); pinned owner copy present (update banner, Calendar hint); one word per action per
       language (`common.undo` ≠ `task.giveUp` in RU; `assistant.approved` ≠ `task.done` in both;
       Revoke/End, Sign in/Log in unified) — F-CPY-01/02/03/05.
-- [ ] Implement the catalog changes; PASS. Bug-lessons: new class "Owner-corrected copy with no test
+- [x] Implement the catalog changes; PASS. Bug-lessons: new class "Owner-corrected copy with no test
       pinning it" (F-CPY-01) and extend class 45's guard. Commit.
 
 ---

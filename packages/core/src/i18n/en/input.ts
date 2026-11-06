@@ -220,7 +220,7 @@ export const enInput = {
   "action.doubtful": "(check this)",
   "assistant.approve": "Approve",
   "assistant.review": "Review assistant actions",
-  "assistant.approved": "Done",
+  "assistant.approved": "Approved",
   "assistant.approvedMore.one": "and {count} more action",
   "assistant.approvedMore.few": "and {count} more actions",
   "assistant.approvedMore.many": "and {count} more actions",

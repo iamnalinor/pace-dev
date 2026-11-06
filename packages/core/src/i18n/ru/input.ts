@@ -223,7 +223,7 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "action.doubtful": "(проверьте)",
   "assistant.approve": "Подтвердить",
   "assistant.review": "Посмотреть действия ассистента",
-  "assistant.approved": "Готово",
+  "assistant.approved": "Принято",
   "assistant.approvedMore.one": "и ещё {count} действие",
   "assistant.approvedMore.few": "и ещё {count} действия",
   "assistant.approvedMore.many": "и ещё {count} действий",

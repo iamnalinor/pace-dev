@@ -235,14 +235,14 @@ describe("Settings → Devices and sessions", () => {
     const server = sessionsServer(ALL);
     await renderSettings(server.routes);
     const row = await screen.findByLabelText("Firefox on Linux");
-    await fireEvent.press(within(row).getByRole("button", { name: "Revoke" }));
+    await fireEvent.press(within(row).getByRole("button", { name: "End session" }));
     expect(within(row).getByText("End this session?")).toBeOnTheScreen();
     await fireEvent.press(within(row).getByRole("button", { name: "Cancel" }));
     expect(within(row).queryByText("End this session?")).toBeNull();
     expect(server.deleted).toEqual([]);
 
-    await fireEvent.press(within(row).getByRole("button", { name: "Revoke" }));
-    const confirm = within(row).getByRole("button", { name: "Revoke" });
+    await fireEvent.press(within(row).getByRole("button", { name: "End session" }));
+    const confirm = within(row).getByRole("button", { name: "End session" });
     // Two presses in one batch: the latch is synchronous (bug class 36).
     await act(async () => {
       void fireEvent.press(confirm);
@@ -259,7 +259,7 @@ describe("Settings → Devices and sessions", () => {
   it("moves focus into the confirm and says its question, and gives focus back on Cancel", async () => {
     await renderSettings(sessionsServer(ALL).routes);
     const row = await screen.findByLabelText("Firefox on Linux");
-    await fireEvent.press(within(row).getByRole("button", { name: "Revoke" }));
+    await fireEvent.press(within(row).getByRole("button", { name: "End session" }));
     // The question is announced: a polite live region, and the confirm is named by it.
     const question = within(row).getByText("End this session?");
     expect(question.props).toMatchObject({ accessibilityLiveRegion: "polite", role: "status" });
@@ -274,21 +274,23 @@ describe("Settings → Devices and sessions", () => {
     expect(mockMoveFocus).toHaveBeenCalledTimes(2);
     const [backTarget, saidBack] = mockMoveFocus.mock.calls[1] ?? [];
     expect(saidBack).toBeUndefined();
-    expect(isControl(backTarget, within(row).getByRole("button", { name: "Revoke" }))).toBe(true);
+    expect(isControl(backTarget, within(row).getByRole("button", { name: "End session" }))).toBe(
+      true,
+    );
   });
 
   it("keeps one confirm open at a time: opening another closes the first (QA round 15 L1)", async () => {
     await renderSettings(sessionsServer(ALL).routes);
     const browser = await screen.findByLabelText("Firefox on Linux");
     const computer = screen.getByLabelText("Linux Mint");
-    await fireEvent.press(within(browser).getByRole("button", { name: "Revoke" }));
+    await fireEvent.press(within(browser).getByRole("button", { name: "End session" }));
     expect(within(browser).getByText("End this session?")).toBeOnTheScreen();
     await fireEvent.press(within(computer).getByRole("button", { name: "Disconnect" }));
     expect(
       within(computer).getByText("Disconnect this computer? Its token stops working at once."),
     ).toBeOnTheScreen();
     expect(within(browser).queryByText("End this session?")).toBeNull();
-    expect(within(browser).getByRole("button", { name: "Revoke" })).toBeOnTheScreen();
+    expect(within(browser).getByRole("button", { name: "End session" })).toBeOnTheScreen();
   });
 
   it("reloads the list when the person comes back and when a sign-in notice arrives (QA round 15 M1)", async () => {
@@ -348,7 +350,7 @@ describe("Settings → Devices and sessions", () => {
     const server = sessionsServer(ALL);
     await renderSettings(server.routes);
     const computer = await screen.findByLabelText("Linux Mint");
-    expect(within(computer).queryByRole("button", { name: "Revoke" })).toBeNull();
+    expect(within(computer).queryByRole("button", { name: "End session" })).toBeNull();
     await fireEvent.press(within(computer).getByRole("button", { name: "Disconnect" }));
     expect(
       within(computer).getByText("Disconnect this computer? Its token stops working at once."),
@@ -359,9 +361,9 @@ describe("Settings → Devices and sessions", () => {
     });
 
     const app = screen.getByLabelText("Claude");
-    await fireEvent.press(within(app).getByRole("button", { name: "Revoke" }));
-    expect(within(app).getByText("Revoke this app's access?")).toBeOnTheScreen();
-    await fireEvent.press(within(app).getByRole("button", { name: "Revoke" }));
+    await fireEvent.press(within(app).getByRole("button", { name: "End session" }));
+    expect(within(app).getByText("End this app's access?")).toBeOnTheScreen();
+    await fireEvent.press(within(app).getByRole("button", { name: "End session" }));
     await waitFor(() => {
       expect(screen.queryByLabelText("Claude")).toBeNull();
     });
@@ -394,9 +396,9 @@ describe("Settings → Devices and sessions", () => {
       stops.count += 1;
       stop();
     });
-    await fireEvent.press(within(row).getByRole("button", { name: "Revoke" }));
+    await fireEvent.press(within(row).getByRole("button", { name: "End session" }));
     expect(within(row).getByText("End this session? This device signs out.")).toBeOnTheScreen();
-    await fireEvent.press(within(row).getByRole("button", { name: "Revoke" }));
+    await fireEvent.press(within(row).getByRole("button", { name: "End session" }));
     await waitFor(() => {
       expect(runtime.auth.store.getState().status).toBe("signed-out");
     });
@@ -433,8 +435,8 @@ describe("Settings → Devices and sessions", () => {
         await jest.advanceTimersByTimeAsync(100);
       });
       const row = screen.getByLabelText("Chrome on macOS");
-      await fireEvent.press(within(row).getByRole("button", { name: "Revoke" }));
-      await fireEvent.press(within(row).getByRole("button", { name: "Revoke" }));
+      await fireEvent.press(within(row).getByRole("button", { name: "End session" }));
+      await fireEvent.press(within(row).getByRole("button", { name: "End session" }));
       const startsBefore = starts.mock.calls.length;
       await act(async () => {
         await jest.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS);
@@ -463,8 +465,8 @@ describe("Settings → Devices and sessions", () => {
       "GET /api/sessions": () => SessionsOutputSchema.parse({ sessions: ALL }),
     });
     const row = await screen.findByLabelText("Firefox on Linux");
-    await fireEvent.press(within(row).getByRole("button", { name: "Revoke" }));
-    await fireEvent.press(within(row).getByRole("button", { name: "Revoke" }));
+    await fireEvent.press(within(row).getByRole("button", { name: "End session" }));
+    await fireEvent.press(within(row).getByRole("button", { name: "End session" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Couldn't end the session. Try again.",
     );
@@ -487,8 +489,8 @@ describe("Settings → Devices and sessions", () => {
     // Meanwhile a computer was added elsewhere and the browser ended: the reload shows both.
     const added = session({ id: "01NEW", kind: "agent", name: "New laptop" });
     listed.sessions = [...ALL.filter((item) => item.id !== OTHER_BROWSER.id), added];
-    await fireEvent.press(within(row).getByRole("button", { name: "Revoke" }));
-    await fireEvent.press(within(row).getByRole("button", { name: "Revoke" }));
+    await fireEvent.press(within(row).getByRole("button", { name: "End session" }));
+    await fireEvent.press(within(row).getByRole("button", { name: "End session" }));
     await waitFor(() => {
       expect(screen.queryByLabelText("Firefox on Linux")).toBeNull();
     });
@@ -503,14 +505,14 @@ describe("Settings → Devices and sessions", () => {
     const row = await screen.findByLabelText("Firefox on Linux");
     const names = rowNames();
     const next = names[names.indexOf("Firefox on Linux") + 1] ?? "";
-    await fireEvent.press(within(row).getByRole("button", { name: "Revoke" }));
-    await fireEvent.press(within(row).getByRole("button", { name: "Revoke" }));
+    await fireEvent.press(within(row).getByRole("button", { name: "End session" }));
+    await fireEvent.press(within(row).getByRole("button", { name: "End session" }));
     await waitFor(() => {
       expect(screen.queryByLabelText("Firefox on Linux")).toBeNull();
     });
     const [target] = mockMoveFocus.mock.calls.at(-1) ?? [];
     const nextAction = within(screen.getByLabelText(next)).getByRole("button", {
-      name: /^(?:Revoke|Disconnect)$/u,
+      name: /^(?:End session|Disconnect)$/u,
     });
     expect(isControl(target, nextAction)).toBe(true);
   });
@@ -518,8 +520,8 @@ describe("Settings → Devices and sessions", () => {
   it("moves focus to Add a computer when the last row is ended", async () => {
     await renderSettings(sessionsServer([THIS_BROWSER, OTHER_BROWSER]).routes);
     const row = await screen.findByLabelText("Firefox on Linux");
-    await fireEvent.press(within(row).getByRole("button", { name: "Revoke" }));
-    await fireEvent.press(within(row).getByRole("button", { name: "Revoke" }));
+    await fireEvent.press(within(row).getByRole("button", { name: "End session" }));
+    await fireEvent.press(within(row).getByRole("button", { name: "End session" }));
     await waitFor(() => {
       expect(screen.queryByLabelText("Firefox on Linux")).toBeNull();
     });
@@ -533,12 +535,14 @@ describe("Settings → Devices and sessions", () => {
       "GET /api/sessions": () => SessionsOutputSchema.parse({ sessions: ALL }),
     });
     const row = await screen.findByLabelText("Firefox on Linux");
-    await fireEvent.press(within(row).getByRole("button", { name: "Revoke" }));
+    await fireEvent.press(within(row).getByRole("button", { name: "End session" }));
     const confirm = within(row).getByLabelText("End this session?");
-    await fireEvent.press(within(confirm).getByRole("button", { name: "Revoke" }));
+    await fireEvent.press(within(confirm).getByRole("button", { name: "End session" }));
     await screen.findByRole("alert");
     const [target] = mockMoveFocus.mock.calls.at(-1) ?? [];
-    expect(isControl(target, within(confirm).getByRole("button", { name: "Revoke" }))).toBe(true);
+    expect(isControl(target, within(confirm).getByRole("button", { name: "End session" }))).toBe(
+      true,
+    );
   });
 
   it("puts the question above Cancel and the action, in that order, on a phone and a computer (QA round 15 M3)", async () => {
@@ -546,7 +550,7 @@ describe("Settings → Devices and sessions", () => {
       mockLayout.isWide = isWide;
       await renderSettings(sessionsServer(ALL).routes);
       const row = await screen.findByLabelText("Firefox on Linux");
-      await fireEvent.press(within(row).getByRole("button", { name: "Revoke" }));
+      await fireEvent.press(within(row).getByRole("button", { name: "End session" }));
       const confirm = within(row).getByLabelText("End this session?");
       expect(within(confirm).getByText("End this session?")).toBeOnTheScreen();
       // The two buttons share a row of their own, under the question, Cancel first.
@@ -564,9 +568,9 @@ describe("Settings → Devices and sessions", () => {
       const labels = within(actions)
         .getAllByRole("button")
         .map((button) =>
-          String(within(button).getByText(/^(?:Cancel|Revoke)$/u).props["children"]),
+          String(within(button).getByText(/^(?:Cancel|End session)$/u).props["children"]),
         );
-      expect(labels).toEqual(["Cancel", "Revoke"]);
+      expect(labels).toEqual(["Cancel", "End session"]);
       await screen.unmount();
     }
   });
@@ -895,7 +899,7 @@ describe("Settings' buttons", () => {
     mockLayout.isWide = true;
     await renderSettings(sessionsServer(ALL).routes);
     await screen.findByLabelText("Firefox on Linux");
-    expect(isStretched("Revoke")).toBe(false);
+    expect(isStretched("End session")).toBe(false);
     expect(isStretched("Add a computer")).toBe(false);
     expect(isStretched("Connect an AI app")).toBe(false);
     expect(isStretched("Log out")).toBe(false);

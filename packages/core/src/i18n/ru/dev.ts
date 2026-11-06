@@ -67,7 +67,7 @@ export const ruDev: { readonly [K in keyof typeof enDev]: string } = {
   "dev.gallery.controls.buttons": "Кнопки",
   "dev.gallery.controls.primary": "Сохранить изменения",
   "dev.gallery.controls.secondary": "Добавить компьютер",
-  "dev.gallery.controls.plain": "Отменить",
+  "dev.gallery.controls.plain": "Вернуть",
   "dev.gallery.controls.destructive": "Удалить аккаунт",
   "dev.gallery.controls.busy": "Сохраняется",
   "dev.gallery.controls.long": "Отправить отчёт преподавателю по электронной почте до пятницы",

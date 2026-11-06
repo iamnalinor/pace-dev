@@ -415,6 +415,8 @@ The same rule applies when a previously successful channel is no longer configur
 - **Missed because.** The card had its own `assistant.cancel` key, translated on its own; catalog tests checked that every key exists and has the same placeholders, not that one meaning keeps one word, and no test put the card and the toast on screen together in Russian.
 - **Rule.** A common action has one key (`common.cancel`, `common.undo`) and screens reuse it rather than adding a copy; Cancel and Undo read differently in every language. `i18n.test.ts` fails when any key that reads "Cancel" or "Undo" in English reads otherwise than the common key in Russian, or when the two common words are the same.
 
+Extended (F-CPY-02/03/05, 2026-11-06): the same class held for «Отменить» (Undo) against «Отменить задачу», "Done" for a task and an approved proposal, and "Revoke" against "End this session?". `glossary.test.ts` now also compares `common.undo` with `review.action.cancel` (RU) and `assistant.approved` with `task.done`, and bans "Revoke" and "Log in" in the English catalog.
+
 ### 46. A workflow expression GitHub holds instead of running
 - **Bug.** After #45 every Deploy run (after CI and by hand) ended `action_required` with no job started, so the merge never reached production. The new step read all secrets at once (`toJSON(secrets)`) to find the `LLM_*_N` slots; GitHub holds such a run for approval.
 - **Missed because.** Workflows have no tests: the jq was simulated locally and the YAML parsed, but nothing runs a workflow before it is on `main`, and nobody checked what GitHub does with an expression over the whole secrets context.
@@ -1951,3 +1953,8 @@ New bugs go here with their class; a new class gets its own section above.
 - **Sweep and guard.** Swept the forms: Day's sheet, the project form and the close sheet already attach
   theirs (the project form's name error stays a form line, by its single field). Guard: the preset tests
   assert the sentence, `aria-invalid` on the field and that editing the name clears it.
+
+### 134. Owner-corrected copy with no test pinning it
+- **Bug.** The update banner went back to "We changed a few things" (PR #42) after the owner had rejected that copy twice; "Settings → Devices" and the long Calendar hint came back the same way (F-CPY-01).
+- **Missed because.** A test pinned the rejected copy itself (`update-banner.web.test.tsx` expected "We changed a few things"), and no test listed phrases the owner had banned or strings they had agreed.
+- **Sweep and guard.** Swept the catalogs for the banned phrases (none left). Guard: `packages/core/src/i18n/glossary.test.ts` lists banned phrases, pins the agreed update copy and the Calendar hint's length, and holds one word per action per language (class 45). A correction by the owner adds its phrase there in the same change.
