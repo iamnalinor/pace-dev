@@ -136,6 +136,8 @@ export type TokensV2 = {
       readonly move: Bezier;
     };
     readonly exit: Readonly<Record<MotionStep, number>>;
+    /** How long a created row carries its one-time highlight, fading (spec §6 "proposal accepted"). */
+    readonly highlight: number;
     readonly reduced: { readonly fade: number };
     readonly spring: {
       readonly sheet: {

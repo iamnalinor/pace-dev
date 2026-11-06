@@ -202,13 +202,15 @@ const datesThrough = (first: string, last: string): readonly string[] => {
 
 /**
 The days the sheet offers each time to be put on: the start any day the block touched, the end
-any day from the start's to the day after it ended (a running block's end has none). A Fri 20:00 –
+any day from the start's to the day after it ended, but never one that has not begun (a block is
+what already happened: tomorrow's chip was always refused, QA21 L3); a running block's end has none. A Fri 20:00 –
 Sun 07:00 block left running is cut back to Friday by choosing Friday, which the clock rules alone
 never reach (round 6).
 */
 export const dayChoicesOf = (
   target: SheetTarget,
   zone: string,
+  now: string,
 ): { readonly from: readonly string[]; readonly to: readonly string[] } => {
   const startDate = wallClock(target.startAt, zone).date;
   if (target.endAt === null) {
@@ -218,7 +220,11 @@ export const dayChoicesOf = (
   const dayAfter = new Date(Date.parse(`${endDate}T00:00:00.000Z`) + DAY_MS)
     .toISOString()
     .slice(0, 10);
-  return { from: datesThrough(startDate, endDate), to: datesThrough(startDate, dayAfter) };
+  const today = wallClock(now, zone).date;
+  return {
+    from: datesThrough(startDate, endDate),
+    to: datesThrough(startDate, dayAfter).filter((date) => date <= today),
+  };
 };
 
 /** A block whose start and end fall on different days (an end at midnight is still the day before). */

@@ -305,7 +305,10 @@ test("a switch takes keyboard focus visibly and is a 24 px target", async ({ pag
   await page.keyboard.press("Shift+Tab");
   await page.keyboard.press("Tab");
   await expect(toggle).toBeFocused();
-  const outline = await toggle.evaluate((element) => getComputedStyle(element).outlineStyle);
+  // The ring is on the drawn track (the kit's small visual), not on the target around it.
+  const outline = await toggle
+    .locator("[data-pace-visual]")
+    .evaluate((element) => getComputedStyle(element).outlineStyle);
   expect(outline).not.toBe("none");
 });
 

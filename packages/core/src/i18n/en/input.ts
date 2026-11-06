@@ -84,6 +84,9 @@ export const enInput = {
   "close.recordedAt": "{recorded} · happened {happened}",
   "close.beforeDeadline": "Done · before deadline",
   "close.late": "Done · late",
+  "close.recordsAs": "Will be recorded as",
+  "close.submittedBeforeDeadline": "Submitted · before deadline",
+  "close.submittedLate": "Submitted · late",
   "close.submit": "Submit",
   "close.otherLabel": "Close task as…",
   "close.cancelled": "Cancelled",
@@ -217,7 +220,7 @@ export const enInput = {
   "action.doubtful": "(check this)",
   "assistant.approve": "Approve",
   "assistant.review": "Review assistant actions",
-  "assistant.approved": "Done",
+  "assistant.approved": "Approved",
   "assistant.approvedMore.one": "and {count} more action",
   "assistant.approvedMore.few": "and {count} more actions",
   "assistant.approvedMore.many": "and {count} more actions",
@@ -225,10 +228,14 @@ export const enInput = {
   "assistant.correct": "Correct the assistant…",
   "assistant.sendCorrection": "Send correction",
   "assistant.reading": "The assistant is reading…",
-  "assistant.rulesUsed":
-    "Assistant unavailable. These actions come from local rules; check them before approving.",
-  "assistant.rulesUsedUnreadable":
+  "assistant.rulesUsed.limited":
+    "The assistant is out of requests for now. These actions come from local rules; check them before approving.",
+  "assistant.rulesUsed.unreachable":
+    "The assistant could not be reached. These actions come from local rules; check them before approving.",
+  "assistant.rulesUsed.unreadable":
     "The assistant couldn't read this one. These actions come from local rules; check them before approving.",
+  "assistant.rulesUsed.off":
+    "This server has no assistant. These actions come from local rules; check them before approving.",
   "assistant.couldNotRead": "The assistant could not read this. Try again.",
   "assistant.unread.limited":
     "The assistant is out of requests until about {time}, and the rules found nothing here. Try again after that.",

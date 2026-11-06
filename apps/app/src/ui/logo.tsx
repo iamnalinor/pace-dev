@@ -5,7 +5,7 @@ import { useTheme } from "./theme-provider.tsx";
 
 /**
 The chevron mark from `assets/logo/pace-mark.svg`, drawn with the current palette: the lead
-chevron in the accent's text shade, so it reads on a light background as well as a dark one.
+chevron in the `logo` lime (deeper on light, bright on dark), the trailing one in the secondary label.
 */
 export const PaceMark = ({ size = 56 }: { readonly size?: number }) => {
   const { palette } = useTheme();
@@ -14,7 +14,7 @@ export const PaceMark = ({ size = 56 }: { readonly size?: number }) => {
       <Path
         d="M18 30 L48 60 L18 90"
         fill="none"
-        stroke={palette["label.tertiary"]}
+        stroke={palette["label.secondary"]}
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth={16}

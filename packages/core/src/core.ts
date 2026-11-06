@@ -14,6 +14,7 @@ export * from "./api/protocol.ts";
 export {
   AccountDeletedSchema,
   AuthSessionSchema,
+  DEVICE_FIELD_LIMITS,
   DevLoginSchema,
   LogoutSchema,
   type Me,

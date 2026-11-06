@@ -149,8 +149,11 @@ describe("LoginScreen", () => {
     // opens is named after this phone and linked to its install id.
     const { loadDeviceId } = jest.requireActual<typeof DeviceIdActual>("../platform/device-id.ts");
     expect(auth.startBotLogin).toHaveBeenCalledWith("app", {
+      deviceBrand: "mock",
       deviceId: await loadDeviceId(),
+      deviceModel: "mock",
       deviceName: "Pixel 9a",
+      osVersion: "mock",
     });
     expect(screen.getByText("Waiting for Telegram…")).toBeOnTheScreen();
     const [options] = waitForToken.mock.calls[0] ?? [];
@@ -237,7 +240,7 @@ describe("LoginScreen", () => {
     });
     auth.adoptToken.mockResolvedValue(ok(fakeUser));
     await renderScreen();
-    await fireEvent.press(screen.getByText("Log in on the web instead"));
+    await fireEvent.press(screen.getByText("Sign in on the web instead"));
     await waitFor(() => {
       expect(auth.adoptToken).toHaveBeenCalledWith("tok_web");
     });
@@ -258,7 +261,7 @@ describe("LoginScreen", () => {
       });
       auth.adoptToken.mockResolvedValueOnce(answer);
       const { unmount } = await renderScreen();
-      await fireEvent.press(screen.getByText("Log in on the web instead"));
+      await fireEvent.press(screen.getByText("Sign in on the web instead"));
       await waitFor(() => {
         expect(auth.adoptToken).toHaveBeenCalledWith("tok_web");
       });

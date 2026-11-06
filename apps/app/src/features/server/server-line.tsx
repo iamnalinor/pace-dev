@@ -4,6 +4,7 @@ import { useStore } from "zustand";
 
 import { useT } from "#app/app-state.tsx";
 import { serverHost, serverStore } from "#app/platform/server-store.ts";
+import { OverlayPresence } from "#app/ui/overlay-presence.tsx";
 
 import { ChangeServerSheet } from "./change-server-sheet.tsx";
 
@@ -31,13 +32,15 @@ export const ServerLine = () => {
           <Text className="font-medium text-accent-text">{t("server.change")}</Text>
         </Text>
       </Pressable>
-      {isOpen ? (
-        <ChangeServerSheet
-          onClose={() => {
-            setIsOpen(false);
-          }}
-        />
-      ) : null}
+      <OverlayPresence value={isOpen ? true : null}>
+        {() => (
+          <ChangeServerSheet
+            onClose={() => {
+              setIsOpen(false);
+            }}
+          />
+        )}
+      </OverlayPresence>
     </>
   );
 };

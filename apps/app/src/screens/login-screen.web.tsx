@@ -66,7 +66,7 @@ const LoginOptions = ({
       <Button
         busy={bot.phase.kind === "starting"}
         onPress={() => void bot.start()}
-        variant="ghost"
+        variant="plain"
         width="fill"
       >
         {t("login.botFallback")}

@@ -98,6 +98,8 @@ for (const size of SIZES) {
       });
       // By keyboard, focus stays in the row (bug class 5): onto Cancel inside the confirm, which
       // is named by its question, and back onto Disconnect when cancelled.
+      // The sheet that added it hands focus back to its opener as it leaves: wait for that first.
+      await expect(section.getByRole("button", { name: "Add a computer" })).toBeFocused();
       await computer.getByRole("button", { name: "Disconnect" }).focus();
       await page.keyboard.press("Enter");
       const confirm = computer.getByRole("group", {
@@ -176,10 +178,10 @@ for (const size of SIZES) {
       const section = page.getByRole("group", { name: "Devices and sessions" });
       const current = section.getByRole("group").filter({ hasText: "This device" }).first();
       await expect(current).toBeVisible();
-      await current.getByRole("button", { name: "Revoke" }).click();
+      await current.getByRole("button", { name: "End session" }).click();
       await current
         .getByRole("group", { name: "End this session? This device signs out." })
-        .getByRole("button", { name: "Revoke" })
+        .getByRole("button", { name: "End session" })
         .click();
       await expect(page).toHaveURL(/\/login$/u);
       // The server closes this browser's socket as it ends the session: a late check of it must

@@ -1,8 +1,6 @@
 import { useState } from "react";
-import { TextInput } from "react-native";
 
-import { cx } from "#app/ui/cx.ts";
-import { useTheme } from "#app/ui/theme-provider.tsx";
+import { TextField } from "#app/ui/text-field.tsx";
 
 /**
 A number the person types freely: the text is kept as typed and every parseable value is
@@ -22,16 +20,12 @@ export const NumberInput = ({
   readonly invalid?: boolean;
   readonly onChange: (value: number) => void;
 }) => {
-  const { palette } = useTheme();
   const [text, setText] = useState(value === undefined ? "" : String(value));
   return (
-    <TextInput
-      accessibilityLabel={label}
-      className={cx(
-        "h-hit-web rounded-lg border bg-app px-3 font-sans text-callout tabular-nums text-label-primary",
-        invalid ? "border-danger" : "border-outline",
-      )}
-      inputMode="decimal"
+    <TextField
+      isInvalid={invalid}
+      isLabelHidden
+      label={label}
       onChangeText={(next) => {
         setText(next);
         const parsed = Number(next);
@@ -40,7 +34,7 @@ export const NumberInput = ({
         }
       }}
       placeholder={placeholder}
-      placeholderTextColor={palette["label.tertiary"]}
+      purpose="number"
       value={text}
     />
   );

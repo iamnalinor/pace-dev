@@ -36,7 +36,7 @@ const addTaskHere = async (page: Page, title: string): Promise<void> => {
   await line.press("Enter");
   await expect(page.getByText(/^The assistant will create /u)).toBeVisible();
   await approve(page);
-  await expect(page.getByRole("button", { name: "Edit details" })).toBeVisible();
+  await expect(page.getByRole("button", { exact: true, name: "Edit" })).toBeVisible();
 };
 
 test("a task added on one device shows on another within a second and a half, over the socket alone", async ({

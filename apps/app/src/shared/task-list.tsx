@@ -1,15 +1,14 @@
-import { ChevronDown, ChevronUp } from "lucide-react-native";
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { View } from "react-native";
 import Animated from "react-native-reanimated";
 
 import type { NowRow } from "@pace/client";
 
-import { useLanguage } from "#app/app-state.tsx";
+import { useT } from "#app/app-state.tsx";
+import { Button } from "#app/ui/button.tsx";
+import { Disclosure } from "#app/ui/disclosure.tsx";
+import { Group } from "#app/ui/group.tsx";
 import { ROW_ENTER, ROW_EXIT, ROW_LAYOUT } from "#app/ui/motion.ts";
-import { RowList } from "#app/ui/row-list.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
-import { formatCount } from "@pace/core";
 
 import { useOpenTask } from "./task-opener.tsx";
 import { TaskRow } from "./task-row.tsx";
@@ -24,22 +23,14 @@ const keeping = (
   return kept.length === ids.size ? ids : new Set(kept);
 };
 
-/** A list of task rows: tap to open, the check to close. */
-export const TaskRows = ({
-  animateLayout = true,
-  checked = false,
-  label,
-  rows,
-  withTag = true,
-}: {
-  readonly animateLayout?: boolean;
-  /** Closed tasks: checked rows that open the task (reopen is there). */
-  readonly checked?: boolean;
-  readonly label: string;
-  readonly rows: readonly NowRow[];
-  readonly withTag?: boolean;
-}) => {
-  const openTask = useOpenTask();
+/**
+Rows drawn at once (spec 4.3.1 Scale): a long list shows this many and a "Show more" row adds as
+many again, so a 1 284-task fold mounts a page, not the lot, inside the screen's own scroll.
+*/
+export const PAGE_SIZE = 30;
+
+/** The rows turning to dust after their check, and the ones whose dust has gone. */
+const useSettling = (rows: readonly NowRow[]) => {
   const { check, doesOpenSheet } = useCheckTask();
   // Rows turning to dust after their check; each closes once its dust has gone.
   const [dissolving, setDissolving] = useState<ReadonlySet<string>>(() => new Set());
@@ -66,17 +57,62 @@ export const TaskRows = ({
     setGone((current) => keeping(current, (id) => id !== row.id));
     setDissolving((current) => keeping(current, (id) => id !== row.id));
   };
+  return { check, doesOpenSheet, dissolving, gone, setDissolving, settle };
+};
+
+/** The key of the first row of the second kind, with the boundary's name; none when only one kind is shown. */
+const boundaryOf = (
+  shown: readonly NowRow[],
+  boundary: undefined | { readonly isAfter: (row: NowRow) => boolean; readonly label: string },
+): Readonly<Record<string, string>> | undefined => {
+  const first = shown.findIndex((row) => boundary?.isAfter(row) === true);
+  const row = shown[first];
+  return boundary === undefined || row === undefined || first === 0
+    ? undefined
+    : { [row.id]: boundary.label };
+};
+
+/** A list of task rows: tap to open, the check to close. */
+export const TaskRows = ({
+  animateLayout = true,
+  boundary,
+  checked = false,
+  label,
+  rows,
+  withTag = true,
+}: {
+  readonly animateLayout?: boolean;
+  /** Where the rows change kind: the first open row `isAfter` holds a labelled edge-to-edge rule above it. */
+  readonly boundary?: { readonly isAfter: (row: NowRow) => boolean; readonly label: string };
+  /** Closed tasks: checked rows that open the task (reopen is there). */
+  readonly checked?: boolean;
+  readonly label: string;
+  readonly rows: readonly NowRow[];
+  readonly withTag?: boolean;
+}) => {
+  const t = useT();
+  const openTask = useOpenTask();
+  const [shownCount, setShownCount] = useState(PAGE_SIZE);
+  const { check, dissolving, doesOpenSheet, gone, setDissolving, settle } = useSettling(rows);
+  const open = rows.filter((row) => !gone.has(row.id));
+  const hidden = Math.max(0, open.length - shownCount);
+  // A long list turns the layout animation off: sliding a page of rows is not worth the frames.
+  const isAnimated = animateLayout && open.length <= PAGE_SIZE;
   return (
-    <RowList aria-label={label} className="px-2" role="list">
-      {rows
-        .filter((row) => !gone.has(row.id))
-        .map((row) => (
+    <>
+      <Group
+        aria-label={label}
+        boundaries={boundaryOf(open.slice(0, shownCount), boundary)}
+        role="list"
+        separatorInset="check"
+      >
+        {open.slice(0, shownCount).map((row) => (
           <Animated.View
             entering={ROW_ENTER}
             key={row.id}
             // The dust is the exit of a checked row; the fade would only bring it back for a moment.
             {...(!dissolving.has(row.id) && { exiting: ROW_EXIT })}
-            {...(animateLayout && { layout: ROW_LAYOUT })}
+            {...(isAnimated && { layout: ROW_LAYOUT })}
             role="listitem"
           >
             <TaskRow
@@ -102,13 +138,24 @@ export const TaskRows = ({
             />
           </Animated.View>
         ))}
-    </RowList>
+      </Group>
+      {hidden === 0 ? null : (
+        <Button
+          onPress={() => {
+            setShownCount((current) => current + PAGE_SIZE);
+          }}
+          variant="plain"
+        >
+          {t("now.showMore", { count: Math.min(hidden, PAGE_SIZE) })}
+        </Button>
+      )}
+    </>
   );
 };
 
 /**
-A section folded by default under its title and count ("In future · 3", "Done · 11"): the same
-chevron as every other disclosure.
+A section folded by default under its title and count ("In future · 3", "Done · 11"): the kit's
+`Disclosure`, the one fold of the app. Nothing to fold, no fold.
 */
 export const FoldedSection = ({
   children,
@@ -121,27 +168,24 @@ export const FoldedSection = ({
   readonly initiallyOpen?: boolean;
   readonly title: string;
 }) => {
-  const { palette } = useTheme();
-  const language = useLanguage();
   const [isOpen, setIsOpen] = useState(initiallyOpen);
   if (count === 0) {
     return null;
   }
-  const Icon = isOpen ? ChevronUp : ChevronDown;
   return (
     <View className="mt-2">
-      <Pressable
-        accessibilityRole="button"
-        aria-expanded={isOpen}
-        className="mx-3 h-hit-web flex-row items-center gap-2 border-t border-separator px-2 active:opacity-70"
-        onPress={() => {
+      {/* The hairline that set the fold apart from the list above it, kept from before the kit. */}
+      <View className="mx-gutter border-t border-separator" testID="fold-hairline" />
+      <Disclosure
+        count={count}
+        label={title}
+        onToggle={() => {
           setIsOpen(!isOpen);
         }}
+        open={isOpen}
       >
-        <Text className="font-sans text-footnote font-medium text-label-secondary">{`${title} · ${formatCount(count, language)}`}</Text>
-        <Icon color={palette["label.secondary"]} size={16} strokeWidth={2} />
-      </Pressable>
-      {isOpen ? children : null}
+        {children}
+      </Disclosure>
     </View>
   );
 };

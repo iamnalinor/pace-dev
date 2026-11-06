@@ -86,6 +86,9 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "close.recordedAt": "{recorded} · произошло {happened}",
   "close.beforeDeadline": "Сделано · до срока",
   "close.late": "Сделано · с опозданием",
+  "close.recordsAs": "Запишется как",
+  "close.submittedBeforeDeadline": "Сдано · до срока",
+  "close.submittedLate": "Сдано · с опозданием",
   "close.submit": "Сдать",
   "close.otherLabel": "Закрыть как…",
   "close.cancelled": "Отменена",
@@ -220,7 +223,7 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "action.doubtful": "(проверьте)",
   "assistant.approve": "Подтвердить",
   "assistant.review": "Посмотреть действия ассистента",
-  "assistant.approved": "Готово",
+  "assistant.approved": "Принято",
   "assistant.approvedMore.one": "и ещё {count} действие",
   "assistant.approvedMore.few": "и ещё {count} действия",
   "assistant.approvedMore.many": "и ещё {count} действий",
@@ -228,10 +231,14 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "assistant.correct": "Уточнить для ассистента…",
   "assistant.sendCorrection": "Отправить уточнение",
   "assistant.reading": "Ассистент разбирает текст…",
-  "assistant.rulesUsed":
-    "Ассистент недоступен. Это разбор по правилам; проверьте действия перед подтверждением.",
-  "assistant.rulesUsedUnreadable":
+  "assistant.rulesUsed.limited":
+    "У ассистента пока закончились запросы. Это разбор по правилам; проверьте действия перед подтверждением.",
+  "assistant.rulesUsed.unreachable":
+    "Не удалось связаться с ассистентом. Это разбор по правилам; проверьте действия перед подтверждением.",
+  "assistant.rulesUsed.unreadable":
     "Ассистент не смог разобрать этот текст. Это разбор по правилам; проверьте действия перед подтверждением.",
+  "assistant.rulesUsed.off":
+    "На этом сервере нет ассистента. Это разбор по правилам; проверьте действия перед подтверждением.",
   "assistant.couldNotRead": "Не удалось разобрать текст. Попробуйте ещё раз.",
   "assistant.unread.limited":
     "У ассистента закончились запросы примерно до {time}, а правила здесь ничего не нашли. Попробуйте после этого.",

@@ -74,6 +74,7 @@ describe("NowScreen on a wide window", () => {
     await renderScreen(<NowScreen />, await createTestRuntime());
     await fireEvent.press(screen.getByRole("checkbox", { name: "Mark Algebra HW 6 done" }));
     expect(submitSheet()).toBeOnTheScreen();
+    await fireEvent.changeText(line(), "pay the rent");
     await fireEvent.press(button("nav.newTask"));
     await fireEvent.press(button("common.close"));
     expect(taskDetails()).toBeOnTheScreen();
@@ -100,12 +101,12 @@ describe("NowScreen on a wide window", () => {
     await renderScreen(<NowScreen />, runtime);
     await fireEvent.press(screen.getByText("Algebra HW 6"));
     expect(taskDetails()).toBeOnTheScreen();
+    await fireEvent.changeText(line(), "pay the rent");
     await fireEvent.press(button("nav.newTask"));
     // The pane holds the form in place of the task; the line is still in the list's column.
     expect(screen.getByRole("header", { name: en("form.newTask") })).toBeOnTheScreen();
     expect(taskDetails()).toBeNull();
     expect(line()).toBeOnTheScreen();
-    await fireEvent.changeText(title(), "pay the rent");
     await fireEvent(title(), "submitEditing");
     await waitFor(() => {
       expect(titles(runtime)).toContain("pay the rent");
@@ -114,15 +115,24 @@ describe("NowScreen on a wide window", () => {
     expect(taskDetails()).toBeOnTheScreen();
   });
 
-  it("closes back to the pane's empty state, the typed line kept", async () => {
+  it("closes the inspector with the form, the typed line kept (collapsed with nothing picked, F-LAY-03)", async () => {
     await renderScreen(<NowScreen />, await createTestRuntime());
     await fireEvent.changeText(line(), "renew the passport");
     await fireEvent.press(button("nav.newTask"));
     expect(title()).toHaveDisplayValue("renew the passport");
     await fireEvent.press(button("common.close"));
     expect(screen.queryByLabelText(en("edit.taskTitle"))).toBeNull();
-    expect(screen.getByText(en("now.pickTask"))).toBeOnTheScreen();
+    expect(screen.queryByLabelText(en("now.details"))).toBeNull();
     expect(line()).toHaveDisplayValue("renew the passport");
+  });
+
+  it("offers + beside the line only once it has text, and opens the form in the labelled inspector (F-CMP-18, F-LAY-03)", async () => {
+    await renderScreen(<NowScreen />, await createTestRuntime());
+    expect(screen.queryByRole("button", { name: en("nav.newTask") })).toBeNull();
+    expect(screen.queryByLabelText(en("now.details"))).toBeNull();
+    await fireEvent.changeText(line(), "renew the passport");
+    await fireEvent.press(button("nav.newTask"));
+    expect(screen.getByLabelText(en("now.details"))).toBeOnTheScreen();
   });
 
   it("shows a task picked while the form is open: the form's draft goes, the line keeps its text", async () => {

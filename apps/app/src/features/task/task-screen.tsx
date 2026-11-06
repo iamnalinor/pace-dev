@@ -3,6 +3,7 @@ import { View } from "react-native";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { EmptyState } from "#app/ui/empty-state.tsx";
+import { OverlayPresence } from "#app/ui/overlay-presence.tsx";
 import { Screen } from "#app/ui/screen.tsx";
 import { type TaskViewModel, workLeftAt } from "@pace/client";
 
@@ -53,15 +54,22 @@ const OpenSheet = ({
   readonly onDismiss: () => void;
 }) => (
   <>
-    {open === "close" || open === "close-as" ? (
-      <CloseSheet
-        onClose={dismiss}
-        {...(open === "close-as" && { startMode: CLOSE_AS })}
-        view={task}
-      />
-    ) : null}
-    {open === "edit" ? <EditTaskSheet onClose={dismiss} view={task} /> : null}
-    {open === "project" ? <ProjectSheet onClose={dismiss} view={task} /> : null}
+    {/* Each kept through its exit (F-MOT-05). */}
+    <OverlayPresence value={open === "close" || open === "close-as" ? open : null}>
+      {(kept) => (
+        <CloseSheet
+          onClose={dismiss}
+          {...(kept === "close-as" && { startMode: CLOSE_AS })}
+          view={task}
+        />
+      )}
+    </OverlayPresence>
+    <OverlayPresence value={open === "edit" ? open : null}>
+      {() => <EditTaskSheet onClose={dismiss} view={task} />}
+    </OverlayPresence>
+    <OverlayPresence value={open === "project" ? open : null}>
+      {() => <ProjectSheet onClose={dismiss} view={task} />}
+    </OverlayPresence>
   </>
 );
 
@@ -84,7 +92,7 @@ export const TaskScreen = ({
   if (!view.ok) {
     return (
       <Screen header={<TaskHeader />}>
-        <EmptyState>{t("task.notFound")}</EmptyState>
+        <EmptyState title={t("task.notFound")} />
       </Screen>
     );
   }

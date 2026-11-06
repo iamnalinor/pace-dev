@@ -3,10 +3,10 @@ import { type TextInput, View } from "react-native";
 
 import type { RepeatChangeProblem } from "@pace/client";
 
-import { useIsAccountUnknown, useLanguage, useT } from "#app/app-state.tsx";
+import { useIsAccountUnknown, useIsFirstSync, useLanguage, useT } from "#app/app-state.tsx";
 import { focusField } from "#app/platform/focus-field.ts";
-import { IMPORTANCE_HUES } from "#app/ui/color.tsx";
 import { KnownAfterSync } from "#app/ui/empty-state.tsx";
+import { IMPORTANCE_HUES } from "#app/ui/hue.ts";
 import { RadioChips } from "#app/ui/radio-chips.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 import { ImportanceSchema, presetLabel } from "@pace/core";
@@ -197,12 +197,15 @@ export const TaskFields = ({
   // A fresh form does not open blaming the title the person has not typed yet (QA round 14 L6);
   // once typed and cleared it asks for one.
   const [isTitleTouched, setIsTitleTouched] = useState(false);
-  // Not `autoFocus`: on the web that scrolls the box the composer's form is still growing in.
+  // Not `autoFocus`: on the web that scrolls the box the composer's form is still growing in. A
+  // direct load of /add opens the form under a fresh browser's first-sync cover, where a hidden
+  // field takes no focus: the cursor comes once the cover lifts (QA21 M2, R23-12).
+  const isCovered = useIsFirstSync();
   useEffect(() => {
-    if (isTitleFocused) {
+    if (isTitleFocused && !isCovered) {
       focusField(titleRef.current);
     }
-  }, [isTitleFocused]);
+  }, [isCovered, isTitleFocused]);
   return (
     <View
       className="gap-4"

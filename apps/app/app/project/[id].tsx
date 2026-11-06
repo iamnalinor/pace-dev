@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from "expo-router";
 
-import { ProjectScreen } from "#app/screens/project-screen.tsx";
+import { ProjectScreen } from "#app/features/projects/project-screen.tsx";
 
 export default function ProjectRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();

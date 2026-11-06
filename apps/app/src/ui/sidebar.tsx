@@ -1,17 +1,5 @@
 import { type Href, usePathname, useRouter } from "expo-router";
-import {
-  CalendarRange,
-  ChartColumn,
-  Clock,
-  Folder,
-  History,
-  Inbox,
-  type LucideIcon,
-  Plus,
-  Settings,
-  Zap,
-} from "lucide-react-native";
-import { Pressable, Text, View } from "react-native";
+import { Text as NativeText, View } from "react-native";
 
 import type { MessageKey } from "@pace/core";
 
@@ -19,21 +7,18 @@ import { useOwnerName, useT } from "../app-state.tsx";
 import { requestNewTask } from "../shared/new-task-request.ts";
 import { NotificationBell } from "../shared/notifications/notification-bell.tsx";
 import { useWaitingCount } from "../shared/use-waiting-count.ts";
-import { UserAvatar } from "../shared/user-avatar.tsx";
 import { KeyHint } from "./button.tsx";
-import { CountBadge } from "./count-badge.tsx";
-import { cx } from "./cx.ts";
 import { HOTKEYS } from "./hotkeys.ts";
+import { Icon, type IconName } from "./icon.tsx";
 import { PaceMark } from "./logo.tsx";
-import { useTheme } from "./theme-provider.tsx";
-import { useDockToastsHere } from "./toast.tsx";
+import { ARIA_CURRENT, type NavCurrent, NavItem } from "./nav-item.tsx";
+import { Pressable } from "./pressable.tsx";
+import { Text } from "./text.tsx";
 import { useHotkey } from "./use-hotkey.tsx";
 
-const STROKE = 1.75;
-
-type Destination = {
+export type Destination = {
   readonly href: Href;
-  readonly icon: LucideIcon;
+  readonly icon: IconName;
   readonly label: MessageKey;
   /** For a row that carries a count badge: its accessibility label, which takes the `{count}`. */
   readonly countedLabel?: MessageKey;
@@ -41,181 +26,195 @@ type Destination = {
   readonly owns: (path: string) => boolean;
 };
 
-const DESTINATIONS: readonly Destination[] = [
+/** The eight destinations, in order: the sidebar and the rail list them all (spec §5.0.1). */
+export const DESTINATIONS: readonly Destination[] = [
   {
     href: "/",
-    icon: Zap,
+    icon: "zap",
     label: "nav.now",
     owns: (path) => path === "/" || path.startsWith("/task/"),
   },
-  { href: "/day", icon: Clock, label: "nav.day", owns: (path) => path === "/day" },
+  { href: "/day", icon: "clock", label: "nav.day", owns: (path) => path === "/day" },
   {
     href: "/week",
-    icon: CalendarRange,
+    icon: "calendar-range",
     label: "nav.week",
     owns: (path) => path === "/week",
   },
   {
     href: "/inbox",
-    icon: Inbox,
+    icon: "inbox",
     countedLabel: "nav.inboxWaiting",
     label: "nav.inbox",
     owns: (path) => path === "/inbox",
   },
   {
     href: "/projects",
-    icon: Folder,
+    icon: "folder",
     label: "nav.projects",
     owns: (path) => path === "/projects" || path.startsWith("/project/"),
   },
   {
     href: "/insights",
-    icon: ChartColumn,
+    icon: "chart-column",
     label: "nav.insights",
     owns: (path) => path === "/insights",
   },
-  { href: "/history", icon: History, label: "nav.history", owns: (path) => path === "/history" },
+  { href: "/history", icon: "history", label: "nav.history", owns: (path) => path === "/history" },
   {
     href: "/settings",
-    icon: Settings,
+    icon: "settings",
     label: "nav.settings",
     owns: (path) => ["/settings", "/presets"].some((own) => path.startsWith(own)),
   },
 ];
 
+/** Where the person is, for one destination: its own page, a screen it owns, or elsewhere. */
+export const currentOf = (destination: Destination, path: string): NavCurrent => {
+  if (path === destination.href || (path === "/add" && destination.href === "/")) {
+    return "page";
+  }
+  return destination.owns(path) ? "section" : null;
+};
+
+/** A destination link of the navigation (the sidebar's row, the rail's item). */
+export type DestinationLinkProps = {
+  /** What waits behind it (the Inbox's badge); 0 for one without. */
+  readonly count: number;
+  readonly destination: Destination;
+  readonly current: NavCurrent;
+};
+
+/**
+What every destination link says: its address, `aria-current` (`page` on its own page, `true` on a
+screen it owns), and its name for screen readers with what waits behind it, if anything.
+*/
+export const useDestinationLink = ({ count, current, destination }: DestinationLinkProps) => {
+  const t = useT();
+  return {
+    "aria-current": current === null ? undefined : ARIA_CURRENT[current],
+    href: destination.href,
+    label:
+      count > 0 && destination.countedLabel !== undefined
+        ? t(destination.countedLabel, { count })
+        : t(destination.label),
+  };
+};
+
 /** The sidebar paths: on a wide window these screens are top level, with no back chevron. */
 export const isSidebarPath = (path: string): boolean =>
   DESTINATIONS.some((destination) => destination.href === path);
 
-const SidebarLink = ({
-  count,
-  destination,
-  isCurrent,
-  onPress,
-}: {
-  /** What waits behind this row (the Inbox's badge); 0 for a row without one. */
-  readonly count: number;
-  readonly destination: Destination;
-  readonly isCurrent: boolean;
-  readonly onPress: () => void;
-}) => {
+/**
+A destination: a `NavItem`, a link with its address (`<a href>` on the web, so Ctrl/⌘-click opens it
+in a new tab; F-WEB-03). It navigates rather than pushes, so a destination already open is shown
+again.
+*/
+const SidebarLink = (props: DestinationLinkProps) => {
   const t = useT();
-  const { palette } = useTheme();
-  const Icon = destination.icon;
+  const { count, current, destination } = props;
+  const { href, label } = useDestinationLink(props);
   return (
-    <Pressable
-      accessibilityLabel={
-        count > 0 && destination.countedLabel !== undefined
-          ? t(destination.countedLabel, { count })
-          : t(destination.label)
-      }
-      accessibilityRole="link"
-      aria-current={isCurrent ? "page" : undefined}
-      className={cx(
-        "h-10 flex-row items-center gap-3 rounded-lg px-3 active:opacity-70",
-        isCurrent && "bg-fill-3",
-      )}
-      onPress={onPress}
-    >
-      <Icon
-        color={isCurrent ? palette["accent.text"] : palette["label.secondary"]}
-        size={18}
-        strokeWidth={STROKE}
-      />
-      <Text
-        className={cx(
-          "flex-1 font-sans text-subhead",
-          isCurrent ? "text-label-primary" : "font-normal text-label-secondary",
-        )}
-      >
-        {t(destination.label)}
-      </Text>
-      <CountBadge count={count} />
-    </Pressable>
-  );
-};
-
-/** The mark, the name and the bell; who is signed in on a line of its own beneath. */
-export const SidebarHeader = ({ owner }: { readonly owner: null | string }) => {
-  const t = useT();
-  return (
-    <>
-      <View className="flex-row items-center gap-2 px-2">
-        <PaceMark size={22} />
-        <Text className="flex-1 font-sans text-body font-semibold text-label-primary">
-          {t("app.name")}
-        </Text>
-        <NotificationBell variant="plain" />
-      </View>
-      {/* Who is signed in, on a line of its own: beside the logo and the bell it had 23 px (QA 17 M6). */}
-      {owner === null ? (
-        <View className="mb-2" />
-      ) : (
-        <View
-          accessibilityLabel={t("nav.signedInAs", { name: owner })}
-          accessible
-          className="mb-3 flex-row items-center gap-2 px-2"
-        >
-          <UserAvatar size={24} />
-          <Text
-            className="min-w-0 flex-1 font-sans text-footnote text-label-secondary"
-            numberOfLines={1}
-          >
-            {owner}
-          </Text>
-        </View>
-      )}
-    </>
+    <NavItem
+      count={count}
+      current={current}
+      href={href}
+      icon={destination.icon}
+      label={label}
+      title={t(destination.label)}
+    />
   );
 };
 
 /**
-The wide window's navigation, beside every signed-in screen (pushed ones included): it
-navigates by path, so a destination already open is shown again rather than stacked twice.
+The sidebar's header (spec §5.0.1, §4.2.22): the mark, «Pace» and the bell on one row; who is
+signed in on a line of its own under it, in full: beside the mark and the bell a name had 23 px and
+showed one letter (QA 17 M6). A name too long for the column ends in "…" and is whole in its
+tooltip (the web's `title`) and in what a screen reader says. No avatar: the initial beside the name
+said it twice (R22-25).
 */
-export const Sidebar = () => {
+export const SidebarHeader = ({ owner }: { readonly owner: null | string }) => {
   const t = useT();
+  return (
+    <View className="mb-3 gap-1 px-3" testID="sidebar-header">
+      <View className="min-h-hit-web flex-row items-center gap-2">
+        <PaceMark size={22} />
+        <Text className="flex-1" role="headline">
+          {t("app.name")}
+        </Text>
+        <NotificationBell place="sidebar" />
+      </View>
+      {owner === null ? null : (
+        <View
+          accessibilityLabel={t("nav.signedInAs", { name: owner })}
+          accessible
+          className="flex-row"
+          testID="sidebar-owner"
+        >
+          <Text className="flex-1" policy="truncate" role="callout">
+            {owner}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+};
+
+/**
+New task from the navigation (the sidebar's button, the rail's top button): the empty form opens
+on Now, which is brought to the front. Elsewhere than Now, N does the same (Now's composer takes N
+itself).
+*/
+export const useNewTask = (): (() => void) => {
   const router = useRouter();
   const path = usePathname();
-  const { palette } = useTheme();
-  const owner = useOwnerName();
-  const waiting = useWaitingCount();
-  useDockToastsHere();
-  // The empty form opens on Now (in its right pane): asked for, and Now brought to the front.
   const newTask = (): void => {
     requestNewTask();
     if (path !== "/" && path !== "/add") {
       router.navigate("/");
     }
   };
-  // Elsewhere than Now, N does the same (Now's composer takes N itself).
   useHotkey(HOTKEYS.newTask, newTask);
+  return newTask;
+};
+
+/**
+The wide window's navigation (spec §4.2.22), beside every signed-in screen (pushed ones included):
+the header, New task (the shell's one filled accent, with its key), and the eight destinations as
+`NavItem`s. It navigates by path, so a destination already open is shown again rather than stacked
+twice.
+*/
+export const Sidebar = () => {
+  const t = useT();
+  const path = usePathname();
+  const owner = useOwnerName();
+  const waiting = useWaitingCount();
+  const newTask = useNewTask();
   return (
     <View
       aria-label={t("nav.main")}
-      className="w-sidebar gap-1 border-r border-separator bg-sidebar px-3 pb-4 pt-5"
+      className="w-sidebar gap-1 border-r border-separator bg-sidebar px-3 pb-4 pt-4"
       role="navigation"
     >
       <SidebarHeader owner={owner} />
       <Pressable
-        accessibilityLabel={t("nav.newTask")}
-        accessibilityRole="button"
-        className="mb-3 h-10 flex-row items-center gap-2 rounded-lg bg-accent px-3 active:opacity-80"
+        className="mb-3 min-h-hit-web flex-row items-center gap-2 rounded-md bg-accent px-3"
+        label={t("nav.newTask")}
         onPress={newTask}
+        role="button"
       >
-        <Plus color={palette["accent.on"]} size={18} strokeWidth={STROKE} />
-        <Text className="flex-1 font-sans text-subhead text-accent-on">{t("nav.newTask")}</Text>
+        <Icon name="plus" tone="onAccent" />
+        <NativeText className="flex-1 font-sans text-callout font-medium text-accent-on">
+          {t("nav.newTask")}
+        </NativeText>
         <KeyHint hotkey={HOTKEYS.newTask} variant="primary" />
       </Pressable>
       {DESTINATIONS.map((destination) => (
         <SidebarLink
           count={destination.countedLabel === undefined ? 0 : waiting}
+          current={currentOf(destination, path)}
           destination={destination}
-          isCurrent={destination.owns(path)}
           key={destination.label}
-          onPress={() => {
-            router.navigate(destination.href);
-          }}
         />
       ))}
     </View>

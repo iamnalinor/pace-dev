@@ -117,7 +117,7 @@ describe("SettingsScreen", () => {
     });
     const presetsLink = `${en("settings.presets")} ${en("settings.presets.hint")}`;
     await fireEvent.press(screen.getByRole("link", { name: presetsLink }));
-    expect(router.push).toHaveBeenCalledWith("/presets");
+    expect(router.navigate).toHaveBeenCalledWith("/presets");
   });
 
   it("turns Week's night hours on and off", async () => {
@@ -520,11 +520,16 @@ describe("SettingsScreen", () => {
     await fireEvent.press(screen.getByRole("button", { name: en("settings.deleteAccount") }));
     const remove = screen.getByRole("button", { name: en("settings.deleteAccount.confirm") });
     expect(en("settings.deleteAccount.confirm")).toMatch(/Telegram/u);
-    expect(String(remove.props["className"])).toMatch(/border-danger/u);
+    // Both on the destructive look, alike (spec §4.2.3, F-CMP-07): the quiet danger fill.
+    expect(String(within(remove).getByTestId("pressable-visual").props["className"])).toMatch(
+      /border-danger/u,
+    );
     await fireEvent.press(screen.getByRole("button", { name: en("common.cancel") }));
     await fireEvent.press(screen.getByRole("button", { name: en("settings.wipe") }));
     const wipe = screen.getByRole("button", { name: en("settings.wipe.confirm") });
-    expect(String(wipe.props["className"])).toMatch(/border-danger/u);
+    expect(String(within(wipe).getByTestId("pressable-visual").props["className"])).toMatch(
+      /border-danger/u,
+    );
   });
 
   it("keeps focus through Wipe's and Delete's first confirm: onto Cancel and back to the opener (bug class 5)", async () => {
@@ -622,5 +627,24 @@ describe("SettingsScreen", () => {
     await fireEvent.press(screen.getByRole("button", { name: en("common.cancel") }));
     expect(screen.getByText(en("settings.confirmation.waiting"))).toBeOnTheScreen();
     expect(mockPendingConfirmation.current?.request.id).toBe(id);
+  });
+});
+
+describe("Settings sections (spec §5.17)", () => {
+  it("groups the settings under headings, destructive actions last in the danger style", async () => {
+    await renderScreen(<SettingsScreen />, await createTestRuntime({ world: "empty" }));
+    for (const key of ["settings.account", "settings.notifications", "settings.tasks"] as const) {
+      expect(screen.getByRole("header", { name: en(key) })).toBeOnTheScreen();
+    }
+    expect(screen.getAllByTestId("group-separator").length).toBeGreaterThan(0);
+  });
+
+  it("shows the server read-only with its host on a phone", async () => {
+    await renderScreen(<SettingsScreen />, await createTestRuntime({ world: "empty" }));
+    expect(screen.getByText(en("settings.server.hint"))).toBeOnTheScreen();
+  });
+
+  it("runs in a zone that is not UTC, so a host-zone assumption fails here (bug-lessons class 135)", () => {
+    expect(new Date(2026, 0, 1).getTimezoneOffset()).not.toBe(0);
   });
 });

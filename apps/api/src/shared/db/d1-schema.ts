@@ -68,6 +68,10 @@ export const sessions = sqliteTable(
     city: text(),
     /** The device whose usage it sends (a phone's install id); an agent files under the session id. */
     deviceId: text(),
+    /** What a phone app named about itself at login (`expo-device`); null for the rest. */
+    deviceBrand: text(),
+    deviceModel: text(),
+    osVersion: text(),
     createdAt: integer({ mode: "timestamp_ms" }).notNull(),
     expiresAt: integer({ mode: "timestamp_ms" }).notNull(),
     lastSeenAt: integer({ mode: "timestamp_ms" }).notNull(),
@@ -148,6 +152,9 @@ export const loginNonces = sqliteTable("login_nonces", {
   /** The phone the app named when it asked (its model and install id); none from the web. */
   deviceName: text(),
   deviceId: text(),
+  deviceBrand: text(),
+  deviceModel: text(),
+  osVersion: text(),
   /** The session the nonce opened, once the app's poll consumed it. */
   sessionId: text(),
   /** The bot's reply to `/start` for this login, so the login notice can edit it into place. */

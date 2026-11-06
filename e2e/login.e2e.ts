@@ -291,7 +291,7 @@ test("a phone has Now, Day, Inbox and More; More leads to Week and the rest and 
   await page.setViewportSize({ height: 844, width: 390 });
   await loginViaApi(page);
   await page.goto("/");
-  const tabs = page.getByRole("tablist", { name: "Main" }).getByRole("tab");
+  const tabs = page.getByRole("navigation", { name: "Main" }).getByRole("link");
   await expect(tabs).toHaveText(["Now", "Day", "Inbox", "More"]);
   await tabs.getByText("More").click();
   await expect(page.getByRole("heading", { level: 1, name: "More" })).toBeVisible();
@@ -328,7 +328,7 @@ test("a server older than the app holds a signed-in person at the versions scree
   // The web has no other server to sign in on: its owner updates it (QA 17 L1).
   await expect(page.getByText("Ask whoever runs it to update it.", { exact: false })).toBeVisible();
   await expect(page.getByText(/sign in on another/u)).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Refresh" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Refresh page" })).toHaveCount(0);
   // Nothing of the app around it: no navigation, no Change server, one way out.
   await expect(page.getByRole("navigation")).toHaveCount(0);
   await expect(page.getByText(/Change/u)).toHaveCount(0);
@@ -364,6 +364,6 @@ test("a page older than its server offers Refresh, and a refresh with a fitting 
   await expect(page.getByText("Refresh it to load the new one.", { exact: false })).toBeVisible();
   await expectNoA11yViolations(page);
   instance.isTooNew = false;
-  await page.getByRole("button", { name: "Refresh" }).click();
+  await page.getByRole("button", { name: "Refresh page" }).click();
   await expect(page.getByRole("heading", { name: "Now" })).toBeVisible();
 });

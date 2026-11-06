@@ -4,7 +4,7 @@ import type { PaceRuntime } from "#app/runtime.ts";
 import type { ParseField, TaskDraft } from "@pace/core";
 
 import { requestNewTask } from "#app/shared/new-task-request.ts";
-import { classLinePx, classPx } from "#app/test/class-px.ts";
+import { classLinePx } from "#app/test/class-px.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { FAKE_STORE_ID, fakeUser } from "@pace/client/testing";
@@ -114,7 +114,7 @@ describe("Composer", () => {
     await fireEvent(line(), "contentSizeChange", {
       nativeEvent: { contentSize: { height: 1000, width: 300 } },
     });
-    const eightLines = 8 * classLinePx(line()) + 2 * classPx(line(), "py");
+    const eightLines = 8 * classLinePx(line());
     expect((line().props as { style: { height: number } }).style.height).toBe(eightLines);
   });
 
@@ -122,13 +122,13 @@ describe("Composer", () => {
     await renderComposer(await createTestRuntime());
     await fireEvent.press(button("nav.newTask"));
     await fireEvent.press(screen.getByRole("radio", { name: "Homework" }));
-    await fireEvent.press(screen.getByRole("radio", { name: /^Estimate: /u }));
-    expect(screen.getByRole("radio", { name: "Estimate: Default (1h)" })).toBeChecked();
+    await fireEvent.press(screen.getByRole("button", { name: /^Estimate: /u }));
+    expect(screen.getByRole("button", { name: "Estimate: Default (1h)" })).toBeExpanded();
     expect(screen.queryByRole("radio", { name: "Default (1h)" })).toBeNull();
     expect(screen.queryByRole("radio", { name: "1h" })).toBeNull();
     await fireEvent.press(screen.getByRole("radio", { name: "30m" }));
-    expect(screen.getByRole("radio", { name: "Estimate: 30m" })).toBeOnTheScreen();
-    await fireEvent.press(screen.getByRole("radio", { name: /^Estimate: /u }));
+    expect(screen.getByRole("button", { name: "Estimate: 30m" })).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: /^Estimate: /u }));
     expect(screen.queryByRole("radio", { name: "Default (1h)" })).toBeNull();
     expect(screen.getByRole("radio", { name: "1h" })).toBeOnTheScreen();
   });
@@ -136,17 +136,17 @@ describe("Composer", () => {
   it("closes the due calendar after picking a day", async () => {
     await renderComposer(await createTestRuntime());
     await fireEvent.press(button("nav.newTask"));
-    await fireEvent.press(screen.getByRole("radio", { name: /Due: No deadline/u }));
+    await fireEvent.press(screen.getByRole("button", { name: /Due: No deadline/u }));
     expect(screen.getByRole("button", { name: /October 7/u })).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("button", { name: /October 7/u }));
     expect(screen.queryByRole("button", { name: /October 7/u })).toBeNull();
-    expect(screen.getByRole("radio", { name: "Due: tomorrow 23:59" })).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Due: tomorrow 23:59" })).toBeOnTheScreen();
   });
 
   it("closes the due calendar when another form field is touched", async () => {
     await renderComposer(await createTestRuntime());
     await fireEvent.press(button("nav.newTask"));
-    await fireEvent.press(screen.getByRole("radio", { name: /Due: No deadline/u }));
+    await fireEvent.press(screen.getByRole("button", { name: /Due: No deadline/u }));
     expect(screen.getByRole("button", { name: /October 7/u })).toBeOnTheScreen();
     await fireEvent(screen.getByLabelText(en("edit.description")), "touchStart");
     expect(screen.queryByRole("button", { name: /October 7/u })).toBeNull();
@@ -576,7 +576,7 @@ describe("Composer", () => {
     await fireEvent.changeText(line(), "синк по дашборду");
     await fireEvent.changeText(line(), "синк по дашборду завтра 15:00 1ч");
     await enter();
-    expect(await screen.findByText(en("assistant.rulesUsed"))).toBeOnTheScreen();
+    expect(await screen.findByText(en("assistant.rulesUsed.unreachable"))).toBeOnTheScreen();
     expect(screen.getByText(/синк по дашборду/u)).toBeOnTheScreen();
     expect(created(runtime, "синк по дашборду")).toBeUndefined();
     await fireEvent.press(screen.getByRole("button", { name: en("assistant.approve") }));
@@ -611,10 +611,10 @@ describe("Composer", () => {
     await renderComposer(runtime);
     await fireEvent.changeText(line(), "оплатить связь");
     await enter();
-    expect(await screen.findByText(en("assistant.rulesUsed"))).toBeOnTheScreen();
+    expect(await screen.findByText(en("assistant.rulesUsed.unreachable"))).toBeOnTheScreen();
     await fireEvent.press(button("composer.aiLater"));
     expect(await screen.findByText(en("composer.aiQueuedSoon"))).toBeOnTheScreen();
-    expect(screen.queryByText(en("assistant.rulesUsed"))).toBeNull();
+    expect(screen.queryByText(en("assistant.rulesUsed.unreachable"))).toBeNull();
     expect(line()).toHaveDisplayValue("");
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 300));
@@ -666,10 +666,26 @@ describe("Composer", () => {
     await renderComposer(runtime);
     await fireEvent.changeText(line(), "оплатить связь");
     await enter();
-    expect(await screen.findByText(en("assistant.rulesUsedUnreadable"))).toBeOnTheScreen();
+    expect(await screen.findByText(en("assistant.rulesUsed.unreadable"))).toBeOnTheScreen();
     expect(screen.queryByRole("button", { name: en("composer.aiLater") })).toBeNull();
     expect(calls).toBe(1);
   });
+
+  it.each([
+    ["limited", "assistant.rulesUsed.limited"],
+    ["off", "assistant.rulesUsed.off"],
+  ] as const)(
+    "names the reason on the rules' preview card: %s (QA round 21 L7)",
+    async (reason, key) => {
+      const runtime = await createTestRuntime({
+        routes: { "POST /api/parse": () => unavailable(reason) },
+      });
+      await renderComposer(runtime);
+      await fireEvent.changeText(line(), "оплатить связь");
+      await enter();
+      expect(await screen.findByText(en(key))).toBeOnTheScreen();
+    },
+  );
 
   it("says why when the server could not keep the line after all, and does not offer it again", async () => {
     const bodies: unknown[] = [];
@@ -776,7 +792,7 @@ describe("Composer", () => {
     await renderComposer(await createTestRuntime());
     await fireEvent.press(button("nav.newTask"));
     await fireEvent.changeText(title(), "Leftover");
-    await fireEvent.press(screen.getByRole("radio", { name: /Due: No deadline/u }));
+    await fireEvent.press(screen.getByRole("button", { name: /Due: No deadline/u }));
     await fireEvent.press(screen.getByRole("button", { name: /October 7/u }));
     await fireEvent.press(screen.getByRole("radio", { name: en("form.repeat.daily") }));
     await fireEvent.press(button("form.addSubtask"));
@@ -788,7 +804,7 @@ describe("Composer", () => {
     expect(line()).toHaveDisplayValue("");
     await fireEvent.press(button("nav.newTask"));
     expect(title()).toHaveDisplayValue("");
-    expect(screen.getByRole("radio", { name: /Due: No deadline/u })).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: /Due: No deadline/u })).toBeOnTheScreen();
     expect(
       screen.getByRole("radio", { checked: true, name: en("form.repeat.none") }),
     ).toBeOnTheScreen();

@@ -1,19 +1,17 @@
-import { ChevronUp, X } from "lucide-react-native";
 import { type ReactNode, useMemo } from "react";
-import { Pressable, Text, View } from "react-native";
+import { View } from "react-native";
 
 import { useAppState, useT } from "#app/app-state.tsx";
 import { isDeadlineChoiceValid } from "#app/shared/task-fields/deadline-choice.ts";
 import { SubtaskList } from "#app/shared/task-fields/subtask-list.tsx";
 import { TaskFields, type TaskFormValues } from "#app/shared/task-fields/task-fields.tsx";
 import { Button } from "#app/ui/button.tsx";
-import { cx } from "#app/ui/cx.ts";
-import { HOTKEYS, labelWithHotkey } from "#app/ui/hotkeys.ts";
+import { HOTKEYS } from "#app/ui/hotkeys.ts";
+import { IconButton } from "#app/ui/icon-button.tsx";
 import { RadioChips } from "#app/ui/radio-chips.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
-import { Tooltip } from "#app/ui/tooltip.tsx";
-import { HotkeyLayer, KEYBOARD, useHotkey } from "#app/ui/use-hotkey.tsx";
+import { Text } from "#app/ui/text.tsx";
+import { HotkeyLayer, useHotkey } from "#app/ui/use-hotkey.tsx";
 import { type ComposerEdits, type ComposerModel, taskFormOptions } from "@pace/client";
 
 import { subtaskOf } from "./composer-flow.tsx";
@@ -104,41 +102,22 @@ const FormHeader = ({
   readonly variant: FormVariant;
 }) => {
   const t = useT();
-  const { palette } = useTheme();
   useHotkey(HOTKEYS.escape, onClose);
   // The second Enter, wherever the focus is outside a field or a button; ⌘↵ from anywhere.
   useHotkey(HOTKEYS.enter, onAdd);
   useHotkey(HOTKEYS.primary, onAdd);
-  const CloseIcon = variant === "pane" ? X : ChevronUp;
+  const closeIcon = variant === "pane" ? "x" : "chevron-up";
   return (
     <View className="flex-row items-center gap-2">
-      <Text
-        accessibilityRole="header"
-        className={cx(
-          "flex-1 font-sans text-label-primary",
-          variant === "pane" ? "text-title2" : "pl-1 text-callout font-semibold",
-        )}
-      >
+      <Text className="flex-1" level={2} role={variant === "pane" ? "title2" : "headline"}>
         {title}
       </Text>
       <View className="shrink">
-        <Button disabled={!canAdd} hotkey={HOTKEYS.enter} hotkeyMode="hint" onPress={onAdd}>
+        <Button disabled={!canAdd} onPress={onAdd} shortcut={HOTKEYS.primary} shortcutMode="hint">
           {actionLabel}
         </Button>
       </View>
-      <Tooltip
-        label={labelWithHotkey(t("common.close"), HOTKEYS.escape, KEYBOARD)}
-        showsOnTap={false}
-      >
-        <Pressable
-          accessibilityLabel={t("common.close")}
-          accessibilityRole="button"
-          className="h-hit-web w-hit-web items-center justify-center rounded-md active:opacity-70"
-          onPress={onClose}
-        >
-          <CloseIcon color={palette["label.secondary"]} size={20} strokeWidth={1.75} />
-        </Pressable>
-      </Tooltip>
+      <IconButton icon={closeIcon} label={t("common.close")} onPress={onClose} />
     </View>
   );
 };

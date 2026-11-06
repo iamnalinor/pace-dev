@@ -1,17 +1,19 @@
 import { useRouter } from "expo-router";
-import { ChevronDown, ChevronRight, ChevronUp } from "lucide-react-native";
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { View } from "react-native";
 
 import { useAppState, useLanguage, usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button } from "#app/ui/button.tsx";
-import { ActionChip } from "#app/ui/chip.tsx";
-import { ColorTag } from "#app/ui/color.tsx";
-import { cx } from "#app/ui/cx.ts";
+import { Chip } from "#app/ui/chip.tsx";
+import { Group } from "#app/ui/group.tsx";
 import { IconButton } from "#app/ui/icon-button.tsx";
+import { Icon } from "#app/ui/icon.tsx";
+import { ListRow } from "#app/ui/list-row.tsx";
+import { SectionHeader } from "#app/ui/section-header.tsx";
 import { SwitchRow } from "#app/ui/switch-row.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
+import { Dot } from "#app/ui/tag.tsx";
+import { Text } from "#app/ui/text.tsx";
 import {
   byPresetOrder,
   EXAMPLE_PRESET_IDS,
@@ -21,24 +23,7 @@ import {
   resolvePreset,
 } from "@pace/core";
 
-const Badge = ({
-  children,
-  isQuiet = false,
-}: {
-  readonly children: string;
-  readonly isQuiet?: boolean;
-}) => (
-  <Text
-    className={cx(
-      "rounded-sm px-2 py-0.5 font-sans text-caption2 font-normal",
-      isQuiet ? "text-label-tertiary" : "bg-fill-3 text-label-secondary",
-    )}
-  >
-    {children}
-  </Text>
-);
-
-/** One preset: tap to edit, arrows to move it in the pickers. */
+/** One preset: its dot and name, «Default» or «Yours» (and «Deleted») trailing; the arrows beside it move it in the pickers. */
 const PresetRow = ({
   isFirst,
   isLast,
@@ -51,70 +36,70 @@ const PresetRow = ({
   const t = useT();
   const language = useLanguage();
   const router = useRouter();
-  const { palette } = useTheme();
   const { actions } = usePace();
   const run = useRunAction();
   const presets = useAppState((state) => state.presets);
   const resolved = resolvePreset(presets, preset.id);
   const name = presetLabel(preset, language);
   return (
-    <View className="min-h-row flex-row items-center gap-1 border-b border-separator">
-      <Pressable
-        accessibilityRole="link"
-        className="min-h-row flex-1 flex-row items-center gap-2 px-1 active:opacity-70"
-        onPress={() => {
-          router.push({ params: { id: preset.id }, pathname: "/presets/[id]" });
-        }}
-      >
-        <View className="min-w-0 flex-1 flex-row">
-          <ColorTag color={resolved.ok ? resolved.value.color : null}>{name}</ColorTag>
-        </View>
-        {preset.archived ? <Badge isQuiet>{t("presets.archivedBadge")}</Badge> : null}
-        <Badge>{t(preset.builtIn ? "presets.builtIn" : "presets.yours")}</Badge>
-        <ChevronRight color={palette["label.tertiary"]} size={16} strokeWidth={1.75} />
-      </Pressable>
+    <View className="flex-row items-center">
+      <View className="min-w-0 flex-1">
+        <ListRow
+          label={name}
+          leading={<Dot hue={resolved.ok ? resolved.value.color : "slate"} />}
+          onPress={() => {
+            router.push({ params: { id: preset.id }, pathname: "/presets/[id]" });
+          }}
+          role="link"
+          title={name}
+          titleLines={1}
+          trailing={
+            <View className="flex-row items-center gap-2">
+              <Text role="footnote" tone="secondary">
+                {[
+                  ...(preset.archived ? [t("presets.archivedBadge")] : []),
+                  t(preset.builtIn ? "presets.builtIn" : "presets.yours"),
+                ].join(" · ")}
+              </Text>
+              <Icon name="chevron-right" size="inline" tone="tertiary" />
+            </View>
+          }
+        />
+      </View>
       <IconButton
         disabled={isFirst}
-        icon={ChevronUp}
+        icon={"chevron-up"}
         label={t("presets.moveUp", { name })}
         onPress={() => void run(actions.movePreset(preset.id, -1))}
-        variant="plain"
       />
       <IconButton
         disabled={isLast}
-        icon={ChevronDown}
+        icon={"chevron-down"}
         label={t("presets.moveDown", { name })}
         onPress={() => void run(actions.movePreset(preset.id, 1))}
-        variant="plain"
       />
     </View>
   );
 };
 
-/** Each kind opens a new unsaved preset based on it: actions in a row, none of them picked. */
+/** Each kind opens a new unsaved preset based on it: actions that say so, none of them picked. */
 const NewPreset = ({ choices }: { readonly choices: readonly Preset[] }) => {
   const t = useT();
   const language = useLanguage();
   const router = useRouter();
   return (
-    <View
-      accessibilityLabel={t("presets.startFrom")}
-      accessibilityRole="toolbar"
-      className="gap-2 rounded-xl border border-separator bg-cell p-4"
-    >
-      <Text className="font-sans text-caption font-normal text-label-tertiary">
-        {t("presets.startFrom")}
-      </Text>
-      <View className="flex-row flex-wrap gap-2">
+    <View accessibilityLabel={t("presets.new")} accessibilityRole="toolbar">
+      <SectionHeader title={t("presets.new")} />
+      <View className="mx-gutter flex-row flex-wrap gap-2 px-row-x">
         {choices.map((preset) => (
-          <ActionChip
+          <Chip
             key={preset.id}
             onPress={() => {
               router.push({ params: { from: preset.id, id: "new" }, pathname: "/presets/[id]" });
             }}
           >
-            {presetLabel(preset, language)}
-          </ActionChip>
+            {t("presets.startFromName", { name: presetLabel(preset, language) })}
+          </Chip>
         ))}
       </View>
     </View>
@@ -134,19 +119,8 @@ export const PresetsList = () => {
   const shown = all.filter((preset) => isShowingArchived || !preset.archived);
   const hasExamples = EXAMPLE_PRESET_IDS.some((id) => presetById(presets, id) !== undefined);
   return (
-    <View className="gap-4 px-4 pb-6">
-      <NewPreset choices={all.filter((preset) => !preset.archived)} />
-      {hasExamples ? null : (
-        <Button onPress={() => void run(actions.seedExamplePresets())} variant="secondary">
-          {t("presets.seedExamples")}
-        </Button>
-      )}
-      <SwitchRow
-        isOn={isShowingArchived}
-        label={t("presets.showArchived")}
-        onChange={setIsShowingArchived}
-      />
-      <View accessibilityLabel={t("presets.title")} role="group">
+    <View className="pb-6">
+      <Group aria-label={t("presets.title")} role="group">
         {shown.map((preset, index) => (
           <PresetRow
             isFirst={index === 0}
@@ -155,6 +129,23 @@ export const PresetsList = () => {
             preset={preset}
           />
         ))}
+      </Group>
+      <NewPreset choices={all.filter((preset) => !preset.archived)} />
+      {hasExamples ? null : (
+        <View className="mx-gutter mt-4 items-start px-row-x">
+          <Button onPress={() => void run(actions.seedExamplePresets())} variant="secondary">
+            {t("presets.seedExamples")}
+          </Button>
+        </View>
+      )}
+      <View className="mt-4">
+        <Group>
+          <SwitchRow
+            isOn={isShowingArchived}
+            label={t("presets.showArchived")}
+            onChange={setIsShowingArchived}
+          />
+        </Group>
       </View>
     </View>
   );

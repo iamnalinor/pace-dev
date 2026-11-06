@@ -1,14 +1,15 @@
-import { Repeat } from "lucide-react-native";
 import { Fragment } from "react";
-import { Text, View } from "react-native";
+import { Text as NativeText, View } from "react-native";
 
 import type { MetaPart, NowRow } from "@pace/client";
 
 import { useT } from "#app/app-state.tsx";
 import { metaTexts, type MetaTone } from "#app/format/meta.ts";
-import { ColorTag, IMPORTANCE_HUES } from "#app/ui/color.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
-import { type Language, presetLabel } from "@pace/core";
+import { cx } from "#app/ui/cx.ts";
+import { Icon } from "#app/ui/icon.tsx";
+import { Tag } from "#app/ui/tag.tsx";
+import { Text, type TextProps } from "#app/ui/text.tsx";
+import { type Importance, type Language, presetLabel } from "@pace/core";
 
 import { useViewer } from "./use-viewer.ts";
 
@@ -22,55 +23,83 @@ const TONE: Readonly<Record<MetaTone, string>> = {
 const rowTagLabel = (tag: NowRow["tag"], language: Language): string =>
   tag.kind === "project" ? tag.name : presetLabel({ id: tag.presetId, name: tag.name }, language);
 
+/** The importance as a word: the ramp is weight and ink, not colour (spec 4.3.2); Normal has no word. */
+const IMPORTANCE_LOOK: Readonly<
+  Record<
+    Exclude<Importance, "normal">,
+    { readonly className: string; readonly tone: TextProps["tone"] }
+  >
+> = {
+  asap: { className: "font-semibold", tone: "danger" },
+  nice_to_have: { className: "font-normal", tone: "secondary" },
+  prioritized: { className: "font-semibold", tone: "primary" },
+};
+
 /** A small repeat mark: the row is one of a series (or a weekly homework). */
-const RepeatMark = () => {
+export const RepeatMark = () => {
   const t = useT();
-  const { palette } = useTheme();
   return (
     <View accessibilityLabel={t("meta.repeats")} accessible role="img">
-      <Repeat color={palette["label.secondary"]} size={13} strokeWidth={2.25} />
+      <Icon name="repeat" size="inline" />
     </View>
   );
 };
 
 /**
-A row's meta line: the project (else the category) and the importance as coloured tags, a repeat
-mark for a series, then `by end of day · 2 subtasks left` with lateness in orange.
+A row's meta line, one line (spec 4.3.2): the project (else the category) as a tag that yields
+first (at most half the line), the importance word when it is not Normal, a repeat mark for a
+series, then `by end of day · 2 subtasks left` in the footnote's tabular figures, ending in "…"
+when it does not fit. Lateness is red.
 */
 export const MetaLine = ({
   asOf,
   parts,
+  showRepeat = true,
   tag,
 }: {
   /** The moment "tomorrow" and "in 2 days" count from (History's); now by default. */
   readonly asOf?: string | undefined;
   readonly parts: readonly MetaPart[];
+  /** Off where the row carries the mark itself (the task row's trailing slot). */
+  readonly showRepeat?: boolean;
   readonly tag: null | Pick<NowRow, "color" | "tag">;
 }) => {
   const t = useT();
   const current = useViewer();
   const viewer = asOf === undefined ? current : { ...current, now: asOf };
-  const importances = parts.flatMap((part) => (part.kind === "importance" ? [part] : []));
-  const isRepeating = parts.some((part) => part.kind === "repeats");
+  const importances = parts
+    .filter((part) => part.kind === "importance")
+    .map((part) => part.importance)
+    .filter((importance) => importance !== "normal");
+  const isRepeating = showRepeat && parts.some((part) => part.kind === "repeats");
   const rest = parts.filter((part) => part.kind !== "importance" && part.kind !== "repeats");
   const texts = metaTexts(rest, viewer);
   const tagLabel = tag === null ? null : rowTagLabel(tag.tag, viewer.language);
   return (
-    <View className="flex-row flex-wrap items-center gap-x-2 gap-y-1">
-      {tag === null || tagLabel === null ? null : <ColorTag color={tag.color}>{tagLabel}</ColorTag>}
-      {importances.map((part) => (
-        <ColorTag color={IMPORTANCE_HUES[part.importance]} key={part.importance}>
-          {t(`importance.${part.importance}`)}
-        </ColorTag>
+    <View className="flex-row items-center gap-x-2">
+      {tag === null || tagLabel === null ? null : (
+        <View className="max-w-1/2 shrink">
+          <Tag hue={tag.color}>{tagLabel}</Tag>
+        </View>
+      )}
+      {importances.map((importance) => (
+        <Text
+          className={cx("shrink-0", IMPORTANCE_LOOK[importance].className)}
+          key={importance}
+          role="footnote"
+          tone={IMPORTANCE_LOOK[importance].tone}
+        >
+          {t(`importance.${importance}`)}
+        </Text>
       ))}
       {isRepeating ? <RepeatMark /> : null}
       {texts.length === 0 ? null : (
-        <Text className="font-sans text-caption font-normal text-label-tertiary">
+        <Text numeric policy="truncate" role="footnote" tone="secondary">
           {texts.map((piece, index) => (
             // eslint-disable-next-line @eslint-react/no-array-index-key -- positional pieces without ids; a text can repeat
             <Fragment key={index}>
               {index === 0 ? null : " · "}
-              <Text className={TONE[piece.tone]}>{piece.text}</Text>
+              <NativeText className={TONE[piece.tone]}>{piece.text}</NativeText>
             </Fragment>
           ))}
         </Text>

@@ -60,7 +60,6 @@ describe("nowViewModel", () => {
   it("describes Algebra HW 6 as due tomorrow 23:59 · 4/7 solved · 2 sent", () => {
     const hw = row(board.rows, HW_ID);
     expect(hw.meta).toEqual([
-      { importance: "normal", kind: "importance" },
       // A weekly homework instance.
       { kind: "repeats" },
       { at: HW_DUE, kind: "due", relative: "tomorrow", tz: MOSCOW, zoneDiffers: false },
@@ -75,6 +74,12 @@ describe("nowViewModel", () => {
       title: "Algebra HW 6",
     });
     expect(hw.progress).toBeCloseTo(4 / 7, 10);
+  });
+
+  it("gives no importance part to a Normal task (spec 4.3.2, Q3)", () => {
+    const parts = board.rows.flatMap((entry) => entry.meta);
+    expect(parts).not.toContainEqual({ importance: "normal", kind: "importance" });
+    expect(row(board.rows, HW_ID).importance).toBe("normal");
   });
 
   it("describes the ASAP reply without a due as ASAP and its age", () => {
@@ -101,7 +106,6 @@ describe("nowViewModel", () => {
   it("describes Calculus HW 5 as 1 day late · 2 subtasks left", () => {
     const calc = row(board.rows, CALC_HW5_ID);
     expect(calc.meta).toEqual([
-      { importance: "normal", kind: "importance" },
       { kind: "repeats" },
       { isSoft: false, kind: "late", minutes: 15 * 60 + 1 },
       { count: 2, kind: "subtasks-left" },
@@ -181,12 +185,9 @@ describe("nowViewModel on a task that has not started yet", () => {
 });
 
 describe("nowViewModel on a repeating task", () => {
-  it("marks an instance of a series right after its importance, and no one-off", () => {
+  it("marks an instance of a series first (Normal says nothing), and no one-off", () => {
     const rows = withRent(NOW);
-    expect(row(rows, RENT_ID).meta.slice(0, 2)).toEqual([
-      { importance: "normal", kind: "importance" },
-      { kind: "repeats" },
-    ]);
+    expect(row(rows, RENT_ID).meta[0]).toEqual({ kind: "repeats" });
     expect(row(rows, TRK_ID).meta).not.toContainEqual({ kind: "repeats" });
   });
 

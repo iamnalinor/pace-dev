@@ -125,9 +125,9 @@ export const CloseSheet = ({
       }
       name="close"
       onClose={onClose}
+      open
       subtitle={isSubmit ? t("close.subtitleSolved", { title: view.title }) : view.title}
       title={isSubmit ? submitTitle : t("close.closeTitle")}
-      visible
     >
       <OutcomeRow
         form={form}

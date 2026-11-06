@@ -5,6 +5,7 @@ export const enDecisions = {
   "decisions.empty": "Nothing in the log yet.",
   "decisions.noMatch": "Nothing matches “{query}”.",
   "decisions.failed": "The log could not be loaded.",
+  "decisions.clear": "Clear the search",
   "decisions.retry": "Try again",
   "decisions.done.task.create": "Created task “{subject}”",
   "decisions.done.task.update": "Changed “{subject}”: {fields}",
@@ -74,5 +75,4 @@ export const enDecisions = {
   "decisions.notFound": "Not in your text: {fields}",
   "decisions.via.model": "via {model}",
   "decisions.via.rules": "via local rules",
-  "decisions.open": "Opens the task",
 } as const;

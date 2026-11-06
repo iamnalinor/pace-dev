@@ -1,4 +1,4 @@
-import { DecisionsScreen } from "#app/screens/decisions-screen.tsx";
+import { DecisionsScreen } from "#app/features/decisions/decisions-screen.tsx";
 
 export default function DecisionsRoute() {
   return <DecisionsScreen />;

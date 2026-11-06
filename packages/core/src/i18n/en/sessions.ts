@@ -11,14 +11,15 @@ export const enSessions = {
   "sessions.kind.agent": "Computer",
   "sessions.kind.dev": "Developer sign-in",
   "sessions.kind.mcp": "AI app",
+  "sessions.browserOn": "{browser} on {os}",
   "sessions.added": "Added {time}",
   "sessions.signedIn": "Signed in {time}",
-  "sessions.revoke": "Revoke",
+  "sessions.revoke": "End session",
   "sessions.disconnect": "Disconnect",
   "sessions.revokeConfirm": "End this session?",
   "sessions.revokeCurrentConfirm": "End this session? This device signs out.",
   "sessions.disconnectConfirm": "Disconnect this computer? Its token stops working at once.",
-  "sessions.revokeAppConfirm": "Revoke this app's access?",
+  "sessions.revokeAppConfirm": "End this app's access?",
   "sessions.revokeFailed": "Couldn't end the session. Try again.",
   "connectAi.open": "Connect an AI app",
   "connectAi.intro":
@@ -40,5 +41,5 @@ export const enSessions = {
   "connectAi.otherSteps":
     "Any MCP client with OAuth (Cursor, Claude Code, MCP Inspector): add a remote HTTP server with the URL; it opens Pace to sign in.",
   "connectAi.revokeHint":
-    "A connected app shows up in Devices and sessions; Revoke there cuts its access at once.",
+    "A connected app shows up in Devices and sessions; End it there to cut its access at once.",
 } as const;

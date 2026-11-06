@@ -1,11 +1,9 @@
-import { Clock } from "lucide-react-native";
 import { useState } from "react";
-import { TextInput, View } from "react-native";
 
 import { useLanguage, useT } from "#app/app-state.tsx";
 import { Chip } from "#app/ui/chip.tsx";
-import { cx } from "#app/ui/cx.ts";
-import { useTheme } from "#app/ui/theme-provider.tsx";
+import { RadioGroup } from "#app/ui/radio-group.tsx";
+import { TextField } from "#app/ui/text-field.tsx";
 import { formatDuration, typedActivity } from "@pace/core";
 
 /** The estimates offered at one tap; a typed one ("2.5h") stays as it was read. */
@@ -37,10 +35,10 @@ export const EstimateChip = ({
   const text = minutes === null ? none : formatDuration(minutes, language);
   return (
     <Chip
+      expanded={isOpen}
+      icon="clock"
       label={`${t("composer.estimate")}: ${text}`}
-      leading={(color) => <Clock color={color} size={14} strokeWidth={1.75} />}
       onPress={onToggle}
-      selected={isOpen}
     >
       {text}
     </Chip>
@@ -61,16 +59,13 @@ const MAX_MINUTES = 24 * 60;
 /** Any other length, typed: Enter sets it. */
 const TypedEstimate = ({ onEstimate }: { readonly onEstimate: (minutes: number) => void }) => {
   const t = useT();
-  const { palette } = useTheme();
   const [text, setText] = useState("");
   const minutes = typedMinutes(text);
   return (
-    <TextInput
-      accessibilityLabel={t("form.estimateTyped")}
-      className={cx(
-        "h-8 min-w-32 rounded-pill border px-3 font-sans text-footnote text-label-primary",
-        text !== "" && minutes === null ? "border-danger" : "border-outline",
-      )}
+    <TextField
+      inputMode="text"
+      isInvalid={text !== "" && minutes === null}
+      label={t("form.estimateTyped")}
       onChangeText={setText}
       onSubmitEditing={() => {
         if (minutes !== null) {
@@ -78,7 +73,6 @@ const TypedEstimate = ({ onEstimate }: { readonly onEstimate: (minutes: number) 
         }
       }}
       placeholder={t("form.estimateTyped")}
-      placeholderTextColor={palette["label.tertiary"]}
       returnKeyType="done"
       value={text}
     />
@@ -97,24 +91,23 @@ export const EstimateOptions = ({
 }) => {
   const t = useT();
   const language = useLanguage();
+  const options = ESTIMATES.filter((option) => minutes !== null || option !== fallback);
   return (
-    <View
-      aria-label={t("composer.estimate")}
-      className="flex-row flex-wrap gap-2 px-1"
-      role="radiogroup"
+    <RadioGroup
+      className="flex-row flex-wrap items-center gap-x-2 px-1"
+      label={t("composer.estimate")}
+      onChange={(option: number) => {
+        onEstimate(option);
+      }}
+      value={minutes}
+      values={options}
     >
-      {ESTIMATES.filter((option) => minutes !== null || option !== fallback).map((option) => (
-        <Chip
-          key={option}
-          onPress={() => {
-            onEstimate(option);
-          }}
-          selected={option === minutes}
-        >
+      {options.map((option) => (
+        <Chip key={option} value={option}>
           {formatDuration(option, language)}
         </Chip>
       ))}
       <TypedEstimate onEstimate={onEstimate} />
-    </View>
+    </RadioGroup>
   );
 };

@@ -1,11 +1,3 @@
-import {
-  Globe,
-  Laptop,
-  type LucideIcon,
-  Plug,
-  Smartphone,
-  SquareTerminal,
-} from "lucide-react-native";
 import { type Ref, useRef, useState } from "react";
 import { Text, View } from "react-native";
 
@@ -18,15 +10,15 @@ import { Button } from "#app/ui/button.tsx";
 import { useConfirmFocus } from "#app/ui/confirm-focus.ts";
 import { cx } from "#app/ui/cx.ts";
 import { HOTKEYS } from "#app/ui/hotkeys.ts";
+import { Icon, type IconName } from "#app/ui/icon.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
-import { useTheme } from "#app/ui/theme-provider.tsx";
 
-const ICON: Readonly<Record<Row["kind"], LucideIcon>> = {
-  agent: Laptop,
-  app: Smartphone,
-  browser: Globe,
-  dev: SquareTerminal,
-  mcp: Plug,
+const ICON: Readonly<Record<Row["kind"], IconName>> = {
+  agent: "laptop",
+  app: "smartphone",
+  browser: "globe",
+  dev: "square-terminal",
+  mcp: "plug",
 };
 
 /** What the confirmation asks: this device signs out; a computer's token stops; an app loses access. */
@@ -46,8 +38,7 @@ it came, whole however long (wrapped, never cut), and the viewer's line. Each pa
 keeps together where it can: an address moves to the next line whole instead of breaking.
 */
 const Identity = ({ row }: { readonly row: Row }) => {
-  const { palette } = useTheme();
-  const Icon = ICON[row.kind];
+  const icon = row.formFactor === "phone" && row.kind === "browser" ? "smartphone" : ICON[row.kind];
   return (
     <>
       <View
@@ -55,7 +46,7 @@ const Identity = ({ row }: { readonly row: Row }) => {
         className="h-8 w-8 items-center justify-center rounded-pill bg-fill-3"
         importantForAccessibility="no-hide-descendants"
       >
-        <Icon color={palette["label.secondary"]} size={18} strokeWidth={1.75} />
+        <Icon name={icon} />
       </View>
       <View className="min-w-0 flex-1">
         <Text className="font-sans text-callout font-medium text-label-primary">{row.name}</Text>
@@ -120,9 +111,9 @@ const Confirm = ({
           <View className={cx(!isWide && "flex-1")}>
             {/* Escape cancels, as it closes the sheets (QA round 15 L1); one confirm is open at a time. */}
             <Button
-              hotkey={HOTKEYS.escape}
               onPress={onCancel}
               ref={cancelRef}
+              shortcut={HOTKEYS.escape}
               variant="secondary"
               width={width}
             >
@@ -130,7 +121,13 @@ const Confirm = ({
             </Button>
           </View>
           <View className={cx(!isWide && "flex-2")}>
-            <Button busy={isEnding} onPress={onEnd} ref={actionRef} variant="danger" width={width}>
+            <Button
+              busy={isEnding}
+              onPress={onEnd}
+              ref={actionRef}
+              variant="destructive"
+              width={width}
+            >
               {actionLabel}
             </Button>
           </View>
@@ -194,7 +191,7 @@ export const SessionRow = ({
     }
   };
   return (
-    <View aria-label={row.name} className="gap-2 py-1" role="group">
+    <View aria-label={row.name} className="gap-2" role="group">
       <View className="min-h-12 flex-row items-center gap-3">
         <Identity row={row} />
         {isConfirming ? null : (
@@ -207,7 +204,7 @@ export const SessionRow = ({
               toOpener(node);
               openerRef?.(node);
             }}
-            variant="secondary"
+            variant="plain"
           >
             {actionLabel}
           </Button>

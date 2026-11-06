@@ -19,8 +19,23 @@ const GAP = 6;
 /** The bubble keeps this far from the window's edges. */
 const EDGE = 8;
 
-/** How long a tooltip shown by a tap stays (a touch screen has no "pointer left" to wait for). */
-export const TAP_TOOLTIP_MS = 2500;
+/**
+How long the pointer rests on a trigger before its tooltip shows (spec §6 tooltip): a pass over
+a row of buttons on the way elsewhere brings nothing up.
+*/
+export const HOVER_DELAY_MS = 400;
+
+/**
+How long a tooltip waits after the pointer leaves its trigger or its bubble: long enough to cross
+the gap between them, so the bubble can be hovered (WCAG 1.4.13).
+*/
+export const HOVER_GRACE_MS = 120;
+
+/**
+Within this long of one tooltip closing, the next trigger's shows at once: moving along a row of
+icon buttons reads each name without waiting again.
+*/
+export const WARM_MS = 600;
 
 /**
 Where a tooltip's bubble goes: centred over its trigger, or under it when there is no room

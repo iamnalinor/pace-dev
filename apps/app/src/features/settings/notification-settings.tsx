@@ -1,4 +1,3 @@
-import { X } from "lucide-react-native";
 import { useEffect } from "react";
 import { Text, View } from "react-native";
 import { useStore } from "zustand";
@@ -18,7 +17,7 @@ import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button } from "#app/ui/button.tsx";
 import { IconButton } from "#app/ui/icon-button.tsx";
 import { Segmented } from "#app/ui/segmented.tsx";
-import { PaceSwitch } from "#app/ui/switch-row.tsx";
+import { Switch } from "#app/ui/switch.tsx";
 import { TimeInput } from "#app/ui/time-input.tsx";
 import { useToast } from "#app/ui/toast.tsx";
 import { isChannelOn, NOTIFICATION_CHANNELS, NOTIFICATION_KINDS } from "@pace/core";
@@ -33,7 +32,7 @@ export const NotificationChannels = () => {
   const run = useRunAction();
   const settings = useSettings();
   return (
-    <View className="gap-1" role="table">
+    <View aria-label={t("settings.notifications")} className="gap-1" role="table">
       <Text className="font-sans text-footnote text-label-secondary">
         {t("settings.notifications.hint")}
       </Text>
@@ -59,7 +58,7 @@ export const NotificationChannels = () => {
           </Text>
           {NOTIFICATION_CHANNELS.map((channel) => (
             <View className="w-row items-center" key={channel} role="cell">
-              <PaceSwitch
+              <Switch
                 isOn={isChannelOn(settings, kind, channel)}
                 label={t("notify.switch", {
                   channel: t(`notify.channel.${channel}`),
@@ -166,7 +165,12 @@ export const PushStatus = () => {
       <Text className="font-sans text-footnote text-label-secondary">
         {t("settings.push.hint")}
       </Text>
-      <Segmented onChange={pick} options={options} value={state.choice ?? "auto"} />
+      <Segmented
+        label={t("settings.push.hint")}
+        onChange={pick}
+        options={options}
+        value={state.choice ?? "auto"}
+      />
       {state.isFcmOtherProject ? (
         <Text className="font-sans text-footnote text-label-secondary">
           {t("settings.push.otherProject")}
@@ -200,9 +204,8 @@ export const DigestWindows = () => {
       {digestWindows.map((time, index) => (
         // The row is its position: keyed by value, editing a time would remount the input.
         // eslint-disable-next-line @eslint-react/no-array-index-key -- see above
-        <View className="flex-row items-center gap-2" key={index}>
+        <View className="min-h-hit-web flex-row items-center justify-between gap-2" key={index}>
           <TimeInput
-            className="flex-1"
             label={t("settings.digestWindows.time", { index: index + 1 })}
             onTime={(next) => {
               save(digestWindows.with(index, next));
@@ -210,12 +213,11 @@ export const DigestWindows = () => {
             value={time}
           />
           <IconButton
-            icon={X}
+            icon={"x"}
             label={t("settings.digestWindows.remove", { time })}
             onPress={() => {
               save(digestWindows.filter((_, position) => position !== index));
             }}
-            variant="plain"
           />
         </View>
       ))}
@@ -238,7 +240,7 @@ export const QuietHours = () => {
   const run = useRunAction();
   const { quietHours } = useSettings();
   const edge = (side: "from" | "to") => (
-    <View className="flex-1 gap-2">
+    <View className="gap-2">
       <Text className="font-sans text-caption font-normal text-label-tertiary">
         {t(`settings.quietHours.${side}`)}
       </Text>
@@ -256,7 +258,7 @@ export const QuietHours = () => {
       <Text className="font-sans text-footnote text-label-secondary">
         {t("settings.quietHours.hint")}
       </Text>
-      <View className="flex-row gap-3">
+      <View className="flex-row flex-wrap gap-6">
         {edge("from")}
         {edge("to")}
       </View>

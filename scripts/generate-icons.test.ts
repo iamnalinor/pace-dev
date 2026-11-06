@@ -44,15 +44,15 @@ describe("generate-icons", () => {
 
   it("ships the logo SVGs with the board 08 shapes in the brand lime", () => {
     const svg = Object.fromEntries(LOGO_FILES.map((file) => [file.path, file.svg]));
-    expect(svg["assets/logo/pace-mark.svg"]).toContain("#d4ff3a");
+    expect(svg["assets/logo/pace-mark.svg"]).toContain(color("dark", "logo"));
     expect(svg["assets/logo/pace-mark.svg"]).toContain("#6a6a74");
     expect(svg["assets/logo/pace-mark.svg"]).not.toContain(color("dark", "bg.app"));
     expect(svg["assets/logo/pace-mark-light.svg"]).toContain("#b9bcc6");
-    expect(svg["assets/logo/pace-mark-light.svg"]).toContain("#4d6b00");
+    expect(svg["assets/logo/pace-mark-light.svg"]).toContain(color("light", "logo"));
     expect(svg["assets/logo/pace-wordmark.svg"]).toContain(">pace<");
     expect(svg["assets/logo/pace-wordmark.svg"]).toContain("Inter, system-ui, sans-serif");
     // The favicon is a lime tile with dark chevrons.
-    expect(svg["assets/logo/favicon.svg"]).toContain('fill="#d4ff3a"');
+    expect(svg["assets/logo/favicon.svg"]).toContain(`fill="${color("dark", "logo")}"`);
     expect(svg["assets/logo/favicon.svg"]).toContain(`stroke="${color("dark", "bg.app")}"`);
     const everything = Object.values(svg).join("");
     expect(everything).not.toContain("#4263eb");

@@ -121,6 +121,14 @@ export {
   taskFormOptions,
 } from "./view-models/composer.ts";
 export {
+  dayRail,
+  type DayRail,
+  GAP_CAP_MINUTES,
+  type RailBlock,
+  type RailGap,
+  type RailItem,
+} from "./view-models/day-rail.ts";
+export {
   type DayEntry,
   type DayModel,
   dayModel,
@@ -243,6 +251,7 @@ export { type ListedSessions, signInState } from "./view-models/sign-in-notice.t
 export {
   type OverrideSheet,
   type PrimaryAction,
+  submitLabel,
   type SubtaskRow,
   type SubtaskState,
   type TaskLink,
@@ -272,11 +281,11 @@ export {
   type TypedTime,
   typeTime,
 } from "./view-models/time-forms.ts";
+export * from "./view-models/week-layout.ts";
 export {
   fitHourPx,
   gridFromHour,
   type Lane,
-  lanesOf,
   placeIn,
   type Placement,
   type WeekBlock,

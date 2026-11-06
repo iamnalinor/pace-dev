@@ -1,83 +1,22 @@
-import { ChevronDown, ChevronUp } from "lucide-react-native";
-import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
-
-import { useLanguage, useT } from "#app/app-state.tsx";
+import { useT } from "#app/app-state.tsx";
 import { TaskRows } from "#app/shared/task-list.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
 import { groupNowRows, type NowRow } from "@pace/client";
-import { formatCount } from "@pace/core";
 
-const PREVIEW_COUNT = 3;
-
-/** A small preview of one kind of task, expanded without hiding the other kind. */
-const TaskGroup = ({
-  rows,
-  title,
-}: {
-  readonly rows: readonly NowRow[];
-  readonly title: string;
-}) => {
-  const t = useT();
-  const language = useLanguage();
-  const { palette } = useTheme();
-  const [isExpanded, setIsExpanded] = useState(false);
-  const canExpand = rows.length > PREVIEW_COUNT;
-  const shown = isExpanded ? rows : rows.slice(0, PREVIEW_COUNT);
-  return (
-    <View className="mx-3 overflow-hidden rounded-xl border border-separator bg-cell">
-      <View className="min-h-hit-web flex-row items-center justify-between border-b border-separator px-3">
-        <Text className="font-sans text-footnote font-semibold text-label-secondary">{title}</Text>
-        <View className="flex-row items-center gap-2">
-          <Text className="font-sans text-caption font-normal tabular-nums text-label-tertiary">
-            {formatCount(rows.length, language)}
-          </Text>
-          {canExpand ? (
-            <Pressable
-              accessibilityLabel={t(isExpanded ? "now.collapseGroup" : "now.expandGroup", {
-                title,
-              })}
-              accessibilityRole="button"
-              aria-expanded={isExpanded}
-              className="min-h-hit-web flex-row items-center gap-1 px-1"
-              onPress={() => {
-                setIsExpanded((current) => !current);
-              }}
-            >
-              <Text className="font-sans text-caption text-label-secondary">
-                {t(isExpanded ? "now.collapse" : "now.expand")}
-              </Text>
-              {isExpanded ? (
-                <ChevronUp color={palette["label.secondary"]} size={15} />
-              ) : (
-                <ChevronDown color={palette["label.secondary"]} size={15} />
-              )}
-            </Pressable>
-          ) : null}
-        </View>
-      </View>
-      <TaskRows animateLayout={false} label={title} rows={shown} />
-    </View>
-  );
-};
-
-/** A single plain list, or two compact groups when both kinds are present. */
+/**
+One plain list: the tasks with a deadline in their order, a hairline, then the tasks without one.
+No headers, no folds; the hairline is a separator that names what starts below it. With only one
+kind there is no hairline.
+*/
 export const NowTaskGroups = ({ rows }: { readonly rows: readonly NowRow[] }) => {
   const t = useT();
   const { dated, undated } = groupNowRows(rows);
-  if (dated.length === 0 || undated.length === 0) {
-    return (
-      <TaskRows
-        animateLayout={false}
-        label={t("now.tasks")}
-        rows={dated.length === 0 ? undated : dated}
-      />
-    );
-  }
+  const undatedIds = new Set(undated.map((row) => row.id));
   return (
-    <View className="gap-3">
-      <TaskGroup rows={dated} title={t("now.withDeadline")} />
-      <TaskGroup rows={undated} title={t("now.withoutDeadline")} />
-    </View>
+    <TaskRows
+      animateLayout={false}
+      boundary={{ isAfter: (row) => undatedIds.has(row.id), label: t("now.withoutDeadline") }}
+      label={t("now.tasks")}
+      rows={[...dated, ...undated]}
+    />
   );
 };

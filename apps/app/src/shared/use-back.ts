@@ -1,17 +1,18 @@
 import { usePathname, useRouter } from "expo-router";
 
-import { useIsWide } from "#app/ui/layout.ts";
 import { isSidebarPath } from "#app/ui/sidebar.tsx";
+import { useBreakpoint } from "#app/ui/use-breakpoint.ts";
 
 /**
 The way back from a screen pushed over the tabs, or undefined where there is none to offer:
-beside the sidebar (a wide window) a sidebar destination is top level, with no back chevron.
+beside the sidebar or the rail (a computer's or a tablet's window) a destination is top level,
+with no back chevron.
 */
 export const useBack = (): (() => void) | undefined => {
   const router = useRouter();
-  const isWide = useIsWide();
+  const hasNavigation = useBreakpoint() !== "compact";
   const path = usePathname();
-  if (isWide && isSidebarPath(path)) {
+  if (hasNavigation && isSidebarPath(path)) {
     return undefined;
   }
   return () => {

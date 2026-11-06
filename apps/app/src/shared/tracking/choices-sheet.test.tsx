@@ -20,7 +20,13 @@ const CALENDAR: TimeButtonView = {
 };
 
 const sheet = (calendar: CalendarToday | null) => (
-  <ChoicesSheet button={CALENDAR} calendar={calendar} canGoAlongside={false} onClose={jest.fn()} />
+  <ChoicesSheet
+    anchor={{ current: null }}
+    button={CALENDAR}
+    calendar={calendar}
+    canGoAlongside={false}
+    onClose={jest.fn()}
+  />
 );
 
 const permissions = () => screen.queryByRole("button", { name: en("permissions.title") });

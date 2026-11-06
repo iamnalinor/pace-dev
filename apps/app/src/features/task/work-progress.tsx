@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 
 import type { TaskViewModel } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
+import { Group } from "#app/ui/group.tsx";
 import { Slider } from "#app/ui/slider.tsx";
+import { Text } from "#app/ui/text.tsx";
 
 const MAX = 10;
 
@@ -58,22 +60,23 @@ export const WorkProgress = ({
     return null;
   }
   return (
-    <View className="mx-4 gap-1 rounded-xl border border-separator bg-cell px-4 pb-2 pt-4">
-      <View className="flex-row justify-between">
-        <Text className="font-sans text-subhead font-normal text-label-primary">
-          {t("task.progress")}
-        </Text>
-        <Text className="font-sans text-footnote tabular-nums text-label-primary">
-          {t("task.progressOf", { value: (live.step * 100) / MAX })}
-        </Text>
+    <Group>
+      <View className="gap-1 px-row-x pb-2 pt-3">
+        <View className="flex-row items-baseline justify-between gap-3">
+          <Text role="body">{t("task.progress")}</Text>
+          <Text role="numeric.value">
+            {t("task.progressOf", { value: (live.step * 100) / MAX })}
+          </Text>
+        </View>
+        <Slider
+          label={t("task.progressAria")}
+          max={MAX}
+          onChange={live.commit}
+          onSlide={live.slide}
+          value={live.step}
+          valueText={(step) => t("task.progressOf", { value: (step * 100) / MAX })}
+        />
       </View>
-      <Slider
-        label={t("task.progressAria")}
-        max={MAX}
-        onChange={live.commit}
-        onSlide={live.slide}
-        value={live.step}
-      />
-    </View>
+    </Group>
   );
 };

@@ -42,6 +42,9 @@ const dataPart = (item: Session, language: "en" | "ru" = "en"): string | undefin
 const agentSent = (minutes: number, language: "en" | "ru" = "en"): string | undefined =>
   dataPart(agent(before(minutes)), language);
 
+const rowOf = (overrides: Partial<Session>, language: "en" | "ru" = "en") =>
+  sessionRows([session(overrides)], { language, now: NOW, zone: ZONE })[0];
+
 describe("the sessions list", () => {
   it("shows recent data as a duration up to and including eight hours", () => {
     expect(LAST_DATA_EXACT_AFTER_HOURS).toBe(8);
@@ -185,5 +188,71 @@ describe("the sessions list", () => {
       ),
     );
   });
+
+  describe("device details", () => {
+    it("titles a phone by its brand and model and lists its system and browser under it", () => {
+      const row = rowOf({
+        device: {
+          brand: "Samsung",
+          browser: "Chrome",
+          browserVersion: "130",
+          formFactor: "phone",
+          model: "SM-S918B",
+          os: "Android",
+          osVersion: "14",
+        },
+      });
+      expect(row?.name).toBe("Samsung SM-S918B");
+      expect(row?.formFactor).toBe("phone");
+      expect(row?.meta.slice(0, 3)).toEqual(["Browser", "Android 14", "Chrome 130"]);
+    });
+
+    it("does not repeat the brand a model already starts with, and capitalizes a lowercase one", () => {
+      expect(
+        rowOf({
+          kind: "app",
+          name: "Android",
+          device: { brand: "samsung", model: "Galaxy S23", os: "Android", osVersion: "14" },
+        })?.name,
+      ).toBe("Samsung Galaxy S23");
+      expect(
+        rowOf({
+          kind: "app",
+          name: "Android",
+          device: { brand: "Google", model: "Google Pixel 8" },
+        })?.name,
+      ).toBe("Google Pixel 8");
+    });
+
+    it("keeps the name the person gave their phone as the title, the model under it", () => {
+      const device = { brand: "samsung", model: "Galaxy S23", os: "Android", osVersion: "14" };
+      const row = rowOf({ device, kind: "app", name: "Ada's phone" });
+      expect(row?.name).toBe("Ada's phone");
+      expect(row?.meta.slice(0, 3)).toEqual(["Phone app", "Samsung Galaxy S23", "Android 14"]);
+      const same = rowOf({ device, kind: "app", name: "Galaxy S23" });
+      expect(same?.name).toBe("Galaxy S23");
+      expect(same?.meta.slice(0, 2)).toEqual(["Phone app", "Android 14"]);
+    });
+
+    it("titles a browser by itself and its system, in both languages", () => {
+      const device = {
+        browser: "Chrome",
+        browserVersion: "131",
+        formFactor: "desktop" as const,
+        os: "macOS",
+      };
+      expect(rowOf({ device })?.name).toBe("Chrome 131 on macOS");
+      expect(rowOf({ device }, "ru")?.name).toBe("Chrome 131 на macOS");
+      expect(rowOf({ device })?.meta[0]).toBe("Browser");
+    });
+
+    it("keeps the name as it came when there are no details", () => {
+      const row = rowOf({ kind: "app", name: "Pixel 9a" });
+      expect(row?.name).toBe("Pixel 9a");
+      expect(row?.formFactor).toBeUndefined();
+      expect(row?.meta[0]).toBe("Phone app");
+    });
+  });
 });
+
 /* eslint-enable sonarjs/no-hardcoded-ip -- the fixture addresses end here */

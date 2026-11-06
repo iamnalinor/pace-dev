@@ -1,11 +1,14 @@
-import type { ComponentProps } from "react";
-
 import { fireEvent, screen, within } from "@testing-library/react-native";
+import { type ComponentProps, useEffect } from "react";
+import { StyleSheet, type ViewStyle } from "react-native";
 
+import { deadControls } from "#app/test/dead-controls.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { space } from "@pace/core";
 
 import { TabBar } from "./tab-bar.tsx";
+import { useToast } from "./toast.tsx";
 
 // jest renders the phone, where Space is no key; the web's handler is the one under test here.
 jest.mock("./space-press.ts", (): unknown => jest.requireActual("./space-press.web.ts"));
@@ -22,11 +25,12 @@ const TITLES: Readonly<Record<(typeof ROUTES)[number], string>> = {
   more: en("nav.more"),
 };
 
-const propsAt = (current: (typeof ROUTES)[number], navigate: jest.Mock): Props =>
+const propsAt = (current: (typeof ROUTES)[number], navigate: jest.Mock, isFront = true): Props =>
   ({
     descriptors: Object.fromEntries(
       ROUTES.map((name) => [name, { options: { title: TITLES[name] } }]),
     ),
+    isFront,
     navigation: { emit: () => ({ defaultPrevented: false }), navigate },
     state: {
       index: ROUTES.indexOf(current),
@@ -72,9 +76,10 @@ describe("TabBar", () => {
 
   it("anchors the badge at the icon's trailing top and grows it away from the icon (never back over it)", async () => {
     await renderScreen(<TabBar {...propsAt("index", jest.fn())} />, await createTestRuntime());
-    const anchor = screen.getByTestId("count-badge").parent?.props["className"] as string;
-    const classes = anchor.split(" ");
-    expect(classes).toContain("left-5");
+    const anchor = screen.getByTestId("count-badge").parent;
+    const classes = (anchor?.props["className"] as string).split(" ");
+    expect(anchor?.props["style"]).toMatchObject({ left: "100%" });
+    expect(classes).toContain("-top-2");
     expect(classes.some((name) => /^-?right-/.test(name))).toBe(false);
   });
 
@@ -90,5 +95,88 @@ describe("TabBar", () => {
   it("keeps Now selected on New task (the composer on Now)", async () => {
     await renderScreen(<TabBar {...propsAt("add", jest.fn())} />, await createTestRuntime());
     expect(screen.getByRole("tab", { name: en("nav.now"), selected: true })).toBeOnTheScreen();
+  });
+});
+
+/** Shows a toast once mounted. */
+const Toasts = () => {
+  const toast = useToast();
+  useEffect(() => {
+    toast.show({ message: "Deleted" });
+  }, [toast]);
+  return null;
+};
+
+const TAB_BAR_HEIGHT = 81;
+
+/** The bar lays itself out at its measured height (64 + the bottom inset, say). */
+const layOutBar = async (): Promise<void> => {
+  await fireEvent(screen.getByTestId("tab-bar"), "layout", {
+    nativeEvent: { layout: { height: TAB_BAR_HEIGHT, width: 390, x: 0, y: 763 } },
+  });
+};
+
+const toastBottom = (): number | undefined =>
+  StyleSheet.flatten(screen.getByTestId("toast-place").props["style"] as ViewStyle).bottom as
+    | number
+    | undefined;
+
+describe("TabBar and the toast layer (spec §4.1.4, F-CMP-12)", () => {
+  it("tells the layer its measured height: a toast floats space.3 above it, never at a constant", async () => {
+    await renderScreen(
+      <>
+        <TabBar {...propsAt("index", jest.fn())} />
+        <Toasts />
+      </>,
+      await createTestRuntime(),
+    );
+    await layOutBar();
+    expect(toastBottom()).toBe(TAB_BAR_HEIGHT + space["3"]);
+  });
+
+  it("lifts nothing while a screen is pushed over the tabs (the bar is mounted, out of sight)", async () => {
+    await renderScreen(
+      <>
+        <TabBar {...propsAt("index", jest.fn(), false)} />
+        <Toasts />
+      </>,
+      await createTestRuntime(),
+    );
+    await layOutBar();
+    expect(toastBottom()).toBe(space["3"]);
+  });
+});
+
+describe("TabBar's look (spec §4.2.27)", () => {
+  it("marks the current tab with the pill and the weight, not colour alone (F-AND-02)", async () => {
+    await renderScreen(<TabBar {...propsAt("day", jest.fn())} />, await createTestRuntime());
+    expect(screen.getAllByTestId("tab-pill-current")).toHaveLength(1);
+    const day = screen.getByRole("tab", { name: en("nav.day"), selected: true });
+    expect(within(day).getByTestId("tab-pill-current").props["className"]).toContain("bg-fill-3");
+    expect(within(day).getByText(en("nav.day")).props["className"]).toContain("font-semibold");
+  });
+
+  it("lets a long name wrap instead of cutting it (RU at the largest font scale)", async () => {
+    await renderScreen(<TabBar {...propsAt("index", jest.fn())} />, await createTestRuntime());
+    expect(screen.getByText(en("nav.more")).props["numberOfLines"]).toBeUndefined();
+  });
+});
+
+/**
+The current tab's press is meant to change nothing (the screen is already there); every other
+tab must navigate (bug class 10).
+*/
+const ALREADY_THERE = [`tab "${en("nav.now")}"`];
+
+describe("every control of the tab bar does something (bug class 10)", () => {
+  it("each tab navigates", async () => {
+    const navigate = jest.fn();
+    expect(
+      await deadControls(async () => {
+        navigate.mockClear();
+        await renderScreen(<TabBar {...propsAt("index", navigate)} />, await createTestRuntime());
+        return { extra: () => navigate.mock.calls.length };
+      }, ALREADY_THERE),
+    ).toEqual([]);
   });
 });

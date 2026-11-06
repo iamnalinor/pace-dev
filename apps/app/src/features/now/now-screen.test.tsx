@@ -121,27 +121,45 @@ const rowLayouts = (node: unknown): readonly unknown[] => {
   ];
 };
 
-describe("NowBoard", () => {
-  it("shows two compact groups when both dated and undated tasks exist", async () => {
-    await renderScreen(<Board />, await createTestRuntime());
-    expect(screen.getByText(en("now.withDeadline"))).toBeOnTheScreen();
-    expect(screen.getByText(en("now.withoutDeadline"))).toBeOnTheScreen();
-    expect(checks()).toHaveLength(6);
-    const title = en("now.withDeadline");
-    const expand = screen.getByRole("button", { name: en("now.expandGroup", { title }) });
-    await fireEvent.press(expand);
-    expect(checks()).toHaveLength(9);
-    const collapse = screen.getByRole("button", { name: en("now.collapseGroup", { title }) });
-    await fireEvent.press(collapse);
-    expect(checks()).toHaveLength(6);
-  });
+/** The check names and the boundary's label in tree order: where the rule sits among the rows. */
+const flatLabels = (node: unknown): readonly string[] => {
+  if (Array.isArray(node)) {
+    return node.flatMap((child) => flatLabels(child));
+  }
+  if (typeof node !== "object" || node === null) {
+    return [];
+  }
+  const view = node as { children?: unknown; props: Record<string, unknown> };
+  const label = view.props["aria-label"] ?? view.props["accessibilityLabel"];
+  const own =
+    typeof label === "string" &&
+    (view.props["role"] === "separator" || /^Mark .* done$/u.test(label))
+      ? [label]
+      : [];
+  return [...own, ...flatLabels(view.children)];
+};
 
-  it("uses a plain list when filtering leaves only one type of task", async () => {
-    await renderScreen(<Board />, await createTestRuntime());
-    const chips = screen.getByLabelText("Filter by project");
-    await fireEvent.press(within(chips).getByRole("radio", { name: "Algebra" }));
+describe("NowBoard", () => {
+  it("is one list: dated tasks first, one labelled hairline, then the undated; no headers or folds", async () => {
+    const rendered = await renderScreen(<Board />, await createTestRuntime());
     expect(screen.queryByText(en("now.withDeadline"))).toBeNull();
     expect(screen.queryByText(en("now.withoutDeadline"))).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Show all/u })).toBeNull();
+    expect(checks()).toHaveLength(9);
+    // The rule sits between rows: dated ones above it, the undated below.
+    const marks = flatLabels(rendered.toJSON());
+    const boundary = en("now.withoutDeadline");
+    const at = marks.indexOf(boundary);
+    expect(at).toBeGreaterThan(0);
+    expect(at).toBeLessThan(marks.length - 1);
+    expect(marks.filter((mark) => mark === boundary)).toHaveLength(1);
+  });
+
+  it("has no hairline when filtering leaves only one kind of task", async () => {
+    const rendered = await renderScreen(<Board />, await createTestRuntime());
+    const chips = screen.getByLabelText("Filter by project");
+    await fireEvent.press(within(chips).getByRole("radio", { name: "Algebra" }));
+    expect(flatLabels(rendered.toJSON())).not.toContain(en("now.withoutDeadline"));
     expect(checks()).toEqual(["Mark Algebra HW 6 done"]);
   });
 
@@ -158,9 +176,6 @@ describe("NowBoard", () => {
     await renderScreen(<Board />, await createTestRuntime());
     expect(screen.getByText("Tuesday · Oct 6")).toBeOnTheScreen();
     expect(screen.getByText("Now")).toBeOnTheScreen();
-    const title = en("now.withDeadline");
-    const expand = screen.getByRole("button", { name: en("now.expandGroup", { title }) });
-    await fireEvent.press(expand);
     expect(checks()).toEqual([
       "Mark Calculus HW 5 done",
       "Mark Algebra HW 6 done",
@@ -175,9 +190,9 @@ describe("NowBoard", () => {
     expect(
       screen.getByText("Due tomorrow 23:59 · 1d 8h left · 4/7 solved · 2 sent"),
     ).toBeOnTheScreen();
-    // The project (else the category) and the importance are coloured tags before the meta text.
+    // The project (else the category) is a tag and a non-Normal importance a word; Normal says nothing.
     expect(screen.getAllByText("ASAP").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Normal").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Normal")).not.toBeOnTheScreen();
     expect(screen.getByText("15h late · 2 subtasks left")).toBeOnTheScreen();
     expect(screen.getByText("12d old")).toBeOnTheScreen();
     expect(screen.getAllByText("Nice-to-have").length).toBeGreaterThan(0);
@@ -191,8 +206,6 @@ describe("NowBoard", () => {
     const runtime = await createTestRuntime({ now: late });
     await runtime.state.ingest(rentSeriesEvents());
     await renderScreen(<Board />, runtime);
-    const title = en("now.withDeadline");
-    await fireEvent.press(screen.getByRole("button", { name: en("now.expandGroup", { title }) }));
     const repeats = en("meta.repeats");
     const rent = screen.getByRole("link", { name: /^Rent/u });
     expect(within(rent).getByRole("image", { name: repeats })).toBeOnTheScreen();
@@ -205,8 +218,6 @@ describe("NowBoard", () => {
     const runtime = await createTestRuntime({ now: "2026-11-10T12:00:00.000Z" });
     await runtime.state.ingest(rentSeriesEvents());
     await renderScreen(<Board />, runtime);
-    const title = en("now.withDeadline");
-    await fireEvent.press(screen.getByRole("button", { name: en("now.expandGroup", { title }) }));
     const rent = screen.getByRole("link", { name: /^Rent/u });
     expect(within(rent).getByText("9d late")).toBeOnTheScreen();
     expect(within(rent).getByText("final deadline passed Nov 7 23:59")).toBeOnTheScreen();
@@ -351,8 +362,12 @@ describe("NowBoard", () => {
       "Mark RFC: dedicated runner pool done",
     ]);
     await fireEvent.press(screen.getByRole("radio", { name: "All" }));
-    expect(checks()).toHaveLength(6);
+    expect(checks()).toHaveLength(9);
     const fold = screen.getByRole("button", { name: "In future · 4" });
+    // A hairline sets the fold apart from the list above it (as before the kit Disclosure).
+    expect(String(screen.getByTestId("fold-hairline").props["className"])).toContain(
+      "border-separator",
+    );
     expect(screen.queryByText("Check test 1 grade")).toBeNull();
     await fireEvent.press(fold);
     expect(screen.getByText("Check test 1 grade")).toBeOnTheScreen();

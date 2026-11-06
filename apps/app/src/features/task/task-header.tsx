@@ -1,95 +1,43 @@
-import { Ban, ChevronDown, Pause, Pencil, Play, Trash2, X } from "lucide-react-native";
-import { Pressable, Text, View } from "react-native";
+import { View } from "react-native";
 
 import type { TaskViewModel } from "@pace/client";
 
-import { usePace, useT } from "#app/app-state.tsx";
+import { useT } from "#app/app-state.tsx";
 import { useIsInPane, useTaskBack } from "#app/shared/task-opener.tsx";
-import { useRunAction } from "#app/shared/use-run-action.ts";
-import { BackHeader } from "#app/ui/back-header.tsx";
-import { inkClass } from "#app/ui/color.tsx";
-import { cx } from "#app/ui/cx.ts";
-import { IconButton } from "#app/ui/icon-button.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
-import { toastQuote, useToast } from "#app/ui/toast.tsx";
+import { Button } from "#app/ui/button.tsx";
+import { inkClass } from "#app/ui/hue.ts";
+import { Icon } from "#app/ui/icon.tsx";
+import { Pressable } from "#app/ui/pressable.tsx";
+import { ScreenHeader } from "#app/ui/screen-header.tsx";
+import { Text } from "#app/ui/text.tsx";
 
-/** Deletes the task at once and goes back; the toast's Undo brings it back. */
-const useDeleteTask = (view: TaskViewModel): (() => void) => {
-  const t = useT();
-  const { actions } = usePace();
-  const back = useTaskBack();
-  const toast = useToast();
-  const run = useRunAction();
-  return () => {
-    void (async () => {
-      const result = await run(actions.deleteTask(view.id));
-      if (!result.ok) {
-        return;
-      }
-      back();
-      const [revocation] = result.value;
-      toast.show({
-        message: t("task.deleted", { title: toastQuote(view.title) }),
-        ...(revocation !== undefined && {
-          action: {
-            label: t("common.undo"),
-            onPress: () => void run(actions.revoke(revocation.id)),
-          },
-        }),
-      });
-    })();
-  };
-};
-
-/**
-Edit, pause or resume, give up (Cancelled or Skipped, kept in History) and delete (gone, with
-Undo in the toast): the task's actions as icons, no menu in between.
-*/
-const TaskActions = ({
-  onGiveUp,
-  onEdit,
-  view,
-}: {
-  readonly view: TaskViewModel;
-  readonly onEdit: () => void;
-  /** Opens the close sheet on Cancelled · Skipped, which is the confirmation. */
-  readonly onGiveUp: () => void;
-}) => {
-  const t = useT();
-  const { actions } = usePace();
-  const run = useRunAction();
-  const isOpen = view.closed === null;
-  const isPaused = view.tags.some((tag) => tag.kind === "status" && tag.status === "paused");
-  const remove = useDeleteTask(view);
-  return (
-    <View className="flex-row">
-      <IconButton icon={Pencil} label={t("task.edit")} onPress={onEdit} variant="plain" />
-      {isOpen ? (
-        <IconButton
-          icon={isPaused ? Play : Pause}
-          label={t(isPaused ? "task.resume" : "task.pause")}
-          onPress={() => {
-            void run(actions.setStatus(view.id, isPaused ? "in_progress" : "paused"));
-          }}
-          variant="plain"
-        />
-      ) : null}
-      {isOpen ? (
-        <IconButton icon={Ban} label={t("task.giveUp")} onPress={onGiveUp} variant="plain" />
-      ) : null}
-      <IconButton icon={Trash2} label={t("task.delete")} onPress={remove} variant="plain" />
-    </View>
-  );
-};
+import { TaskMenu } from "./task-menu.tsx";
 
 export type TaskHeaderActions = {
   readonly view: TaskViewModel;
   readonly onEdit: () => void;
+  /** Opens the close sheet on its Cancelled · Skipped choices. */
   readonly onGiveUp: () => void;
 };
 
-/** The task's project, or "No project"; a tap moves the task to another one. */
-const ProjectChip = ({
+/** «Изменить» as a labelled text button and the ⋯ menu: no Pause, no bare icons (Q4, F-CMP-10). */
+const TaskActions = ({ onEdit, onGiveUp, view }: TaskHeaderActions) => {
+  const t = useT();
+  return (
+    <View className="flex-row items-center">
+      <Button onPress={onEdit} size="small" variant="plain">
+        {t("task.edit")}
+      </Button>
+      <TaskMenu onCloseAs={onGiveUp} view={view} />
+    </View>
+  );
+};
+
+/**
+The task's project as the control that moves it: its name in the project's ink with a chevron,
+one line that ends in "…" before the actions (never a pill; F-DAT-02).
+*/
+const ProjectControl = ({
   onProject,
   project,
 }: {
@@ -97,28 +45,25 @@ const ProjectChip = ({
   readonly project: TaskViewModel["project"];
 }) => {
   const t = useT();
-  const { palette } = useTheme();
   const name = project?.name ?? t("task.noProject");
   return (
     <Pressable
-      accessibilityLabel={t("task.changeProject", { project: name })}
-      accessibilityRole="button"
-      className="h-hit-web flex-row items-center gap-1 active:opacity-70"
+      className="min-w-0 shrink flex-row items-center gap-1"
       disabled={onProject === undefined}
+      label={t("task.changeProject", { project: name })}
       onPress={onProject}
+      role="button"
     >
-      <Text
-        className={cx(
-          "font-sans text-callout font-medium",
-          project === null ? "text-label-secondary" : inkClass(project.color),
-        )}
-        numberOfLines={1}
-      >
-        {name}
-      </Text>
-      {onProject === undefined ? null : (
-        <ChevronDown color={palette["label.secondary"]} size={16} strokeWidth={2} />
+      {project === null ? (
+        <Text policy="truncate" role="body" tone="secondary">
+          {name}
+        </Text>
+      ) : (
+        <Text className={inkClass(project.color)} policy="truncate" role="body">
+          {name}
+        </Text>
       )}
+      {onProject === undefined ? null : <Icon name="chevron-down" size="inline" />}
     </Pressable>
   );
 };
@@ -130,7 +75,7 @@ export const TaskHeader = ({
   project,
 }: {
   readonly actions?: TaskHeaderActions;
-  /** Opens the project picker: the chip is how a task changes project. */
+  /** Opens the project picker: the control is how a task changes project. */
   readonly onProject?: () => void;
   /** Left out for a task that does not exist: there is no project to show (QA round 17 L11). */
   readonly project?: TaskViewModel["project"];
@@ -139,14 +84,18 @@ export const TaskHeader = ({
   const back = useTaskBack();
   const isInPane = useIsInPane();
   return (
-    <BackHeader
+    <ScreenHeader
+      actions={actions === undefined ? undefined : <TaskActions {...actions} />}
       // Beside the list the task is a pane: it closes, there is nothing to go back to.
-      {...(isInPane && { backIcon: X })}
+      backIcon={isInPane ? "x" : "chevron-left"}
       backLabel={t(isInPane ? "common.close" : "common.back")}
+      context={
+        project === undefined ? undefined : (
+          <ProjectControl onProject={onProject} project={project} />
+        )
+      }
       onBack={back}
-      right={actions === undefined ? null : <TaskActions {...actions} />}
-    >
-      {project === undefined ? null : <ProjectChip onProject={onProject} project={project} />}
-    </BackHeader>
+      variant="pushed"
+    />
   );
 };

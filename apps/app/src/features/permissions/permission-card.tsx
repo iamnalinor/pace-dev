@@ -4,8 +4,8 @@ import { Text, View } from "react-native";
 import { useT } from "#app/app-state.tsx";
 import { openAppInfo, type Permission } from "#app/platform/permissions.ts";
 import { Button } from "#app/ui/button.tsx";
-import { inkClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
+import { inkClass } from "#app/ui/hue.ts";
 
 /** What a permission is called and why Pace wants it. */
 export const PermissionText = ({ id }: { readonly id: Permission["id"] }) => {

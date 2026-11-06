@@ -415,6 +415,8 @@ The same rule applies when a previously successful channel is no longer configur
 - **Missed because.** The card had its own `assistant.cancel` key, translated on its own; catalog tests checked that every key exists and has the same placeholders, not that one meaning keeps one word, and no test put the card and the toast on screen together in Russian.
 - **Rule.** A common action has one key (`common.cancel`, `common.undo`) and screens reuse it rather than adding a copy; Cancel and Undo read differently in every language. `i18n.test.ts` fails when any key that reads "Cancel" or "Undo" in English reads otherwise than the common key in Russian, or when the two common words are the same.
 
+Extended (F-CPY-02/03/05, 2026-11-06): the same class held for «Отменить» (Undo) against «Отменить задачу», "Done" for a task and an approved proposal, and "Revoke" against "End this session?". `glossary.test.ts` now also compares `common.undo` with `review.action.cancel` (RU) and `assistant.approved` with `task.done`, and bans "Revoke" and "Log in" in the English catalog.
+
 ### 46. A workflow expression GitHub holds instead of running
 - **Bug.** After #45 every Deploy run (after CI and by hand) ended `action_required` with no job started, so the merge never reached production. The new step read all secrets at once (`toJSON(secrets)`) to find the `LLM_*_N` slots; GitHub holds such a run for approval.
 - **Missed because.** Workflows have no tests: the jq was simulated locally and the YAML parsed, but nothing runs a workflow before it is on `main`, and nobody checked what GitHub does with an expression over the whole secrets context.
@@ -1147,6 +1149,25 @@ The same rule applies when a previously successful channel is no longer configur
   and the message names two actions and counts the rest (`approvalText`, «и ещё 3 действия», plural
   in both languages); the gallery's Toast section carries a ten-action approval, so the overflow
   sweep reads it.
+- **Kit guard (Task 3.2, F-DAT-02).** The shrink rule is no longer each call site's to remember: the
+  kit's `Text` (`ui/text.tsx`) is `flexShrink: 1, minWidth: 0` by construction and takes a `policy`
+  (`wrap` by default, so UI strings are never cut; `truncate`; `clamp` with `lines`) instead of
+  `numberOfLines`; on the web a cut text carries `data-text-policy` and its full value in the `title`
+  (`text.web.tsx`), which is what the overflow sweep accepts. Controls stay `shrink-0` (the kit's
+  `Pressable`). **Guard.** `pace/kit-primitives` (`rawLineLimit`): `numberOfLines` on React Native's
+  `Text` outside `ui/text.tsx` is reported, with the way to the kit in the message (and `rawIcon`:
+  a `lucide-react-native` import outside `ui/icon.tsx`, the same "reach past the kit" shape for
+  icons, F-CMP-21); a warning held by the exact ratchet `KIT_PRIMITIVE_WARNINGS` (71 at
+  introduction: 23 line limits, 48 icon imports), an error at 0; `text.test.tsx`,
+  `text.web.test.tsx`, `kit-primitives.test.ts`, `eslint-scoped-bans.test.ts`. **Sweep.** The 23
+  line limits the rule found are the class's remaining instances; the sidebar's owner name moved to
+  the kit's `Text` (its worst-case entry F-DAT-07 "🌿 Bartholomew" left `e2e/worst-case.e2e.ts`), the
+  rest, `ColorTag` and every tag and label in a row first, move in Task 3.9 and the 4.x screen tasks,
+  each lowering the ratchet. **Fix round 1.** The icon half of the sweep is done (every lucide import
+  through `Icon`, `rawIcon` 0, and the rule now sees re-exports, deep and dynamic imports); 13 line
+  limits moved to the kit `Text`, 10 remain counted (`KIT_PRIMITIVE_WARNINGS` 10). A cut text built of
+  parts takes its full value as `full`, so the sweep can read it; without it the text stays unmarked and
+  the sweep reports it.
 
 ### 110. Locale formatting by hand
 - **Bug.** Design review 05 (F-CPY-04): Insights showed «3.3» and «0.0» in Russian (`toFixed(1)`), a count of 1 284 read «1284» (`String(count)`), Russian durations were «23 ч 58 м» (a breaking space, «м» reads as metres) and `formatDuration` never rolled hours into days («Оценка 168 ч») while `formatLeft` did. The catalog held «15 минут» and «2,5 ч» with plain spaces, so a unit could land alone at the start of a line.
@@ -1327,6 +1348,79 @@ The same rule applies when a previously successful channel is no longer configur
   card, clear of "Can't see the Telegram button?" and its button, which still takes the click (red
   against the old layout: the frame started 105 px left of the screen).
 
+### 122. A cross-cutting state drawn by every call site on its own
+- **Bug.** Review F-CMP-01 (redesign spec §4.1.1): 21 of the app's 63 pressables gave no feedback at all
+  when pressed, the rest drew it each in its own way (43 `active:opacity-*`, four disabled opacities), and
+  none had a hover or an Android ripple. NativeWind's `active:` is a React state, so even the feedback that
+  existed came a render after the finger, and react-native-web held press-in back another 50 ms.
+- **Missed because.** Each control was written and tested on its own, for what it does when pressed, never
+  for what the person sees while pressing; jest draws no pixels and no test listed the pressables to ask
+  each the same question. Nothing made the shared state the default: a bare React Native `Pressable` was as
+  easy to reach as a kit one.
+- **Rule.** A state every control must show (pressed, hover, focus, selected, disabled) is drawn once, by
+  one kit primitive, and a call site cannot opt out by reaching past it: the raw primitive is banned by
+  lint outside the kit, with the way to the kit in the message. Feedback that must be instant is drawn by
+  the platform (a native ripple, a CSS `:active`), never by a React state.
+- **Sweep and guard.** `ui/pressable.tsx` (+ `.web.tsx`) is the state layer: Android ripple in `fill.3`,
+  web `[data-pace-press]` in `global.css` (hover `fill.1` only for a hovering pointer, pressed `fill.2` in
+  0 ms and out `duration.xs`, forced colours), `delayPressIn={0}` on the web, haptics through
+  `platform/haptics.ts`. Guards: `no-restricted-imports` of React Native's `Pressable`/`Touchable*` in
+  `src/features/**` and `src/shared/**` (a warning held by the exact ratchet `BARE_PRESSABLE_WARNINGS`, 33
+  at introduction, lowered as the kit tasks migrate each caller, then an error); `pace/no-raw-design-values`
+  reports any `active:` class outside `ui/pressable.tsx` as `pressedClass` (the 46 that exist were already
+  counted in `DESIGN_VALUE_WARNINGS`); `pressable.test.tsx`, `pressable.web.test.tsx` and
+  `state-layer.test.ts` (the CSS held to the motion tokens). Fix round 1: Pressable also owns Space for
+  tab, checkbox, radio and switch (class 113, the disabled gate in one place; a caller that still spreads
+  `spacePress` is not pressed twice), says `selected` only on roles ARIA allows it and `checked` on
+  checkables, draws nothing for a Pressable with no press, and the web overlay is the control's `::after`.
+  The callers (Button, IconButton, Chip, rows)
+  move in their own tasks (redesign plan 3.x); `src/screens`, `src/auth` and `src/platform` are not under
+  the import ban yet (four files).
+
+### 123. Contrast asserted for text only
+- **Bug.** Review F-COL-09 (and F-COL-01/02, findings "Bugs" 32): the off switch's knob was the
+  surface colour on the surface (1.0:1 in dark, white on a white card in light), so on and off differed
+  by the track's colour alone; the selected row read 1.10:1 and field edges 1.25-1.35:1. Task 3.9 met the
+  class again while building it: the segmented control's chosen thumb (`bg.elevated` on the `fill.2`
+  track) measures 1.05-1.15:1, and an `outline` edge on that track 2.5-2.9:1 in light.
+- **Missed because.** The contrast test measured the text tokens on the grounds, the pairs a reviewer
+  thinks of as "colours". A knob, a thumb, a ring, a disc or a fill is a mark that carries a state, but
+  no pair named it, so nothing measured it: a mark on a translucent fill over a ground is a composite no
+  one computes by eye.
+- **Rule.** Every mark a control draws to carry a state (a knob, a thumb, a check, a selected fill, a
+  track's fill, an edge) is a pair in `USED_PAIRS` at the `ui` target (WCAG 1.4.11, 3:1) on the real
+  composite it sits on, added in the same change as the mark. A mark that cannot reach 3:1 on its fill
+  gets an edge that can (the segmented thumb's `label.tertiary` hairline, the switch's `label.tertiary`
+  knob), never "it is only decoration" while it is the state's cue.
+- **Sweep (Task 3.9).** Every control of the kit: the switch (off knob `label.tertiary` on `fill.2`, on
+  knob `accent.on` on `accent`: present), the chip and the segment at rest (`label.secondary` and
+  `label.primary` on `fill.2`: added), the destructive button (the spec's `status.dangerQuiet`
+  fill under the danger label read 4.31:1 over the page in axe, `sync-state.e2e.ts`' offline Log out;
+  the pair existed only over `bg.cell`: the button is now `bg.cell` inside a danger ring, on its
+  `bg.cell` pair), the chosen segment's thumb (edge: added via the switch's pair), the
+  checked circle (`bg.app` on `label.secondary`: added), the slider's thumb and fill (`label.primary` on
+  the grounds and on `fill.4`: added), the progress fill (`label.primary`, the hue strokes and slate on
+  `fill.4`: present for slate, primary added), the chosen chip (`accent` on the grounds: present), the
+  count badges (present). Disabled marks are exempt (WCAG). Left for their tasks: the selected row's fill
+  (Task 3.3 carries the accent bar as the cue), field edges (Task 3.8).
+- **Guard.** `packages/core/src/design/contrast.test.ts` over `USED_PAIRS` (both themes); the kit's
+  component tests pin each mark's class to the role its pair names (`switch.test.tsx`,
+  `segmented.test.tsx`, `check-circle.test.tsx`, `chip.test.tsx`), so a recolour without a pair fails one
+  of the two.
+
+### 124. A parent claiming to be the page
+- **Bug.** QA round 23 R23-14 (and a PR #48 follow-up): on Presets and New preset the sidebar drew
+  Settings as the current page (the full selected look and `aria-current="page"`) while the screen itself
+  showed Back to Settings. A screen reader heard "Settings, current page" on a page that was not Settings.
+- **Missed because.** A destination knew only `owns(path)`: "this path is mine". The tests asked whether
+  the right row was highlighted, never whether the highlight said page or place; the pushed screens a
+  destination owns (a task under Now, Presets under Settings) had no row of their own to be checked against.
+- **Rule.** Navigation tells three things apart: its own page (`aria-current="page"`, the full current
+  look), a screen it owns but does not name (`aria-current="true"`, a quieter look that still says where
+  the person is), and elsewhere. A parent never claims to be the page a child shows.
+- **Sweep and guard.** `currentOf(destination, path)` in `ui/sidebar.tsx` serves the sidebar's `NavItem`
+  and the rail; the tab bar's current tab is its own route. `nav-item.test.tsx` pins the three looks and
+  a table of paths (Settings on `/presets` and `/presets/new`, Now on a task and `/add`).
 ## Log
 
 New bugs go here with their class; a new class gets its own section above.
@@ -1712,6 +1806,172 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-03 | A9 review m3: the consent page read the server's permanent refusals of a session (403 `auth/forbidden`, 422 `auth/identity-conflict`) through the error map's default, "Could not finish connecting. Try again.", a remedy that cannot work; and no client test pinned the 403 `auth/not-allowed` line | 99 (a failure's reason dropped at a boundary, so the remedy offered cannot work) | yes: every code `/api/oauth/complete` answers now has a case in `errorKey` (`auth/not-allowed`, `auth/unauthorized`, `auth/forbidden`, `auth/identity-conflict`, the scope and request codes); the rest of the default is the network and unknown answers | missed because the server's refusals were traced only for the 401; `oauth.deviceToken` and `oauth.identityConflict` in EN and RU; `oauth.test.tsx` "a session refused with %i %s says why in words, once…" (3 cases; the two new ones red before) |
 | 2026-11-03 | Full e2e of A9 fix round 3: `login.e2e.ts` "a page older than its server offers Refresh…" ended while its `/api/instance` route handler still awaited `route.fetch()` (the app polls the instance); Playwright threw "route.fetch: Test ended" outside any test, failed the run and left 11 tests (the latency project with them) not run. Fix round 2 had caught only the "disposed" spelling of the same end | 63 (a handler that outlives the page it serves, with nobody owning its end) | yes: the only other `route.fetch()` handler (`notifications.e2e.ts`, `/api/sessions`) has the same shape; both are covered by one owner of the end now | missed because the handler caught one error message of the race, not its cause; the shared `test` (`e2e/support/fixtures.ts`) unroutes every page's handlers with `ignoreErrors` when its test ends, so no handler outlives its test; the first full run of this round also failed while the other worktree's e2e reused this one's servers and reset the same test accounts (see the report) |
 | 2026-11-03 | Full e2e of A9 fix round 3 (third run, alone on the machine): `assistant.e2e.ts` "the assistant reads a line, the task is added, the decision is logged" did not see the "Created task “разобрать почту”" toast within 5 s; the file then passed 21/21 (`--repeat-each 3`), and earlier full runs of this branch passed it | 20 (a screen judged against a short wait while the machine is loaded; not traced further) | no: not traced to a cause in this round; open for PR B's QA round to watch (the toast's 5 s window under four workers) | none yet: recorded so a second sighting is a pattern, not a surprise |
+| 2026-11-03 | Task 3.1 (review F-CMP-01): 21 of 63 pressables drew no press feedback; the rest used NativeWind `active:opacity-*`, a React render late (and 50 ms later again on the web) | 122 (new) | partly: the state layer exists and both bans count every remaining caller (33 bare imports in features/shared, 46 `active:` classes); the callers move in their own kit tasks, each lowering its ratchet | `pressable.test.tsx`, `pressable.web.test.tsx`, `state-layer.test.ts`; `no-restricted-imports` with `BARE_PRESSABLE_WARNINGS`; `pressedClass` in `pace/no-raw-design-values`; `eslint-scoped-bans.test.ts`, `eslint-ratchet.test.ts` |
+| 2026-11-03 | Task 3.2 (review F-DAT-02): a line limit on a text that cannot shrink never ellipsizes, and each call site had to remember the shrink rule (23 `numberOfLines` on React Native's `Text`, 48 raw lucide imports at 7 sizes / 6 strokes) | 109 | partly: the kit's `Text` and `Icon` exist and the rule counts every remaining site; the sidebar and the tab bar moved, the rest (tags and labels first) move in Task 3.9 and 4.x | `pace/kit-primitives` with `KIT_PRIMITIVE_WARNINGS`; `text.test.tsx`, `text.web.test.tsx`, `icon.test.tsx`, `kit-primitives.test.ts`, `eslint-scoped-bans.test.ts` |
+| 2026-11-03 | Review of Task 3.1, Important 1: Pressable said `aria-selected` on every role (invalid on button, checkbox, radio, switch; axe `aria-allowed-attr`), and had no `checked`, so a checkbox could not say its state at all | 106 (a state made for one case, said in every other) | yes: the other state attributes the kit hands react-native-web (`aria-checked`, `aria-disabled`) are role-checked or valid everywhere; no caller passed `selected` yet but the gallery's tabs | missed because the tests used a tab for selected and nothing asked what a checkbox says; `selected` is typed for tab/option/row/gridcell and `checked` for checkbox/radio/switch, and the markup drops either elsewhere; `pressable.markup.web.test.tsx` renders react-native-web's real markup (no `aria-selected` on five roles, `aria-checked` on a checkbox), `pressable.test.tsx` pins the types with `@ts-expect-error` |
+| 2026-11-03 | Review of Task 3.1, Minor 2: the bare-pressable ratchet counted every `no-restricted-imports` warning in the app, so an unrelated ban would have eaten its allowance and asked to lower the wrong number | 76 (a guard that cannot tell its case from others) | yes: the other ratchets are keyed on rules no other check shares (`pace/no-raw-design-values`, `pace/kit-primitives`) | missed because the ratchet test fed only the rule ids it counts; ratchets now count by `constant`, and a ratchet on a shared rule names its `marker` (the ban's message, one constant `BARE_PRESSABLE_MARKER` used by the config and the ratchet); `eslint-ratchet.test.ts` (another restricted import is an "other warning"), `eslint-scoped-bans.test.ts` (named, namespace `import * as RN` and gesture-handler imports all carry the marker) |
+| 2026-11-03 | Review of Task 3.1, Minor 3: the web overlay was an inset `box-shadow` on the control, under its children: an opaque child hid it, and a caller's own shadow and transition were replaced while hovered or pressed | 5 (layout that unit tests cannot see) | yes: the overlay is the only CSS the state layer paints; hover, pressed and the forced-colours drop now all live on `::after` | missed because the gallery tried only plain boxes and the CSS test read the values, not where they paint; the overlay is `[data-pace-press]::after` (`inset: 0`, `border-radius: inherit`, `pointer-events: none`), `state-layer.test.ts` pins that and that the control's own `box-shadow`/`transition` is untouched; the gallery has an opaque child and a raised control (to look at in the matrix) |
+| 2026-11-03 | Review of Task 3.1, Minor 4: a Pressable with no `onPress` still rippled, hovered and played its haptic, as if it did something | 106 (feedback made for a control, given to every Pressable) | yes: the long press goes the same way (no `onLongPress`: none passed) | missed because every test gave an `onPress`; `isLive` gates the ripple and the `data-pace-press` mark, the press is `undefined`; `pressable.test.tsx`, `pressable.web.test.tsx`, `pressable.markup.web.test.tsx` |
+| 2026-11-03 | Review 3.2 M2: a disabled kit Link still rendered `<a href>`; react-native-web refuses the press, but the browser follows the address | 10 (an affordance whose behaviour disagrees with its state) | yes: the Link is the only kit control that renders an address; the sidebar and the gallery are its callers | missed because the web test checked only an enabled link; `link.web.test.tsx` "has no address while disabled" (red before) |
+| 2026-11-03 | Review 3.2 M1: the sidebar's rows and New task were 40 px, under the 44 px web target | 11 (a target set per site) | yes: the kit `Pressable` now carries the target itself (`min-h-hit`/`min-w-hit` 48 dp, `-web` 44 px), so every caller that moves to it meets it; callers on React Native's own Pressable keep their own sizes until their tasks | `pressable.test.tsx`, `pressable.web.test.tsx` (the target classes on both platforms; red before) |
+| 2026-11-03 | Task 3.4 (review F-LAY-02 / QA round 22 R22-13, F-LAY-03): every screen placed its own title (5 placements, eyebrow or not, 22 or 30 px, pushed or not), so the title jumped between destinations; Week's wide pane stood empty with a hint while nothing was picked | 122 | yes: every header is the kit `ScreenHeader` (Now, Day, Week, Inbox, More, the four sidebar destinations through `DestinationScreen`, the pushed screens through `PushedScreen`, the task header); `SplitPane` is gone, Week's inspector opens only with a pick (Now's own split moves with its screen task) | `e2e/layout.e2e.ts` (title y ±1 px over eight destinations at 1440 and 390), `screen-header.test.tsx`, `shell.test.tsx`, `week-wide.test.tsx` |
+| 2026-11-03 | Task 3.4: React Native's Jest default window is 750 wide, a `medium` window once the rail exists, so every app test silently ran a tablet's layout (no tab bar, no Back on More's screens) | 113 | yes: no test read the width before `useBreakpoint`; `useIsWide` mocks keep working | `jest.setup.ts` gives every test the design's phone (390 × 844); `src/test/window.ts` `withWindowWidth(n)` for a tablet or a desktop; `use-breakpoint.test.ts` pins 599/600/1023/1024 |
+| 2026-11-03 | Task 3.5 (QA 22 fix round 2 carry-over, F-MOT-08): the assistant's preview mounted inside the composer card while `AnimatedHeight` was still growing it (220 ms, overflow hidden), so Approve was half clipped when announced and a click had to wait for it (`clickWhenSettled`); the form's unfold clipped its foot the same way | 5 | yes: `AnimatedHeight` had one caller (the composer); it is deleted, the card takes its height in the swap frame and the content fades in (`Presence`); the folds (`FoldedSection`) are the kit `Disclosure`, which grows from a measured height and hides its content from assistive tech while closing | `expectDescendantsStayInside` in `e2e/support/geometry.ts` (every box inside the card, every frame, all four sides) on the form's unfold and on the preview in `overlays.e2e.ts`; `presence.test.tsx`, `disclosure.test.tsx` |
+| 2026-11-03 | Task 3.4 e2e: the skip link, a kit `Pressable` with role `link` (react-native-web draws a `div role="link"`), ignored Enter, so the keyboard stayed on it; and hidden as a 1 px clipped box it read as an overflow in the worst-case sweep and as a control under the Calendar tooltip | 113 | yes: the only other `role="link"` without an address was none (the kit `Link` renders `<a href>`); the skip link is now `<a href="#pace-main">` whose press keeps the address and focuses `main`, and it waits above the page's top edge, whole, until focused | `e2e/layout.e2e.ts` "the skip link is the first stop…" (Tab, Enter, `main` focused); `worst-case.e2e.ts` and the tooltip check in `overlays.e2e.ts` see no box |
+| 2026-11-03 | Review of Tasks 3.3–3.5, Important 1: a pressed `ListRow` carried both the kit Pressable's `min-h-hit` and its own `min-h-row lg:min-h-row-compact`; `cx` only joins strings, so the stylesheet's order chose the height: either a compact row (and a regular row on an Android tablet ≥ 1024 dp, where `lg:` applies) at 44 dp below the 48 dp target, or a regular phone row at 48 instead of 52 | 11 | yes: the other kit controls with their own min-height (Button, chips) are rewritten on the kit in Task 3.9 and get the same rule; no other new caller adds `min-h-*` to a kit Pressable | `list-row.test.tsx` renders on Android and asserts exactly one min-height on the control (`min-h-hit`) and the density on an inner box; the desktop density lives in `list-row-density.web.ts` |
+| 2026-11-03 | Review of Tasks 3.3–3.5, Important 2 and 3: lifting the portrait lock made a phone in landscape a `medium` window, where the rail's eight destinations (about 640 high) ran past a ~390 window, and no inset kept the rail or the content off the cutout | 113 | yes: the sidebar is only `expanded` (≥ 1024, tall windows); the tab bar is `compact`; the Shell pads `insets.left`/`insets.right` for every region | `layout.e2e.ts` at 844 × 390 scrolls to every rail link; `shell-motion.test.tsx` asserts the shell's side insets; spec §11 item 13a (hardware) |
+| 2026-11-03 | Review of Tasks 3.3–3.5, Important 5: `Disclosure` closed from the height measured when it opened; a fold that grew while open (a row checked off elsewhere) was cut by a row at full opacity in the close's first frame | 5 | yes: no other animated height is left to close in the kit or the screens (`animated-height.tsx` deleted, the composer tweens none, the web update banner only grows and never closes; Task 6.3 rebuilds it) | `disclosure.test.tsx` "closes from the content's current height when it grew while open" (the height is set to the current measure, kept in step while open, before the exit's timing: parked N2 replaced the 0 ms step, which cost the first frame) |
+| 2026-11-03 | Merge of PR A fix round 3 into PR B: `bun lint` failed on four type aliases PR B had written at module scope (`SharedProps` in `ui/pressable-props.ts`, `Focusable` in `ui/shell.web.tsx`, `Escape` in `e2e/support/geometry.ts`, `JsxAttribute` in `scripts/eslint-rules/kit-primitives.ts`): PR A had turned on `unicorn/prefer-smaller-scope` meanwhile, and each branch was green alone | 101 (a rule changed in one branch, code written against the old one in the other) | yes: the merged tree's full `bun lint` reports every instance of the rule; these four were all of them | missed because each branch ran its lint against its own config; the merge's own `bun lint` (the red) found them, and is the guard: a merge of parallel branches runs the full lint and the full e2e before it is pushed (class 101's rule) |
+| 2026-11-03 | Merge of PR A fix round 3 into PR B: `CI=1 bun test:unit` failed on `RuleTester.itOnly = it.only` in `scripts/eslint-rules/kit-primitives.test.ts`, a RuleTester file PR B (Task 3.2) had written from the same template as the two class 120 fixed in PR A | 120, 101 | yes: no other `itOnly`/`.only` in the merged tree (the guard reads every test file) | `scripts/no-focused-tests.test.ts` (PR A's guard) was the red on the merge, whatever the environment; nothing new needed |
+| 2026-11-03 | CI on PR #54 (first CI e2e of PR B, run 41662203819): `overlays.e2e.ts` "a toast covers no control…" at 390 read Settings' Activity check switches as stuck under the toast; `mouse.wheel` resolves when the event is sent, and the read right after it saw the rows before the scroll landed (the trace's next frame shows them scrolled clear) | 120 (a behaviour only CI's browser shows), 115 | yes: the only other wheel in the e2e (`layout.e2e.ts`) already polls for the scroll | missed because every local full run used full Chrome (`PLAYWRIGHT_CHROMIUM_EXECUTABLE`), where the scroll lands first; with Playwright's headless shell (CI's browser) it failed 1 in 2 locally (the red); `wheelAndSettle` waits for the scroll events to go quiet (150 ms, or 600 ms with none) before the second read: 30 of 30 on the headless shell; `docs/testing.md` says to run on the headless shell before calling a run green |
+| 2026-11-03 | CI on PR #54 (same run): `link.e2e.ts` "a sidebar link is an anchor…" waited 30 s for the new tab a Ctrl-click opens; none came. Not the app: no `preventDefault` ran (instrumented), and a bare `<a href>` on an empty page opened no tab about 1 in 50 on the headless shell, 0 in 30 on full Chrome | 120 (a test asserting the browser's own behaviour, which CI's browser does not always perform) | yes: the only Ctrl-click or new-tab wait in the e2e | missed for the same reason as the row above (red: 2 of 30, then 4 of 30, on the headless shell); the test now asserts the app's half, which is deterministic: a Ctrl/⌘-click's default is left to the browser ("followed") and the page stays, a plain click's default is taken over ("prevented") and the page moves; a tab the browser does open is checked for `/week`: 15 of 15 |
+| 2026-11-03 | Local latency step of the merge (headless shell, fresh servers, run right after the 21-minute chromium project on the same machine): "Day: previous and next day" read p75 192 ms against its 160 ms ceiling; the next two runs read 128 and 104 | 115 (a time budget read on a machine still busy) | n/a: no code change, the ceiling stays (never raised) | the same cause as A9 fix round 3's latency row: the machine had not settled after the chromium project; the CI step runs the project on its own against fresh servers; a single over-ceiling read is rerun before it is called a regression, and two clean reruns are recorded here |
 | 2026-11-03 | CI run 41668309388 (PR #53): `live.e2e.ts` "a session ended from another device says 'another device' in every open tab" saw a 401 for `/api/notifications?limit=50` after both tabs showed the login card. The second tab was still starting when the session ended: its first pull got the 401, the session check (`me`) went out, and the bootstrap went on to `pool.refresh()` with the ended token before `me` answered; the read's answer landed after the test began listening | 75 (a request sent in the gap of a hand-over: here the gap between a 401 and the `me` check's answer) | yes: the two senders that carry the session are the API client (every call) and the live socket's (re)connect; both now wait for a check under way (`sessionChecks` in `create-client.ts`), and the socket's session-ended close joins the same check instead of a second `me`. No other code sends the token (`Authorization` and `pace.auth.` appear only in `api-client.ts` and `live.ts`) | missed because the e2e ended the session after the second tab showed Log out, and only on a loaded runner was its bootstrap still between the pull and the bell; locally 20/20 passed. Red first: two `create-client.test.ts` cases (a call's 401, the socket's close) with `me` held, a `live.test.ts` case for the reconnect, and a deterministic `live.e2e.ts` test that holds the starting tab's first pull until the end and slows `me` by 1 s (it caught the same `/api/notifications` read, plus a second pull); a test that a call held for a check that keeps the session still goes out with it |
 | 2026-11-03 | PR A CI fix review I1, m1: the hold of a session check waited on `me` with no deadline and ignored the caller's abort, so a `me` that got no answer would have stalled every held call, the sync's run (its 30 s timeout only aborts) and ending this device; a check that rejected would have failed the held calls with its own error | 62 (a value not known yet stood in as a final answer: here "the check is still on its way" waited for good) | yes: the two waits on a check (`heldUntilChecked` in `held-call.ts`, the live waiter in `live.ts`) both end on any answer, a rejection included; the check itself (`session-checks.ts`) is bounded by `REQUEST_DEADLINE_MS` and resolves to a `Result` whatever happens | `create-client.test.ts` "a check whose `me` never answers gives up after the request deadline…" (fake timers: held until the deadline, then sent once, nothing signed out) and `api-client.test.ts` cases for an abort while held and a check that fails; red before (the held call hung) |
 | 2026-11-03 | PR A CI fix review I2: the new `live.e2e.ts` test opened its own context and released its route handlers and the context only on the green path, so a failed step would leave a handler waiting (the "Test ended" failure of A9 fix round 3) | 63 (a handler that outlives the page it serves, with nobody owning its end) | yes: every `browser.newContext()` in `e2e/` (five in `live.e2e.ts`, one in `design-shots.e2e.ts`) now goes through the `openContext` fixture, which unroutes every page and closes every context it opened when the test ends, passed or failed | the `openContext` fixture in `e2e/support/fixtures.ts`, and a lint rule (`no-restricted-syntax`, `OWN_CONTEXT` in `eslint.config.ts`) that refuses `.newContext(` in an e2e test file |
+| 2026-11-03 | F-COL-09 (Task 3.9): the off switch's knob was the surface colour on the surface (1.0:1 in dark); building the segmented control, its chosen thumb measured 1.05-1.15:1 on the track | 123 (new) | yes: every mark of the kit's controls (switch, chip, segment, check circle, slider, progress bar, badges), see class 123 | pairs for each mark in `USED_PAIRS` (`contrast.test.ts`); the segmented thumb has a `label.tertiary` edge; component tests pin each mark's class |
+| 2026-11-03 | F-DAT-10, QA round 23 R23-13b (Task 3.9): the 99+ badge was anchored by its right edge (`-right-3`, the bell `right-0.5`), so it grew leftward over the Inbox icon and sat over the bell's glyph | 6 | yes: the bell, the tab bar and the rail anchored their badges by hand; the bell moves to the kit's `BadgeAnchor` (on `IconButton`'s `badge`); the tab bar and the rail are Task 3.10's rewrite, which takes the same anchor; the sidebar row keeps the badge in its trailing slot | `BadgeAnchor` (`ui/count-badge.tsx`): the badge's leading edge on the icon's trailing edge, so it grows away; `count-badge.test.tsx` (no `right-*` anchor, 120 → "99+") |
+| 2026-11-03 | QA round 21 L1 / R23-15 (Task 3.9): radio groups outside the close sheet were a tab stop per chip (Settings' theme and language, Now's project filter, the New task form's Start and Repeat, Day's category, the preset editor: 25 stops), several `role=radio` with no `radiogroup`; and the chip rows gave about 40 px of real press area, their 44 px boxes overlapping the next row through a negative margin | 84 | yes: every `radio` in the app now comes from `useRadio` inside a `RadioGroup` (chips, the segmented control, the project picker and Day's task link as `ListRow select`, the colour swatches, the OS picker); the AI-question chips and the date and estimate chips were never radios (actions and pickers: now buttons, the pickers with `aria-expanded`); the kit's Pressable gained the small-visual pattern (`visual`: the target is the layout box, the drawn pill inside, no negative margin), which chips, the switch, the check circle and small buttons use | `useRadio` throws outside a `RadioGroup` (`chip.test.tsx`: a lone radio refuses to render; one `tabIndex` 0 per group, the first when none is chosen); `chip.test.tsx`, `switch.test.tsx`, `check-circle.test.tsx`: the target has no negative margin |
+| 2026-11-03 | QA round 23 R23-10 (Task 3.9): a click on «Показать удалённые» (Presets) or the night-hours label (Settings) did nothing; only the 52 px switch toggled | 84 | yes: every `SwitchRow` (Presets, the preset form's rows, recurrence, calendar sync, the pickers' "Alongside", Settings) is now a `ListRow` toggle; the two bare switches left (the preset override beside its value, the notification matrix's cells) are named by their cell and keep the 48 target | `ListRow` `toggle`: the whole row is one `switch` named by its title, a press on the label flips it, one stop (`list-row.test.tsx`) |
+| 2026-11-03 | F-DAT-02, tags (Task 3.9): `ColorTag` set `numberOfLines` on a box that did not yield, so a 78-96-character project pushed its row | 109 | yes: `ColorTag` is gone; every tag is the kit's `Tag` (the task row's meta line, the running row, Day's rows and totals, the presets list) | `tag.test.tsx` (a 120-character name in a 200 px parent: the tag shrinks, its text is one line ending in "…"); the gallery's Tags section in a 200 px column, measured by `e2e/worst-case.e2e.ts` |
+
+| 2026-11-03 | Task 3.7 (F-CMP-12, R22-21): the toast floated at `BASE_BOTTOM = 96` / `TAB_BAR_HEIGHT = 72`, a guess at the tab bar (really `min-h-12` + padding + inset), and on a computer docked in the sidebar ~1000 px from its cause. Tests read the constants back, so they agreed with the guess | 6 | yes: the offline pill used the same constant (`useFloatBottom`); every floating line now reads one layer | `ui/float-layer.ts`: the tab bar, each screen footer and the pill publish their measured heights, the shell its content region; toast/pill tests drive measured layouts (`toast.test`, `tab-bar.test` "never at a constant") |
+| 2026-11-03 | PR #48 review #6 and QA 23 R23-13a: the offline pill and the toast shared one spot (the toast covered Retry), and at 1440 the pill was centred on the window, straddling the sidebar's edge. The pill e2e checked only the header's controls | 6 | yes: the toast was centred on the window too (and docked in the sidebar); both now float in the content region, the toast stacked above the pill | `usePublishStatus` + `useContentRegionLayout`; e2e `offline-pill.e2e.ts` "offline with a toast" (no overlap, Retry pressable, 390 and 1440) and "inside the content column at 1440" (`controlsUnder` the pill) |
+| 2026-11-03 | QA 23 R23-14 / PR #48 follow-up: on Presets and New preset the sidebar said Settings was the current page (`aria-current="page"`, the full selected look) while the screen showed Back. A destination's `owns(path)` was the only notion of current, so the owner of a pushed screen claimed to be it | 124 (new: "a parent claiming to be the page": a navigation item that owns a pushed screen marks itself as that page) | yes: the rail and the task → Now case had the same rule | `currentOf` (`page` · `section` · null) shared by the sidebar and the rail; `NavItem` gives a section the bar without the fill and `aria-current="true"`; `nav-item.test` table of paths |
+| 2026-11-03 | Task 3.7 (F-WEB-04): a tap on Week's moon toggled night hours and popped a «Ночные часы» bubble over the grid for 2.5 s; tooltips showed on touch by default (`showsOnTap` defaulted to true) | 6 | yes: every other tooltip had opted out with `showsOnTap={false}`; the prop is gone, touch shows nothing anywhere | `tooltip.test` and `tooltip.web.test` "touch shows nothing"; e2e `overlays.e2e.ts` sweeps every tooltip on Now, Day and a task for covered controls |
+| 2026-11-03 | PR B parked N1 (review of Tasks 3.3–3.5): a static (unpressable) compact `ListRow` on Android had no minimum height: the 48 dp lived only on the kit Pressable around a pressable row, and the test pinned "compact has no min-height of its own" because it only drew pressable rows | 5 (layout a unit test pins only for the variant it draws) | yes: `ROW_BOX` is the only row box; the web's compact already had its own 44 | `list-row.test.tsx` "a static compact row is still 48 dp" (the minimum is on the box, so every frame of the row keeps it) |
+| 2026-11-03 | PR B parked N2: `Disclosure`'s close went to the current measure through a 0 ms timing step, which still costs one frame: the first frame of the close drew the stale height | 5 | yes: the update banner only grows; no other close animates a height | `disclosure.test.tsx` "closes from the content's current height" (no 0 ms step; the height is set to the measure, kept in step while open) |
+| 2026-11-03 | PR B parked N4: the inspector took presses during its 160 ms exit (a second row press acted on the pane on its way out) | 5 | yes: the fix is in `Presence`, so every exit it keeps (inspector, composer, gallery) takes no touches; `Disclosure` already set `pointerEvents="none"` while closing | `presence.test.tsx` "takes no touches while it leaves" |
+| 2026-11-03 | PR B 3.1 re-review: the kit Pressable's Space for checkbox/radio/switch/tab skipped its own press only when the caller's key handler had called `preventDefault`; a caller that pressed on Space without it would press twice | 113 (a guard that relies on what a caller happens to do) | yes: the kit now owns Space for those roles outright (the caller never sees a Space aimed at the control); the 9 callers still spreading `spacePress` cannot double-fire | `pressable.web.test.tsx` "presses once when a caller presses on Space without preventing the default" |
+| 2026-11-03 | PR B 3.2 re-review: a kit `Link` (and any kit Pressable) handed `aria-disabled` looked disabled to assistive tech and still pressed, and on the web kept its live `href`; a hyphenated JSX attribute passes every prop type, so the type could not refuse it | 10 (a control whose state and behaviour disagree) | yes: `usePressableProps` reads `aria-disabled` as `disabled` for every kit control; the web Link drops `href` on either | `link.web.test.tsx` "is disabled by aria-disabled as by disabled" |
+| 2026-11-06 | PR B 4.2 (F-A11Y-10): the running row sat in `accessibilityLiveRegion="polite"` around a value that changes every minute, so a screen reader spoke the whole row at each tick; no test asserted what is *not* announced | 125 (live region around a ticking value) | yes: the time bar's reading-line status stays one announcement; no other live region wraps a clock (swept `accessibilityLiveRegion` in `apps/app/src`) | `running-card.test.tsx` "is not a live region" and "ticks on Stop, and says a start, a stop and the past-expected once each" (`useRunningAnnouncements`); QA checklist: a value that changes while the screen is idle gets no live region, only a one-off announcement of its transitions |
+| 2026-11-06 | PR B 4.1: a check (a control) inside a pressable row is a nested interactive (axe `nested-interactive`); the first `ListRow`-based task row would have put `CheckCircle` inside the row's Pressable | 10 (a control whose structure disagrees with its role) | yes: `ListRow` takes `control`, rendered beside the press area, never inside it | `task-row.test.tsx` "keeps the check beside the press area, never inside it" |
+| 2026-11-06 | R23-12 / QA21 M2: bare `/add` left the cursor on `BODY` (title focus asked for under the first-sync cover) | 126 (new) | yes: every focus-on-arrival caller | `add-focus.test.tsx` (held first pull), e2e at 390 and 1440 |
+| 2026-11-06 | QA21 L3: Day's activity sheet offered tomorrow as an end day, which the "still ahead" check always refused | 127 (new) | yes: the day chips derive from the same `now` the validation uses; Week's detail has no day chips | `activity-draft.test.ts` (no end day ahead of now; midnight edge) and `activity-sheet.test.tsx` |
+
+### 125. A live region around a ticking value
+- **Bug.** PR B 4.2 (F-A11Y-10): the running row sat in `accessibilityLiveRegion="polite"` around the
+  elapsed time, which changes every minute: a screen reader read the whole row at each tick.
+- **Missed because.** Tests asserted what was shown, never what is *announced*; a live region looks
+  like a feature ("polite") and nothing counts how often it speaks.
+- **Rule.** A value that changes while the screen is idle (a clock, a counter, a progress) is never
+  inside a live region. Its transitions that matter (started, stopped, past the Expect) are announced
+  once each with `AccessibilityInfo.announceForAccessibility`; what is on screen at mount is not news.
+- **Sweep and guard.** Swept every `accessibilityLiveRegion` in `apps/app/src`: the remaining ones wrap
+  one-off messages (a reading status, an error). `running-card.test.tsx` pins "not a live region" and
+  "announces a start, a stop and past-expected once each"; QA checklist line in `docs/qa.md` scope:
+  "does anything that ticks speak?".
+
+
+### 126. A focus asked for while the field cannot take it
+- **Bug.** QA round 21 M2 / round 23 R23-12: a direct load of `/add` opened the New task form, whose
+  title asked for the cursor at mount — under a fresh browser's first-sync cover, where the field is
+  hidden and takes no focus. Focus stayed on `BODY` (a phone and a computer alike). The composer's
+  line already waited for the cover (QA 19 L4); the form's title did not.
+- **Missed because.** Tests rendered the form with the copy already synced, so "focus at mount" always
+  worked; the cover exists only in the first-sync state.
+- **Rule.** Every "focus on arrival" waits for what can hide the field: the first-sync cover
+  (`useIsFirstSync`), an overlay still entering. Ask once it can be seen.
+- **Sweep and guard.** Swept `focusField(` / `autoFocus` callers: the line (done), `TaskFields` title
+  (fixed), the add-computer field (not under the cover). `screens/add-focus.test.tsx` holds the first
+  pull and asserts no focus before the cover lifts and one after; `e2e/composer.e2e.ts` checks the
+  title is focused on a direct load of `/add` at 390 and 1440.
+
+### 127. A choice offered that the validation always refuses
+- **Bug.** QA round 21 L3: the activity sheet's "End day" chips ran to the day after the old end; for a block that ended today that was tomorrow, and any time on it was answered "That is still ahead".
+- **Missed because.** The chips and the check were written apart: the chips from the block's own dates, the check from `now`; tests used a block far in the past, where the two never disagree.
+- **Rule.** Options are derived from the same rule that validates them: if a value can only ever be refused, it is not offered. The test clock sits at the edge (a day that has just begun, one that has not).
+- **Sweep and guard.** Swept the other chip sets built from dates (`DayChoices` start days, Week's detail: none). `activity-draft.test.ts` pins the edge in Moscow time.
+
+### 128. Text from data placed in chrome without a length policy
+- **Bug.** PR B 4.5 (F-DAT-01): the task footer's submit button was built from the names of every solved
+  subtask; with 37 of them it grew to 20 lines and at 320 px the body was 0 px tall.
+- **Missed because.** Fixtures had two or three short subtasks, and jest-expo draws no layout, so a label
+  that wraps looks the same as one that fits.
+- **Rule.** A button, tab, badge or bar title is chrome: its length is set by a policy (`fixed` words plus a
+  `count`, or one truncated line), never by data. The full data goes to the accessibility hint and to the
+  sheet the button opens. The pure function that builds such a label (`submitLabel`) is tested with the
+  worst case (37 items, a 200-character name), not with the typical one.
+- **Sweep and guard.** Swept every `t(...)` call that interpolates a list or a name into a `Button` or an
+  `IconButton` label: the toasts already quote through `toastQuote`; the close sheet's title keeps the
+  full list on purpose (it scrolls). Guard: `submitLabel` tests in `task.test.ts`.
+
+### 129. A control replaced by its own confirm drops the way back
+- **Bug.** PR B 4.5 (F-A11Y-02): the task header's trash deleted at once, the page stayed as «No such
+  task», and Escape did nothing in the confirm that other menus had.
+- **Missed because.** The delete test pressed the button and checked the store; no test pressed Escape or
+  Cancel, so nothing asserted that the question could be refused from the keyboard.
+- **Rule.** A destructive item asks in place (the item turns into «Delete the task?» with Cancel and
+  Delete, focus on Cancel), Escape cancels the question before it closes the menu, and the recovery is
+  offered at once. The test walks Cancel, Escape and Delete in that order.
+- **Sweep and guard.** Swept the other one-tap destructive controls (sessions, History undo, wipe): they
+  already confirm. Guard: the `deleting` tests in `task-screen.test.tsx`.
+
+### 130. A box drawn at a minimum size hangs outside the clip that holds it
+- **Bug.** PR B 4.6 (the day's-end block, found by the rebase): a 3-minute item at 23:56 is drawn at the 24 px
+  target and ran past the day column, which the sideways scroller clips, so half of its target missed taps;
+  lifting it into the column would have covered the item before it.
+- **Missed because.** Geometry (drawn height) and lanes were computed in two places and the grid's tests never
+  put an item at the edge of the column; jest draws no clip.
+- **Rule.** One function (`layoutWeek`) returns each box's drawn rectangle, its lane and how far the lowest box
+  reaches below the column (`overhang`); the grid keeps that much room under the last hour, so a minimum-size
+  box never leaves its clip and never moves onto a neighbour. A pure test places the item at the edge.
+- **Sweep and guard.** Swept the other minimum-size boxes (Day's rail, the time bar tiles): none is clipped by an
+  ancestor. Guard: `week-layout.test.ts` (5 lanes, the 23:56 item, folds) and the e2e in `week.e2e.ts` that
+  asserts the target is inside the scroller and covers no neighbour.
+
+### 131. One sentence for several reasons, in the one place that was not swept
+- **Bug.** QA round 21 L7, closed in PR B 4.7: the rules' preview card said «Assistant unavailable» for
+  out of requests, unreachable and «this server has no assistant» alike, while the composer's form had a
+  sentence for each (bug class 99 had fixed the form and the no-card line, not the card).
+- **Missed because.** Class 99's sweep named the screens that show a reading issue; the card's own
+  two-way `?:` (unreadable or everything else) looked complete, and its test used one reason.
+- **Rule.** A text keyed by a reason is looked up by the reason itself (`assistant.rulesUsed.${reason}`), so
+  a new reason is a type error until its sentence exists in both catalogs, never a fall-through branch.
+- **Sweep and guard.** Swept every `reason === …` ternary over `ParseUnavailableReason`. Guard: `it.each`
+  over the reasons in `composer.test.tsx`; the typed key.
+
+### 132. A control inside a pressable row is a button in a button
+- **Bug.** PR B 4.7/4.10 (found while rebuilding the rows): an Inbox row that opens its details and also
+  carries Accept/Delete, and a History row that asks before undoing and also carries Undo, cannot be one
+  pressable (axe `nested-interactive`; TalkBack reads one button).
+- **Missed because.** The old cards were not pressable, so no test could nest; the kit's `ListRow`
+  documents `control` only for a leading check.
+- **Rule.** A row with its own actions is a row beside its actions (the row presses, the actions are
+  siblings), or it is not pressable and the action is the only way in; never both on one box. Buttons that
+  repeat per row name their row («Accept: <text>»).
+- **Sweep and guard.** Swept the lists: Day's rows, Projects and the task rows keep one control per row.
+  Guard: the Inbox and History tests press the row and the button separately by name.
+
+### 133. A refusal said a screen below the field it is about
+- **Bug.** QA round 23 R23-05, closed in PR B 4.8: a taken or empty preset name was refused in a line at the
+  foot of a long form; the Name field showed nothing and kept no cursor.
+- **Missed because.** The test read the alert anywhere on the screen (`findByRole("alert")`), so a message far
+  from its field passed; jest has no viewport.
+- **Rule.** A refusal about one field is that field's `error` (marked, announced, with the cursor sent back
+  to it) and goes when the field's value changes; only a refusal about the whole form uses the form's line.
+- **Sweep and guard.** Swept the forms: Day's sheet, the project form and the close sheet already attach
+  theirs (the project form's name error stays a form line, by its single field). Guard: the preset tests
+  assert the sentence, `aria-invalid` on the field and that editing the name clears it.
+
+### 134. Owner-corrected copy with no test pinning it
+- **Bug.** The update banner went back to "We changed a few things" (PR #42) after the owner had rejected that copy twice; "Settings → Devices" and the long Calendar hint came back the same way (F-CPY-01).
+- **Missed because.** A test pinned the rejected copy itself (`update-banner.web.test.tsx` expected "We changed a few things"), and no test listed phrases the owner had banned or strings they had agreed.
+- **Sweep and guard.** Swept the catalogs for the banned phrases (none left). Guard: `packages/core/src/i18n/glossary.test.ts` lists banned phrases, pins the agreed update copy and the Calendar hint's length, and holds one word per action per language (class 45). A correction by the owner adds its phrase there in the same change.
+
+### 135. A test that assumes the host's time zone
+- **Bug.** Tests passed on one machine and failed on another: `app-state.test.tsx` assumed the device was not in Moscow (0747db9), and `week.e2e.ts`'s 23:56 test never seeded the account zone while its neighbours passed `timezone: "UTC"`, so it depended on where it ran.
+- **Missed because.** Every run so far was on a host whose zone was UTC or close to it; nothing varied the zone.
+- **Sweep and guard.** Swept `e2e/**` and the jest and vitest suites for host-zone and locale reads: the e2e project now pins `timezoneId: "UTC"` and `locale: "en-US"` (a test needing another zone sets its own, as `sync-state.e2e.ts`), and the 23:56 test seeds the account zone. The jest app suite (its `test` script sets `TZ`) and the core and client vitest configs run under `TZ=America/Los_Angeles`, so a UTC assumption fails everywhere; `tz-guard.test.ts` in core and a case in `settings.test.tsx` fail if the suite ends up in UTC again.
+
+### 136. Optional descriptive metadata able to block a core flow
+- **Bug.** The phone sends its maker, model, Android version and name at login. The Worker's strict body schema refused a value over its limit (40/60/20/80 characters; custom ROMs report long `Build.MODEL`), so the whole `POST /api/auth/nonce` answered 400/422 and a cosmetic field took away the only way to sign in on Android. The strict object also made a new app fail against an older Worker (final review of PR #54, I1 and M1).
+- **Missed because.** Tests pinned the refusal as the wanted behaviour ("refuses an out-of-range device") and fed short fixtures; no test asked what a real phone sends, or what an older or newer peer sends.
+- **Class.** Untrusted or peer-supplied optional metadata whose validation can fail the request it only decorates.
+- **Sweep and guard.** Swept the auth and login bodies: every optional descriptive field of `NonceCreateSchema` (name, brand, model, OS version, and the install id) is now dropped when invalid (`droppedIfInvalid`), the object ignores unknown keys, and the client cuts the texts to `DEVICE_FIELD_LIMITS` by grapheme before sending (`cleanLoginDevice`) and asks again with the old fields on a 422 from an older Worker. Guards: core schema test, api int tests (too long, blank, wrong type, unknown key), client unit tests. `cloud.ts`'s upload `deviceName` is a required field of an authenticated upload, not a login, and stays strict. Rule: client-sent descriptive metadata never blocks auth.
+
+### 137. The first e2e run of a whole redesign: specs written against the old screens, and two real faults they found
+- **Bug.** The first CI run of the overhaul's e2e suite (217 tests) failed 45: specs still drove the old screens (Delete on the task page, a switch's ring on the control, `shell-content` once, sheets on a computer where the picker is now a popover, a `textbox` that is now a `searchbox`, 500+ events in one push); and two real faults: a popover with no known height opened below a bottom-edge tile and left the window (the time bar's pickers on a computer, 1440 × 900), and the unread dot was an unnamed `div` with an `aria-label` (axe `aria-prohibited-attr`).
+- **Missed because.** Screen tasks ran jest and lint only (the owner's rule: e2e runs in CI), so no spec ran against a built screen until the whole PR was up; the popover took its height from a prop nobody passed and jest has no layout.
+- **Class.** A shared overlay that needs its own size to be placed, taking it from an optional prop; a decorative marker given an accessible name without a role; specs that are not run on the commit that changes their screen.
+- **Sweep and guard.** `Popover` measures its frame when no height is passed (every caller); the dot has `role="img"`; the specs' shared flows moved to `e2e/support` (`deleteOpenTask`). A screen task that changes a flow greps `e2e/` for its labels in the same commit.

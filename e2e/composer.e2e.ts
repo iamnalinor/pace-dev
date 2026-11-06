@@ -138,6 +138,20 @@ test("a blank share lands on Now at / with the line focused, like the others (QA
   await expect(page.getByRole("form", { name: "New task" })).toHaveCount(0);
 });
 
+/** A bare /add (the manifest's New task shortcut) puts the cursor in the form's field (QA21 M2, R23-12). */
+for (const [width, height, size] of [
+  [390, 844, "phone"],
+  [1440, 900, "computer"],
+] as const) {
+  test(`a direct load of /add focuses the New task form's title on a ${size}`, async ({ page }) => {
+    await page.setViewportSize({ height, width });
+    await loginViaApi(page);
+    await page.goto("/add");
+    await expect(taskForm(page)).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Title" })).toBeFocused();
+  });
+}
+
 /** Goes to `path` inside the page, as the router does (no new page). */
 const goInPage = async (page: Page, path: string): Promise<void> => {
   await page.evaluate((to) => {
@@ -217,9 +231,10 @@ test("the form's close drops its draft: New task opens an empty form again (QA 1
 });
 
 /**
-Samples, frame by frame, where the form sits inside the card's clipping box while the card
-unfolds: the browser must not scroll the box to reveal the focused title, which would slide
-the header (and the top of Create) out of the card and back.
+Samples, frame by frame, where the form sits inside the card while the card unfolds, and how far
+the screen's scroller has moved: the browser must not scroll to reveal the focused title, which
+would slide the header (and the top of Create) away and back. The card itself no longer scrolls
+or clips, so the scroller measured is the nearest ancestor that scrolls.
 */
 const sampleUnfolding = async (page: Page): Promise<readonly { top: number; scroll: number }[]> =>
   await page.evaluate(
@@ -229,15 +244,19 @@ const sampleUnfolding = async (page: Page): Promise<readonly { top: number; scro
         let end = Infinity;
         const frame = (now: number): void => {
           const form = globalThis.document.querySelector('[role="form"]');
-          // The nearest ancestor that clips: the box whose height grows.
-          let clip = form?.parentElement ?? null;
-          while (clip !== null && globalThis.getComputedStyle(clip).overflow !== "hidden") {
-            clip = clip.parentElement;
+          // The card that changes shape (it no longer clips: it takes the form's height at once).
+          const clip = globalThis.document.querySelector('[data-testid="composer-card"]');
+          let scroller = clip?.parentElement ?? null;
+          while (
+            scroller !== null &&
+            !/auto|scroll/u.test(globalThis.getComputedStyle(scroller).overflowY)
+          ) {
+            scroller = scroller.parentElement;
           }
           if (form !== null && clip !== null) {
             end = Math.min(end, now + 600);
             samples.push({
-              scroll: clip.scrollTop,
+              scroll: scroller?.scrollTop ?? globalThis.scrollY,
               top: form.getBoundingClientRect().top - clip.getBoundingClientRect().top,
             });
           }
@@ -262,7 +281,7 @@ for (const [width, height, size] of [[390, 844, "phone"]] as const) {
     const sampling = sampleUnfolding(page);
     await formByHand(page).click();
     const samples = await sampling;
-    // The card grew over several frames, and the form stayed inside it throughout.
+    // Sampled over several frames, and the form stayed inside the card throughout.
     expect(samples.length).toBeGreaterThan(5);
     expect(Math.min(...samples.map((sample) => sample.top))).toBeGreaterThanOrEqual(0);
     expect(Math.max(...samples.map((sample) => sample.scroll))).toBe(0);
@@ -277,7 +296,7 @@ test("on a computer the form opens in the right pane and closing it brings the t
   await page.goto("/");
   await addTask(page, "Water the plants");
   await nowTasks(page).getByText("Water the plants").click();
-  const details = page.getByRole("button", { name: "Edit details" });
+  const details = page.getByRole("button", { exact: true, name: "Edit" });
   await expect(details).toBeVisible();
   await page.getByRole("navigation").getByRole("button", { name: "New task" }).click();
   const form = page.getByRole("form", { name: "New task" });
@@ -331,7 +350,7 @@ test("on a computer the form swaps into the pane in place: its title inside the 
   await page.goto("/");
   await addTask(page, "Water the plants");
   await nowTasks(page).getByText("Water the plants").click();
-  await expect(page.getByRole("button", { name: "Edit details" })).toBeVisible();
+  await expect(page.getByRole("button", { exact: true, name: "Edit" })).toBeVisible();
   const list = await nowTasks(page).boundingBox();
   const sampling = samplePaneSwap(page);
   await page.getByRole("navigation").getByRole("button", { name: "New task" }).click();

@@ -87,9 +87,9 @@ export type NowViewModel = {
 };
 
 /** Every row names its importance, Normal included: it reads right after the project. */
-const importancePart = (item: NowItem): readonly MetaPart[] => [
-  { kind: "importance", importance: item.importance },
-];
+/** Normal is the default and says nothing; only the other three are worth a word (Q3). */
+const importancePart = (item: NowItem): readonly MetaPart[] =>
+  item.importance === "normal" ? [] : [{ kind: "importance", importance: item.importance }];
 
 const repeatsPart = (item: NowItem): readonly MetaPart[] =>
   hasNextRepeat(item.repeat) ? [{ kind: "repeats" }] : [];

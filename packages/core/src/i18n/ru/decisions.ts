@@ -7,6 +7,7 @@ export const ruDecisions: { readonly [K in keyof typeof enDecisions]: string } =
   "decisions.empty": "В журнале пока пусто.",
   "decisions.noMatch": "Ничего не нашлось по «{query}».",
   "decisions.failed": "Не удалось загрузить журнал.",
+  "decisions.clear": "Сбросить поиск",
   "decisions.retry": "Попробовать снова",
   "decisions.done.task.create": "Создана задача «{subject}»",
   "decisions.done.task.update": "Изменено «{subject}»: {fields}",
@@ -77,5 +78,4 @@ export const ruDecisions: { readonly [K in keyof typeof enDecisions]: string } =
   "decisions.notFound": "Не нашлось в вашем тексте: {fields}",
   "decisions.via.model": "через {model}",
   "decisions.via.rules": "по локальным правилам",
-  "decisions.open": "Открывает задачу",
 };

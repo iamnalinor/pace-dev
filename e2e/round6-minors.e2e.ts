@@ -48,7 +48,7 @@ test.describe("on a computer", () => {
     await expect(page).toHaveTitle("Алгебра · Pace");
     // Opened the way a person does, from Presets' "Start from".
     await page.goto("/presets");
-    await page.getByRole("button", { exact: true, name: "Домашка" }).click();
+    await page.getByRole("button", { exact: true, name: "Начать с «Домашка»" }).click();
     await expect(page).toHaveURL(/\/presets\/new\?from=hw$/u);
     await expect(page).toHaveTitle("Новый пресет · Pace");
     // Nothing to type an id into; the cursor is in Name.

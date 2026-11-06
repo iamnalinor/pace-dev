@@ -1,6 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 
-import { addTask, approve, nowTasks } from "./support/composer.ts";
+import { addTask, approve, deleteOpenTask, nowTasks } from "./support/composer.ts";
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { controlsUnder } from "./support/geometry.ts";
 import { API_URL, loginViaApi } from "./support/login.ts";
@@ -68,9 +68,9 @@ for (const size of SIZES) {
       await expect(
         tasks.getByRole("button", { name: `Write the lab report ${size.name}` }),
       ).toBeVisible();
-      await page.getByRole("textbox", { name: "Find a task" }).fill("zzz");
+      await page.getByRole("searchbox", { name: "Find a task" }).fill("zzz");
       await expect(page.getByText("No open task matches.")).toBeVisible();
-      await page.getByRole("textbox", { name: "Find a task" }).fill("lab report");
+      await page.getByRole("searchbox", { name: "Find a task" }).fill("lab report");
       await shoot(page, `day-picker-task-${size.name}`, (name) => info.outputPath(name));
       await expectNoA11yViolations(page);
       await tasks.getByRole("button", { name: `Write the lab report ${size.name}` }).click();
@@ -215,8 +215,8 @@ for (const size of SIZES) {
     // Deleting a task says so in a toast (with Undo); the bar is below it on Now.
     await addTask(page, `Toast ${size.name}`);
     await nowTasks(page).getByText(`Toast ${size.name}`).click();
-    await page.getByRole("button", { name: "Delete the task" }).click();
-    const toast = page.getByRole("alert");
+    await deleteOpenTask(page);
+    const toast = page.getByTestId("toast-card");
     await expect(toast).toBeVisible();
     // In the app, not a reload: a reload would drop the toast.
     await page
@@ -226,8 +226,8 @@ for (const size of SIZES) {
     const bar = timeBar(page);
     await expect(bar).toBeVisible();
     await expect(toast).toBeVisible();
-    // Above the bar on a phone, at the sidebar's foot on a computer: over none of its buttons.
-    expect(await controlsUnder(page, '[role="alert"]')).toEqual([]);
+    // Above the bar on a phone and on a computer alike: over none of its buttons.
+    expect(await controlsUnder(page, '[data-testid="toast-card"]')).toEqual([]);
   });
 }
 
@@ -241,7 +241,7 @@ test("the greyed Calendar button says why the moment the pointer is over it", as
   const tooltip = page.getByRole("tooltip");
   // No toast and no delay: the bubble is there at once, right above the button.
   await expect(tooltip).toBeVisible({ timeout: 300 });
-  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(page.getByTestId("toast-card")).toHaveCount(0);
   const gap = await gapAbove(tooltip, calendar);
   expect(gap).toBeGreaterThanOrEqual(0);
   expect(gap).toBeLessThan(16);
@@ -257,7 +257,7 @@ test("the Calendar picker on the web offers no phone calendar to set up (QA 19 L
   await page.setViewportSize({ height: 900, width: 1280 });
   await page.goto("/");
   await timeBar(page).getByRole("button", { exact: true, name: "Calendar" }).click();
-  const sheet = page.locator('[data-pace-surface="sheet"]');
+  const sheet = page.locator('[data-pace-surface="sheet"], [data-testid="popover-surface"]');
   await expect(
     sheet.getByRole("button", { name: "Start a meeting without an event" }),
   ).toBeVisible();

@@ -7,18 +7,47 @@ import {
   type Page,
 } from "@playwright/test";
 
+/** Whether an axe finding is about colour alone (a fade may be what it measured). */
+const isColourFault = (violation: { readonly id: string }): boolean =>
+  violation.id === "color-contrast";
+
 /** Fails on serious/critical WCAG 2.2 AA violations of the current page. */
 export const expectNoA11yViolations = async (page: Page): Promise<void> => {
-  // Check what the person sees once things settle, not a toast halfway through fading in.
+  // Check what the person sees once things settle, not a toast halfway through fading in. A loop
+  // (a skeleton's breathing) never ends: only the animations that do are waited for.
   await page.waitForFunction(() =>
-    document.getAnimations().every((a) => a.playState !== "running"),
+    document
+      .getAnimations()
+      .every(
+        (a) => a.playState !== "running" || a.effect?.getComputedTiming().iterations === Infinity,
+      ),
   );
-  const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
-    .analyze();
-  const serious = results.violations.filter(
-    (violation) => violation.impact === "serious" || violation.impact === "critical",
-  );
+  // A fade the app drives itself (a reanimated opacity) is no web animation: a scan that finds only
+  // colour faults is repeated until the page holds still, and fails on what stays.
+  const scan = async () => {
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+      .analyze();
+    return results.violations.filter(
+      (violation) => violation.impact === "serious" || violation.impact === "critical",
+    );
+  };
+  let serious = await scan();
+  if (serious.some((violation) => isColourFault(violation))) {
+    try {
+      await expect
+        .poll(
+          async () => {
+            serious = await scan();
+            return serious.length;
+          },
+          { intervals: [250], timeout: 3000 },
+        )
+        .toBe(0);
+    } catch {
+      // What stays after the wait is reported below.
+    }
+  }
   expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
 };
 

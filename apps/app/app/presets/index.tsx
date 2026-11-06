@@ -1,4 +1,4 @@
-import { PresetsScreen } from "#app/screens/presets-screen.tsx";
+import { PresetsScreen } from "#app/features/presets/presets-screen.tsx";
 
 export default function PresetsRoute() {
   return <PresetsScreen />;

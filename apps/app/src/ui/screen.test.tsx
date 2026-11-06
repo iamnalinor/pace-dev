@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, type ViewStyle } from "react-native";
 
 import { renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { space } from "@pace/core";
 
 import { Screen } from "./screen.tsx";
 import { useToast } from "./toast.tsx";
@@ -27,7 +28,7 @@ const layOutFooter = async (): Promise<void> => {
 
 /** How far the toast floats above the bottom edge. */
 const bottomOfToast = (): number => {
-  const style = StyleSheet.flatten(screen.getByTestId("toast").props["style"] as ViewStyle);
+  const style = StyleSheet.flatten(screen.getByTestId("toast-place").props["style"] as ViewStyle);
   return typeof style.bottom === "number" ? style.bottom : NaN;
 };
 
@@ -84,10 +85,10 @@ describe("a toast on a screen with a footer", () => {
       });
     }
     await fireEvent.press(screen.getByRole("button", { name: "Close the pane" }));
-    expect(bottomOfToast()).toBe(72 + FOOTER_HEIGHT + 12);
+    expect(bottomOfToast()).toBe(FOOTER_HEIGHT + space["3"]);
   });
 
-  it("sits above the footer and the phone's tab bar, not over the footer's buttons", async () => {
+  it("sits above the footer, not over the footer's buttons", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(
       <Screen footer={<Text>Time bar</Text>}>
@@ -96,11 +97,11 @@ describe("a toast on a screen with a footer", () => {
       runtime,
     );
     await layOutFooter();
-    // The tab bar (72), the footer (88) and 12 px of air.
-    expect(bottomOfToast()).toBe(72 + FOOTER_HEIGHT + 12);
+    // The footer (88) and `space.3` of air; no tab bar is on screen here (its own test: toast.test).
+    expect(bottomOfToast()).toBe(FOOTER_HEIGHT + space["3"]);
   });
 
-  it("floats at the usual height on a screen without a footer", async () => {
+  it("floats just above the bottom edge on a screen without a footer or a tab bar", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(
       <Screen>
@@ -108,15 +109,61 @@ describe("a toast on a screen with a footer", () => {
       </Screen>,
       runtime,
     );
-    expect(bottomOfToast()).toBe(96);
+    expect(bottomOfToast()).toBe(space["3"]);
   });
 
   it("drops back when the screen with the footer is gone", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(<Leaves />, runtime);
     await layOutFooter();
-    expect(bottomOfToast()).toBe(72 + FOOTER_HEIGHT + 12);
+    expect(bottomOfToast()).toBe(FOOTER_HEIGHT + space["3"]);
     await fireEvent.press(screen.getByRole("button", { name: "Leave" }));
-    expect(bottomOfToast()).toBe(96);
+    expect(bottomOfToast()).toBe(space["3"]);
+  });
+});
+
+/** The body's scroll, as React Native reports it. */
+const scrollTo = async (y: number): Promise<void> => {
+  await fireEvent.scroll(screen.getByTestId("screen-body"), {
+    nativeEvent: {
+      contentOffset: { x: 0, y },
+      contentSize: { height: 2000, width: 390 },
+      layoutMeasurement: { height: 700, width: 390 },
+    },
+  });
+};
+
+const edgeClasses = (): readonly string[] =>
+  (screen.getByTestId("screen-header-edge").props["className"] as string).split(" ");
+
+describe("the header's scroll edge (F-LAY-13)", () => {
+  it("shows a hairline on the page's ground once content scrolls under the header, and none at rest", async () => {
+    await renderScreen(
+      <Screen header={<Text>Header</Text>}>
+        <Text>Body</Text>
+      </Screen>,
+      await createTestRuntime(),
+    );
+    expect(edgeClasses()).toEqual(expect.arrayContaining(["bg-app", "border-transparent"]));
+    await scrollTo(40);
+    expect(edgeClasses()).toEqual(expect.arrayContaining(["bg-app", "border-separator"]));
+    await scrollTo(0);
+    expect(edgeClasses()).toContain("border-transparent");
+  });
+
+  it("lets the list scroll out from under a toast: its foot grows by what floats over it", async () => {
+    await renderScreen(
+      <Screen header={<Text>Header</Text>}>
+        <Shows message="Deleted" />
+      </Screen>,
+      await createTestRuntime(),
+    );
+    await fireEvent(screen.getByTestId("toast"), "layout", {
+      nativeEvent: { layout: { height: 120, width: 358, x: 0, y: 0 } },
+    });
+    const style = StyleSheet.flatten(
+      screen.getByTestId("screen-body").props["contentContainerStyle"] as ViewStyle,
+    );
+    expect(style.paddingBottom).toBe(120 + 2 * space["3"]);
   });
 });

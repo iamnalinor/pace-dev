@@ -1,4 +1,4 @@
-import { HistoryScreen } from "#app/screens/history-screen.tsx";
+import { HistoryScreen } from "#app/features/history/history-screen.tsx";
 
 export default function HistoryRoute() {
   return <HistoryScreen />;

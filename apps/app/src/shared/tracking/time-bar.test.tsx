@@ -97,17 +97,17 @@ describe("TimeBar", () => {
     expect(screen.queryByRole("button", { name: /More about/u })).toBeNull();
   });
 
-  it("folds the field and the buttons on a phone while something runs, one tap away", async () => {
+  it("folds only the typed field on a phone while something runs: the four tiles stay (Q12)", async () => {
     const runtime = await createTestRuntime();
     await runtime.actions.startActivity(
       { buttonId: "rest:walk", category: "rest", expectMinutes: 30, label: "Walk" },
       { at: addMinutesIso(NOW, -10) },
     );
     await renderScreen(<TimeBar />, runtime);
-    // What runs and its Stop stay; the rest folds into one line.
+    // What runs, its Stop and the tiles stay; the field folds into one line.
     expect(screen.getByRole("button", { name: "Stop: Walk" })).toBeOnTheScreen();
     expect(screen.queryByLabelText(en("time.whatDoing"))).toBeNull();
-    expect(screen.queryByRole("button", { name: "Chores" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Chores" })).toBeOnTheScreen();
     const more = screen.getByRole("button", { name: en("time.startOther") });
     expect(more).toBeCollapsed();
     await fireEvent.press(more);
@@ -438,7 +438,8 @@ describe("TimeBar", () => {
         expect.objectContaining({ category: "sport", expectMinutes: 20, label: "ЦСС" }),
       ]);
     });
-    expect(field).toHaveDisplayValue("");
+    // The bar re-lays itself once something runs: ask for the field again.
+    expect(screen.getByLabelText("What are you doing?")).toHaveDisplayValue("");
   });
 
   it("answers the assistant's question about an activity with one tap", async () => {
@@ -621,7 +622,7 @@ describe("TimeBar", () => {
     await renderScreen(<TimeBar />, runtime);
     await fireEvent.changeText(screen.getByLabelText("What are you doing?"), "ем");
     await fireEvent.press(screen.getByRole("button", { name: "Review assistant actions" }));
-    expect(await screen.findByText(en("assistant.rulesUsed"))).toBeOnTheScreen();
+    expect(await screen.findByText(en("assistant.rulesUsed.unreachable"))).toBeOnTheScreen();
     expect(activities(runtime)).toEqual([]);
     await fireEvent.press(screen.getByRole("button", { name: "Approve" }));
     await waitFor(() => {

@@ -1,10 +1,8 @@
-import { CloudOff, RefreshCw } from "lucide-react-native";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
-import { AppState, Pressable, Text, View } from "react-native";
+import { AppState, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { PaceRuntime } from "#app/runtime.ts";
-import type { MessageKey } from "@pace/core";
 
 import {
   useAuth,
@@ -16,10 +14,13 @@ import {
 } from "#app/app-state.tsx";
 import { useIsDeviceOffline } from "#app/platform/device-offline.ts";
 import { canStartSenders } from "#app/senders.ts";
+import { type MessageKey, z } from "@pace/core";
 
+import { useFloatPlace, usePublishStatus } from "./float-layer.ts";
+import { Icon } from "./icon.tsx";
+import { Pressable } from "./pressable.tsx";
 import { Skeleton } from "./skeleton.tsx";
-import { useTheme } from "./theme-provider.tsx";
-import { useFloatBottom } from "./toast.tsx";
+import { Text } from "./text.tsx";
 
 /**
 How long the first sync may hide the app. A pull that never answers (a stalled connection, a
@@ -33,30 +34,38 @@ is written stays on the device and goes out on reconnect, QA round 17 M5), not l
 first sync reached the server and failed (QA round 21 M4: an HTTP 500 said nothing), or still
 syncing once the first sync outlasts its cover. The first two offer Retry. It floats over the page rather than sitting in the layout, so
 the page never moves under the person as it comes and goes (QA round 18 L11: a line in the layout
-pushed everything down 37 px mid-typing), and sits where the toast does, clear of the tab bar and
-the screen's footer: at the top it lay over the header's Back, bell and task actions (round 7
-review 3). A press goes through around it.
+pushed everything down 37 px mid-typing), and sits at the foot of the bottom stack: clear of the
+measured tab bar and the screen's footer (at the top it lay over the header's Back, bell and task
+actions, round 7 review 3), inside the content region (at 1440 it straddled the column's edge,
+R23-13a), with a toast stacked above it rather than over its Retry (review #6). A press goes
+through around it.
 */
 const SyncStrip = ({ message }: { readonly message: MessageKey }) => {
   const t = useT();
-  const { palette } = useTheme();
-  const bottom = useFloatBottom();
-  const Icon = message === "errors.offline" ? CloudOff : RefreshCw;
+  const { bottom, left, right } = useFloatPlace();
+  const [height, setHeight] = useState(0);
+  usePublishStatus(height);
+  const icon = message === "errors.offline" ? "cloud-off" : "refresh-cw";
   const canRetry = message === "errors.offline" || message === "sync.notSyncedYet";
   return (
     <View
-      className="absolute left-0 right-0 items-center px-4"
+      className="absolute items-center"
       pointerEvents="box-none"
-      style={{ bottom }}
+      style={{ bottom, left, right, zIndex: z.toast }}
     >
       <View
         accessibilityLiveRegion="polite"
-        className="min-h-hit-web max-w-toast-max flex-row items-center gap-2 rounded-pill border border-separator bg-elevated pl-3 pr-1 shadow-lg"
+        className="min-h-hit-web max-w-toast-max flex-row items-center gap-2 rounded-pill border border-separator bg-elevated pl-4 pr-1 shadow-lg"
+        onLayout={(event) => {
+          setHeight(event.nativeEvent.layout.height);
+        }}
         role="status"
         testID="sync-strip"
       >
-        <Icon aria-hidden color={palette["status.warn"]} size={16} strokeWidth={2} />
-        <Text className="shrink py-2 font-sans text-footnote text-label-primary">{t(message)}</Text>
+        <Icon name={icon} size="inline" tone="secondary" />
+        <Text className="py-2" role="footnote" tone="secondary">
+          {t(message)}
+        </Text>
         {canRetry ? <RetryNow /> : null}
       </View>
     </View>
@@ -73,13 +82,13 @@ const RetryNow = () => {
   const runtime = usePace();
   return (
     <Pressable
-      accessibilityRole="button"
-      className="min-h-hit-web min-w-hit-web items-center justify-center rounded-pill px-3 active:opacity-70"
+      className="min-h-hit-web min-w-hit-web items-center justify-center rounded-pill px-3"
       onPress={() => {
         backOnline(runtime);
       }}
+      role="button"
     >
-      <Text className="font-sans text-footnote font-medium text-label-primary underline">
+      <Text className="font-semibold" role="footnote" tone="accent">
         {t("sync.retry")}
       </Text>
     </Pressable>
@@ -165,7 +174,7 @@ const FirstSyncPlaceholder = () => {
   return (
     <View className="flex-1 items-center bg-app px-4" style={{ paddingTop: insets.top + 32 }}>
       <View className="w-full max-w-content gap-4">
-        <Text className="font-sans text-callout text-label-secondary">
+        <Text role="callout" tone="secondary">
           {t("sync.firstSyncLine")}
         </Text>
         <Skeleton label={t("sync.firstSync")} rows={6} />

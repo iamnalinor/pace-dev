@@ -11,16 +11,16 @@ describe("UpdateStrip", () => {
   it("says what happened and offers a single Refresh button, nothing to postpone", async () => {
     const onRefresh = jest.fn();
     await renderScreen(<UpdateStrip onRefresh={onRefresh} />, await createTestRuntime());
-    expect(screen.getByText("We changed a few things. Refresh to see them.")).toBeOnTheScreen();
+    expect(screen.getByText("A new version of Pace is ready.")).toBeOnTheScreen();
     expect(screen.getAllByRole("button")).toHaveLength(1);
     expect(screen.queryByText("Later")).toBeNull();
-    await fireEvent.press(screen.getByRole("button", { name: "Refresh" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Refresh page" }));
     expect(onRefresh).toHaveBeenCalledTimes(1);
   });
 
   it("has an English source copy", () => {
-    expect(en("update.message")).toBe("We changed a few things. Refresh to see them.");
-    expect(en("update.refresh")).toBe("Refresh");
+    expect(en("update.message")).toBe("A new version of Pace is ready.");
+    expect(en("update.refresh")).toBe("Refresh page");
   });
 });
 
@@ -50,7 +50,7 @@ describe("UpdateFrame", () => {
 
   it("takes the status bar's room itself once open, so the screens below do not pad it twice", async () => {
     await renderFrame(true);
-    expect(screen.getByRole("button", { name: "Refresh" })).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Refresh page" })).toBeOnTheScreen();
     expect(screen.getByTestId("top-inset")).toHaveTextContent("0");
   });
 });

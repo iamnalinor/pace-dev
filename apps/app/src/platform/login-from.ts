@@ -1,6 +1,7 @@
 import type { LoginDevice } from "@pace/client";
 
 import { loadDeviceId } from "./device-id.ts";
+import { phoneDetails } from "./phone-details.ts";
 import { phoneName } from "./phone-name.ts";
 
 /** Where a bot login starts on this build: the phone app (the web build has `login-from.web.ts`). */
@@ -11,6 +12,7 @@ The phone a bot login starts on, so the session it opens is named after it ("Pix
 linked to this install's usage data.
 */
 export const loginDevice = async (): Promise<LoginDevice | undefined> => ({
+  ...phoneDetails(),
   deviceId: await loadDeviceId(),
   deviceName: phoneName(),
 });

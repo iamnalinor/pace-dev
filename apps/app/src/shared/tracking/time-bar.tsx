@@ -1,215 +1,24 @@
-import { CalendarDays, Coffee, House, type LucideIcon, Play, Timer } from "lucide-react-native";
 import { useRef, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { ScrollView, useWindowDimensions, View } from "react-native";
 
 import type { TimeButtonView } from "@pace/client";
-import type { MessageKey } from "@pace/core";
 
 import { usePace, useT } from "#app/app-state.tsx";
-import { ActionCards } from "#app/shared/assistant/action-cards.tsx";
-import { ReadingIssueLine } from "#app/shared/assistant/reading-issue-line.tsx";
-import { usePendingActions } from "#app/shared/assistant/use-pending-actions.ts";
-import { inkClass, outlineClass } from "#app/ui/color.tsx";
-import { cx } from "#app/ui/cx.ts";
-import { useTheme } from "#app/ui/theme-provider.tsx";
-import { Tooltip } from "#app/ui/tooltip.tsx";
+import { Disclosure } from "#app/ui/disclosure.tsx";
+import { OverlayPresence } from "#app/ui/overlay-presence.tsx";
 
 import type { CalendarToday } from "./calendar-today.ts";
 
+import { BarTiles } from "./bar-tiles.tsx";
 import { ChoicesSheet } from "./choices-sheet.tsx";
-import { RunningRow } from "./running-row.tsx";
-import { FoldToggle, HIDDEN, useFold } from "./time-bar-fold.tsx";
+import { RunningCard } from "./running-card.tsx";
+import { useFold } from "./time-bar-fold.tsx";
+import { TypedStart, useTypedStart } from "./typed-start.tsx";
 import { useCalendarButton } from "./use-calendar-button.ts";
+import { useRunningAnnouncements } from "./use-running-announcements.ts";
 
-const ICONS: Readonly<Record<TimeButtonView["id"], LucideIcon>> = {
-  calendar: CalendarDays,
-  chores: House,
-  rest: Coffee,
-  task: Timer,
-};
-
-/** The line's start: the assistant reads it first, so it is named "see the actions" (an icon only). */
-const ReviewButton = ({
-  isDim,
-  isDisabled,
-  onPress,
-}: {
-  readonly isDim: boolean;
-  readonly isDisabled: boolean;
-  readonly onPress: () => void;
-}) => {
-  const t = useT();
-  const { palette } = useTheme();
-  return (
-    <Tooltip label={t("assistant.review")} showsOnTap={false}>
-      <Pressable
-        accessibilityLabel={t("assistant.review")}
-        accessibilityRole="button"
-        accessibilityState={{ disabled: isDisabled }}
-        className={cx(
-          "h-hit-web w-hit-web items-center justify-center rounded-lg bg-accent active:opacity-80",
-          isDim && "opacity-50",
-        )}
-        disabled={isDisabled}
-        onPress={onPress}
-      >
-        <Play color={palette["accent.on"]} fill={palette["accent.on"]} size={16} />
-      </Pressable>
-    </Tooltip>
-  );
-};
-
-const NOTE = "font-sans text-footnote";
-
-/**
-"What are you doing?" first reads actions; the owner approves before anything is written.
-*/
-const TypedStart = ({ onUse }: { readonly onUse: () => void }) => {
-  const t = useT();
-  const { palette } = useTheme();
-  const [text, setText] = useState("");
-  const fieldRef = useRef<TextInput>(null);
-  const pending = usePendingActions("activity", () => {
-    setText("");
-  });
-  const typed = text.trim();
-  const start = (): void => {
-    onUse();
-    if (pending.pending !== null) {
-      void pending.approve();
-      // Reading already: Enter again would only send the same request twice.
-    } else if (typed !== "" && !pending.busy) {
-      pending.submit(typed);
-    }
-  };
-  return (
-    <View className="gap-2">
-      {pending.pending === null ? null : (
-        <ActionCards
-          actions={pending.pending.actions}
-          busy={pending.busy}
-          onApprove={() => {
-            onUse();
-            void pending.approve();
-          }}
-          onCancel={() => {
-            // The card goes; the cursor goes back to the field that opened it.
-            pending.cancel();
-            fieldRef.current?.focus();
-          }}
-          onFollowup={pending.followup}
-          questions={pending.pending.questions}
-          unread={pending.pending.unread}
-        />
-      )}
-      {pending.busy && pending.pending === null ? (
-        <Text accessibilityLiveRegion="polite" className={cx(NOTE, "text-label-secondary")}>
-          {t("assistant.reading")}
-        </Text>
-      ) : null}
-      {pending.issue === null ? null : <ReadingIssueLine issue={pending.issue} />}
-      <View className="flex-row items-center gap-2">
-        <TextInput
-          accessibilityLabel={t("time.whatDoing")}
-          className="h-hit-web flex-1 rounded-lg border border-outline bg-cell px-3 font-sans text-callout text-label-primary"
-          maxLength={200}
-          onChangeText={(next) => {
-            onUse();
-            pending.discard();
-            setText(next);
-          }}
-          onSubmitEditing={start}
-          placeholder={t("time.whatDoing")}
-          placeholderTextColor={palette["label.tertiary"]}
-          ref={fieldRef}
-          returnKeyType="go"
-          value={text}
-        />
-        <ReviewButton
-          isDim={typed === ""}
-          isDisabled={typed === "" || pending.busy}
-          onPress={start}
-        />
-      </View>
-    </View>
-  );
-};
-
-type ButtonProps = {
-  readonly button: TimeButtonView;
-  /** Greyed: why it cannot start anything now (the Calendar button), shown in its tooltip. */
-  readonly unavailable?: string | undefined;
-  readonly onTap: (button: TimeButtonView) => void;
-};
-
-/**
-How a button looks, and what its hint says a tap does: on (its activity runs: the picker opens
-on Stop), greyed (cannot start now) or resting in its color.
-*/
-const buttonLook = (
-  button: TimeButtonView,
-  isGreyed: boolean,
-): { readonly box: string; readonly ink: string; readonly hintKey: MessageKey } => {
-  if (button.isRunning) {
-    return {
-      box: "border-accent bg-accent-quiet",
-      hintKey: "time.buttonRunningHint",
-      ink: "font-medium text-accent-text",
-    };
-  }
-  return isGreyed
-    ? {
-        box: "border-dashed border-outline bg-cell",
-        hintKey: "time.buttonHint",
-        ink: "text-label-secondary",
-      }
-    : {
-        box: `bg-cell ${outlineClass(button.color)}`,
-        hintKey: "time.buttonHint",
-        ink: inkClass(button.color),
-      };
-};
-
-/**
-A big button in its fixed place: icon over name, its color's outline, filled with the quiet
-accent while its activity runs (a state, said in its name too). A tap always opens its picker.
-*/
-const BarButton = ({ button, onTap, unavailable }: ButtonProps) => {
-  const t = useT();
-  const { palette } = useTheme();
-  const label = t(button.labelKey);
-  const Icon = ICONS[button.id];
-  const look = buttonLook(button, unavailable !== undefined);
-  const restingColor =
-    unavailable === undefined ? palette["label.secondary"] : palette["label.tertiary"];
-  return (
-    <View className="flex-1">
-      {/* Greyed, it says why the moment the pointer is over it; a tap opens the picker, which says it too. */}
-      <Tooltip label={unavailable} showsOnTap={false}>
-        <Pressable
-          accessibilityHint={unavailable ?? t(look.hintKey)}
-          accessibilityLabel={button.isRunning ? t("time.buttonRunning", { label }) : label}
-          accessibilityRole="button"
-          className={cx(
-            "h-row items-center justify-center gap-0.5 rounded-xl border-2 px-1 active:opacity-80",
-            look.box,
-          )}
-          onPress={() => {
-            onTap(button);
-          }}
-        >
-          <Icon color={button.isRunning ? palette["accent.text"] : restingColor} size={18} />
-          <Text
-            className={cx("text-center font-sans text-caption font-normal", look.ink)}
-            numberOfLines={1}
-          >
-            {label}
-          </Text>
-        </Pressable>
-      </Tooltip>
-    </View>
-  );
-};
+/** The share of the window the bar's cards and proposals may take before they scroll (spec 3.3). */
+const BUDGET = 0.4;
 
 /**
 Which picker is open. Calendar's opens once today's calendar is read; only the picker asked for
@@ -237,36 +46,54 @@ const usePicker = (readCalendar: () => Promise<CalendarToday>) => {
   };
 };
 
-/** The four buttons in their fixed places. */
-const BarButtons = ({
-  buttons,
-  calendarUnavailable,
-  onTap,
-}: {
-  readonly buttons: readonly TimeButtonView[];
-  readonly calendarUnavailable: string | undefined;
-  readonly onTap: (button: TimeButtonView) => void;
-}) => (
-  <View className="flex-row gap-2">
-    {buttons.map((button) => (
-      <BarButton
-        button={button}
-        key={button.id}
-        onTap={onTap}
-        // Running its own activity, it is on, whatever the calendar says.
-        unavailable={
-          button.kind === "calendar" && !button.isRunning ? calendarUnavailable : undefined
-        }
-      />
-    ))}
-  </View>
-);
+/** The anchors of the four tiles: a wide window opens each picker as a popover on its tile. */
+const useTileAnchors = () => ({
+  calendar: useRef<null | View>(null),
+  chores: useRef<null | View>(null),
+  rest: useRef<null | View>(null),
+  task: useRef<null | View>(null),
+});
+
+/** The fold of the typed field, and the mark a use of the bar leaves so a start it made never folds it. */
+const useBarFold = (runningId: null | string, isPicking: boolean) => {
+  const lastUseRef = useRef(0);
+  const fold = useFold(runningId, { isPicking, lastUseRef });
+  return {
+    fold,
+    markUse: (): void => {
+      lastUseRef.current = Date.now();
+    },
+  };
+};
 
 /**
-The time bar at the foot of Now: what runs (and what runs alongside), "What are you
-doing?", and four buttons that never move — Calendar, Task, Chores and Rest — each opening
-what it can start. On a phone, opened on something running, the field and the buttons fold
-into one line under it, so the bar leaves room for the tasks; a tap unfolds them.
+The cards and the typed field under the region budget: what runs and the proposal being read
+scroll inside 40 % of the window less the tiles, so the list above keeps its half (spec 3.3).
+*/
+const Budgeted = ({
+  children,
+  reserved,
+}: {
+  readonly children: React.ReactNode;
+  readonly reserved: number;
+}) => {
+  const { height } = useWindowDimensions();
+  return (
+    <ScrollView
+      keyboardShouldPersistTaps="handled"
+      style={{ flexGrow: 0, maxHeight: Math.max(0, height * BUDGET - reserved) }}
+      testID="time-bar-scroll"
+    >
+      <View className="gap-2">{children}</View>
+    </ScrollView>
+  );
+};
+
+/**
+The time bar at the foot of Now: what runs (and what runs alongside), "What are you doing?", and
+four tiles that never move and never fold — Calendar, Task, Chores and Rest — each opening what
+it can start. On a phone, opened on something running, only the typed field folds, under «Start
+something else»; a tap unfolds it. The bar's cards scroll past 40 % of the window.
 */
 export const TimeBar = () => {
   const t = useT();
@@ -274,26 +101,40 @@ export const TimeBar = () => {
   const { alongside, buttons, running } = hooks.useTimeBar();
   const calendar = useCalendarButton();
   const { close, open, opened } = usePicker(calendar.forPicker);
+  const anchors = useTileAnchors();
   const openedButton = buttons.find((button) => button.id === opened?.id) ?? null;
-  const lastUseRef = useRef(0);
-  const markUse = (): void => {
-    lastUseRef.current = Date.now();
-  };
-  const fold = useFold(running?.activityId ?? null, { isPicking: opened !== null, lastUseRef });
+  const [text, setText] = useState("");
+  const typed = useTypedStart(text, setText);
+  const [tilesHeight, setTilesHeight] = useState(0);
+  const cards = [...(running === null ? [] : [running]), ...alongside];
+  useRunningAnnouncements(cards);
+  const { fold, markUse } = useBarFold(running?.activityId ?? null, opened !== null);
+  const field = <TypedStart onUse={markUse} setText={setText} typed={typed} />;
   return (
     <View
       accessibilityLabel={t("time.bar")}
       className="gap-2 border-t border-separator bg-app px-3 pb-3 pt-3"
       role="region"
     >
-      {[...(running === null ? [] : [running]), ...alongside].map((item) => (
-        <RunningRow key={item.activityId} running={item} />
-      ))}
-      {fold.isFoldable ? <FoldToggle isOpen={fold.isUnfolded} onToggle={fold.toggle} /> : null}
-      {/* Folded, the field stays mounted (hidden) so what was typed waits for the next unfold. */}
-      <View className="gap-2" style={fold.isShown ? undefined : HIDDEN}>
-        <TypedStart onUse={markUse} />
-        <BarButtons
+      <Budgeted reserved={tilesHeight}>
+        {cards.map((item) => (
+          <RunningCard key={item.activityId} running={item} />
+        ))}
+        {fold.isFoldable ? (
+          <Disclosure label={t("time.startOther")} onToggle={fold.toggle} open={fold.isUnfolded}>
+            {field}
+          </Disclosure>
+        ) : (
+          field
+        )}
+      </Budgeted>
+      <View
+        onLayout={(event) => {
+          setTilesHeight(event.nativeEvent.layout.height + 48);
+        }}
+      >
+        <BarTiles
+          anchors={anchors}
           buttons={buttons}
           calendarUnavailable={calendar.unavailable}
           onTap={(pressed) => {
@@ -302,18 +143,24 @@ export const TimeBar = () => {
           }}
         />
       </View>
-      {opened === null || openedButton === null ? null : (
-        <ChoicesSheet
-          button={openedButton}
-          calendar={opened.calendar}
-          canGoAlongside={running !== null && !openedButton.isRunning}
-          onClose={() => {
-            // A start picked here is the bar's own: closing must not fold it.
-            markUse();
-            close();
-          }}
-        />
-      )}
+      {/* Kept through its exit: the sheet leaves with what it showed (F-MOT-05). */}
+      <OverlayPresence
+        value={opened === null || openedButton === null ? null : { button: openedButton, opened }}
+      >
+        {(kept) => (
+          <ChoicesSheet
+            anchor={anchors[kept.button.id]}
+            button={kept.button}
+            calendar={kept.opened.calendar}
+            canGoAlongside={running !== null && !kept.button.isRunning}
+            onClose={() => {
+              // A start picked here is the bar's own: closing must not fold it.
+              markUse();
+              close();
+            }}
+          />
+        )}
+      </OverlayPresence>
     </View>
   );
 };

@@ -19,7 +19,7 @@ import {
   WORK_ID,
 } from "@pace/core/testing";
 
-import { type TaskViewModel, taskViewModel, workLeftAt } from "./task.ts";
+import { submitLabel, type TaskViewModel, taskViewModel, workLeftAt } from "./task.ts";
 
 const view = (taskId: string, now: string, deviceTz?: string): TaskViewModel => {
   const result = taskViewModel(artboardState(now), taskId, ctx(now, deviceTz));
@@ -215,5 +215,40 @@ describe("taskViewModel", () => {
 
   it("names the task's category with its colour, as its row does (QA 13 L9)", () => {
     expect(view(TRK_ID, TRK_NOW).category).toEqual({ color: "violet", id: "work", name: "Work" });
+  });
+});
+
+/** The Algebra task with these subtasks, all solved and being sent. */
+const sending = (labels: readonly (number | string)[]): TaskViewModel => {
+  const base = view(HW_ID, HW_VIEW_NOW);
+  const subtasks = labels.map((label, index) => ({
+    id: `n${String(index)}`,
+    label: String(label),
+    number: typeof label === "number" ? label : null,
+    solvedAt: null,
+    state: "solved" as const,
+    submittedAt: null,
+  }));
+  return {
+    ...base,
+    primaryAction: { kind: "submit", subtaskIds: subtasks.map((subtask) => subtask.id) },
+    subtasks,
+  };
+};
+
+describe("submitLabel", () => {
+  it("spells out up to three short names", () => {
+    expect(submitLabel(sending([290, 292]), "ru")).toBe("Сдать 290 и 292");
+    expect(submitLabel(sending([3, 4, 5]), "en")).toBe("Submit 3, 4 and 5");
+  });
+
+  it("counts what is too many or too long for one line (F-DAT-01)", () => {
+    const many = Array.from({ length: 37 }, (_, index) => index + 1);
+    const thirtySeven = sending(many);
+    expect(submitLabel(thirtySeven, "ru")).toBe("Сдать 37");
+    const four = sending([1, 2, 3, 4]);
+    expect(submitLabel(four, "en")).toBe("Submit 4");
+    const long = sending(["x".repeat(200)]);
+    expect(submitLabel(long, "en")).toBe("Submit 1");
   });
 });

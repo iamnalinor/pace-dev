@@ -5,6 +5,7 @@ import {
   extractLink,
   finalDeadlineOf,
   type Importance,
+  type Language,
   linkHost,
   type Outcome,
   presetById,
@@ -17,6 +18,7 @@ import {
   type Result,
   type Submission,
   type SubmitPreview,
+  t,
   type Task,
   taskOutcome,
   taskRepeatRule,
@@ -256,4 +258,31 @@ export const taskViewModel = (
       outcome: taskOutcome(task, preset),
     },
   };
+};
+
+/** Most subtasks whose names the submit button spells out; more are counted. */
+const SUBMIT_NAMES_MAX = 3;
+/** Most characters of the joined names on the button: it is one line at half a phone's width. */
+const SUBMIT_NAMES_FIT = 14;
+
+/**
+The submit button's words (F-DAT-01): the sent subtasks' names when up to three short ones read
+on one line ("Submit 290 and 292"), otherwise their count ("Submit 37"). A button's label is
+chrome, so a label from data never sets its length.
+*/
+export const submitLabel = (view: TaskViewModel, language: Language): string => {
+  const ids = view.primaryAction.kind === "submit" ? new Set(view.primaryAction.subtaskIds) : null;
+  const names = view.subtasks
+    .filter((subtask) => ids?.has(subtask.id) === true)
+    .map((subtask) => (subtask.number === null ? subtask.label : String(subtask.number)));
+  const last = names.at(-1);
+  const joined =
+    last === undefined || names.length === 1
+      ? (last ?? "")
+      : `${names.slice(0, -1).join(", ")} ${t(language, "common.and")} ${last}`;
+  const isSpelledOut =
+    names.length > 0 && names.length <= SUBMIT_NAMES_MAX && joined.length <= SUBMIT_NAMES_FIT;
+  return t(language, "task.submitSubtasks", {
+    subtasks: isSpelledOut ? joined : String(names.length),
+  });
 };

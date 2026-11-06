@@ -19,13 +19,13 @@ const XMLNS = 'xmlns="http://www.w3.org/2000/svg"';
 const STROKE = 'fill="none" stroke-linecap="round" stroke-linejoin="round"';
 
 // The first chevron is the quiet one, yet it must read on the dark tile (3:1, not 1.7:1).
-const DARK: Palette = { accent: "#d4ff3a", fg: "#ececee", track: "#6a6a74" };
-// On a light ground the lime would vanish, so the chevron takes the dark olive of accentText.
-const LIGHT: Palette = { accent: "#4d6b00", fg: "#17181c", track: "#b9bcc6" };
+const DARK: Palette = { accent: color("dark", "logo"), fg: "#ececee", track: "#6a6a74" };
+// On a light ground the bright lime would vanish, so the chevron takes the deeper lime of the `logo` role.
+const LIGHT: Palette = { accent: color("light", "logo"), fg: "#17181c", track: "#b9bcc6" };
 const WHITE: Palette = { accent: "#ffffff", fg: "#ffffff", track: "#ffffff" };
 // The tile is the app's dark ground, so the launcher icon, the splash and the page agree (F-WEB-02).
 const DARK_BG = color("dark", "bg.app");
-const LIME = "#d4ff3a";
+const LIME = color("dark", "logo");
 
 /**
 The mark's drawing in its 120x120 coordinate space (no <svg> wrapper). Its ink spans x 10–114,

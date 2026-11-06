@@ -580,14 +580,15 @@ const STATES: readonly State[] = [
     name: "task-edit-sheet",
     run: async ({ page, L, seeded }) => {
       await open(page, `/task/${seeded.openTaskId}`);
-      await first(page.getByRole("button", { name: L("Edit details") })).click();
+      await first(page.getByRole("button", { name: L("Edit") })).click();
     },
   },
   {
     name: "task-close-as",
     run: async ({ page, L, seeded }) => {
       await open(page, `/task/${seeded.openTaskId}`);
-      await first(page.getByRole("button", { name: L("Cancel or skip the task…") })).click();
+      await first(page.getByRole("button", { name: L("More actions") })).click();
+      await first(page.getByRole("button", { name: L("Close as…") })).click();
     },
   },
   {

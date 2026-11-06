@@ -50,6 +50,10 @@ export const SidewaysDays = ({
     scrollerRef.current.scrollTo({ animated: false, x });
     scrolledWeekRef.current = week.weekStart;
   };
+  // Whole days only: the strip and the grid stop at a day's edge (F-LAY-11).
+  const offsets = columnPx.map((_, index) =>
+    columnPx.slice(0, index).reduce((sum, width) => sum + width, 0),
+  );
   // Another week keeps the same width, so its content size never changes: every render asks,
   // and `sidewaysStart` answers only for a week not scrolled for yet.
   useEffect(scrollToStart);
@@ -57,9 +61,11 @@ export const SidewaysDays = ({
     <ScrollView
       accessibilityLabel={t("week.scrollHint")}
       contentContainerClassName="min-w-full flex-row"
+      decelerationRate="fast"
       horizontal
       onContentSizeChange={scrollToStart}
       ref={scrollerRef}
+      snapToOffsets={offsets}
       tabIndex={0}
       testID="week-days"
     >

@@ -1,14 +1,15 @@
-import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
-import { Linking, type ViewStyle } from "react-native";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { Linking, type StyleProp, StyleSheet, type TextStyle, type ViewStyle } from "react-native";
 
 import { classPx } from "#app/test/class-px.ts";
 import { refusingStore } from "#app/test/refusing-store.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { problem } from "@pace/client/testing";
 import { addMinutesIso, type CalendarEvent } from "@pace/core";
-import { MOSCOW, NOW } from "@pace/core/testing";
+import { NOW } from "@pace/core/testing";
 
-import { BOTTOM_PX, dayLabel, LABELS_PX } from "./week-grid.tsx";
+import { BOTTOM_PX, LABELS_PX } from "./week-grid.tsx";
 import { COLUMN_INSET_PX, laneStyle, PHONE_COLUMN_MAX_PX, phoneColumnPx } from "./week-lanes.ts";
 import { WeekScreen } from "./week-screen.tsx";
 
@@ -60,17 +61,22 @@ const measure = async (height: number): Promise<void> => {
   });
 };
 
+/** An hour's label in the gutter: decoration, hidden from assistive tech (F-A11Y-09). */
+const hourLabel = (hour: string) => screen.queryByText(hour, { includeHiddenElements: true });
+
 /** How tall the gutter draws an hour (its "08" row). */
 const hourHeight = (): unknown =>
-  (screen.getByText("08").props as { style?: { height?: number } }).style?.height;
+  StyleSheet.flatten(
+    (hourLabel("08")?.props as undefined | { style?: StyleProp<TextStyle> })?.style,
+  ).height;
 
 describe("WeekScreen", () => {
   it("lays the week's tracked time and calendar on one grid; a block lists the apps used during it", async () => {
     await renderScreen(<WeekScreen />, await world());
     expect(
-      await screen.findByRole("button", { name: "From the calendar: Seminar" }),
+      await screen.findByRole("button", { name: /, From the calendar: Seminar$/u }),
     ).toBeOnTheScreen();
-    await fireEvent.press(screen.getByRole("button", { name: /^Lecture notes, / }));
+    await fireEvent.press(screen.getByRole("button", { name: /, Lecture notes$/u }));
     expect(await screen.findByText("Study · 1h")).toBeOnTheScreen();
     expect(screen.getByRole("header", { name: "Apps during this" })).toBeOnTheScreen();
     expect(await screen.findByText("code")).toBeOnTheScreen();
@@ -84,7 +90,7 @@ describe("WeekScreen", () => {
     const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
     await renderScreen(<WeekScreen />, await world());
     await fireEvent.press(
-      await screen.findByRole("button", { name: "From the calendar: Seminar" }),
+      await screen.findByRole("button", { name: /, From the calendar: Seminar$/u }),
     );
     expect(await screen.findByText("6 Tue, 12:30–14:00")).toBeOnTheScreen();
     expect(screen.getByText("University")).toBeOnTheScreen();
@@ -112,7 +118,7 @@ describe("WeekScreen", () => {
     };
     await renderScreen(<WeekScreen />, await world([bare]));
     await fireEvent.press(
-      await screen.findByRole("button", { name: "From the calendar: Call with Anna" }),
+      await screen.findByRole("button", { name: /, From the calendar: Call with Anna$/u }),
     );
     expect(await screen.findByText("6 Tue, 12:30–14:00")).toBeOnTheScreen();
     expect(screen.getByText("From the calendar")).toBeOnTheScreen();
@@ -120,14 +126,14 @@ describe("WeekScreen", () => {
     expect(screen.queryByText(/invited/u)).toBeNull();
   });
 
-  it("offers Back to today only on another week, and it brings this week back", async () => {
+  it("offers This week only on another week, and it brings this week back", async () => {
     await renderScreen(<WeekScreen />, await world());
-    const back = () => screen.queryByRole("button", { name: "Back to today" });
+    const back = () => screen.queryByRole("button", { name: en("period.thisWeek") });
     expect(screen.getByText("Oct 5 – Oct 11")).toBeOnTheScreen();
     expect(back()).toBeNull();
     await fireEvent.press(screen.getByRole("button", { name: "Previous week" }));
     expect(await screen.findByText("Sep 28 – Oct 4")).toBeOnTheScreen();
-    await fireEvent.press(screen.getByRole("button", { name: "Back to today" }));
+    await fireEvent.press(screen.getByRole("button", { name: en("period.thisWeek") }));
     expect(await screen.findByText("Oct 5 – Oct 11")).toBeOnTheScreen();
     expect(back()).toBeNull();
   });
@@ -147,6 +153,36 @@ describe("WeekScreen", () => {
     expect(screen.getByTestId("week-scroller")).toHaveProp("scrollEnabled", true);
   });
 
+  it("names a block by its weekday, date and hours before its label (F-A11Y-09)", async () => {
+    await renderScreen(<WeekScreen />, await world());
+    const block = await screen.findByRole("button", { name: /, Lecture notes$/u });
+    expect(block.props["accessibilityLabel"]).toMatch(
+      /^Tue, Oct 6, \d\d:\d\d–\d\d:\d\d, Lecture notes$/u,
+    );
+    // The hour numbers are decoration: the grid's lines and the names above say the time.
+    expect(screen.queryByText("08")).toBeNull();
+  });
+
+  it("draws each day's tracked time as a line under its name, and today's now mark on it", async () => {
+    await renderScreen(<WeekScreen />, await world());
+    await screen.findByRole("button", { name: /, Lecture notes$/u });
+    expect(screen.getAllByTestId("day-header")).toHaveLength(7);
+    const lines = screen.getAllByTestId("day-line");
+    const [today] = screen.getAllByTestId("day-now");
+    expect(today).toBeDefined();
+    expect(screen.getAllByTestId("day-now")).toHaveLength(1);
+    // Only today has a block in this world: one segment on one line.
+    expect(lines.filter((line) => line.children.length > 0)).toHaveLength(1);
+  });
+
+  it("snaps the phone's days to whole days (F-LAY-11)", async () => {
+    await renderScreen(<WeekScreen />, await world());
+    const offsets = screen.getByTestId("week-days").props["snapToOffsets"] as readonly number[];
+    expect(offsets).toHaveLength(7);
+    expect(offsets[0]).toBe(0);
+    expect(offsets[1]).toBeGreaterThanOrEqual(72);
+  });
+
   it("makes the phone's sideways days discoverable and keyboard reachable", async () => {
     await renderScreen(<WeekScreen />, await world());
     expect(screen.getByText("Swipe to see all days")).toBeOnTheScreen();
@@ -162,7 +198,7 @@ describe("WeekScreen", () => {
     await fireEvent.press(screen.getByRole("switch", { name: "Night hours" }));
     expect(await screen.findByText(en("actionError.persist_failed"))).toBeOnTheScreen();
     expect(screen.getByRole("switch", { name: "Night hours" })).not.toBeChecked();
-    expect(screen.queryByText("00")).toBeNull();
+    expect(hourLabel("00")).toBeNull();
   });
 
   it("fits the whole day as drawn (the day names, every hour, the room under it) in the measured height", async () => {
@@ -174,22 +210,23 @@ describe("WeekScreen", () => {
     // At 700 the old 28 px label constant drew 4 px past the room once the row was 32 px.
     await measure(700);
     await waitFor(() => {
-      expect(screen.getByText("00")).toBeOnTheScreen();
+      expect(hourLabel("00")).not.toBeNull();
     });
-    const gutter = screen.getByText("00").parent as { readonly props: object };
+    const gutter = hourLabel("00")?.parent as { readonly props: object };
     // The grid: the gutter and the columns in a row, with the room under them.
-    const grid = screen.getByText("00").parent?.parent as {
+    const column = screen.getAllByTestId("week-column")[0] as {
       readonly props: { readonly style?: ViewStyle };
     };
-    const dayName = screen.getByText(dayLabel(NOW, MOSCOW, "en"));
+    const dayName = screen.getAllByTestId("day-header")[0] as { readonly props: object };
     const hint = screen.getByText(en("week.scrollHint")).parent as { readonly props: object };
     // The room the fit subtracts is the room the classes draw: a class change shows here.
     expect(LABELS_PX).toBe(classPx(dayName, "h"));
     expect(BOTTOM_PX).toBe(classPx(hint, "h"));
     // The gutter's numbers start where the day names end.
     expect(classPx(gutter, "pt")).toBe(classPx(dayName, "h"));
-    const drawn =
-      classPx(dayName, "h") + 24 * Number(hourHeight()) + Number(grid.props.style?.paddingBottom);
+    // The column's tail is the room under the grid: a short item at midnight hangs there.
+    expect(column.props.style?.height).toBe(24 * Number(hourHeight()) + BOTTOM_PX);
+    const drawn = classPx(dayName, "h") + Number(column.props.style?.height);
     expect(drawn).toBeLessThanOrEqual(700 - classPx(hint, "h"));
   });
 
@@ -208,10 +245,10 @@ describe("WeekScreen", () => {
     await measure(700);
     const toggle = screen.getByRole("switch", { name: "Night hours" });
     expect(toggle).not.toBeChecked();
-    expect(screen.queryByText("00")).toBeNull();
+    expect(hourLabel("00")).toBeNull();
     await fireEvent.press(toggle);
     await waitFor(() => {
-      expect(screen.getByText("00")).toBeOnTheScreen();
+      expect(hourLabel("00")).not.toBeNull();
     });
     expect(screen.getByRole("switch", { name: "Night hours" })).toBeChecked();
     expect(runtime.state.store.getState().settings.nightHours).toBe(true);
@@ -223,9 +260,9 @@ describe("WeekScreen", () => {
       await runtime.actions.setNightHours(false);
     });
     await waitFor(() => {
-      expect(screen.queryByText("00")).toBeNull();
+      expect(hourLabel("00")).toBeNull();
     });
-    expect(within(screen.getByTestId("week-body")).getByText("07")).toBeOnTheScreen();
+    expect(hourLabel("07")).not.toBeNull();
   });
 
   it("draws a 0-minute block, which opens like any other (QA round 18 L7)", async () => {
@@ -234,8 +271,48 @@ describe("WeekScreen", () => {
     await runtime.actions.startActivity({ category: "rest", label: "Zero" });
     await runtime.actions.stopActivity();
     await renderScreen(<WeekScreen />, runtime);
-    await fireEvent.press(await screen.findByRole("button", { name: /^Zero, / }));
+    await fireEvent.press(await screen.findByRole("button", { name: /, Zero$/u }));
     expect(await screen.findByText("Rest · 0m")).toBeOnTheScreen();
+  });
+});
+
+describe("WeekScreen states (spec §5.6)", () => {
+  it("says what lands here, with a way to Now, when the week holds nothing", async () => {
+    const runtime = await createTestRuntime({
+      routes: {
+        "GET /api/calendar": () => ({ events: [] }),
+        "GET /api/usage": () => ({ sessions: [] }),
+      },
+      world: "empty",
+    });
+    await renderScreen(<WeekScreen />, runtime);
+    expect(await screen.findByText(en("week.empty"))).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: en("week.openNow") })).toBeOnTheScreen();
+  });
+
+  it("shows no empty state over a week with a block in it", async () => {
+    await renderScreen(<WeekScreen />, await world());
+    await screen.findByRole("button", { name: /Lecture notes/u });
+    expect(screen.queryByText(en("week.empty"))).toBeNull();
+  });
+
+  it("says the calendar did not load, and reads it again on Try again", async () => {
+    let calls = 0;
+    const runtime = await createTestRuntime({
+      routes: {
+        "GET /api/calendar": () => {
+          calls += 1;
+          return calls === 1 ? problem(503, "offline") : { events: [] };
+        },
+        "GET /api/usage": () => ({ sessions: [] }),
+      },
+    });
+    await renderScreen(<WeekScreen />, runtime);
+    expect(await screen.findByText(en("week.calendarFailed"))).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: en("common.retry") }));
+    await waitFor(() => {
+      expect(screen.queryByText(en("week.calendarFailed"))).toBeNull();
+    });
   });
 });
 

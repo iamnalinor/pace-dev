@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react-native";
 
-import { ProjectScreen } from "#app/screens/project-screen.tsx";
-import { ProjectsScreen } from "#app/screens/projects-screen.tsx";
+import { ProjectScreen } from "#app/features/projects/project-screen.tsx";
+import { ProjectsScreen } from "#app/features/projects/projects-screen.tsx";
 import { isControl } from "#app/test/focus-target.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";

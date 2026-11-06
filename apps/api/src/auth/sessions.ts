@@ -27,10 +27,19 @@ export type NewSession = {
   readonly place?: RequestPlace | undefined;
   /** The device whose usage it sends (a phone's install id); an agent files under the session id. */
   readonly deviceId?: null | string | undefined;
+  /** What a phone app told about itself; null parts are unknown. */
+  readonly device?: PhoneDetails | undefined;
   /** A device token's one permission; a sign-in has none (it may do everything). */
   readonly scope?: SessionScope | undefined;
   /** How long it lasts; a sign-in's 90 days by default. */
   readonly days?: number | undefined;
+};
+
+/** What a phone app tells about itself at login. */
+export type PhoneDetails = {
+  readonly brand: null | string;
+  readonly model: null | string;
+  readonly osVersion: null | string;
 };
 
 /** What a device token may do: upload its usage. */
@@ -100,6 +109,12 @@ export type PreparedSession = {
   readonly insert: BatchItem<"sqlite">;
 };
 
+const phoneColumns = (device: PhoneDetails | undefined) => ({
+  deviceBrand: device?.brand ?? null,
+  deviceModel: device?.model ?? null,
+  osVersion: device?.osVersion ?? null,
+});
+
 /**
 A session ready to be stored: its id and bearer token (32 random bytes; only its SHA-256 is
 stored) and the insert, for the caller to batch with whatever must go in with it.
@@ -118,6 +133,7 @@ export const prepareSession = async (db: Db, input: NewSession): Promise<Prepare
     scope: input.scope ?? null,
     ...(input.place ?? UNKNOWN_PLACE),
     deviceId: input.deviceId ?? null,
+    ...phoneColumns(input.device),
     createdAt: new Date(input.now),
     expiresAt: new Date(expiresAt),
     lastSeenAt: new Date(input.now),
@@ -207,6 +223,8 @@ export type ListedSession = {
   readonly lastSeenAt: number;
   /** The device its usage is filed under; null when it sends none. */
   readonly usageDevice: null | string;
+  readonly userAgent: null | string;
+  readonly phone: PhoneDetails;
 };
 
 /** The person's live sessions, the most recently seen first. */
@@ -230,6 +248,8 @@ export const listSessions = async (
     kind: kindOf(row.kind),
     lastSeenAt: row.lastSeenAt.getTime(),
     name: row.name,
+    phone: { brand: row.deviceBrand, model: row.deviceModel, osVersion: row.osVersion },
     usageDevice: usageDeviceOf({ ...row, sessionId: row.id }),
+    userAgent: row.userAgent,
   }));
 };

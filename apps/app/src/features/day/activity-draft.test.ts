@@ -374,10 +374,25 @@ describe("readDraft with a day chosen for a time (round 6: a runaway block cut b
   });
 });
 
+/** A "now" well after every block here: no end day is ahead of it. */
+const LATER = "2026-12-01T00:00:00.000Z";
+
 describe("the days a time may be put on", () => {
+  it("offers no end day that is still ahead (QA21 L3: tomorrow was always refused)", () => {
+    const target = block("2026-10-31T04:31:00.000Z", "2026-11-02T16:32:00.000Z");
+    // Monday evening in Moscow: Tuesday has not begun.
+    expect(dayChoicesOf(target, MOSCOW, "2026-11-02T17:00:00.000Z").to).toEqual([
+      "2026-10-31",
+      "2026-11-01",
+      "2026-11-02",
+    ]);
+    // After Moscow's midnight Tuesday is today: an end may be put on it.
+    expect(dayChoicesOf(target, MOSCOW, "2026-11-02T21:30:00.000Z").to.at(-1)).toBe("2026-11-03");
+  });
+
   it("offers the end every day from the start's to the day after the old end", () => {
     const target = block("2026-10-02T17:00:00.000Z", "2026-10-04T04:00:00.000Z");
-    expect(dayChoicesOf(target, MOSCOW)).toEqual({
+    expect(dayChoicesOf(target, MOSCOW, LATER)).toEqual({
       from: ["2026-10-02", "2026-10-03", "2026-10-04"],
       to: ["2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05"],
     });
@@ -385,14 +400,14 @@ describe("the days a time may be put on", () => {
 
   it("offers a one-day block's end its day and the next, its start no other", () => {
     const target = block("2026-10-06T06:00:00.000Z", "2026-10-06T07:00:00.000Z");
-    expect(dayChoicesOf(target, MOSCOW)).toEqual({
+    expect(dayChoicesOf(target, MOSCOW, LATER)).toEqual({
       from: ["2026-10-06"],
       to: ["2026-10-06", "2026-10-07"],
     });
   });
 
   it("offers no end day for a block still running", () => {
-    expect(dayChoicesOf(block("2026-10-06T06:00:00.000Z", null), MOSCOW)).toEqual({
+    expect(dayChoicesOf(block("2026-10-06T06:00:00.000Z", null), MOSCOW, LATER)).toEqual({
       from: ["2026-10-06"],
       to: [],
     });

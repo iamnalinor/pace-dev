@@ -132,8 +132,9 @@ const screenFaults = async (
   return [
     ...(expected === null || expected === landed ? [] : [`landed on ${landed}`]),
     ...Array.from({ length: crashes }, () => "the crash screen"),
+    // On a phone the tab bar is a navigation too: only a computer's sidebar is judged by it.
     ...[`sidebar ${SIDEBAR_FAULT[Number(isSidebarExpected)] ?? ""}`].filter(
-      () => isSidebarExpected === (sidebars === 0),
+      () => isWide && isSidebarExpected === (sidebars === 0),
     ),
     ...(await rawKeys(page)).map((key) => `raw message key "${key}"`),
   ];

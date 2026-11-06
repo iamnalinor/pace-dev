@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { Text, View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
-import { PaceSwitch } from "#app/ui/switch-row.tsx";
+import { Switch } from "#app/ui/switch.tsx";
 
 /** Not overridden: the control shows the inherited value and cannot be changed. */
 export type RowState = { readonly disabled: boolean; readonly invalid: boolean };
@@ -39,7 +39,7 @@ export const OverrideRow = ({
         <Text className="font-sans text-caption font-normal text-label-tertiary">
           {t("presets.overrideShort")}
         </Text>
-        <PaceSwitch
+        <Switch
           isOn={isOverridden}
           label={t("presets.override", { field: label })}
           onChange={onToggle}

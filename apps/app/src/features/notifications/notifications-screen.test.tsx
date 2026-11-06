@@ -158,6 +158,31 @@ describe("NotificationsScreen", () => {
     expect(screen.getByRole("header", { name: today })).toBeOnTheScreen();
   });
 
+  it("lists five tasks of a digest at most, with «and N more» for the rest, each title clamped to two lines", async () => {
+    const tasks = Array.from({ length: 12 }, (_, index) => ({
+      dueAt: "2026-10-07T15:00:00.000Z",
+      dueTz: null,
+      taskId: `t-${String(index)}`,
+      title: `Task number ${String(index)}`,
+    }));
+    const { runtime } = await feedRuntime([{ ...digest, payload: { ...digest.payload, tasks } }]);
+    await renderScreen(<NotificationsScreen />, runtime);
+    expect(await screen.findByText("Task number 4")).toBeOnTheScreen();
+    expect(screen.queryByText("Task number 5")).toBeNull();
+    expect(screen.getByText("and 7 more")).toBeOnTheScreen();
+    expect(screen.getByText("Task number 0").props["numberOfLines"]).toBe(2);
+  });
+
+  it("marks what was unread with a «new» dot that stays while the visit lasts, though it is marked read", async () => {
+    const { read, runtime } = await feedRuntime([login]);
+    await renderScreen(<NotificationsScreen />, runtime);
+    expect(await screen.findByLabelText(en("notifications.unread"))).toBeOnTheScreen();
+    await waitFor(() => {
+      expect(read).toHaveBeenCalled();
+    });
+    expect(screen.getByLabelText(en("notifications.unread"))).toBeOnTheScreen();
+  });
+
   it("shows where each notification went, when, and when it was taken back", async () => {
     const { runtime } = await feedRuntime([login], {
       "GET /api/notifications": () => ({
@@ -213,7 +238,7 @@ describe("NotificationsScreen", () => {
     });
     await fireEvent.press(screen.getByRole("link", { name: /Write the report/u }));
     expect(router.push).toHaveBeenCalledWith("/task/t-report");
-    await fireEvent.press(screen.getByRole("link", { name: en("notifications.assistantLog") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("notifications.assistantLog") }));
     expect(router.push).toHaveBeenCalledWith("/decisions");
   });
 

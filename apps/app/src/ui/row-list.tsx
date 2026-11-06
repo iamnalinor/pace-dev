@@ -7,6 +7,7 @@ the rows children of whatever holds the list: then a card appearing above it (th
 "Attend or skip?" on Now, the sleep card on Day) moves each row's own frame, and every row runs
 its layout transition from where it was. On the owner's phone those transitions stuck at their
 start, so the rows stayed drawn over the card. Kept, the box moves as one and its rows stay put.
-The web never flattens, so only Android ever showed it.
+The web never flattens, so only Android ever showed it. The kit's `Group` is a RowList, so every
+grouped list keeps the fix (spec §4.2.15).
 */
 export const RowList = (props: ViewProps) => <View {...props} collapsable={false} />;

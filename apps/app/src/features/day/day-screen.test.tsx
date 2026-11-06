@@ -138,27 +138,49 @@ describe("DayScreen", () => {
     expect(await screen.findByText("Type a time like 09:30.")).toBeOnTheScreen();
   });
 
-  it("offers Back to today only on another day, and it brings today back", async () => {
+  it("offers Today only on another day, and it brings today back (F-CMP-05)", async () => {
     await renderScreen(<DayScreen />, await createTestRuntime());
-    const back = () => screen.queryByRole("button", { name: "Back to today" });
-    expect(back()).toBeNull();
-    // The header is the arrows and the day picker alone: Week is reached from the navigation,
-    // and the time bar with its Calendar is on Now.
+    const today = () => screen.queryByRole("button", { name: en("period.today") });
+    expect(today()).toBeNull();
+    // The header is the period control alone: Week is reached from the navigation, and the time
+    // bar with its Calendar is on Now. › is not offered at the present (hidden, not greyed).
+    expect(screen.getByLabelText(en("period.group"))).toBeOnTheScreen();
     expect(screen.queryByRole("button", { name: "Week" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Calendar" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Next day" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Next day" })).toBeNull();
     await fireEvent.press(screen.getByRole("button", { name: "Previous day" }));
     await waitFor(() => {
       expect(screen.getByText("Monday · Oct 5")).toBeOnTheScreen();
     });
-    await fireEvent.press(screen.getByRole("button", { name: "Back to today" }));
+    expect(screen.getByRole("button", { name: "Next day" })).toBeEnabled();
+    await fireEvent.press(screen.getByRole("button", { name: en("period.today") }));
     expect(await screen.findByText("Tuesday · Oct 6")).toBeOnTheScreen();
-    expect(back()).toBeNull();
+    expect(today()).toBeNull();
     // A day picked from the month view is another day too.
-    await fireEvent.press(screen.getByRole("button", { name: "Pick a day" }));
+    await fireEvent.press(screen.getByRole("button", { name: /Pick a day/u }));
     await fireEvent.press(await screen.findByRole("button", { name: "Thursday, October 1" }));
     expect(await screen.findByText("Thursday · Oct 1")).toBeOnTheScreen();
-    expect(back()).toBeOnTheScreen();
+    expect(today()).toBeOnTheScreen();
+  });
+
+  it("replaces one day with the next in place: the new day's rows do not fade in (F-MOT-07)", async () => {
+    const runtime = await createTestRuntime();
+    await runtime.actions.logPast({
+      category: "work",
+      endAt: addMinutesIso(NOW, -1500),
+      label: "Yesterday's chat",
+      startAt: addMinutesIso(NOW, -1560),
+    });
+    await renderScreen(<DayScreen />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: "Previous day" }));
+    await waitFor(() => {
+      expect(screen.getByText("Monday · Oct 5")).toBeOnTheScreen();
+    });
+    const rows = screen.getAllByTestId("day-entry");
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.props["entering"]).toBeUndefined();
+    }
   });
 
   it("has no time bar on any day: it lives on Now", async () => {

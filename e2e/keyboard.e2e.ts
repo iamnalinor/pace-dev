@@ -61,8 +61,10 @@ test("the keyboard ring is the focus role on a switch and on the range slider", 
   await page.keyboard.press("Shift+Tab");
   await page.keyboard.press("Tab");
   await expect(toggle).toBeFocused();
-  expect(await ringOf(toggle)).toEqual({
-    color: await focusColor(toggle),
+  // A switch's ring is on the drawn track (the kit's small visual), not on its 44 px target.
+  const visual = toggle.locator("[data-pace-visual]");
+  expect(await ringOf(visual)).toEqual({
+    color: await focusColor(visual),
     style: "solid",
     width: "2px",
   });
@@ -83,14 +85,26 @@ test("the keyboard ring is the focus role on a switch and on the range slider", 
   });
 });
 
-test("Space opens a tab of the phone's bar, as Enter does", async ({ page }) => {
+/**
+The phone web's bar is a `nav` of links (spec §4.2.27, F-A11Y-11): Enter follows one, as for any
+link, and the current one says `aria-current="page"`. (It was a tablist, where Space had to open a
+tab too: Android keeps that role for TalkBack.)
+*/
+test("Enter opens a destination of the phone's bar, which then says it is the current page", async ({
+  page,
+}) => {
   await page.setViewportSize({ height: 844, width: 390 });
   await loginViaApi(page);
   await page.goto("/");
-  const day = page.getByRole("tab", { name: "Day" });
+  const bar = page.getByRole("navigation", { name: "Main" });
+  const day = bar.getByRole("link", { exact: true, name: "Day" });
   await expect(day).toBeVisible();
+  await expect(day).toHaveAttribute("href", "/day");
   await day.focus();
-  await page.keyboard.press("Space");
+  await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/day$/);
-  await expect(day).toHaveAttribute("aria-selected", "true");
+  await expect(day).toHaveAttribute("aria-current", "page");
+  await expect(bar.getByRole("link", { exact: true, name: "Now" })).not.toHaveAttribute(
+    "aria-current",
+  );
 });

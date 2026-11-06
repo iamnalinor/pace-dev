@@ -57,6 +57,8 @@ const SELECTED_ROW_PAIRS: readonly ContrastPair[] = (["bg.app", "bg.cell"] as co
     { bg: SELECTED_ROW_FILL, fg: "label.secondary", over, target: "meta" },
     { bg: SELECTED_ROW_FILL, fg: "label.tertiary", over, target: "textSmall" },
     { bg: SELECTED_ROW_FILL, fg: "status.danger", over, target: "textSmall" },
+    // The kit ListRow's selected bar: the cue that does not lean on the fill (F-COL-02).
+    { bg: SELECTED_ROW_FILL, fg: "accent", over, target: "ui" },
     ...HUE_NAMES.map(
       (name): ContrastPair => ({
         bg: `hue.${name}.tint`,
@@ -103,6 +105,13 @@ export const USED_PAIRS: readonly ContrastPair[] = [
     (over): ContrastPair => ({ bg: "fill.4", fg: "label.secondary", over, target: "meta" }),
   ),
   ...SELECTED_ROW_PAIRS,
+  // The current destination (spec §4.2.22, §4.2.27): the sidebar's row and the rail's pill on the
+  // sidebar ground, the tab bar's pill on the bar's cell; its name and icon in `label.primary`,
+  // and the sidebar row's 4 px accent bar on the `fill.3` fill.
+  ...(["bg.sidebar", "bg.cell"] as const).flatMap((over): readonly ContrastPair[] => [
+    { bg: "fill.3", fg: "label.primary", over, target: "text" },
+    { bg: "fill.3", fg: "accent", over, target: "ui" },
+  ]),
   // A neutral count badge (unread notifications): secondary digits on `fill.3`.
   ...LABEL_GROUNDS.map(
     (over): ContrastPair => ({ bg: "fill.3", fg: "label.secondary", over, target: "meta" }),
@@ -118,6 +127,23 @@ export const USED_PAIRS: readonly ContrastPair[] = [
   ...(["bg.cell", "bg.elevated"] as const).map(
     (over): ContrastPair => ({ bg: "fill.4", fg: "hue.slate.stroke", over, target: "ui" }),
   ),
+  // The kit's controls (Task 3.9; bug-lessons 123: every mark a control draws is measured, not
+  // only its text). A chip, a segment and a secondary button rest on `fill.2`: their labels.
+  ...LABEL_GROUNDS.flatMap((over): readonly ContrastPair[] => [
+    { bg: "fill.2", fg: "label.secondary", over, target: "meta" },
+    { bg: "fill.2", fg: "label.primary", over, target: "text" },
+  ]),
+  // The chosen segment's thumb: `bg.elevated` on the `fill.2` track measures 1.05-1.15:1 and
+  // `outline` 2.5-2.9:1 in light, so its edge is a `label.tertiary` hairline (the switch's off knob
+  // pair above), with the label's weight as the second cue.
+  // A checked circle at rest: the `bg.app` check on the `label.secondary` disc.
+  { bg: "label.secondary", fg: "bg.app", target: "ui" },
+  // The slider's and a task's progress fill (`label.primary`) on the `fill.4` track.
+  ...GROUNDS.map(
+    (over): ContrastPair => ({ bg: "fill.4", fg: "label.primary", over, target: "ui" }),
+  ),
+  // The slider's thumb (`label.primary`) inside its `bg.cell` ring, on the page.
+  ...GROUNDS.map((bg): ContrastPair => ({ bg, fg: "label.primary", target: "ui" })),
   ...HUE_NAMES.flatMap((name): readonly ContrastPair[] => [
     { fg: `hue.${name}.ink`, bg: `hue.${name}.tint`, over: "bg.cell", target: "meta" },
     { fg: `hue.${name}.ink`, bg: `hue.${name}.tint`, over: "bg.app", target: "meta" },
