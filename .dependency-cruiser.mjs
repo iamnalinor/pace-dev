@@ -89,6 +89,8 @@ const config = {
           "^apps/app/public/", // loaded by index.html, not imported
           "^apps/app/modules/[^/]+/index[.]ts$",
           String.raw`^apps/app/jest\.setup\.ts$`,
+          String.raw`^apps/app/jest\.global-setup\.js$`, // loaded by jest's globalSetup
+          String.raw`^apps/app/src/tz-guard\.test\.ts$`, // a guard on the runner, imports nothing
           "^e2e/",
           "^scripts/",
           // The web build swaps these in for their siblings (metro.config.js), by file name.

@@ -8,6 +8,7 @@ import {
   type Ratchet,
   summarise,
 } from "./eslint-ratchet.ts";
+import { clearReport, readReport } from "./eslint-report.ts";
 
 /**
 ESLint per workspace, one process each: type-aware linting of every project in a single
@@ -69,6 +70,7 @@ const stylish = await new ESLint().loadFormatter("stylish");
 for (const [name, targets, ratchets] of PARTS) {
   // ESLint cuts a long report short when it exits into a pipe, so it writes the report to a file.
   const report = `.cache/eslint/${name}.json`;
+  clearReport(report);
   const run = Bun.spawnSync(
     [
       "bunx",
@@ -86,11 +88,9 @@ for (const [name, targets, ratchets] of PARTS) {
     { stderr: "inherit", stdout: "inherit" },
   );
 
-  let results: ESLint.LintResult[];
-  try {
-    results = JSON.parse(await Bun.file(report).text()) as ESLint.LintResult[];
-  } catch {
-    console.error(`eslint failed in ${name} (no report)`);
+  const results = await readReport(report);
+  if (results === undefined) {
+    console.error(`eslint failed in ${name} (no fresh report)`);
     process.exit(run.exitCode === 0 ? 1 : run.exitCode);
   }
 
