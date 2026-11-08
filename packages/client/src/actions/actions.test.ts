@@ -10,6 +10,7 @@ import {
 } from "@pace/core";
 import {
   ALGEBRA_ID,
+  artboardEvents,
   CALC_HW5_ID,
   CALC_W41_ID,
   ctx,
@@ -836,23 +837,23 @@ describe("projects", () => {
 describe("ensureInstances", () => {
   it("adds the missing instances and automatic outcomes as system events, once", async () => {
     const world = await setupActions();
-    await expect(world.actions.ensureInstances()).resolves.toBe(1);
+    // Past its final deadline, Calculus HW 5 stays open and overdue: nothing closes it (feedback 5).
+    await expect(world.actions.ensureInstances()).resolves.toBe(0);
     const missed = world.state.store
       .getState()
       .log.find((event) => event.id === autoOutcomeId(CALC_HW5_ID, "missed"));
-    expect(missed).toMatchObject({ source: "system", deviceId: "dev-1" });
-    expect(taskOf(world, CALC_HW5_ID)?.closed?.outcome).toBe("cancelled_missed");
-    await expect(world.actions.ensureInstances()).resolves.toBe(0);
+    expect(missed).toBeUndefined();
+    expect(taskOf(world, CALC_HW5_ID)?.closed).toBeNull();
 
     world.setNow("2026-10-13T12:00:00.000Z");
-    // Week 42's two issued instances, the outcomes, and History's next one ahead.
-    await expect(world.actions.ensureInstances()).resolves.toBe(6);
+    // Week 42's two issued instances, History's next one ahead, the skip of its empty week 40.
+    await expect(world.actions.ensureInstances()).resolves.toBe(4);
     const log = world.state.store.getState().log;
     for (const id of ["hw:hw.algebra:2026-W42", "hw:hw.calculus:2026-W42"]) {
       expect(log.find((event) => event.id === id)).toMatchObject({ source: "system" });
     }
     expect(taskOf(world, "hw:hw.algebra:2026-W42")?.title).toBe("Algebra HW 2");
-    expect(taskOf(world, TRK_ID)?.closed?.outcome).toBe("cancelled_missed");
+    expect(taskOf(world, TRK_ID)?.closed).toBeNull();
     await expect(world.actions.ensureInstances()).resolves.toBe(0);
   });
 
@@ -861,10 +862,10 @@ describe("ensureInstances", () => {
     // System-made instances share their id with their creation event.
     unwrap(await world.actions.revoke(CALC_W41_ID));
     expect(taskOf(world, CALC_W41_ID)).toBeUndefined();
-    // The automatic outcome as before, and the course's next week put ahead instead.
-    await expect(world.actions.ensureInstances()).resolves.toBe(2);
+    // Nothing: the overdue HW 5 is still open, so the next week is not put ahead (feedback 5).
+    await expect(world.actions.ensureInstances()).resolves.toBe(0);
     expect(taskOf(world, CALC_W41_ID)).toBeUndefined();
-    expect(taskOf(world, "hw:hw.calculus:2026-W42")?.closed).toBeNull();
+    expect(taskOf(world, CALC_HW5_ID)?.closed).toBeNull();
   });
 });
 
@@ -897,7 +898,19 @@ describe("review", () => {
 
   it("shows a correction without a second rebuild and confirms or undoes automatic outcomes", async () => {
     const store = createMemoryEventStore();
-    const world = await setupActions(undefined, store);
+    // An automatic miss an older version wrote: none is made any more (feedback 5).
+    const at = new Date(Date.parse(NOW) - 60 * 60 * 1000).toISOString();
+    const oldMiss: Event = {
+      deviceId: "server",
+      id: autoOutcomeId(CALC_HW5_ID, "missed"),
+      occurredAt: at,
+      payload: { outcome: "cancelled_missed", taskId: CALC_HW5_ID },
+      precision: "exact",
+      recordedAt: at,
+      source: "system",
+      type: "task.closed",
+    };
+    const world = await setupActions([...artboardEvents(), oldMiss], store);
     await world.actions.ensureInstances();
     const item = reviewItems(world.state.store.getState(), ctx()).find(
       (entry) => entry.kind === "confirm-auto-outcome",

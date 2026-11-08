@@ -2,7 +2,7 @@ import type { EventInput } from "../events/event-schema.ts";
 import type { ResolvedPreset } from "../model/preset.ts";
 import type { PresetsState } from "../presets/preset-reducer.ts";
 
-import { autoOutcomeId, type AutoOutcomeKind } from "../ids.ts";
+import { autoOutcomeId } from "../ids.ts";
 import { isOpen, type Subtask, type Task, type TasksState } from "../model/task.ts";
 import { taskPreset } from "../presets/resolve-preset.ts";
 import { addDaysIn, addMinutesIso } from "../time.ts";
@@ -78,7 +78,7 @@ const doneOutcome = (
 };
 
 /**
-`null` while the task is open. An automatic `cancelled_missed` is beaten by a retro
+`null` while the task is open. An automatic `cancelled_missed` (only in old logs) is beaten by a retro
 "done before the deadline" because the reducer keeps the earliest closure; the action
 layer also revokes the automatic event so the log tells the same story.
 */
@@ -122,42 +122,26 @@ const isEmptyInstance = (task: Task): boolean =>
   task.slider === null &&
   task.status === "not_started";
 
-type ClosePayload =
-  | { readonly outcome: "cancelled_missed" }
-  | { readonly outcome: "skipped"; readonly reason: string };
-
-const closeEvent = (
-  task: Task,
-  kind: AutoOutcomeKind,
-  when: { readonly occurredAt: string; readonly payload: ClosePayload },
-): AutoOutcomeEvent => ({
-  id: autoOutcomeId(task.id, kind),
+const closeEvent = (task: Task, occurredAt: string): AutoOutcomeEvent => ({
+  id: autoOutcomeId(task.id, "skipped"),
   type: "task.closed",
-  occurredAt: when.occurredAt,
+  occurredAt,
   precision: "exact",
   source: "system",
-  payload: { taskId: task.id, ...when.payload },
+  payload: { taskId: task.id, outcome: "skipped", reason: NOT_ASSIGNED_REASON },
 });
 
-/** Empty instances are skipped, never missed: nothing was ever assigned to miss. */
-const autoOutcome = (
-  task: Task,
-  preset: ResolvedPreset,
-  now: string,
-): AutoOutcomeEvent | undefined => {
-  if (isEmptyInstance(task)) {
-    const skipAt = task.dueAt === null ? null : addMinutesIso(task.dueAt, SKIP_GRACE_MINUTES);
-    return skipAt !== null && isAfter(now, skipAt)
-      ? closeEvent(task, "skipped", {
-          occurredAt: skipAt,
-          payload: { outcome: "skipped", reason: NOT_ASSIGNED_REASON },
-        })
-      : undefined;
+/**
+Only an empty instance is closed by the system, as skipped: nothing was ever assigned to it.
+A task past its final deadline stays open and reads as overdue (feedback 5: the automatic
+`cancelled_missed` was dropped); old ones in a log still materialize and can be reopened.
+*/
+const autoOutcome = (task: Task): AutoOutcomeEvent | undefined => {
+  if (!isEmptyInstance(task)) {
+    return undefined;
   }
-  const { finalAt } = deadlineOf(task, preset);
-  return finalAt !== null && isAfter(now, finalAt)
-    ? closeEvent(task, "missed", { occurredAt: finalAt, payload: { outcome: "cancelled_missed" } })
-    : undefined;
+  const skipAt = task.dueAt === null ? null : addMinutesIso(task.dueAt, SKIP_GRACE_MINUTES);
+  return skipAt === null ? undefined : closeEvent(task, skipAt);
 };
 
 const compare = (a: AutoOutcomeEvent, b: AutoOutcomeEvent): number => {
@@ -168,16 +152,16 @@ const compare = (a: AutoOutcomeEvent, b: AutoOutcomeEvent): number => {
 };
 
 /**
-The automatic outcomes due by `now`: `cancelled_missed` at the final deadline and
-`skipped` for empty recurring instances a day after their due date. Deterministic ids
-(`auto:<taskId>:<kind>`) keep them idempotent across devices and the server.
+The automatic outcomes due by `now`: `skipped` for empty recurring instances a day after their
+due date (of a preset that still resolves). Deterministic ids (`auto:<taskId>:skipped`) keep them
+idempotent across devices and the server.
 */
 export const autoOutcomeEvents = (input: AutoOutcomeInput): readonly EventInput[] =>
   Object.values(input.tasks.byId)
     .filter(isOpen)
     .flatMap((task) => {
-      const preset = taskPreset(input.presets, task);
-      const event = preset.ok ? autoOutcome(task, preset.value, input.now) : undefined;
-      return event === undefined || input.existingEventIds.has(event.id) ? [] : [event];
+      const event = taskPreset(input.presets, task).ok ? autoOutcome(task) : undefined;
+      const isDue = event !== undefined && isAfter(input.now, event.occurredAt);
+      return !isDue || input.existingEventIds.has(event.id) ? [] : [event];
     })
     .toSorted(compare);

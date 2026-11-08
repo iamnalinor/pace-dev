@@ -92,6 +92,24 @@ const createTask = async (token: string, args: Record<string, unknown>): Promise
   return String(result["taskId"]);
 };
 
+/** The automatic miss an older version wrote at the deadline (none is made since feedback 5). */
+const pushOldMiss = async (taskId: string): Promise<void> => {
+  // The deadline of the overdue tasks below.
+  const at = "2026-09-10T10:00:00.000Z";
+  await pushEvents(await loginAsDev("1001"), [
+    {
+      deviceId: "server",
+      id: `auto:${taskId}:missed`,
+      occurredAt: at,
+      payload: { outcome: "cancelled_missed", taskId },
+      precision: "exact",
+      recordedAt: at,
+      source: "system",
+      type: "task.closed",
+    },
+  ]);
+};
+
 describe("MCP tools catalogue", () => {
   it("lists every tool with annotations, a title and an LLM-facing description", async () => {
     type Listed = {
@@ -444,13 +462,18 @@ describe("review", () => {
       dueTz: "UTC",
       title: "Old",
     });
-    const review = await okTool(token, "list_review");
-    const items = rows(review["items"]);
-    expect(
-      items.some((item) => item["kind"] === "confirm-auto-outcome" && item["taskId"] === taskId),
-    ).toBe(true);
+    // Past its deadline the task stays open and asks what became of it (feedback 5).
+    const open = rows((await okTool(token, "list_review"))["items"]);
+    expect(open.find((entry) => entry["taskId"] === taskId)).toMatchObject({
+      actions: ["mark-done", "cancel", "skip", "keep-open"],
+      kind: "deadline-passed",
+    });
+    expect(await okTool(token, "get_task", { id: taskId })).toMatchObject({ closed: null });
+    // An automatic miss an older version wrote still asks to be confirmed or undone.
+    await pushOldMiss(taskId);
+    const items = rows((await okTool(token, "list_review"))["items"]);
     const item = items.find((entry) => entry["taskId"] === taskId);
-    expect(item?.["actions"]).toEqual(["confirm", "undo"]);
+    expect(item).toMatchObject({ actions: ["confirm", "undo"], kind: "confirm-auto-outcome" });
     const done = await okTool(token, "review_action", { key: "undo", taskId });
     expect(rows(done["events"]).map((event) => event["type"])).toEqual(["event.revoked"]);
     expect(await okTool(token, "get_task", { id: taskId })).toMatchObject({ closed: null });
@@ -658,7 +681,7 @@ type Fixture = {
   readonly taskId: string;
   /** The event that solved problem 1. */
   readonly solveId: string;
-  /** A task whose deadline passed: closed as missed, with a review item to confirm. */
+  /** A task whose deadline passed, closed as missed by an older version: a review item to confirm. */
   readonly missedId: string;
   /** A user preset. */
   readonly presetId: string;
@@ -677,6 +700,8 @@ const writeFixture = async (token: string): Promise<Fixture> => {
     dueTz: "UTC",
     title: "Contract missed",
   });
+  // Nothing closes an overdue task any more (feedback 5): the miss an older version wrote.
+  await pushOldMiss(missedId);
   const presetId = `work.c${newId().toLowerCase()}`;
   await okTool(token, "create_preset", {
     definition: {},

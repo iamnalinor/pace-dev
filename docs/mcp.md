@@ -66,7 +66,7 @@ whose text starts with the Result code (`task/unknown: No task with id …`) and
 `structuredContent` is `{ error: { code, message } }`, never a JSON-RPC error, so the
 assistant can read it and try again. The server runs every tool against the user's Durable
 Object: a read first derives the system events due by now (this week's homework instances,
-automatic `cancelled_missed` / `skipped` outcomes), so the answer is the same the web app
+the automatic `skipped` of an empty instance; nothing closes a task past its deadline), so the answer is the same the web app
 shows.
 
 | Tool | Scope | What it does | Key inputs |

@@ -338,7 +338,7 @@ describe("derive", () => {
     });
   });
 
-  it("closes an overdue hard-deadline task as missed and an empty instance as skipped", async () => {
+  it("leaves an overdue task open (feedback 5) and closes an empty instance as skipped", async () => {
     const stub = freshStore();
     const taskId = newId();
     await runInDurableObject(stub, async (instance: UserStore) => {
@@ -370,18 +370,14 @@ describe("derive", () => {
         { now: NOW },
       );
       const { events } = await instance.list(0, 100);
-      expect(events.find((event) => event.id === `auto:${taskId}:missed`)).toMatchObject({
-        occurredAt: "2026-10-01T00:00:00.000Z",
-        payload: { outcome: "cancelled_missed", taskId },
-        source: "system",
-      });
+      expect(events.find((event) => event.id === `auto:${taskId}:missed`)).toBeUndefined();
       expect(events.find((event) => event.id === "auto:hw:hw:2026-W39:skipped")).toMatchObject({
         payload: { outcome: "skipped", reason: "not-assigned" },
       });
       const rows = await instance.db.select().from(schema.tasks);
       expect(rows.map((row) => [row.id, row.outcome, row.closedAt]).toSorted(byText)).toEqual(
         [
-          [taskId, "cancelled_missed", "2026-10-01T00:00:00.000Z"],
+          [taskId, null, null],
           ["hw:hw:2026-W39", "skipped", "2026-10-02T00:00:00.000Z"],
         ].toSorted(byText),
       );
@@ -390,7 +386,6 @@ describe("derive", () => {
 
   it("emits a system event only once, whatever the number of reads", async () => {
     const stub = freshStore();
-    const taskId = newId();
     await runInDurableObject(stub, async (instance: UserStore) => {
       await instance.append(
         [
@@ -399,11 +394,11 @@ describe("derive", () => {
             {
               dueAt: "2026-10-01T00:00:00.000Z",
               dueTz: "UTC",
-              presetId: "personal",
-              taskId,
-              title: "Late",
+              presetId: "hw",
+              taskId: "hw:hw:2026-W39",
+              title: "HW 1",
             },
-            { occurredAt: "2026-09-20T00:00:00.000Z" },
+            { id: "hw:hw:2026-W39", occurredAt: "2026-09-20T00:00:00.000Z", source: "system" },
           ),
         ],
         { now: NOW },

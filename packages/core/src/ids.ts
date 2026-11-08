@@ -38,7 +38,10 @@ export const instanceId = (presetId: string, isoWeek: string): string =>
 
 export type AutoOutcomeKind = "missed" | "skipped";
 
-/** Automatic outcomes are system-generated once per task and kind. */
+/**
+Automatic outcomes are system-generated once per task and kind. Only `skipped` is still made;
+`missed` names the automatic `cancelled_missed` of old logs (dropped in feedback 5).
+*/
 export const autoOutcomeId = (taskId: string, kind: AutoOutcomeKind): string =>
   `auto:${taskId}:${kind}`;
 

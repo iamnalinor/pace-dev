@@ -5,7 +5,6 @@ import type { CoreState } from "../materialize/core-state.ts";
 
 import { autoOutcomeId } from "../ids.ts";
 import { at, event, HW_ID, solved, TRK_ID } from "../materialize/task-fixture.fake.ts";
-import { autoOutcomeEvents } from "../outcomes/outcome.ts";
 import {
   artboardState,
   CALC_HW5_DUE,
@@ -90,14 +89,26 @@ const quiz = (): readonly Event[] => [
   }),
 ];
 
-/** The automatic outcomes due by `now`, as the client or the server would append them. */
-const autoClosed = (state: CoreState, now: string): readonly Event[] =>
-  autoOutcomeEvents({
-    tasks: state.tasks,
-    presets: state.presets,
-    now,
-    existingEventIds: new Set(),
-  }).map((auto, index) => event(200 + index, auto));
+/**
+The automatic misses an older version wrote for the tasks past their deadline (none is made any
+more, feedback 5; the old ones stay in logs), at each task's due date.
+*/
+const autoClosed = (state: CoreState, _now: string): readonly Event[] =>
+  [QUIZ_ID, CALC_HW5_ID].flatMap((taskId, index) => {
+    const dueAt = state.tasks.byId[taskId]?.dueAt;
+    return dueAt === undefined || dueAt === null
+      ? []
+      : [
+          event(200 + index, {
+            id: autoOutcomeId(taskId, "missed"),
+            type: "task.closed",
+            occurredAt: dueAt,
+            precision: "exact",
+            source: "system",
+            payload: { taskId, outcome: "cancelled_missed" },
+          }),
+        ];
+  });
 
 describe("reviewItems", () => {
   it("lists what needs sorting, oldest first: the stale inbox item, then the passed deadline", () => {

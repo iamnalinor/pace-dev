@@ -249,7 +249,7 @@ export const closeTask = defineTool({
 export const reopen = defineTool({
   annotations: { destructiveHint: false, idempotentHint: true, readOnlyHint: false },
   description:
-    "Reopens a closed task (done, cancelled, skipped or automatically missed), keeping its subtasks and history. To undo an automatic outcome instead, revoke its closing event (see list_review).",
+    "Reopens a closed task (done, cancelled, skipped, or missed: a closure older versions made automatically), keeping its subtasks and history. To undo an automatic outcome instead, revoke its closing event (see list_review).",
   handler: async (args, ctx) =>
     await runWrite(ctx, args, {
       build: forTask(args.taskId, (_scope, when) =>
