@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
-import { useState } from "react";
 
 import { useLanguage, usePace, useT } from "#app/app-state.tsx";
+import { useSearchParam } from "#app/shared/use-search-param.ts";
 import { Button } from "#app/ui/button.tsx";
 import { EmptyState } from "#app/ui/empty-state.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
@@ -149,7 +149,8 @@ export const InboxScreen = () => {
   const review = hooks.useReview();
   const decisions = reviewDecisions(review);
   const sections = sectionsOf(decisions, inbox.cards, t);
-  const [openKey, setOpenKey] = useState<null | string>(null);
+  // What is open is in the address (`?open=<key>`, feedback 5 item 6): a reload opens it again.
+  const [openKey, setOpenKey] = useSearchParam("open");
   const picked =
     sections.flatMap((section) => section.rows).find((entry) => entryKey(entry) === openKey) ??
     null;

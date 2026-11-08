@@ -5,6 +5,7 @@ import Animated from "react-native-reanimated";
 import { usePace, useT } from "#app/app-state.tsx";
 import { IS_PHONE } from "#app/platform/device.ts";
 import { ScreenTimeSection } from "#app/shared/activity-usage.tsx";
+import { useZonedDateParam } from "#app/shared/use-search-param.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { useWhereSat } from "#app/shared/use-where-sat.ts";
 import { EmptyText, FirstSyncBody } from "#app/ui/empty-state.tsx";
@@ -206,7 +207,8 @@ export const DayScreen = () => {
   const t = useT();
   const { hooks } = usePace();
   const isWide = useIsWide();
-  const [date, setDate] = useState<null | string>(null);
+  // The day is in the address (`?date=`, feedback 5 item 6): a reload shows the same day.
+  const [date, setDate] = useZonedDateParam("date");
   const [sheet, setSheet] = useState<null | SheetTarget>(null);
   const closeSheet = (): void => {
     setSheet(null);

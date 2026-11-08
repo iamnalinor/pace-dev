@@ -10,7 +10,7 @@ import { removeSeriesRule, setSeriesRule } from "#app/platform/phone-memory.ts";
 import { heldRoute } from "#app/test/held-route.ts";
 import { controlsInsideControls } from "#app/test/nested-controls.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
-import { router } from "#app/test/router.ts";
+import { paramsSet, router, searchParams, setSearchParams } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { rowsInFlattenableBoxes } from "#app/test/sliding-rows.ts";
 import { DISSOLVE_MS } from "#app/ui/dissolve.tsx";
@@ -372,6 +372,34 @@ describe("NowBoard", () => {
     await fireEvent.press(fold);
     expect(screen.getByText("Check test 1 grade")).toBeOnTheScreen();
     expect(screen.getByText(/^Starts Oct 20/u)).toBeOnTheScreen();
+  });
+
+  it("keeps the project filter in the address: a reload shows the same filter (feedback 5 item 6)", async () => {
+    const runtime = await createTestRuntime();
+    const page = await renderScreen(<Board />, runtime);
+    const chips = screen.getByLabelText("Filter by project");
+    await fireEvent.press(within(chips).getByRole("radio", { name: "Work" }));
+    const { project } = searchParams();
+    expect(project).toBeDefined();
+    await page.unmount();
+    await renderScreen(<Board />, runtime);
+    expect(
+      within(screen.getByLabelText("Filter by project")).getByRole("radio", {
+        checked: true,
+        name: "Work",
+      }),
+    ).toBeOnTheScreen();
+    expect(checks()).toHaveLength(3);
+    await fireEvent.press(screen.getByRole("radio", { name: "All" }));
+    expect(searchParams()).toEqual({});
+  });
+
+  it("reads an unknown project in the address as All, and writes nothing back", async () => {
+    setSearchParams({ project: "gone" });
+    await renderScreen(<Board />, await createTestRuntime());
+    expect(screen.getByRole("radio", { checked: true, name: "All" })).toBeOnTheScreen();
+    expect(checks()).toHaveLength(9);
+    expect(paramsSet).not.toHaveBeenCalled();
   });
 
   it("offers the device zone when the account sits in another one", async () => {

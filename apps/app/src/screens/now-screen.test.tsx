@@ -3,7 +3,9 @@ import { fireEvent, screen, waitFor } from "@testing-library/react-native";
 import type { PaceRuntime } from "#app/runtime.ts";
 
 import { en, renderScreen } from "#app/test/render.tsx";
+import { paramsSet, searchParams, setSearchParams } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { HW_ID } from "@pace/core/testing";
 
 import { NowScreen } from "./now-screen.tsx";
 
@@ -151,5 +153,32 @@ describe("NowScreen on a wide window", () => {
     expect(
       screen.getByRole("radio", { checked: true, name: en("form.repeat.none") }),
     ).toBeOnTheScreen();
+  });
+});
+
+describe("NowScreen: the open task is in the address (feedback 5 item 6)", () => {
+  it("puts the picked task in ?task= and closes it by taking the param off", async () => {
+    await renderScreen(<NowScreen />, await createTestRuntime());
+    await fireEvent.press(screen.getByText("Algebra HW 6"));
+    expect(searchParams()).toEqual({ task: HW_ID });
+    expect(screen.getByRole("header", { name: "Algebra HW 6" })).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: en("common.close") }));
+    expect(searchParams()).toEqual({});
+    expect(taskDetails()).toBeNull();
+  });
+
+  it("reopens the task the address names after a reload", async () => {
+    setSearchParams({ task: HW_ID });
+    await renderScreen(<NowScreen />, await createTestRuntime());
+    expect(screen.getByRole("header", { name: "Algebra HW 6" })).toBeOnTheScreen();
+    expect(taskDetails()).toBeOnTheScreen();
+  });
+
+  it("leaves the pane closed for an unknown task, and writes nothing back (class 1: the address goes quiet)", async () => {
+    setSearchParams({ task: "no-such-task" });
+    await renderScreen(<NowScreen />, await createTestRuntime());
+    expect(taskDetails()).toBeNull();
+    expect(screen.queryByText(en("task.notFound"))).toBeNull();
+    expect(paramsSet).not.toHaveBeenCalled();
   });
 });

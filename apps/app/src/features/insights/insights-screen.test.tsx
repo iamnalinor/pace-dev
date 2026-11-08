@@ -1,6 +1,7 @@
-import { screen, within } from "@testing-library/react-native";
+import { fireEvent, screen, within } from "@testing-library/react-native";
 
-import { renderScreen } from "#app/test/render.tsx";
+import { en, renderScreen } from "#app/test/render.tsx";
+import { paramsSet, searchParams, setSearchParams } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { addMinutesIso } from "@pace/core";
 import { NOW } from "@pace/core/testing";
@@ -8,6 +9,23 @@ import { NOW } from "@pace/core/testing";
 import { InsightsScreen } from "./insights-screen.tsx";
 
 describe("InsightsScreen", () => {
+  it("keeps the week in the address, and opens the week it names (feedback 5 item 6)", async () => {
+    const runtime = await createTestRuntime();
+    const page = await renderScreen(<InsightsScreen />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("insights.previous") }));
+    expect(searchParams()).toEqual({ week: "2026-09-28" });
+    await page.unmount();
+    await renderScreen(<InsightsScreen />, runtime);
+    expect(screen.getByText("Sep 28 – Oct 4")).toBeOnTheScreen();
+  });
+
+  it("shows this week for a week it cannot read, writing nothing back", async () => {
+    setSearchParams({ week: "last" });
+    await renderScreen(<InsightsScreen />, await createTestRuntime());
+    expect(screen.getByText("Oct 5 – 11")).toBeOnTheScreen();
+    expect(paramsSet).not.toHaveBeenCalled();
+  });
+
   it("lets a keyboard reach and scroll its body, which holds no control (QA round 11 L8)", async () => {
     await renderScreen(<InsightsScreen />, await createTestRuntime());
     const body = screen.getByLabelText("Insights, the week's numbers");

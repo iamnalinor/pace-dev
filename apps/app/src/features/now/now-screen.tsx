@@ -1,11 +1,10 @@
-import { useState } from "react";
-
 import type { NowRow } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { Composer } from "#app/features/now/composer/composer.tsx";
 import { FoldedSection, TaskRows } from "#app/shared/task-list.tsx";
 import { TimeBar } from "#app/shared/tracking/time-bar.tsx";
+import { useSearchParam } from "#app/shared/use-search-param.ts";
 import { ZoneBanner } from "#app/shared/zone-banner.tsx";
 import { EmptyState } from "#app/ui/empty-state.tsx";
 import { Screen } from "#app/ui/screen.tsx";
@@ -28,7 +27,8 @@ export const NowBoard = ({
 }) => {
   const t = useT();
   const { hooks } = usePace();
-  const [projectId, setProjectId] = useState<null | string>(null);
+  // In the address (`?project=<id>`, feedback 5 item 6): a reload keeps the filter.
+  const [projectId, setProjectId] = useSearchParam("project");
   const board = hooks.useNow();
   // A filter whose project has nothing open any more lets go, or the list would stay empty.
   const selected = board.projects.some((chip) => chip.id === projectId) ? projectId : null;

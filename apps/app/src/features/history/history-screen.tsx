@@ -1,5 +1,3 @@
-import { useState } from "react";
-
 import type { HistoryEntry, NowRow } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
@@ -7,6 +5,7 @@ import { zonedText } from "#app/format/time.ts";
 import { PeriodStepper } from "#app/shared/period-stepper.tsx";
 import { useOpenTask } from "#app/shared/task-opener.tsx";
 import { useBack } from "#app/shared/use-back.ts";
+import { instantParam, useSearchParam } from "#app/shared/use-search-param.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { EmptyState } from "#app/ui/empty-state.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
@@ -39,6 +38,12 @@ const withLatest = (events: readonly HistoryEntry[]): readonly Row[] => {
     }
     return { entry, isLatest, kind: "event" };
   });
+};
+
+/** The moment the address asks for; a malformed one, or one not yet come, is now (`null`). */
+const momentOf = (param: null | string, now: string): null | string => {
+  const asked = instantParam(param);
+  return asked !== null && Date.parse(asked) < Date.parse(now) ? asked : null;
 };
 
 /** ‹ the moment › and «Today» away from now, in the header's period slot. */
@@ -94,7 +99,9 @@ export const HistoryScreen = () => {
   const openTask = useOpenTask();
   const { hooks } = usePace();
   const { now } = hooks.useClock();
-  const [at, setAt] = useState<null | string>(null);
+  // The moment is in the address (`?at=<instant>`, feedback 5 item 6).
+  const [atParam, setAt] = useSearchParam("at");
+  const at = momentOf(atParam, now);
   const instant = at ?? now;
   const history = hooks.useHistory(instant);
   const when = zonedText({ at: instant, mode: "datetime", tz: viewer.deviceTz }, viewer);
