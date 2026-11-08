@@ -38,7 +38,7 @@ const CODE_MESSAGES: Readonly<Record<string, string>> = {
     "The default presets (hw, work, personal, deferred, inbox) cannot be re-created or re-parented, and the inbox cannot be archived.",
   "preset/cycle": "The preset would extend itself through its parents.",
   "preset/exists": "A preset with this id already exists.",
-  "preset/invalid-definition": "The definition has a key or value the preset schema does not know.",
+  "preset/invalid-definition": "The definition has a key or value the preset schema refuses:",
   "preset/invalid-overrides": "The task's overrides are not a valid preset definition.",
   "preset/name-taken": "Another preset in use already has this name; choose another.",
   "preset/no-base": "A preset must extend a built-in preset or another user preset.",

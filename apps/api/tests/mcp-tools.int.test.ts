@@ -528,6 +528,55 @@ describe("presets", () => {
     expect(await errorText(token, "archive_preset", { id: "inbox" })).toContain("preset/built-in");
   });
 
+  it("reads weekday names, stores their numbers, numbers from firstNumber and says what is wrong (feedback 5)", async () => {
+    const token = await readWriteToken();
+    const refused = await errorText(token, "create_preset", {
+      definition: {
+        recurrence: {
+          due: { time: "23:59", weekday: "someday" },
+          issued: { time: "10:00", weekday: 1 },
+          tz: "UTC",
+        },
+        bogus: 1,
+      },
+      extends: "hw",
+      id: "hw.fb5",
+      name: "FB5 HW",
+    });
+    expect(refused).toMatch(/^preset\/invalid-definition: /u);
+    expect(refused).toContain("recurrence.due.weekday");
+    expect(refused).toContain("1 = Monday");
+    expect(refused).toContain("bogus");
+
+    await okTool(token, "create_preset", {
+      definition: {
+        recurrence: {
+          due: { time: "23:59", weekday: "Sunday" },
+          firstNumber: 9,
+          issued: { time: "00:00", weekday: "mon" },
+          tz: "UTC",
+        },
+      },
+      extends: "hw",
+      id: "hw.fb5",
+      name: "FB5 HW",
+    });
+    const created = (await pull()).events.find(
+      (event) => event.type === "preset.created" && event.payload["id"] === "hw.fb5",
+    );
+    expect(created?.payload["definition"]).toEqual({
+      recurrence: {
+        due: { time: "23:59", weekday: 7 },
+        firstNumber: 9,
+        issued: { time: "00:00", weekday: 1 },
+        tz: "UTC",
+      },
+    });
+    // Monday 00:00 of this week has passed: this week's instance is issued at once, as number 9.
+    const found = rows((await okTool(token, "search", { query: "FB5 HW" }))["results"]);
+    expect(found.map((row) => row["title"])).toContain("FB5 HW 9");
+  });
+
   it("edits a preset that shares its name with another, and seeds around a taken name (review I1, M6)", async () => {
     // An account of its own: the store of 1001 already holds the examples from the test above.
     const token = (await obtainToken({ ...READ_WRITE, devTelegramId: "1002" })).tokens.access_token;
