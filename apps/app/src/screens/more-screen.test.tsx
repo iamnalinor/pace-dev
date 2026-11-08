@@ -35,15 +35,10 @@ describe("MoreScreen", () => {
     expect(router.navigate).toHaveBeenCalledWith("/week");
   });
 
-  it("greets the owner by their Telegram first name at the top", async () => {
+  it("shows no profile name (owner 2026-11-08: Settings says who is signed in)", async () => {
     const runtime = await createTestRuntime({ world: "empty" });
     await runtime.auth.me();
     await renderScreen(<MoreScreen />, runtime);
-    expect(screen.getByText("Ann")).toBeOnTheScreen();
-  });
-
-  it("has no name line before the server has told it", async () => {
-    await renderScreen(<MoreScreen />, await createTestRuntime({ world: "empty" }));
     expect(screen.queryByText("Ann")).toBeNull();
   });
 });

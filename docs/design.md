@@ -113,3 +113,7 @@ project, category or running activity in a row leads with a 32 `HueTile` (the hu
 its ink); the task page's category is a `Tag`. Status dots that carry no colour meaning (unread,
 the now-line's end) stay. Spec §4.2.6, §4.2.7 and the P1 usage rule are superseded where they say
 "dot".
+
+2026-11-08 (owner): **no profile name in the chrome.** The sidebar's header is the mark, «Pace» and
+the bell; More has no owner row. Settings says «Вы вошли как {name}» above Log out, the one place
+that names the account.

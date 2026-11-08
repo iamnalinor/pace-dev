@@ -2,7 +2,7 @@ import { View } from "react-native";
 
 import type { ThemePreference } from "#app/platform/theme.ts";
 
-import { usePace, useSettings, useT } from "#app/app-state.tsx";
+import { useOwnerName, usePace, useSettings, useT } from "#app/app-state.tsx";
 import { BackgroundHint } from "#app/features/permissions/background-hint.tsx";
 import { usePermissions } from "#app/features/permissions/use-permissions.ts";
 import { SessionsSection } from "#app/features/sessions/sessions-section.tsx";
@@ -149,6 +149,7 @@ const AccountCell = ({
 
 export const SettingsScreen = () => {
   const t = useT();
+  const owner = useOwnerName();
   const isWide = useIsWide();
   return (
     <DestinationScreen title={t("settings.title")}>
@@ -202,6 +203,11 @@ export const SettingsScreen = () => {
       ) : null}
       {/* The account's own actions last: export (the web's download), log out, the danger zone. */}
       <View className="mx-gutter gap-3 py-6">
+        {owner === null ? null : (
+          <Text role="footnote" tone="secondary">
+            {t("nav.signedInAs", { name: owner })}
+          </Text>
+        )}
         <View className={cx("gap-3", isWide && "flex-row flex-wrap")}>
           {IS_PHONE ? null : <ExportRow />}
           <LogoutButton />

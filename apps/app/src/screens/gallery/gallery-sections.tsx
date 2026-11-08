@@ -207,7 +207,7 @@ export const ChromeSections = ({ data }: { readonly data: GalleryData }) => {
     <>
       <Section title="dev.gallery.section.sidebar">
         <View className="w-sidebar gap-1 border border-separator bg-sidebar px-3 pb-4 pt-4">
-          <SidebarHeader owner={data.ownerName} />
+          <SidebarHeader />
           {/* The three places a row tells (spec §4.2.22): its page, a screen it owns, elsewhere. */}
           {(["page", "section", null] as const).map((current) => (
             <NavItem

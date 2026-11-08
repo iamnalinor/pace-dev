@@ -3,7 +3,7 @@ import { Text as NativeText, View } from "react-native";
 
 import type { MessageKey } from "@pace/core";
 
-import { useOwnerName, useT } from "../app-state.tsx";
+import { useT } from "../app-state.tsx";
 import { requestNewTask } from "../shared/new-task-request.ts";
 import { NotificationBell } from "../shared/notifications/notification-bell.tsx";
 import { useWaitingCount } from "../shared/use-waiting-count.ts";
@@ -127,35 +127,18 @@ const SidebarLink = (props: DestinationLinkProps) => {
 };
 
 /**
-The sidebar's header (spec §5.0.1, §4.2.22): the mark, «Pace» and the bell on one row; who is
-signed in on a line of its own under it, in full: beside the mark and the bell a name had 23 px and
-showed one letter (QA 17 M6). A name too long for the column ends in "…" and is whole in its
-tooltip (the web's `title`) and in what a screen reader says. No avatar: the initial beside the name
-said it twice (R22-25).
+The sidebar's header (spec §5.0.1, §4.2.22): the mark, «Pace» and the bell on one row. No profile
+name (owner 2026-11-08): who is signed in is said in Settings, by the account's actions.
 */
-export const SidebarHeader = ({ owner }: { readonly owner: null | string }) => {
+export const SidebarHeader = () => {
   const t = useT();
   return (
-    <View className="mb-3 gap-1 px-3" testID="sidebar-header">
-      <View className="min-h-hit-web flex-row items-center gap-2">
-        <PaceMark size={22} />
-        <Text className="flex-1" role="headline">
-          {t("app.name")}
-        </Text>
-        <NotificationBell place="sidebar" />
-      </View>
-      {owner === null ? null : (
-        <View
-          accessibilityLabel={t("nav.signedInAs", { name: owner })}
-          accessible
-          className="flex-row"
-          testID="sidebar-owner"
-        >
-          <Text className="flex-1" policy="truncate" role="callout">
-            {owner}
-          </Text>
-        </View>
-      )}
+    <View className="mb-3 min-h-hit-web flex-row items-center gap-2 px-3" testID="sidebar-header">
+      <PaceMark size={22} />
+      <Text className="flex-1" role="headline">
+        {t("app.name")}
+      </Text>
+      <NotificationBell place="sidebar" />
     </View>
   );
 };
@@ -187,7 +170,6 @@ twice.
 export const Sidebar = () => {
   const t = useT();
   const path = usePathname();
-  const owner = useOwnerName();
   const waiting = useWaitingCount();
   const newTask = useNewTask();
   return (
@@ -196,7 +178,7 @@ export const Sidebar = () => {
       className="w-sidebar gap-1 border-r border-separator bg-sidebar px-3 pb-4 pt-4"
       role="navigation"
     >
-      <SidebarHeader owner={owner} />
+      <SidebarHeader />
       <Pressable
         className="mb-3 min-h-hit-web flex-row items-center gap-2 rounded-md bg-accent px-3"
         label={t("nav.newTask")}

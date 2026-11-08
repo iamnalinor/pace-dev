@@ -84,6 +84,13 @@ const pushRoutes = () => {
 };
 
 describe("SettingsScreen", () => {
+  it("says who is signed in by the account's actions, the one place the name is shown (owner 2026-11-08)", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    await runtime.auth.me();
+    await renderScreen(<SettingsScreen />, runtime);
+    expect(screen.getByText(en("nav.signedInAs", { name: "Ann" }))).toBeOnTheScreen();
+  });
+
   it("saves digest times as they are typed, adds and removes one", async () => {
     const runtime = await createTestRuntime({ world: "empty" });
     await renderScreen(<SettingsScreen />, runtime);
