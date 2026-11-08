@@ -22,7 +22,7 @@ import { IS_PHONE } from "./platform/device.ts";
 import { clearPresentedPoolNotifications } from "./platform/notification-cleanup.ts";
 import { useServerOrigin, watchServer } from "./platform/server-origin.ts";
 import { forgetLineDraft } from "./platform/shared-in.ts";
-import { poolOf, retryOnWindowFocus } from "./runtime-pool.ts";
+import { followReturns, poolOf } from "./runtime-pool.ts";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
 import { canStartSenders, POLL_LIVE_MS, POLL_OFFLINE_MS } from "./senders.ts";
 import { createZoneStep } from "./zone-after-sync.ts";
@@ -156,7 +156,7 @@ const runSyncLoop = (runtime: PaceRuntime, onSynced: OnSynced): (() => void) => 
   });
   const stopNotices = followPhoneNotices(runtime);
   const stopServerChecks = watchServer(runtime);
-  const stopFocus = retryOnWindowFocus(runtime);
+  const stopFocus = followReturns(runtime);
   return () => {
     stopFocus();
     stopServerChecks();

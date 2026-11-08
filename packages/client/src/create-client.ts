@@ -16,7 +16,12 @@ import {
 import { createNotificationFeed, type NotificationFeed, parseLiveNotice } from "./notifications.ts";
 import { parseStoreChange, type PeerTabs } from "./peer-tabs.ts";
 import { type SessionChecks, sessionChecks } from "./session-checks.ts";
-import { noteMark, type SessionStore, type SignOutNotes } from "./session.ts";
+import {
+  type EndedSessionStore,
+  noteMark,
+  type SessionStore,
+  type SignOutNotes,
+} from "./session.ts";
 import { type AppStateHandle, createAppState } from "./state.ts";
 import { createSyncClient, type SyncClient } from "./sync-client.ts";
 import {
@@ -77,6 +82,8 @@ export type PaceClientOptions = {
   /** The other tabs sharing this store (a browser profile's), told of every change to it. */
   readonly peers?: PeerTabs | undefined;
   readonly session: SessionStore;
+  /** The log-outs the server has not heard yet, kept between starts (R22-02); in memory when absent. */
+  readonly endedSessions?: EndedSessionStore | undefined;
   /** The note a tab that logs out leaves the other tabs of its browser profile (the web only). */
   readonly signOutNotes?: SignOutNotes | undefined;
   readonly source: "app" | "web";
@@ -279,7 +286,12 @@ const apiAndAuth = (
     sessionEnded: () => wiring.hasEnded(),
     token: () => wiring.token(),
   });
-  const auth = createAuth({ api, notes: options.signOutNotes, session: options.session });
+  const auth = createAuth({
+    api,
+    ended: options.endedSessions,
+    notes: options.signOutNotes,
+    session: options.session,
+  });
   const checks = sessionChecks(auth, api);
   wiring.token = auth.token;
   wiring.hasEnded = auth.hasEnded;

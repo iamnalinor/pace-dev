@@ -181,6 +181,39 @@ const rowNames = (): readonly string[] =>
   ).map((node) => String(node.props["aria-label"]));
 
 describe("Settings → Devices and sessions", () => {
+  it("says while a session signed out of here still waits for the server to end it (R22-02)", async () => {
+    const runtime = await renderSettings({
+      "GET /api/sessions": () => SessionsOutputSchema.parse({ sessions: ALL }),
+    });
+    const line =
+      "A session you signed out of on this device has not ended on the server yet. Pace ends it when the connection is back.";
+    expect(screen.queryByText(line)).toBeNull();
+    await act(async () => {
+      runtime.auth.endedSessions.setState({ pending: true });
+      await Promise.resolve();
+    });
+    expect(screen.getByText(line)).toBeOnTheScreen();
+    await act(async () => {
+      runtime.auth.endedSessions.setState({ pending: false });
+      await Promise.resolve();
+    });
+    expect(screen.queryByText(line)).toBeNull();
+  });
+
+  it("holds one device row's place while the list loads, not three task rows (QA 22 fix round 2)", async () => {
+    await renderSettings({
+      "GET /api/sessions": async () => await new Promise<never>(() => undefined),
+    });
+    const skeleton = await screen.findByLabelText("Loading devices");
+    const bars = within(skeleton).getByTestId("skeleton-bars");
+    // One row: this device is always in the list; the buttons under it do not move as it loads.
+    expect(bars.children).toHaveLength(1);
+    const drawn = JSON.stringify(bars.children);
+    // A device row's shape (an icon, a name, a trailing action), not a task row's 24 px circle.
+    expect(drawn).toContain("w-12");
+    expect(drawn).not.toContain("size-6");
+  });
+
   it("shows skeleton rows while the list loads, then every session worded for the viewer", async () => {
     const answer: { release?: () => void } = {};
     const pending = new Promise<void>((resolve) => {
@@ -851,7 +884,7 @@ const settingsOutline = (): readonly string[] => {
     typeof node === "string" ? node : node.children.map((child) => textOf(child)).join("");
   const isBottomButton = (node: Rendered): boolean =>
     node.props["accessibilityRole"] === "button" &&
-    ["Export data", "Log out"].includes(textOf(node));
+    ["Export data", "Sign out"].includes(textOf(node));
   return (
     screen.root?.queryAll(
       (node) =>
@@ -874,7 +907,7 @@ describe("Settings' order", () => {
       "Permissions",
       "Server",
       // Export data is the web build's (a download); a phone has none.
-      "Log out",
+      "Sign out",
       "Danger zone",
     ]);
   });
@@ -886,7 +919,7 @@ describe("Settings' order", () => {
     expect(settingsOutline().slice(-4)).toEqual([
       "Appearance",
       "Export data",
-      "Log out",
+      "Sign out",
       "Danger zone",
     ]);
     expect(settingsOutline()).not.toContain("Permissions");
@@ -928,13 +961,13 @@ describe("Settings' buttons", () => {
     expect(isStretched("End session")).toBe(false);
     expect(isStretched("Add a computer")).toBe(false);
     expect(isStretched("Connect an AI app")).toBe(false);
-    expect(isStretched("Log out")).toBe(false);
+    expect(isStretched("Sign out")).toBe(false);
   });
 
   it("fill a phone's width where they are the main action", async () => {
     await renderSettings(sessionsServer(ALL).routes);
     await screen.findByLabelText("Firefox on Linux");
-    expect(isStretched("Log out")).toBe(true);
+    expect(isStretched("Sign out")).toBe(true);
     expect(isStretched("Add a computer")).toBe(true);
   });
 

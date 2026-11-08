@@ -307,4 +307,11 @@ describe("back on the network (QA round 17 review m9)", () => {
       expect(sync).toHaveBeenCalledTimes(1);
     },
   );
+
+  it("sends a Log out the server did not hear again, signed out too (R22-02)", async () => {
+    const runtime = await createTestRuntime({ routes: DEV_LOGIN });
+    const retry = jest.spyOn(runtime.auth, "retryEndedSessions");
+    backOnline(runtime);
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
 });

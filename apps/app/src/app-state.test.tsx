@@ -431,6 +431,28 @@ describe("PaceProvider", () => {
     expect(api.pathsCalled("/api/sync/pull").length).toBeGreaterThan(before);
   });
 
+  it("sends a Log out the server did not hear again when the app returns, signed out (R22-02)", async () => {
+    const { runtime } = await setup();
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    const retry = jest.spyOn(runtime.auth, "retryEndedSessions");
+    await act(async () => {
+      for (const [type, listener] of addEventListener.mock.calls) {
+        if (type !== "change") {
+          continue;
+        }
+
+        listener("background");
+        listener("active");
+      }
+      await Promise.resolve();
+    });
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
   it("clears local data on logout", async () => {
     const { runtime } = await setup();
     await runtime.auth.loginWithDev("1");

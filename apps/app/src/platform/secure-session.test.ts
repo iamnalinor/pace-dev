@@ -1,6 +1,6 @@
 import * as mockSecureStoreModule from "../testing/secure-store.fake.ts";
 import { API_BASE_URL } from "./api-base.ts";
-import { createSecureSessionStore } from "./secure-session.ts";
+import { createSecureEndedSessionStore, createSecureSessionStore } from "./secure-session.ts";
 
 // The fake is created when expo-secure-store is first required (after the import above).
 jest.mock("expo-secure-store", () => mockSecureStoreModule.createFakeSecureStore());
@@ -43,5 +43,24 @@ describe("createSecureSessionStore", () => {
     mockSecureStore.values.set("pace.session", "tok_old");
     await expect(createSecureSessionStore(API_BASE_URL).get()).resolves.toBe("tok_old");
     await expect(createSecureSessionStore(B).get()).resolves.toBeNull();
+  });
+});
+
+describe("createSecureEndedSessionStore (R22-02)", () => {
+  it("keeps the ended sessions per server, once each, until each is removed", async () => {
+    const a = createSecureEndedSessionStore(A);
+    await a.add("tok_1");
+    await a.add("tok_1");
+    await a.add("tok_2");
+    await createSecureEndedSessionStore(B).add("tok_b");
+    await expect(createSecureEndedSessionStore(A).list()).resolves.toEqual(["tok_1", "tok_2"]);
+    await expect(createSecureEndedSessionStore(B).list()).resolves.toEqual(["tok_b"]);
+    await a.remove("tok_1");
+    await expect(a.list()).resolves.toEqual(["tok_2"]);
+  });
+
+  it("reads a damaged entry as nothing kept", async () => {
+    mockSecureStore.values.set("pace.ended-sessions", "not json");
+    await expect(createSecureEndedSessionStore(A).list()).resolves.toEqual([]);
   });
 });
