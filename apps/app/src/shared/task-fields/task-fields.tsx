@@ -16,11 +16,11 @@ import type { TaskFormOptions, TaskFormValues } from "./task-form-types.ts";
 import { DatePanel } from "./date-field.tsx";
 import { DeadlineAndRepeat, DueBeforeStartNote } from "./deadline-and-repeat.tsx";
 import { EstimateOptions } from "./estimate-field.tsx";
-import { TaskTextFields } from "./task-text-fields.tsx";
+import { fieldDraftKey, TaskTextFields } from "./task-text-fields.tsx";
 import { useOutsidePress } from "./use-outside-press.ts";
 import { WhenChips } from "./when-chips.tsx";
 
-export type { TaskFormOptions, TaskFormValues } from "./task-form-types.ts";
+export type { TaskFormValues } from "./task-form-types.ts";
 
 type Panel = "due" | "estimate" | "start" | null;
 
@@ -159,20 +159,13 @@ const ChoiceFields = ({
   );
 };
 
-/**
-The fields of a task, labelled one by one: title, category, importance, project, start, due,
-estimate, description and link. The composer's form and the task editor both draw it.
-*/
-export const TaskFields = ({
-  isTitleFocused = false,
-  onChange,
-  onSubmit,
-  options,
-  isStartChosen,
-  repeatProblem = null,
-  showDeadlineIssue = false,
-  values,
-}: {
+/** What the task fields take. */
+type TaskFieldsProps = {
+  /**
+  Where the typed text (title, description, link) is kept on the device until saved (feedback 5
+  item 7): `task.<id>` in the editor. The composer's form keeps none: its line does.
+  */
+  readonly draftKey?: string | undefined;
   readonly values: TaskFormValues;
   readonly options: TaskFormOptions;
   readonly onChange: (patch: Partial<TaskFormValues>) => void;
@@ -186,7 +179,23 @@ export const TaskFields = ({
   /** The start is the person's (the editor shows an automatic one too): only then is a
   deadline before it worth a note. */
   readonly isStartChosen?: boolean;
-}) => {
+};
+
+/**
+The fields of a task, labelled one by one: title, category, importance, project, start, due,
+estimate, description and link. The composer's form and the task editor both draw it.
+*/
+export const TaskFields = ({
+  draftKey,
+  isTitleFocused = false,
+  onChange,
+  onSubmit,
+  options,
+  isStartChosen,
+  repeatProblem = null,
+  showDeadlineIssue = false,
+  values,
+}: TaskFieldsProps) => {
   const t = useT();
   // The categories, their estimates and the projects are the account's: until a sync of this
   // session succeeded, the built-in ones are not drawn as its own (/add during a first sync, class 62).
@@ -215,6 +224,7 @@ export const TaskFields = ({
       }}
     >
       <TextField
+        draftKey={fieldDraftKey(draftKey, "title")}
         error={isTitleTouched && values.title.trim() === "" ? t("edit.titleRequired") : null}
         label={t("edit.taskTitle")}
         onChangeText={(title) => {
@@ -249,7 +259,7 @@ export const TaskFields = ({
         showDeadlineIssue={showDeadlineIssue}
         values={values}
       />
-      <TaskTextFields onChange={onChange} values={values} />
+      <TaskTextFields draftKey={draftKey} onChange={onChange} values={values} />
     </View>
   );
 };

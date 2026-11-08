@@ -1,4 +1,5 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { Linking } from "react-native";
 
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
@@ -286,6 +287,48 @@ describe("TaskScreen — work", () => {
       );
     });
     expect(screen.getByText("Investigation notes pasted here")).toBeOnTheScreen();
+  });
+
+  it("opens a link in the description without starting to edit; a tap on its words still edits (feedback 5 item 8)", async () => {
+    const runtime = await createTestRuntime({ deviceTz: "UTC", now: TRK_NOW });
+    await runtime.actions.updateTask(TRK_ID, {
+      description: "Logs: https://ci.example.com/run/42 and www.example.org/a, see them.",
+    });
+    const open = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+    await renderScreen(<TaskScreen id={TRK_ID} />, runtime);
+    const link = screen.getByRole("link", { name: "https://ci.example.com/run/42" });
+    await fireEvent.press(link);
+    expect(open).toHaveBeenCalledWith("https://ci.example.com/run/42");
+    expect(screen.queryByLabelText(en("edit.description"))).toBeNull();
+    await fireEvent.press(screen.getByRole("link", { name: "www.example.org/a" }));
+    expect(open).toHaveBeenCalledWith("https://www.example.org/a");
+    expect(screen.queryByLabelText(en("edit.description"))).toBeNull();
+    // The words are the person's, unchanged; a tap on them opens the editor with all of it.
+    await fireEvent.press(screen.getByText(/, see them\./u));
+    expect(screen.getByLabelText(en("edit.description")).props["value"]).toBe(
+      "Logs: https://ci.example.com/run/42 and www.example.org/a, see them.",
+    );
+    // No link sits inside a button (bug-lessons 14, 132).
+    expect(screen.queryByRole("button", { name: en("task.editDescription") })).toBeNull();
+    open.mockRestore();
+  });
+
+  it("keeps a description being edited through a reload, and drops it on Cancel (feedback 5 item 7)", async () => {
+    const runtime = await createTestRuntime({ deviceTz: "UTC", now: TRK_NOW });
+    jest.spyOn(runtime.api, "currentSessionToken").mockReturnValue("session-1");
+    const page = await renderScreen(<TaskScreen id={TRK_ID} />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("task.editDescription") }));
+    await fireEvent.changeText(screen.getByLabelText(en("edit.description")), "Half-written");
+    await page.unmount();
+    const again = await renderScreen(<TaskScreen id={TRK_ID} />, runtime);
+    expect(screen.getByLabelText(en("edit.description")).props["value"]).toBe("Half-written");
+    await fireEvent.press(screen.getByRole("button", { name: en("common.cancel") }));
+    await again.unmount();
+    await renderScreen(<TaskScreen id={TRK_ID} />, runtime);
+    expect(screen.queryByLabelText(en("edit.description"))).toBeNull();
+    expect(
+      screen.getByText("p99 check fails ~1 in 5 runs on the shared runner."),
+    ).toBeOnTheScreen();
   });
 
   it("offers to add a description on a task with none", async () => {

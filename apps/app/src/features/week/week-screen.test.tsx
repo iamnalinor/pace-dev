@@ -4,6 +4,7 @@ import { Linking, type StyleProp, StyleSheet, type TextStyle, type ViewStyle } f
 import { classPx } from "#app/test/class-px.ts";
 import { refusingStore } from "#app/test/refusing-store.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
+import { paramsSet, searchParams, setSearchParams } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { problem } from "@pace/client/testing";
 import { addMinutesIso, type CalendarEvent } from "@pace/core";
@@ -143,6 +144,36 @@ describe("WeekScreen", () => {
     await fireEvent.press(screen.getByRole("button", { name: en("period.thisWeek") }));
     expect(await screen.findByText("Oct 5 – Oct 11")).toBeOnTheScreen();
     expect(back()).toBeNull();
+  });
+
+  it("keeps the week and the picked block in the address, and a reload opens both (feedback 5 item 6)", async () => {
+    const runtime = await world();
+    const page = await renderScreen(<WeekScreen />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: /, Lecture notes$/u }));
+    const { block } = searchParams();
+    expect(block).toBeDefined();
+    await page.unmount();
+    const again = await renderScreen(<WeekScreen />, runtime);
+    expect(await screen.findByText("Study · 1h")).toBeOnTheScreen();
+    await again.unmount();
+    setSearchParams({});
+    await renderScreen(<WeekScreen />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: "Previous week" }));
+    expect(searchParams()).toEqual({ week: "2026-09-28" });
+    await fireEvent.press(screen.getByRole("button", { name: en("period.thisWeek") }));
+    expect(searchParams()).toEqual({});
+  });
+
+  it("opens the week the address names; a date or block it cannot read is the default, nothing written back", async () => {
+    setSearchParams({ week: "2026-09-30" });
+    const page = await renderScreen(<WeekScreen />, await world());
+    expect(screen.getByText("Sep 28 – Oct 4")).toBeOnTheScreen();
+    await page.unmount();
+    setSearchParams({ block: "no-such-block", week: "2026-13-01" });
+    await renderScreen(<WeekScreen />, await world());
+    expect(screen.getByText("Oct 5 – Oct 11")).toBeOnTheScreen();
+    expect(screen.queryByText("Study · 1h")).toBeNull();
+    expect(paramsSet).not.toHaveBeenCalled();
   });
 
   it("fits the day into the measured height, and scrolls only below the floor", async () => {

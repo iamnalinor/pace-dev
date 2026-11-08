@@ -1,10 +1,10 @@
-import { useState } from "react";
 import { View } from "react-native";
 
 import type { InsightBar } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { DestinationScreen } from "#app/screens/destination-screen.tsx";
+import { useZonedDateParam } from "#app/shared/use-search-param.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { WeekPeriod } from "#app/shared/week-period.tsx";
 import { EmptyState } from "#app/ui/empty-state.tsx";
@@ -92,7 +92,8 @@ export const InsightsScreen = () => {
   const t = useT();
   const { hooks } = usePace();
   const { deviceTz, language } = useViewer();
-  const [weekOf, setWeekOf] = useState<null | string>(null);
+  // The week is in the address (`?week=`, feedback 5 item 6): a reload shows the same one.
+  const [weekOf, setWeekOf] = useZonedDateParam("week");
   const week = hooks.useInsights(weekOf);
   return (
     <DestinationScreen

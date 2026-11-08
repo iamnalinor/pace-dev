@@ -34,6 +34,7 @@ const EditProject = ({
   return (
     <View className="mx-gutter mb-4">
       <ProjectForm
+        draftKey={`project.${project.id}`}
         extra={
           <Button
             onPress={() => {

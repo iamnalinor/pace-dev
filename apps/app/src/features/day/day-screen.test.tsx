@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react-nativ
 
 import { controlsInsideControls } from "#app/test/nested-controls.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
-import { router } from "#app/test/router.ts";
+import { paramsSet, router, searchParams, setSearchParams } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { problem } from "@pace/client/testing";
 import { addMinutesIso } from "@pace/core";
@@ -161,6 +161,29 @@ describe("DayScreen", () => {
     await fireEvent.press(await screen.findByRole("button", { name: "Thursday, October 1" }));
     expect(await screen.findByText("Thursday · Oct 1")).toBeOnTheScreen();
     expect(today()).toBeOnTheScreen();
+  });
+
+  it("keeps the day in the address: a reload shows it again, Today takes the param off (feedback 5 item 6)", async () => {
+    await renderScreen(<DayScreen />, await createTestRuntime());
+    await fireEvent.press(screen.getByRole("button", { name: "Previous day" }));
+    expect(await screen.findByText("Monday · Oct 5")).toBeOnTheScreen();
+    expect(searchParams()).toEqual({ date: "2026-10-05" });
+    await fireEvent.press(screen.getByRole("button", { name: en("period.today") }));
+    expect(searchParams()).toEqual({});
+  });
+
+  it("opens the day the address names, and today for one it cannot read, writing nothing back", async () => {
+    setSearchParams({ date: "2026-10-01" });
+    const page = await renderScreen(<DayScreen />, await createTestRuntime());
+    expect(screen.getByText("Thursday · Oct 1")).toBeOnTheScreen();
+    await page.unmount();
+    for (const date of ["2026-02-30", "yesterday", "2026-10-01T00:00"]) {
+      setSearchParams({ date });
+      const shown = await renderScreen(<DayScreen />, await createTestRuntime());
+      expect(screen.getByText("Tuesday · Oct 6")).toBeOnTheScreen();
+      await shown.unmount();
+    }
+    expect(paramsSet).not.toHaveBeenCalled();
   });
 
   it("replaces one day with the next in place: the new day's rows do not fade in (F-MOT-07)", async () => {

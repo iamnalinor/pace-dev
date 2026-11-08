@@ -7,6 +7,7 @@ import { Button } from "#app/ui/button.tsx";
 import { useConfirmFocus } from "#app/ui/confirm-focus.ts";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
+import { useDiscardDraft } from "#app/ui/use-draft.ts";
 import { IS_TOUCH_BROWSER } from "#app/ui/use-hotkey.tsx";
 import { definitionIssues, inheritedOf, newPresetId, type PresetDraft } from "@pace/client";
 import { byPresetOrder, newId, presetById, presetLabel, resolvePreset } from "@pace/core";
@@ -25,6 +26,7 @@ there is a keyboard to type with (bug class 71).
 const Identity = ({
   draft,
   isNew,
+  nameDraftKey,
   nameError,
   nameRef,
   onDraft,
@@ -35,6 +37,7 @@ const Identity = ({
   readonly nameError: null | string;
   readonly nameRef: RefObject<null | TextInput>;
   readonly onDraft: (draft: PresetDraft) => void;
+  readonly nameDraftKey: string;
 }) => {
   const t = useT();
   const language = useLanguage();
@@ -52,6 +55,7 @@ const Identity = ({
     <View className="mx-4 gap-3 rounded-xl border border-separator bg-cell p-4">
       <TextField
         autoFocus={isNew && !IS_TOUCH_BROWSER}
+        draftKey={nameDraftKey}
         error={nameError}
         isSubmitted
         label={t("presets.name")}
@@ -234,7 +238,18 @@ export const PresetForm = ({
   const presets = useAppState((state) => state.presets);
   const [draft, setDraft] = useState(initial);
   const nameError = useNameError();
-  const { issues, problem, remove, save } = usePresetWrites({ draft, isNew, nameError, onDone });
+  // The name typed and not saved survives a reload (feedback 5 item 7); saved or deleted, it goes.
+  const nameDraftKey = `preset.${isNew ? "new" : initial.id}.name`;
+  const discardDraft = useDiscardDraft();
+  const { issues, problem, remove, save } = usePresetWrites({
+    draft,
+    isNew,
+    nameError,
+    onDone: () => {
+      discardDraft(nameDraftKey);
+      onDone();
+    },
+  });
   const parent = draft.extends === null ? undefined : presetById(presets, draft.extends);
   const inheritedHint =
     draft.extends === null
@@ -247,6 +262,7 @@ export const PresetForm = ({
       <Identity
         draft={draft}
         isNew={isNew}
+        nameDraftKey={nameDraftKey}
         nameError={nameError.message}
         nameRef={nameError.ref}
         onDraft={(next) => {

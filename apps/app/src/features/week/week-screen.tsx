@@ -5,6 +5,7 @@ import { ScrollView, View } from "react-native";
 import { useIsAccountUnknown, usePace, useSettings, useT } from "#app/app-state.tsx";
 import { useBack } from "#app/shared/use-back.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
+import { useSearchParam, useZonedDateParam } from "#app/shared/use-search-param.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { WeekPeriod } from "#app/shared/week-period.tsx";
 import { Button } from "#app/ui/button.tsx";
@@ -215,6 +216,30 @@ const WeekPage = ({
 };
 
 /**
+What the grid has picked: a tracked block from the address (`?block=<id>`), so a reload opens
+it again; a calendar event or a folded run stays on the screen only (the phone's calendar is read
+again after a reload, so what it held may be gone). A block the week does not hold is no pick, and
+nothing is written back.
+*/
+const usePicked = (week: WeekModel): readonly [null | Picked, (next: null | Picked) => void] => {
+  const [blockId, setBlockId] = useSearchParam("block");
+  const [other, setOther] = useState<null | Picked>(null);
+  const block =
+    blockId === null
+      ? undefined
+      : week.days.flatMap((day) => day.blocks).find((item) => item.id === blockId);
+  const picked: null | Picked = block === undefined ? other : { block, kind: "block" };
+  const pick = (next: null | Picked): void => {
+    setOther(next?.kind === "block" ? null : next);
+    const nextBlock = next?.kind === "block" ? next.block.id : null;
+    if (nextBlock !== blockId) {
+      setBlockId(nextBlock);
+    }
+  };
+  return [picked, pick];
+};
+
+/**
 The week as lived: Monday to Sunday on one hour grid that fits the screen, tracked time filled
 in its color, the calendar's events outlined, a thin strip where some device was in use. A tap
 tells more: beside the grid on a wide window, in a sheet on a phone.
@@ -223,9 +248,10 @@ export const WeekScreen = () => {
   const t = useT();
   const { hooks } = usePace();
   const isWide = useIsWide();
-  const [weekOf, setWeekOf] = useState<null | string>(null);
-  const [picked, setPicked] = useState<null | Picked>(null);
+  // The week and a picked block are in the address (`?week=`, `?block=`; feedback 5 item 6).
+  const [weekOf, setWeekOf] = useZonedDateParam("week");
   const week = hooks.useWeek(weekOf);
+  const [picked, setPicked] = usePicked(week);
   const close = (): void => {
     setPicked(null);
   };

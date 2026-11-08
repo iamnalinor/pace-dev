@@ -25,6 +25,7 @@ import { forgetLineDraft } from "./platform/shared-in.ts";
 import { poolOf, retryOnWindowFocus } from "./runtime-pool.ts";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
 import { canStartSenders, POLL_LIVE_MS, POLL_OFFLINE_MS } from "./senders.ts";
+import { DraftOwnerContext, forgetDrafts } from "./ui/use-draft.ts";
 import { createZoneStep } from "./zone-after-sync.ts";
 
 const RuntimeContext = createContext<null | PaceRuntime>(null);
@@ -79,6 +80,12 @@ const followSyncedLanguage = (runtime: PaceRuntime, onSynced: OnSynced): (() => 
   });
 };
 
+/** The half-typed line and the fields' drafts were this account's (class 103, feedback 5 item 7). */
+const forgetTyped = (): void => {
+  forgetLineDraft();
+  forgetDrafts();
+};
+
 /** Starts/stops the sync loop with the auth status; a foreground return syncs at once. */
 const runSyncLoop = (runtime: PaceRuntime, onSynced: OnSynced): (() => void) => {
   const { actions, auth, sync } = runtime;
@@ -120,8 +127,7 @@ const runSyncLoop = (runtime: PaceRuntime, onSynced: OnSynced): (() => void) => 
     }
     const leaving = activeSession;
     activeSession = undefined;
-    // The half-typed line was this account's: a share after the next sign-in is only the share.
-    forgetLineDraft();
+    forgetTyped();
     void dropLocalCopyOnSignOut(runtime, { cause: signOutCauseOf(current), leaving });
   });
   // The poll is a safety net while the server can say "changed" itself.
@@ -221,7 +227,9 @@ export const PaceProvider = ({
     <View className="flex-1 bg-app" />
   ) : (
     <RuntimeContext value={runtime}>
-      <SyncedContext value={synced}>{children}</SyncedContext>
+      <SyncedContext value={synced}>
+        <DraftOwnerContext value={runtime.api.currentSessionToken}>{children}</DraftOwnerContext>
+      </SyncedContext>
     </RuntimeContext>
   );
 };

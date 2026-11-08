@@ -28,6 +28,7 @@ const NewProject = ({ onClose }: { readonly onClose: () => void }) => {
   return (
     <View className="mx-gutter mb-3 mt-3">
       <ProjectForm
+        draftKey="project.new"
         initial={{ color: "blue", name: "" }}
         isNameFocused
         onCancel={onClose}

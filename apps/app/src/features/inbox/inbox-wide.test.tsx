@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react-native";
 
 import { en, renderScreen } from "#app/test/render.tsx";
+import { paramsSet, searchParams, setSearchParams } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { INBOX_CABLE_ID, INBOX_TEXTS } from "@pace/core/testing";
 
@@ -29,5 +30,26 @@ describe("InboxScreen on a wide window", () => {
       expect(screen.queryByRole("header", { name: en("inbox.details") })).toBeNull();
     });
     expect(screen.queryByText(INBOX_TEXTS[INBOX_CABLE_ID])).toBeNull();
+  });
+
+  it("keeps what is open in the address: a reload opens it again (feedback 5 item 6)", async () => {
+    const runtime = await createTestRuntime();
+    const page = await renderScreen(<InboxScreen />, runtime);
+    const [row] = screen.getAllByTestId("inbox-capture");
+    await fireEvent.press(row as never);
+    const { open } = searchParams();
+    expect(open).toBeDefined();
+    await page.unmount();
+    await renderScreen(<InboxScreen />, runtime);
+    expect(screen.getByRole("header", { name: en("inbox.details") })).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: en("common.close") }));
+    expect(searchParams()).toEqual({});
+  });
+
+  it("leaves the details closed for an entry it does not hold, writing nothing back", async () => {
+    setSearchParams({ open: "gone" });
+    await renderScreen(<InboxScreen />, await createTestRuntime());
+    expect(pane()).toBeNull();
+    expect(paramsSet).not.toHaveBeenCalled();
   });
 });

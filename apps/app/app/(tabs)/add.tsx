@@ -7,6 +7,7 @@ export default function AddRoute() {
   return (
     <NowScreen
       compose={shared}
+      lineDraftKey="add.line"
       notesLineDraft={LINE_DRAFT_ROUTE === "add"}
       opensForm={shared.isNewTask}
     />
