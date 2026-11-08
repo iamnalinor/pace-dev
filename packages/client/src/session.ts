@@ -21,6 +21,30 @@ export const createMemorySessionStore = (): SessionStore => {
 };
 
 /**
+The sessions this device signed out of that the server has not ended yet (a Log out with no
+network, QA round 22 R22-02): each token waits here until the server confirms the end or answers
+that it no longer knows it. A token here is only ever sent to end itself.
+*/
+export type EndedSessionStore = {
+  readonly list: () => Promise<readonly string[]>;
+  readonly add: (token: string) => Promise<void>;
+  readonly remove: (token: string) => Promise<void>;
+};
+
+export const createMemoryEndedSessionStore = (): EndedSessionStore => {
+  let tokens: readonly string[] = [];
+  return {
+    add: async (token) => {
+      tokens = tokens.includes(token) ? tokens : [...tokens, token];
+    },
+    list: async () => tokens,
+    remove: async (token) => {
+      tokens = tokens.filter((kept) => kept !== token);
+    },
+  };
+};
+
+/**
 Word one tab of a browser profile leaves for the others that it signed a session out on purpose
 (a log-out), kept where they all read it (localStorage): their 401 for that session then says
 "you signed out in another tab", not "another device" (fix round 5 V1). `mark` stands for the

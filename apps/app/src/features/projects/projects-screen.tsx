@@ -89,7 +89,9 @@ export const ProjectsScreen = () => {
         {active.map((project) => (
           <ListRow
             key={project.id}
-            label={project.name}
+            // The name in full (the title clamps at two lines) and the count beside it: the label
+            // stands in for everything the row shows, so it says both (audit 4.8).
+            label={`${project.name}, ${openTasksLabel(language, project.open)}`}
             leading={<HueTile hue={project.color ?? "slate"} icon="folder" />}
             onPress={() => {
               router.push(`/project/${project.id}`);

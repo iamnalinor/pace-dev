@@ -41,7 +41,10 @@ const errorMessage = (
   return botError === undefined ? null : t(botError);
 };
 
-/** The Telegram button, and the bot deep link for when it cannot load. */
+/**
+The Telegram button, and the bot deep link for when it cannot load: a plain action beside the
+button, the filled main one once the button failed (F-CMP-17), so the way in is the obvious one.
+*/
 const LoginOptions = ({
   bot,
   onTelegram,
@@ -51,12 +54,17 @@ const LoginOptions = ({
 }) => {
   const t = useT();
   const { botUsername } = useServerInfo();
+  const [hasWidgetFailed, setHasWidgetFailed] = useState(false);
+  const onWidgetFailed = useCallback(() => {
+    setHasWidgetFailed(true);
+  }, []);
   return (
     <View className="gap-3">
       <TelegramWidget
         botUsername={botUsername}
         label={t("login.telegram")}
         onAuth={onTelegram}
+        onFailed={onWidgetFailed}
         texts={{
           failed: t("login.widgetFailed"),
           loading: t("login.widgetLoading"),
@@ -66,7 +74,7 @@ const LoginOptions = ({
       <Button
         busy={bot.phase.kind === "starting"}
         onPress={() => void bot.start()}
-        variant="plain"
+        variant={hasWidgetFailed ? "primary" : "plain"}
         width="fill"
       >
         {t("login.botFallback")}

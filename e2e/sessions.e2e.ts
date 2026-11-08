@@ -35,7 +35,7 @@ for (const size of SIZES) {
       // The bottom of Settings (QA round 15 L6): the danger zone's openers match the account's
       // actions, full width (one above the other) on a phone, side by side on a computer.
       const isPhone = size.name === "phone";
-      const logout = await boxOf(page.getByRole("button", { name: "Log out" }));
+      const logout = await boxOf(page.getByRole("button", { name: "Sign out" }));
       const wipe = await boxOf(page.getByRole("button", { name: "Wipe data" }));
       const remove = await boxOf(page.getByRole("button", { name: "Delete account" }));
       expect(Math.abs(remove.width - logout.width) < 2).toBe(isPhone);
@@ -195,10 +195,8 @@ for (const size of SIZES) {
     test("shows the local server's MCP URL under Connect an AI app", async ({ page }) => {
       await loginViaApi(page);
       await page.goto("/settings");
-      // The list loads under its skeleton and Connect an AI app moves up as it does (108 px at
-      // 390; plan carry-over, Task 4.11): a click mid-move misses, so the list goes first.
-      const section = page.getByRole("group", { name: "Devices and sessions" });
-      await expect(section.getByText("This device")).toBeVisible();
+      // No wait for the list: its skeleton holds one device row's place, so Connect an AI app
+      // stays where it is as the list loads (QA 22 fix round 2; it moved 108 px at 390 before).
       await page.getByRole("button", { name: "Connect an AI app" }).click();
       await expect(page.getByText(`${API_URL}/mcp`, { exact: true })).toBeVisible();
       await expect(page.getByRole("button", { name: "Copy the URL" })).toBeVisible();

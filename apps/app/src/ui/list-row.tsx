@@ -8,6 +8,7 @@ import type { RowDensity } from "./list-row-types.ts";
 import type { RadioValue } from "./radio-group.tsx";
 import type { TextTone } from "./text-props.ts";
 
+import { ClampedTitle } from "./clamped-title.tsx";
 import { cx } from "./cx.ts";
 import { Icon } from "./icon.tsx";
 import { Link } from "./link.tsx";
@@ -30,6 +31,8 @@ type RowProps = {
   readonly title: string;
   /** A title that is content may clamp at this many lines; a UI string wraps (the default). */
   readonly titleLines?: number | undefined;
+  /** Told whether the clamp at `titleLines` cut the title (measured once laid out). */
+  readonly onTitleClamped?: ((isClamped: boolean) => void) | undefined;
   /** How a content title reads: weight, tone, strike-through (a closed or dimmed task). */
   readonly titleLook?: undefined | { readonly className?: string; readonly tone?: TextTone };
   /** One line of meta under the title (`footnote`, secondary label; it wraps). */
@@ -101,10 +104,45 @@ const LINE_BOX = "min-h-6 justify-center";
 
 export { SelectedBar } from "./list-row-parts.tsx";
 
+/** The title: wrapped (a UI string), clamped (content), or clamped and measured. */
+const Title = ({
+  onTitleClamped,
+  title,
+  titleLines,
+  titleLook,
+}: Pick<RowProps, "onTitleClamped" | "title" | "titleLines" | "titleLook">) => {
+  if (titleLines === undefined) {
+    return <Text role="body">{title}</Text>;
+  }
+  if (onTitleClamped !== undefined) {
+    return (
+      <ClampedTitle
+        className={titleLook?.className}
+        lines={titleLines}
+        onClamped={onTitleClamped}
+        title={title}
+        tone={titleLook?.tone}
+      />
+    );
+  }
+  return (
+    <Text
+      lines={titleLines}
+      policy="clamp"
+      role="body"
+      {...(titleLook?.className !== undefined && { className: titleLook.className })}
+      {...(titleLook?.tone !== undefined && { tone: titleLook.tone })}
+    >
+      {title}
+    </Text>
+  );
+};
+
 /** The slots inside the row's padding: leading, the title column, trailing. */
 const Content = ({
   leading,
   meta,
+  onTitleClamped,
   subtitle,
   title,
   titleLines,
@@ -112,7 +150,14 @@ const Content = ({
   trailing,
 }: Pick<
   RowProps,
-  "leading" | "meta" | "subtitle" | "title" | "titleLines" | "titleLook" | "trailing"
+  | "leading"
+  | "meta"
+  | "onTitleClamped"
+  | "subtitle"
+  | "title"
+  | "titleLines"
+  | "titleLook"
+  | "trailing"
 >) => (
   <View className="flex-1 flex-row items-start gap-row-gap" testID="list-row-content">
     {leading === undefined ? null : (
@@ -121,19 +166,12 @@ const Content = ({
       </View>
     )}
     <View className="min-h-6 flex-1 justify-center gap-0.5">
-      {titleLines === undefined ? (
-        <Text role="body">{title}</Text>
-      ) : (
-        <Text
-          lines={titleLines}
-          policy="clamp"
-          role="body"
-          {...(titleLook?.className !== undefined && { className: titleLook.className })}
-          {...(titleLook?.tone !== undefined && { tone: titleLook.tone })}
-        >
-          {title}
-        </Text>
-      )}
+      <Title
+        onTitleClamped={onTitleClamped}
+        title={title}
+        titleLines={titleLines}
+        titleLook={titleLook}
+      />
       {subtitle === undefined ? null : (
         <Text role="footnote" tone="secondary">
           {subtitle}
@@ -186,6 +224,7 @@ const Frame = ({
         className={className}
         disabled={disabled}
         href={href}
+        label={label}
         testID={testID}
       >
         {children}
@@ -229,6 +268,7 @@ export const ListRow = ({
   density = "regular",
   leading,
   meta,
+  onTitleClamped,
   select,
   subtitle,
   title,
@@ -244,6 +284,7 @@ export const ListRow = ({
       <Content
         leading={leading}
         meta={meta}
+        onTitleClamped={onTitleClamped}
         subtitle={subtitle}
         title={title}
         titleLines={titleLines}

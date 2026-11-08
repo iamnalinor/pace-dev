@@ -1,5 +1,6 @@
 import { type RefObject, useRef, useState } from "react";
 import { Text, View } from "react-native";
+import { useStore } from "zustand";
 
 import { useAuth, usePace, useSettings, useT } from "#app/app-state.tsx";
 import { IS_PHONE } from "#app/platform/device.ts";
@@ -164,13 +165,30 @@ const SessionList = ({
 }) => {
   const t = useT();
   if (sessions.status === "loading") {
-    return <Skeleton label={t("sessions.loading")} />;
+    // One device row's place: this device is always in the list, so the buttons under it do not
+    // move as it loads (three task rows stood 108 px taller than the list, QA 22 fix round 2).
+    return <Skeleton label={t("sessions.loading")} rows={1} shape="listRow" />;
   }
   return sessions.status === "error" ? (
     <ListFailed onRetry={sessions.reload} />
   ) : (
     <ReadyList afterLast={afterLast} sessions={sessions} />
   );
+};
+
+/**
+A session this device signed out of while the server could not hear it still lives there (it shows
+in the list) until the kept log-out goes through (QA round 22 R22-02): a quiet line says so.
+*/
+const EndPending = () => {
+  const t = useT();
+  const { auth } = usePace();
+  const { pending } = useStore(auth.endedSessions);
+  return pending ? (
+    <Text className="font-sans text-footnote text-label-secondary" role="status">
+      {t("sessions.endPending")}
+    </Text>
+  ) : null;
 };
 
 /**
@@ -203,6 +221,7 @@ export const SessionsSection = () => {
     <View className="gap-3">
       <Text className="font-sans text-footnote text-label-secondary">{t("sessions.hint")}</Text>
       {IS_PHONE ? <CalendarSyncRow /> : null}
+      <EndPending />
       <SessionList afterLast={computerButtonRef} sessions={sessions} />
       <View className={cx("gap-2", isWide && "flex-row flex-wrap")}>
         <Button

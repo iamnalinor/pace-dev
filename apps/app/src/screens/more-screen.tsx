@@ -3,6 +3,8 @@ import type { Href } from "expo-router";
 import type { MessageKey } from "@pace/core";
 
 import { useT } from "#app/app-state.tsx";
+import { useFeed } from "#app/shared/notifications/use-feed.ts";
+import { CountBadge } from "#app/ui/count-badge.tsx";
 import { Group } from "#app/ui/group.tsx";
 import { Icon, type IconName } from "#app/ui/icon.tsx";
 import { ListRow } from "#app/ui/list-row.tsx";
@@ -30,6 +32,29 @@ const MoreRow = ({ href, icon, label }: Row) => {
 };
 
 /**
+Notifications, with the bell's unread count (QA round 22 R22-24: on a phone the bell is only in
+Now's header, so a sign-in notice was out of reach from anywhere else). The row's name says the
+count; the badge only shows it.
+*/
+const NotificationsRow = () => {
+  const t = useT();
+  const { model } = useFeed();
+  return (
+    <ListRow
+      href="/notifications"
+      label={
+        model.unread > 0
+          ? t("notifications.openUnread", { count: model.unread })
+          : t("notifications.open")
+      }
+      leading={<Icon name="bell" />}
+      title={t("notifications.open")}
+      trailing={<CountBadge count={model.unread} tone="neutral" />}
+    />
+  );
+};
+
+/**
 The phone's last tab: the rows that did not fit the tab bar (no profile name: Settings says it).
 A wide window has them all in the sidebar and never shows this.
 */
@@ -42,6 +67,7 @@ export const MoreScreen = () => {
         {destinations.map((row) => (
           <MoreRow key={row.label} {...row} />
         ))}
+        <NotificationsRow />
       </Group>
       <Group className="mt-4">
         {settings.map((row) => (

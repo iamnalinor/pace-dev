@@ -80,7 +80,7 @@ for (const size of SIZES) {
       const rest = page.getByRole("list", { name: "Rest" });
       await expect(rest.getByRole("button")).toHaveText([
         /Short break/u,
-        /Rest/u,
+        /Downtime/u,
         /Walk/u,
         /Workout/u,
         /Nap/u,

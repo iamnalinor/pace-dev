@@ -200,7 +200,7 @@ const expectOnlyLogOut = async (detail: string) => {
   expect(screen.getByText(detail)).toBeOnTheScreen();
   const buttons = screen.getAllByRole("button");
   expect(buttons).toHaveLength(1);
-  expect(buttons[0]).toBe(screen.getByRole("button", { name: "Log out" }));
+  expect(buttons[0]).toBe(screen.getByRole("button", { name: "Sign out" }));
   expect(screen.queryByText(/Change/u)).toBeNull();
 };
 
@@ -228,7 +228,7 @@ describe("Versions that do not fit", () => {
       "GET /api/instance": () => ({ ...fakeInstance, minClientProtocol: 2, protocol: 2 }),
     });
     await expectOnlyLogOut("Update the app to keep using this server.");
-    await fireEvent.press(screen.getByRole("button", { name: "Log out" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Sign out" }));
     await waitFor(() => {
       expect(runtime.auth.store.getState().status).toBe("signed-out");
     });
@@ -246,7 +246,7 @@ describe("Versions that do not fit", () => {
   it("treats a server without /api/instance as one older than this app supports", async () => {
     await renderSignedIn({ "GET /api/instance": () => problem(404, "not-found") });
     await expectOnlyLogOut(
-      "This server runs an older Pace. Update the server, or log out and sign in on another one.",
+      "This server runs an older Pace. Update the server, or sign out and sign in on another one.",
     );
   });
 

@@ -108,6 +108,15 @@ describe("ListRow (spec §4.1.1: slots, density, selected)", () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
+  it("a link row is named by its label when it has one, as a button row is (R22-24)", async () => {
+    await render(
+      <ThemeProvider>
+        <ListRow href="/notifications" label="Notifications, 2 unread" title="Notifications" />
+      </ThemeProvider>,
+    );
+    expect(screen.getByRole("link", { name: "Notifications, 2 unread" })).toBeOnTheScreen();
+  });
+
   it("selected adds the leading bar and accessibilityState.selected (a tab)", async () => {
     await render(
       <ThemeProvider>

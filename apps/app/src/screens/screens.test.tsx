@@ -37,19 +37,26 @@ describe("InboxScreen — decisions", () => {
   });
 });
 
+/** A project's row, named by the project and its count (the count is read too, 4.8). */
 const row = (name: string) => screen.getByRole("link", { name });
 
 describe("ProjectsScreen and ProjectScreen", () => {
   it("lists the projects and opens one", async () => {
     await renderScreen(<ProjectsScreen />, await createTestRuntime());
-    await fireEvent.press(screen.getByRole("link", { name: "Algebra" }));
+    await fireEvent.press(row("Algebra, 2 tasks"));
     expect(router.push).toHaveBeenCalledWith(`/project/${ALGEBRA_ID}`);
+  });
+
+  it("says each row's open tasks to a screen reader too, not the name alone (audit 4.8)", async () => {
+    await renderScreen(<ProjectsScreen />, await createTestRuntime());
+    expect(screen.getByRole("link", { name: "Algebra, 2 tasks" })).toBeOnTheScreen();
+    expect(screen.getByRole("link", { name: "Work, 3 tasks" })).toBeOnTheScreen();
   });
 
   it("says how many tasks are open in each project, whatever Now's chips show", async () => {
     await renderScreen(<ProjectsScreen />, await createTestRuntime());
-    expect(within(row("Algebra")).getByText("2 tasks")).toBeOnTheScreen();
-    expect(within(row("Work")).getByText("3 tasks")).toBeOnTheScreen();
+    expect(within(row("Algebra, 2 tasks")).getByText("2 tasks")).toBeOnTheScreen();
+    expect(within(row("Work, 3 tasks")).getByText("3 tasks")).toBeOnTheScreen();
   });
 
   it("says one task, and none", async () => {
@@ -65,8 +72,8 @@ describe("ProjectsScreen and ProjectScreen", () => {
       title: "Weed",
     });
     await renderScreen(<ProjectsScreen />, runtime);
-    expect(within(row("Garden")).getByText("1 task")).toBeOnTheScreen();
-    expect(within(row("Attic")).getByText("No open tasks")).toBeOnTheScreen();
+    expect(within(row("Garden, 1 task")).getByText("1 task")).toBeOnTheScreen();
+    expect(within(row("Attic, No open tasks")).getByText("No open tasks")).toBeOnTheScreen();
   });
 
   it("shows a project's figures and open tasks", async () => {

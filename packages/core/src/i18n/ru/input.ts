@@ -53,7 +53,7 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "close.time": "Время",
   "close.timeInvalid": "Дата в формате ГГГГ-ММ-ДД, время — ЧЧ:ММ.",
   "close.done": "Готово",
-  "close.confirm": "Закрыть как «{outcome}»",
+  "close.confirm": "Закрыть со статусом «{outcome}»",
   "close.closed": "Задача закрыта",
   "add.dueZone": "в зоне {tz}",
   "edit.title": "Изменить задачу",

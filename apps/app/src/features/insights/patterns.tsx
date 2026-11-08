@@ -24,10 +24,22 @@ const SLEEP_FILL = fillClass(CATEGORY_HUES.sleep);
 
 const percent = (share: number): `${number}%` => `${Math.max(2, Math.round(share * 100))}%`;
 
-/** Focus minutes by hour of day: 24 thin columns from a zero baseline, the busiest hour in text. */
+/**
+Focus minutes by hour of day: 24 thin columns from a zero baseline, the busiest hour in text. A week
+with no focus (rest and chores only) draws no empty columns: one line says so (QA round 22 R22-18).
+*/
 const HoursChart = ({ hours }: { readonly hours: InsightsModel["hours"] }) => {
   const t = useT();
   const { language } = useViewer();
+  if (hours.minutes.every((minutes) => minutes === 0)) {
+    return (
+      <Card title={t("insights.hours")}>
+        <Text role="callout" tone="secondary">
+          {t("insights.hoursNone")}
+        </Text>
+      </Card>
+    );
+  }
   const most = Math.max(1, ...hours.minutes);
   const described = hours.minutes
     .map((minutes, hour) => ({ hour, minutes }))
@@ -50,6 +62,7 @@ const HoursChart = ({ hours }: { readonly hours: InsightsModel["hours"] }) => {
         accessibilityLabel={described}
         className="h-24 flex-row items-end gap-0.5 border-b border-separator"
         role="group"
+        testID="hours-chart"
       >
         {hours.minutes.map((minutes, hour) => (
           <View className="h-full flex-1 justify-end" key={hourLabel(hour)}>

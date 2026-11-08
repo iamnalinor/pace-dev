@@ -15,7 +15,10 @@ import { loadDeviceId } from "./platform/device-id.ts";
 import { IS_PHONE } from "./platform/device.ts";
 import { createEventStore, type LocalEventStore } from "./platform/event-store.ts";
 import { createPeerTabs } from "./platform/peer-tabs.ts";
-import { createSecureSessionStore } from "./platform/secure-session.ts";
+import {
+  createSecureEndedSessionStore,
+  createSecureSessionStore,
+} from "./platform/secure-session.ts";
 import { markClientOutdated } from "./platform/server-store.ts";
 import { readServer } from "./platform/server.ts";
 import { createSignOutNotes } from "./platform/sign-out-notes.ts";
@@ -78,10 +81,14 @@ store a test hands in is nobody else's, so it shares no note.
 const sessionOf = (
   provided: SessionStore | undefined,
   baseUrl: string,
-): Pick<PaceClientOptions, "session" | "signOutNotes"> =>
+): Pick<PaceClientOptions, "endedSessions" | "session" | "signOutNotes"> =>
   provided === undefined
-    ? { session: createSecureSessionStore(baseUrl), signOutNotes: createSignOutNotes() }
-    : { session: provided, signOutNotes: undefined };
+    ? {
+        endedSessions: createSecureEndedSessionStore(baseUrl),
+        session: createSecureSessionStore(baseUrl),
+        signOutNotes: createSignOutNotes(),
+      }
+    : { endedSessions: undefined, session: provided, signOutNotes: undefined };
 
 /** Builds the client stack on the platform adapters; options override them (tests). */
 export const createRuntime = async (options: RuntimeOptions = {}): Promise<PaceRuntime> => {

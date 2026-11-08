@@ -87,6 +87,14 @@ describe("bearer sessions", () => {
     expect(await json("/api/auth/logout", { method: "POST", token })).toEqual({ ok: true });
     expect((await call("/api/me", { token })).status).toBe(401);
   });
+
+  it("a repeated logout answers 401 auth/unauthorized: the client's retry reads it as already ended (R22-02)", async () => {
+    const token = await loginAsDev("1001");
+    expect(await json("/api/auth/logout", { method: "POST", token })).toEqual({ ok: true });
+    const again = await call("/api/auth/logout", { method: "POST", token });
+    expect(again.status).toBe(401);
+    expect(await again.json()).toEqual({ code: "auth/unauthorized", message: "Unauthorized" });
+  });
 });
 
 describe("Telegram Login Widget", () => {

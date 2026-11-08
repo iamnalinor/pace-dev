@@ -137,11 +137,13 @@ const stripMessage = ({
 };
 
 /**
-Back on the network: the sync runs at once, and the socket starts again only in a tab the person
-sees. A hidden tab's socket rests (the app's visibility rule): it starts when the tab is shown.
+Back on the network: a Log out the server did not hear is sent again, the sync runs at once, and
+the socket starts again only in a tab the person sees. A hidden tab's socket rests (the app's visibility rule): it starts when the tab is shown.
 */
 export const backOnline = (runtime: PaceRuntime): void => {
   const { live, sync } = runtime;
+  // A Log out the server did not hear goes again, signed in or not (R22-02).
+  void runtime.auth.retryEndedSessions();
   // Not while this device ends its own session (class 75): it would 401 as "ended elsewhere".
   if (!canStartSenders(runtime)) {
     return;

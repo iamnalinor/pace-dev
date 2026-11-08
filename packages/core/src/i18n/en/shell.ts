@@ -87,7 +87,7 @@ export const enShell = {
   "oauth.signedInAs": "Signed in as {name}",
   "oauth.sessionEnded": "Your Pace session has ended. Sign in again to continue.",
   "oauth.deviceToken":
-    "This Pace sign-in cannot connect apps. Log out of Pace in this browser, sign in again and retry.",
+    "This Pace sign-in cannot connect apps. Sign out of Pace in this browser, sign in again and retry.",
   "oauth.identityConflict": "This page sent two sign-ins at once. Reload it and allow again.",
   "oauth.widgetMissing": "Can't see the Telegram button?",
   "oauth.signInFirst": "Sign in to Pace first",
@@ -166,18 +166,18 @@ export const enShell = {
   "settings.categoryEstimates": "Activity estimates",
   "settings.categoryEstimates.hint":
     "An activity's own estimate comes first, then this setting, past runs and the built-in value.",
-  "settings.logout": "Log out",
-  "settings.logout.unsynced.one": "{count} change has not synced yet: logging out now loses it.",
+  "settings.logout": "Sign out",
+  "settings.logout.unsynced.one": "{count} change has not synced yet: signing out now loses it.",
   "settings.logout.unsynced.few":
-    "{count} changes have not synced yet: logging out now loses them.",
+    "{count} changes have not synced yet: signing out now loses them.",
   "settings.logout.unsynced.many":
-    "{count} changes have not synced yet: logging out now loses them.",
+    "{count} changes have not synced yet: signing out now loses them.",
   "settings.logout.unsynced.other":
-    "{count} changes have not synced yet: logging out now loses them.",
+    "{count} changes have not synced yet: signing out now loses them.",
   "settings.logout.unsynced.unknown":
-    "Some changes may not have synced yet: logging out now loses them.",
+    "Some changes may not have synced yet: signing out now loses them.",
   "settings.logout.wait": "Wait",
-  "settings.logout.anyway": "Log out anyway",
+  "settings.logout.anyway": "Sign out anyway",
   "settings.deleteAccount": "Delete account",
   "settings.deleteAccount.warning":
     "This deletes the account for good: tasks, time, presets, the decision log and every connected app. It cannot be undone.",
@@ -262,7 +262,7 @@ export const enShell = {
   "nav.history": "History",
   "nav.newTask": "New task",
   "bot.notLinked":
-    "This Telegram account is not linked to Pace yet. Open Pace and log in with the bot first.",
+    "This Telegram account is not linked to Pace yet. Open Pace and sign in with the bot first.",
   "bot.preview": "The assistant will create this task:",
   "bot.rulesPreview": "AI is unavailable. This suggestion uses simple rules.",
   "bot.rulesPreviewUnreadable":

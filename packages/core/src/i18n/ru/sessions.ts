@@ -8,6 +8,8 @@ export const ruSessions: { readonly [K in keyof typeof enSessions]: string } = {
   "sessions.loading": "Загружаем устройства",
   "sessions.failed": "Не удалось загрузить устройства",
   "sessions.retry": "Попробовать снова",
+  "sessions.endPending":
+    "Сеанс, из которого вы вышли на этом устройстве, ещё не завершён на сервере. Pace завершит его, когда появится связь.",
   "sessions.kind.browser": "Браузер",
   "sessions.kind.app": "Приложение на телефоне",
   "sessions.kind.agent": "Компьютер",

@@ -6,6 +6,8 @@ export const enSessions = {
   "sessions.loading": "Loading devices",
   "sessions.failed": "Couldn't load devices",
   "sessions.retry": "Try again",
+  "sessions.endPending":
+    "A session you signed out of on this device has not ended on the server yet. Pace ends it when the connection is back.",
   "sessions.kind.browser": "Browser",
   "sessions.kind.app": "Phone app",
   "sessions.kind.agent": "Computer",

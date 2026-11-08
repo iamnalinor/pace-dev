@@ -10,13 +10,19 @@ import {
   UserSchema,
 } from "@pace/core";
 
-import type { SessionStore, SignOutNotes } from "./session.ts";
-
 import { type ApiClient, ApiError } from "./api-client.ts";
 import { type AuthState, createSession, type Granted, type Session } from "./auth-session.ts";
+import { createEndedSessions, type EndedSessionsState, endingLogout } from "./ended-sessions.ts";
 import { cleanLoginDevice, createNonce, type LoginDevice } from "./login-device.ts";
+import {
+  createMemoryEndedSessionStore,
+  type EndedSessionStore,
+  type SessionStore,
+  type SignOutNotes,
+} from "./session.ts";
 
 export type { AuthState } from "./auth-session.ts";
+export type { EndedSessionsState } from "./ended-sessions.ts";
 export type { LoginDevice } from "./login-device.ts";
 
 export type BotLoginError = "cancelled" | "not-allowed" | "timeout";
@@ -75,9 +81,17 @@ export type Auth = {
   readonly resumeBotLogin: (nonce: string) => BotLoginPoll;
   /**
   Forgets the token, then tells the server with it (even when the server cannot be reached, the
-  device stays signed out): nothing else is sent with the session once the person signed out.
+  device stays signed out): nothing else is sent with the session once the person signed out. A
+  log-out the server did not hear is kept (`endedSessions`) and sent again until it is (R22-02).
   */
   readonly logout: () => Promise<void>;
+  /** Whether a session this device signed out of still waits for the server to end it. */
+  readonly endedSessions: StoreApi<EndedSessionsState>;
+  /**
+  Sends the log-outs still waiting again (the network may be back): at most one request per
+  session at a time, and none once the server answered. Also run at start and after a login.
+  */
+  readonly retryEndedSessions: () => Promise<void>;
   /**
   Ends this device's own session from its device list: `revoke` asks the server, then the token
   is forgotten without a logout, which would only answer 401 (QA round 15 L2). The other tabs'
@@ -152,8 +166,15 @@ const pollOnce = async (api: ApiClient, nonce: string): Promise<Poll> => {
   }
 };
 
+/** What a login poll needs: the API, the session it signs in, and word that the server answered. */
+type PollDeps = {
+  readonly api: ApiClient;
+  readonly reached: () => void;
+  readonly session: Session;
+};
+
 const waitForToken =
-  (api: ApiClient, session: Session, nonce: string): BotLogin["waitForToken"] =>
+  ({ api, reached, session }: PollDeps, nonce: string): BotLogin["waitForToken"] =>
   async ({ intervalMs, signal, timeoutMs }) => {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
@@ -162,7 +183,11 @@ const waitForToken =
       }
       const poll = await pollOnce(api, nonce);
       if (poll !== undefined) {
-        return poll.ok ? ok(await session.signIn(poll.value)) : poll;
+        if (!poll.ok) {
+          return poll;
+        }
+        reached();
+        return ok(await session.signIn(poll.value));
       }
       await sleep(intervalMs, signal);
     }
@@ -289,19 +314,26 @@ export const createAuth = (options: {
   readonly session: SessionStore;
   /** Shared with the other tabs of the browser profile; absent in the app (one process). */
   readonly notes?: SignOutNotes | undefined;
+  /** The log-outs the server has not heard yet, kept between starts; in memory when absent. */
+  readonly ended?: EndedSessionStore | undefined;
 }): Auth => {
   const { api } = options;
   const session = createSession(options.session, options.notes);
+  const ended = createEndedSessions(api, options.ended ?? createMemoryEndedSessionStore());
+  const { reached } = ended;
 
   const login = async (grant: () => Promise<Granted>): Promise<Result<User, string>> => {
     try {
-      return ok(await session.signIn(await grant()));
+      const granted = await grant();
+      reached();
+      return ok(await session.signIn(granted));
     } catch (error) {
       return err(errorCode(error));
     }
   };
 
   const me = meOf(api, session);
+  const polls: PollDeps = { api, reached, session };
 
   return {
     ...confirmationActions(api, session),
@@ -323,32 +355,21 @@ export const createAuth = (options: {
       await login(async () => await api.call(endpoints.auth.dev, { body: { telegramId } })),
     loginWithTelegram: async (payload) =>
       await login(async () => await api.call(endpoints.auth.telegram, { body: payload })),
-    logout: async () => {
-      const leaving = session.token();
-      if (leaving === undefined) {
-        await session.signOut();
-        return;
-      }
-      // The note goes before anything else: another tab's 401 can come before the answer.
-      await session.leaveNote(leaving);
-      // Forgotten here first, then the server is told with the token it had: once the server
-      // ends the session it closes this device's socket (4401) and answers anything else 401,
-      // and a check or a sync set off by that would read the person's own sign-out as "ended
-      // elsewhere" (QA round 22 R22-02). Signed out, the device sends nothing more with it.
-      await session.signOut();
-      try {
-        await api.call(endpoints.auth.logout, {}, { credential: leaving });
-      } catch {
-        // The session is dropped locally regardless; the server expires it on its own.
-      }
-    },
+    logout: endingLogout(session, ended),
+    endedSessions: ended.store,
+    retryEndedSessions: ended.retry,
     me,
-    ready: session.ready,
-    resumeBotLogin: (nonce) => ({ nonce, waitForToken: waitForToken(api, session, nonce) }),
+    ready: (async (): Promise<void> => {
+      await Promise.all([session.ready, ended.ready]);
+    })(),
+    resumeBotLogin: (nonce) => ({
+      nonce,
+      waitForToken: waitForToken(polls, nonce),
+    }),
     startBotLogin: async (from, device) => {
       const body = cleanLoginDevice(device);
       const created = await createNonce(api, from, body);
-      return { ...created, waitForToken: waitForToken(api, session, created.nonce) };
+      return { ...created, waitForToken: waitForToken(polls, created.nonce) };
     },
     hasEnded: session.hasEnded,
     store: session.store,

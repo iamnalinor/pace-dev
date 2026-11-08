@@ -29,7 +29,7 @@ describe("project forms", () => {
     await fireEvent.changeText(screen.getByLabelText(en("projects.name")), "Physics");
     await fireEvent.press(screen.getByRole("radio", { name: en("color.teal") }));
     await fireEvent.press(screen.getByRole("button", { name: en("projects.create") }));
-    expect(await screen.findByRole("link", { name: "Physics" })).toBeOnTheScreen();
+    expect(await screen.findByRole("link", { name: "Physics, No open tasks" })).toBeOnTheScreen();
   });
 
   it("puts the cursor in a new project's name; Enter on it empty says what is missing (QA 17 L6)", async () => {
