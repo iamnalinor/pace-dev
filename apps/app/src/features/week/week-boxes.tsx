@@ -93,6 +93,8 @@ export const ItemBox = ({
         <Pressable
           aria-current={isSelected ? "true" : undefined}
           className={cx("flex-1 overflow-hidden rounded-xs px-1", look.box)}
+          // The box is as tall as the time it spans (at least 24): the target is what is drawn.
+          hitArea="drawn"
           label={named}
           onPress={() => {
             onPick(picked);
@@ -127,6 +129,7 @@ export const FoldBox = ({
       <Pressable
         aria-current={pickedKey(picked) === selectedKey ? "true" : undefined}
         className="flex-1 items-center justify-center rounded-xs border border-outline bg-fill-3"
+        hitArea="drawn"
         label={t("week.folded", { count, day })}
         onPress={() => {
           onPick(picked);

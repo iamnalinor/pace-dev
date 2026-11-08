@@ -18,13 +18,13 @@ const TARGET = "min-h-hit min-w-hit";
 
 export const Pressable = <R extends AccessibilityRole>(props: PressableProps<R>) => {
   const { palette } = useTheme();
-  const { inner, isLive, rest, ripple, shared } = usePressableProps(props);
+  const { inner, isLive, isMinimum, rest, ripple, shared } = usePressableProps(props);
   return (
     <NativePressable
       {...rest}
       {...(inner !== undefined && { children: inVisual(rest.children, inner, {}) })}
       {...shared}
-      className={cx(TARGET, shared.className)}
+      className={cx(isMinimum && TARGET, shared.className)}
       {...(isLive && {
         android_ripple: {
           borderless: ripple === "borderless",

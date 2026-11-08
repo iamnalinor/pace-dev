@@ -234,6 +234,16 @@ describe("Pressable (the kit's state layer, spec §3.7)", () => {
     expect(classes.split(" ")).toEqual(expect.arrayContaining(["min-h-hit", "min-w-hit", "h-10"]));
   });
 
+  it("is exactly its drawn box with hitArea drawn (a Week block whose geometry is the time it spans)", async () => {
+    await renderLight(
+      <Pressable className="h-6" hitArea="drawn" onPress={jest.fn()} role="button">
+        <Text>Lecture</Text>
+      </Pressable>,
+    );
+    const classes = String(screen.getByRole("button", { name: "Lecture" }).props["className"]);
+    expect(classes.split(" ")).not.toContain("min-h-hit");
+  });
+
   it("draws a visual smaller than the target inside it, without a negative margin (the small-visual pattern)", async () => {
     await renderLight(
       <Pressable onPress={jest.fn()} role="button" shape="pill" visual="h-8 px-4 bg-fill-2">

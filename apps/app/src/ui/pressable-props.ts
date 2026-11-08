@@ -106,6 +106,12 @@ export type PressableProps<R extends AccessibilityRole = AccessibilityRole> = {
   at least as large as the target.
   */
   readonly visual?: string | undefined;
+  /**
+  `drawn`: the target is the drawn box, not the kit's minimum. Only for a mark whose size is data
+  (a Week block is as tall as the time it spans, at least 24): the minimum made a 24 block's target
+  44 tall, over the block below and past the day's end (bug-lessons 139).
+  */
+  readonly hitArea?: "drawn" | "minimum" | undefined;
   /** Takes the press event: a link reads its modifier keys (Ctrl-click opens a new tab). */
   readonly onPress?: ((event: GestureResponderEvent) => void) | undefined;
   readonly onLongPress?: (() => void) | undefined;
@@ -189,6 +195,7 @@ export const usePressableProps = <R extends AccessibilityRole>({
   role,
   selected,
   shape,
+  hitArea = "minimum",
   visual,
   ...rest
 }: PressableProps<R> & { readonly "aria-disabled"?: boolean | undefined }) => {
@@ -238,5 +245,12 @@ export const usePressableProps = <R extends AccessibilityRole>({
     onPress: onPress === undefined ? undefined : press,
   };
   const isLive = onPress !== undefined || onLongPress !== undefined;
-  return { inner: visualClass(visual, shape), isLive, rest, ripple, shared };
+  return {
+    inner: visualClass(visual, shape),
+    isLive,
+    isMinimum: hitArea === "minimum",
+    rest,
+    ripple,
+    shared,
+  };
 };

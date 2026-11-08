@@ -116,6 +116,18 @@ describe("Pressable on the web", () => {
     );
   });
 
+  it("is exactly its drawn box on the web too with hitArea drawn", async () => {
+    await render(
+      <ThemeProvider forced="light">
+        <Pressable className="h-6" hitArea="drawn" onPress={jest.fn()} role="button">
+          <ReactNative.Text>Lecture</ReactNative.Text>
+        </Pressable>
+      </ThemeProvider>,
+    );
+    const classes = String(screen.getByRole("button", { name: "Lecture" }).props["className"]);
+    expect(classes.split(" ")).not.toContain("min-h-hit-web");
+  });
+
   it("keeps the press, disabled and selected behaviour of the phone", async () => {
     const onPress = jest.fn();
     await render(

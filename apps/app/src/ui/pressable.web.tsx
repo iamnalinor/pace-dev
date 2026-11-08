@@ -59,7 +59,7 @@ for React. A Pressable with nothing to do gets no mark, so no hover or press. `d
 react-native-web otherwise holds press-in back 50 ms.
 */
 export const Pressable = <R extends AccessibilityRole>(props: PressableProps<R>) => {
-  const { inner, isLive, rest, ripple, shared } = usePressableProps(props);
+  const { inner, isLive, isMinimum, rest, ripple, shared } = usePressableProps(props);
   const { onKeyDown: callerKeyDown, ...others } = rest as typeof rest & {
     readonly onKeyDown?: (event: KeyEvent) => void;
   };
@@ -74,7 +74,7 @@ export const Pressable = <R extends AccessibilityRole>(props: PressableProps<R>)
         children: inVisual(others.children, inner, { dataSet: { paceVisual: "true" } }),
       })}
       {...shared}
-      className={cx(TARGET, shared.className)}
+      className={cx(isMinimum && TARGET, shared.className)}
       // react-native-web's props React Native's types do not know: `dataSet` becomes a `data-*`
       // attribute, `delayPressIn` its press-in delay (50 ms unless told), `onKeyDown` a key handler.
       // A small visual (`data-pace-inner`) takes the overlay and the ring off the target.

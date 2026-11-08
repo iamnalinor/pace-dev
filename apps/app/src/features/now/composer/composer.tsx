@@ -63,30 +63,34 @@ const Preview = ({ flow }: { readonly flow: ComposerFlow }) => {
     setKept(pending);
   }
   return kept === null ? null : (
-    <Presence
-      enter="lift"
-      exit="fade"
-      initial
-      onExited={() => {
-        setKept(null);
-      }}
-      pointerEvents={pending === null ? "none" : "auto"}
-      show={pending !== null}
-    >
-      <ActionCards
-        actions={kept.actions}
-        busy={flow.pending.busy}
-        onApprove={() => {
-          void flow.pending.approve();
+    // Room under it for its 4 px lift: it rises from inside the card, never from below its edge
+    // (overlays e2e, bug-lessons 5).
+    <View className="pb-1">
+      <Presence
+        enter="lift"
+        exit="fade"
+        initial
+        onExited={() => {
+          setKept(null);
         }}
-        onCancel={flow.dismiss}
-        onFollowup={flow.pending.followup}
-        // Offered once: after a press the status line below says what came of it.
-        onLater={flow.ai.state.status === "idle" ? () => void flow.readLater() : undefined}
-        questions={kept.questions}
-        unread={kept.unread}
-      />
-    </Presence>
+        pointerEvents={pending === null ? "none" : "auto"}
+        show={pending !== null}
+      >
+        <ActionCards
+          actions={kept.actions}
+          busy={flow.pending.busy}
+          onApprove={() => {
+            void flow.pending.approve();
+          }}
+          onCancel={flow.dismiss}
+          onFollowup={flow.pending.followup}
+          // Offered once: after a press the status line below says what came of it.
+          onLater={flow.ai.state.status === "idle" ? () => void flow.readLater() : undefined}
+          questions={kept.questions}
+          unread={kept.unread}
+        />
+      </Presence>
+    </View>
   );
 };
 

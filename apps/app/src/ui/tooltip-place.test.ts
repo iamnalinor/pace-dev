@@ -8,7 +8,8 @@ describe("placeTooltip", () => {
     expect(placeTooltip({ height: 40, width: 40, x: 500, y: 600 }, BUBBLE, VIEWPORT)).toEqual({
       left: 460,
       side: "above",
-      top: 568,
+      // 4 px of air (space.2): 6 laid the sidebar bell's bubble over New task (overlays e2e).
+      top: 570,
     });
   });
 
@@ -16,7 +17,7 @@ describe("placeTooltip", () => {
     expect(placeTooltip({ height: 40, width: 40, x: 500, y: 10 }, BUBBLE, VIEWPORT)).toEqual({
       left: 460,
       side: "below",
-      top: 56,
+      top: 54,
     });
   });
 

@@ -131,6 +131,8 @@ const OPENERS: readonly Opener[] = [
       await page.getByRole("button", { name: named("day.logPast") }).click();
     },
     sheet: "activity",
+    // A computer edits it in the inspector beside the day (Task 4.4), not in a sheet.
+    sizes: ["phone"],
     via: "Day's Log past activity",
   },
   {
@@ -148,7 +150,8 @@ const OPENERS: readonly Opener[] = [
     open: async (page) => {
       await page.goto("/week");
       await page
-        .getByRole("button", { name: /, \d{2}:\d{2}–\d{2}:\d{2}$/u })
+        // A block is named "<day>, <from>–<to>, <name>" (F-A11Y-09).
+        .getByRole("button", { name: /, \d{2}:\d{2}–\d{2}:\d{2}, /u })
         .first()
         .click();
     },
@@ -158,6 +161,12 @@ const OPENERS: readonly Opener[] = [
   },
   {
     open: async (page) => {
+      // The lived-in account has nothing to sort: one line goes to the Inbox first.
+      await page.goto("/");
+      const line = page.getByRole("textbox", { name: ru["composer.label"] });
+      await line.pressSequentially("Спросить про счёт");
+      await page.getByRole("button", { name: ru["composer.toInbox"] }).click();
+      await expect(line).toHaveValue("");
       await page.goto("/inbox");
       await page.getByTestId("inbox-capture").first().click();
     },

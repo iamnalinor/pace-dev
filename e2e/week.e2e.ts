@@ -21,10 +21,9 @@ const SIZES: readonly Size[] = [
     details: (page) => page.locator("body"),
     height: 844,
     leaveDetails: async (page) => {
-      await page
-        .getByRole("button", { name: "Close" })
-        .first()
-        .click({ position: { x: 5, y: 5 } });
+      // The sheet's dim is no button any more: Escape closes it, as the system Back does.
+      await page.keyboard.press("Escape");
+      await expect(page.locator('[data-pace-surface="sheet"]')).toHaveCount(0);
     },
     name: "phone",
     // A phone keeps Week behind More.
@@ -52,6 +51,9 @@ const SIZES: readonly Size[] = [
 const SHOT_DIR = process.env["E2E_SHOT_DIR"];
 
 const HOUR = 60 * 60_000;
+
+/** A run folded into one «+N» block (`week.folded`). */
+const FOLDED = /^\d+ overlapping, /u;
 const DAY = 24 * HOUR;
 
 const shoot = async (page: Page, name: string, outputPath: (name: string) => string) => {
@@ -219,10 +221,8 @@ for (const size of SIZES) {
       await expectNoA11yViolations(page);
       await gap.click();
       await expect(page.getByRole("textbox", { name: "From" })).toHaveValue("10:00");
-      await page
-        .getByRole("button", { name: "Close" })
-        .first()
-        .click({ position: { x: 5, y: 5 } });
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("textbox", { name: "From" })).toHaveCount(0);
       await back.click();
       await expect(back).toHaveCount(0);
     });
@@ -330,12 +330,15 @@ test("narrow side-by-side blocks say their whole name on hover, and a 0-minute b
     });
   const zero = ulid(start + 101);
   const zeroAt = { offsetMs: 90 * minute };
-  // Four blocks over the same half hour (four lanes), and one started and stopped the same instant.
+  // Two blocks side by side (two narrow lanes), a run of four an hour later (more lanes than a
+  // computer's column holds at 44 px each: folded), and one started and stopped the same instant.
   const pushed = await pushAsClient(token, [
     logged(1, "Email the dean", 0),
     logged(2, "Call the bank", 1),
-    logged(3, "Snack", 2),
-    logged(4, "Walk", 3),
+    logged(3, "Snack", 45),
+    logged(4, "Walk", 46),
+    logged(5, "Read", 47),
+    logged(6, "Stretch", 48),
     event({ ...zeroAt, index: 10 }, "activity.started", {
       activityId: zero,
       category: "rest",
@@ -349,6 +352,13 @@ test("narrow side-by-side blocks say their whole name on hover, and a 0-minute b
   await expect(email).toBeVisible();
   await email.hover();
   await expect(page.getByText(/^Email the dean, \d\d:\d\d–\d\d:\d\d$/u)).toBeVisible();
+  // No lane under a thumb's width: the run of four is one «+N» block (spec §5.6 ruling).
+  for (const name of [/, Snack$/u, /, Walk$/u, /, Read$/u, /, Stretch$/u]) {
+    await expect(page.getByRole("button", { name })).toHaveCount(0);
+  }
+  const fold = page.getByRole("button", { name: FOLDED });
+  await expect(fold).toBeVisible();
+  expect((await fold.boundingBox())?.width ?? 0).toBeGreaterThanOrEqual(44);
   // Drawn, a target, and it opens like any block.
   const zeroBox = page.getByRole("button", { name: /, Zero$/u });
   expect((await zeroBox.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(24);

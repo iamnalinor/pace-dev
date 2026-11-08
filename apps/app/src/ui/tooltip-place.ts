@@ -1,3 +1,5 @@
+import { space } from "@pace/core";
+
 /** A rectangle on the screen, in the window's coordinates. */
 export type Box = {
   readonly x: number;
@@ -15,7 +17,7 @@ export type Placement = {
 };
 
 /** Air between the trigger and the bubble. */
-const GAP = 6;
+const GAP = space["2"];
 /** The bubble keeps this far from the window's edges. */
 const EDGE = 8;
 

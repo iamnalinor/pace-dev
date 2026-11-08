@@ -311,7 +311,12 @@ const sweepTooltips = async (
   const names = new Set(await iconOnlyNames(page));
   for (const name of names) {
     // By its label as written (a role query reads the computed name, which a description may change).
-    await page.getByLabel(name, { exact: true }).first().hover({ timeout: 5000 });
+    await page
+      .getByLabel(name, { exact: true })
+      // A period stepper keeps hidden twins of its controls (aria-hidden): the one in sight.
+      .filter({ visible: true })
+      .first()
+      .hover({ timeout: 5000 });
     if (await isTooltipShownSoon(page)) {
       shown += 1;
       const under = await controlsUnder(page, "[data-e2e-shown]", [name]);
@@ -353,6 +358,8 @@ test.describe("tooltips and toasts on Now, Day and a task (Task 3.7, bug class 6
       await page.goto(url);
       await expect(page.getByRole("heading").first()).toBeVisible();
       await expect(page.getByRole("progressbar")).toHaveCount(0);
+      // The account's Russian arrives with the first sync: names read before it are gone after.
+      await expect(page.getByRole("link", { exact: true, name: "Сейчас" })).toBeVisible();
       const found = await sweepTooltips(page, url);
       swept += found.shown;
       covered.push(...found.covered);
