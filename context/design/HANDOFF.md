@@ -55,6 +55,10 @@ run against any screen. Class 137 in `bug-lessons.md`. A screen task that change
 
 | 4.8 | Projects: no «Archive · n» fold, no skeleton; project edit stays an inline form (no `Sheet`); no «Add task» in the project's empty state; presets: no drag handle / ⌥↑⌥↓, Save at the foot of the preset page (not the header), parent picked by chips | §4.8 |
 | 4.9 | charts in one padded cell (not a `Group`); no 960 column / two-column grid; no tile → `ListRow` fallback; no «Start tracking» action; value column measured after first layout; `insights.e2e.ts` written, not run | §4.9 |
+| 4.11 | phone per-kind notification rows with a channel sheet (the compact matrix stays at every width); time-zone, estimates and Devices rows keep their own blocks inside a cell (not one `ListRow` per value); «Выйти» as a centred row; Escape-on-confirm is the Button shortcut (web, e2e only); the Keyboard row lists today's single-key N and F (Alt+N/Alt+F of Q6 not built). [DONE audit-gaps: R22-02 a Sign out the server did not hear is kept and sent again; Devices skeleton is one device row] | §4.11 |
+| 4.12 | `app/oauth/authorize.tsx` and the login card not restyled; onboarding's per-permission cards keep their layout. [DONE audit-gaps: «Sign in with the bot» is the filled button once the Telegram widget fails; Notifications row with its unread count in More (R22-24)]. **Open, not deferred:** F-AND-03 "pushed destinations keep the tab bar" is NOT built (Week/Projects/Insights/History/Settings are root `Stack` screens over `(tabs)`); the controller builds the nested More stack after the other merges | §4.12 |
+| 4.13 | nothing deferred. [DONE audit-gaps: the Calendar hint pinned word for word; EN signs in and out with one pair (Sign in / Sign out) pinned in `glossary.test.ts`; R22-22 RU copy («Дневной сон», the Rest picker's own item renamed, «Закрыть со статусом «…»»)] | §4.13 |
+| 5.6 | scale e2e: the fold's commit frame is under the 100 ms budget, not 32 ms (`e2e/scale.e2e.ts` takes p95 over ≥ 60 frames from the press and bounds the slowest frame at 100 ms) | §5.6 |
 
 Later batches append their rows here.
 
