@@ -1,3 +1,4 @@
+import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
 
 import { allLinks, extractLink, isHttpUrl, linkHost, splitLinks } from "./links.ts";
@@ -40,6 +41,51 @@ describe("links", () => {
         .map((part) => part.text)
         .join(""),
     ).toBe(text);
+  });
+
+  it("splits out a bare www. address too, opening it over https (feedback 5 item 8)", () => {
+    expect(splitLinks("Docs at www.example.com/a, ok")).toEqual([
+      { at: 0, kind: "text", text: "Docs at " },
+      { at: 8, kind: "link", text: "www.example.com/a", url: "https://www.example.com/a" },
+      { at: 25, kind: "text", text: ", ok" },
+    ]);
+    // Not inside a word, an address or an e-mail.
+    for (const text of ["awww.example.com", "bob@www.example.com", "x.www.example.com"]) {
+      expect(splitLinks(text).filter((part) => part.kind === "link")).toEqual([]);
+    }
+    expect(splitLinks("www.")).toEqual([{ at: 0, kind: "text", text: "www." }]);
+  });
+
+  it("never changes the text: the parts joined give it back, whatever it holds", () => {
+    const piece = fc.constantFrom(
+      "https://a.org/x?y=1",
+      "www.b.com",
+      "(",
+      ")",
+      ".",
+      ", ",
+      " ",
+      "\n",
+      "слово",
+      "www.",
+      "https://",
+      "«",
+      "»",
+    );
+    const pieces = fc.array(fc.oneof(piece, fc.string()));
+    fc.assert(
+      fc.property(pieces, (parts) => {
+        const text = parts.join("");
+        const split = splitLinks(text);
+        expect(split.map((part) => part.text).join("")).toBe(text);
+        expect(
+          split.every((part) => text.slice(part.at, part.at + part.text.length) === part.text),
+        ).toBe(true);
+        expect(split.every((part) => part.kind === "text" || /^https?:\/\//u.test(part.url))).toBe(
+          true,
+        );
+      }),
+    );
   });
 
   it("finds every web address in a text, in order", () => {
