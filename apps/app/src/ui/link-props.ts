@@ -31,3 +31,6 @@ export const EXTERNAL = { rel: "noopener", target: "_blank" } as const;
 
 export const isExternal = (href: Href): boolean =>
   typeof href === "string" && /^https?:\/\//u.test(href);
+
+/** A link inside text: the accent's text colour, underlined, so it says so by more than colour. */
+export const TEXT_LINK_CLASS = "text-accent-text underline";
