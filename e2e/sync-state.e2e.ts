@@ -435,7 +435,7 @@ test("Settings and Presets show no account value and write nothing during a firs
   await expect(page.getByRole("progressbar", { name: "Loading your data…" }).first()).toBeVisible();
   await expect(page.getByRole("radio", { name: "English" })).toHaveCount(0);
   await expect(page.getByRole("switch", { name: "Show night hours" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
   await page
     .getByRole("link", { name: "Presets" })
     .or(page.getByRole("button", { name: "Presets" }))
@@ -568,21 +568,21 @@ for (const [width, height] of [
     await page.setViewportSize({ height, width });
     await loginViaApi(page);
     await page.goto("/settings");
-    await expect(page.getByRole("button", { exact: true, name: "Log out" })).toBeVisible();
+    await expect(page.getByRole("button", { exact: true, name: "Sign out" })).toBeVisible();
     // The start's own write (a new account's time zone) sent first: the press counts the outbox
     // as it is, so only the change made below is in it.
     await outboxSent(page);
     // Offline, a setting changed here waits in the outbox.
     await context.setOffline(true);
     await page.getByRole("switch", { name: "Show night hours" }).click();
-    const logOut = page.getByRole("button", { exact: true, name: "Log out" });
+    const logOut = page.getByRole("button", { exact: true, name: "Sign out" });
     await logOut.focus();
     await page.keyboard.press("Enter");
     const confirm = page.getByRole("group", {
-      name: "1 change has not synced yet: logging out now loses it.",
+      name: "1 change has not synced yet: signing out now loses it.",
     });
     const wait = confirm.getByRole("button", { name: "Wait" });
-    const anyway = confirm.getByRole("button", { name: "Log out anyway" });
+    const anyway = confirm.getByRole("button", { name: "Sign out anyway" });
     await expect(wait).toBeFocused();
     await expectNoA11yViolations(page);
     // A line of its own, the width of the column, under Export (beside it, its buttons sat at the

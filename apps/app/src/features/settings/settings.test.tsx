@@ -439,7 +439,7 @@ describe("SettingsScreen", () => {
       await Promise.resolve();
     });
     expect(
-      await screen.findByText("1 change has not synced yet: logging out now loses it."),
+      await screen.findByText("1 change has not synced yet: signing out now loses it."),
     ).toBeOnTheScreen();
     expect(logout).not.toHaveBeenCalled();
   });
@@ -473,7 +473,7 @@ describe("SettingsScreen", () => {
     await fireEvent.press(screen.getByRole("button", { name: en("settings.logout") }));
     // Nothing is discarded yet: the question names how many, and offers to wait.
     expect(
-      await screen.findByText("2 changes have not synced yet: logging out now loses them."),
+      await screen.findByText("2 changes have not synced yet: signing out now loses them."),
     ).toBeOnTheScreen();
     expect(logout).not.toHaveBeenCalled();
     await fireEvent.press(screen.getByRole("button", { name: en("settings.logout.wait") }));

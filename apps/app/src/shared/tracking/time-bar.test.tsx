@@ -172,7 +172,7 @@ describe("TimeBar", () => {
     await fireEvent.press(screen.getByRole("button", { name: "Rest" }));
     expect(await choicesIn("Rest")).toEqual([
       "Short break",
-      "Rest",
+      "Downtime",
       "Walk",
       "Workout",
       "Nap",

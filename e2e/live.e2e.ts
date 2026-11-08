@@ -173,7 +173,7 @@ const twoTabsSignedIn = async (openContext: OpenContext) => {
   await expect(first.getByRole("heading", { name: "Now" })).toBeVisible();
   const second = await context.newPage();
   await second.goto("/settings");
-  await expect(second.getByRole("button", { name: "Log out" })).toBeVisible();
+  await expect(second.getByRole("button", { name: "Sign out" })).toBeVisible();
   return { context, first, second, telegramId };
 };
 
@@ -184,7 +184,7 @@ test('a log-out in another tab of the same browser says so, not "another device"
   openContext,
 }) => {
   const { context, first, second } = await twoTabsSignedIn(openContext);
-  await second.getByRole("button", { name: "Log out" }).click();
+  await second.getByRole("button", { name: "Sign out" }).click();
   await expect(second).toHaveURL(/\/login$/u);
   await expect(first).toHaveURL(/\/login$/u, { timeout: 15_000 });
   await expect(first.getByRole("status").filter({ hasText: ANOTHER_TAB })).toBeVisible();
@@ -269,7 +269,7 @@ test("a stale tab's late 401 leaves the session another tab signed in with since
   const { context, first, second, telegramId } = await twoTabsSignedIn(openContext);
   await hide(first);
   // The person logs out in the second tab and signs in again there, before the hidden tab hears.
-  await second.getByRole("button", { name: "Log out" }).click();
+  await second.getByRole("button", { name: "Sign out" }).click();
   await expect(second).toHaveURL(/\/login$/u);
   await second.getByLabel("Telegram id").fill(telegramId);
   await second.getByRole("button", { name: "Sign in as dev" }).click();

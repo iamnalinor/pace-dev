@@ -131,9 +131,11 @@ if (SHOT_DIR !== undefined) {
       await desktop.getByRole("button", { name: "Rest", exact: true }).click();
       await desktop
         .getByRole("list", { name: "Rest" })
-        .getByRole("button", { name: "Rest" })
+        .getByRole("button", { name: "Downtime" })
         .click();
-      await expect(desktop.getByRole("region", { name: "Time" }).getByText("Rest")).toBeVisible();
+      await expect(
+        desktop.getByRole("region", { name: "Time" }).getByText("Downtime"),
+      ).toBeVisible();
       await shoot(desktop, "now-desktop");
       await desktop.goto("/day");
       await shoot(desktop, "day-desktop");
