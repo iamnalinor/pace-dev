@@ -74,6 +74,15 @@ jest.mock("./platform/shared-in.ts", (): unknown => ({
   },
 }));
 
+/** Every time the fields' drafts are forgotten (a sign-out, feedback 5 item 7). */
+const mockForgetDrafts = jest.fn();
+jest.mock("./ui/use-draft.ts", (): unknown => ({
+  ...jest.requireActual<object>("./ui/use-draft.ts"),
+  forgetDrafts: () => {
+    mockForgetDrafts();
+  },
+}));
+
 /** The browser window's focus coming back, as the web stand-in hears it. */
 const mockWindowFocus = { listeners: new Set<() => void>() };
 jest.mock("./platform/window-focus.ts", (): unknown => ({
@@ -456,6 +465,8 @@ describe("PaceProvider", () => {
     expect(screen.getByTestId("auth")).toHaveTextContent("signed-out:-");
     // The half-typed line goes with the account: a share after the next sign-in is only the share.
     expect(mockForgetLineDraft).toHaveBeenCalledTimes(1);
+    // So do the drafts in its fields (class 103).
+    expect(mockForgetDrafts).toHaveBeenCalledTimes(1);
   });
 
   it("after Log out the network goes quiet: only the logout names the session, nothing goes without one (QA round 22 R22-02)", async () => {

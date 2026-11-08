@@ -8,12 +8,15 @@ import { usePendingActions } from "#app/shared/assistant/use-pending-actions.ts"
 import { IconButton } from "#app/ui/icon-button.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 import { Text } from "#app/ui/text.tsx";
+import { useDraft } from "#app/ui/use-draft.ts";
 
 /** What the typed field keeps while the bar folds: the text and the proposal being read. */
 export const useTypedStart = (text: string, setText: (text: string) => void) => {
   const pending = usePendingActions("activity", () => {
     setText("");
   });
+  // The line's unsent words survive a reload (feedback 5 item 7); approved, the line empties.
+  useDraft("time.line", text, setText);
   return { pending, text };
 };
 

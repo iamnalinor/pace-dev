@@ -1,19 +1,44 @@
 import { useRouter } from "expo-router";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 
 import type { SharedIn } from "#app/platform/shared-line.ts";
 
-import { useT } from "#app/app-state.tsx";
+import { useAppState, useT } from "#app/app-state.tsx";
 import { ComposerProvider, useComposerFlow } from "#app/features/now/composer/composer-flow.tsx";
 import { ComposerPane } from "#app/features/now/composer/composer-pane.tsx";
 import { NowBoard } from "#app/features/now/now-screen.tsx";
 import { TaskScreen } from "#app/features/task/task-screen.tsx";
 import { useLineDraftNote } from "#app/platform/shared-in.ts";
 import { TaskOpenerProvider, TaskPaneProvider } from "#app/shared/task-opener.tsx";
+import { useSearchParam } from "#app/shared/use-search-param.ts";
 import { useIsWide } from "#app/ui/layout.ts";
 import { Shell } from "#app/ui/shell.tsx";
 
 type Picked = { readonly id: string; readonly close: boolean };
+
+/**
+The task open beside the list, from the address (`?task=<id>`, feedback 5 item 6): a reload, a
+link and the browser's history open the same one. An id the store does not know (a deleted task,
+a mistyped link, the log still loading) leaves the pane closed and the address as it is: nothing
+is written back, so nothing loops (bug-lessons 1). Whether the submit sheet opens with it is not
+in the address: it opens once, on the tap that asked for it.
+*/
+const usePickedTask = (): readonly [null | Picked, (picked: null | Picked) => void] => {
+  const [taskId, setTaskId] = useSearchParam("task");
+  const [closeFor, setCloseFor] = useState<null | string>(null);
+  const isKnown = useAppState(
+    (state) => taskId !== null && Object.hasOwn(state.tasks.byId, taskId),
+  );
+  const pick = useCallback(
+    (next: null | Picked): void => {
+      setCloseFor(next?.close === true ? next.id : null);
+      setTaskId(next?.id ?? null);
+    },
+    [setTaskId],
+  );
+  const picked = taskId !== null && isKnown ? { close: closeFor === taskId, id: taskId } : null;
+  return [picked, pick];
+};
 
 /** The inspector's task: the picked one, with its pane's close. */
 const PickedTask = ({
@@ -99,10 +124,13 @@ so each share fills the line, the same text again included.
 */
 export const NowScreen = ({
   compose,
+  lineDraftKey = "now.line",
   notesLineDraft = false,
   opensForm = false,
 }: {
   readonly compose?: SharedIn | undefined;
+  /** Where the line's unsent text is kept: Now's own, or the Add tab's (feedback 5 item 7). */
+  readonly lineDraftKey?: string;
   /** The line a share goes after (Now at "/" on the web, the Add tab on a phone) tells what it holds. */
   readonly notesLineDraft?: boolean;
   /** New task arriving on /add: the empty form opens at once. */
@@ -110,13 +138,14 @@ export const NowScreen = ({
 }) => {
   const router = useRouter();
   const isWide = useIsWide();
-  const [picked, setPicked] = useState<null | Picked>(null);
+  const [picked, setPicked] = usePickedTask();
   const isComposerFocused = compose !== undefined;
   return (
     <ComposerProvider
       initialText={compose?.text}
       isFormInPane={isWide}
       key={compose === undefined ? "now" : `share-${compose.seq}`}
+      lineDraftKey={lineDraftKey}
       onCreatedTask={(taskId) => {
         if (isWide) {
           setPicked({ close: false, id: taskId });

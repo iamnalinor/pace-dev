@@ -9,6 +9,7 @@ import { FieldLabel } from "./field-label.tsx";
 import { Icon } from "./icon.tsx";
 import { useSheetSubmit } from "./sheet-submit.tsx";
 import { useTheme } from "./theme-provider.tsx";
+import { useDraft } from "./use-draft.ts";
 
 /**
 What a field holds (spec §4.2.28, §7 Fields): one prop sets the keyboard, the browser's attributes
@@ -164,6 +165,12 @@ export type TextFieldProps = Omit<
   readonly isInvalid?: boolean | undefined;
   /** What is typed is a draft being read (the time bar's assistant): a dashed outline, not a final value. */
   readonly isDraft?: boolean | undefined;
+  /**
+  Keeps what is typed on this device under this key until it is sent or emptied, and brings it
+  back after a reload (feedback 5 item 7). Name the thing it belongs to (`task.<id>.title`); never
+  set it on a field that holds a secret (a token, a code).
+  */
+  readonly draftKey?: string | undefined;
 };
 
 /** A multiline field grows to 8 lines of `body`, then scrolls (spec §4.2.28). */
@@ -296,8 +303,9 @@ and announced once, after the touched gate lets it through; disabled it is `fill
 border. `purpose` sets the keyboard and the browser's attributes. In a sheet, Enter in a
 single-line field presses the form's action and the field keeps the focus (QA round 21 M1).
 */
-export const TextField = ({ onBlur, onFocus, ...props }: TextFieldProps) => {
+export const TextField = ({ draftKey, onBlur, onFocus, ...props }: TextFieldProps) => {
   const { palette } = useTheme();
+  useDraft(draftKey, props.value ?? "", props.onChangeText);
   const field = useFieldState({ onBlur, onFocus });
   const submit = useSheetSubmit();
   const {

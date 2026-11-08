@@ -9,6 +9,7 @@ import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { HOTKEYS } from "#app/ui/hotkeys.ts";
 import { useToast } from "#app/ui/toast.tsx";
+import { useDraft } from "#app/ui/use-draft.ts";
 import { useHotkey } from "#app/ui/use-hotkey.tsx";
 import {
   type AiOutcome,
@@ -30,7 +31,7 @@ export const subtaskOf = (label: string): ComposerModel["subtasks"][number] => {
 };
 
 /** The typed line, the chip taps and the assistant's reading, kept consistent with each other. */
-const useDraft = (initialText: string, assistant: Assistant) => {
+const useComposerDraft = (initialText: string, assistant: Assistant) => {
   const [text, setText] = useState(initialText);
   const [edits, setEdits] = useState<ComposerEdits>({});
   // A subtask typed into the form's field and not yet added with Enter: Create keeps it too.
@@ -235,7 +236,7 @@ const useFlowState = ({
   readonly onCreatedTask: (taskId: string) => void;
 }) => {
   const { assistant, hooks } = usePace();
-  const draft = useDraft(initialText, assistant);
+  const draft = useComposerDraft(initialText, assistant);
   const { ai, edits, onReading, onText, reset, setEdits, text } = draft;
   const model = hooks.useComposer({ edits, text });
   // What Create adds: the form as shown, with a subtask still being typed.
@@ -322,11 +323,14 @@ export const ComposerProvider = ({
   children,
   initialText = "",
   isFormInPane = false,
+  lineDraftKey,
   onCreatedTask = ignoreCreatedTask,
   opensForm = false,
 }: {
   readonly children: ReactNode;
   readonly initialText?: string | undefined;
+  /** Where the line's unsent text is kept on the device (feedback 5 item 7); none keeps nothing. */
+  readonly lineDraftKey?: string | undefined;
   readonly isFormInPane?: boolean;
   readonly onCreatedTask?: (taskId: string) => void;
   readonly opensForm?: boolean;
@@ -339,6 +343,8 @@ export const ComposerProvider = ({
   });
   useNewTaskRequest(flow.expand);
   useHotkey(HOTKEYS.newTask, flow.expand);
+  // The line's text comes back after a reload as plain text: never read again as a paste.
+  useDraft(lineDraftKey, flow.text, flow.onText);
   return <ComposerContext value={flow}>{children}</ComposerContext>;
 };
 
