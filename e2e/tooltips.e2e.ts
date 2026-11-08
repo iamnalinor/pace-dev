@@ -100,8 +100,8 @@ test("Done tells of its other times on hover, and a button beside it opens them"
   const { token } = await loginViaApi(page);
   const seeded = await seedLivedIn(token);
   await page.goto(`/task/${seeded.openTaskId}`);
-  // Done, or "Submit …" for a task handed in by its subtasks: the footer's primary either way.
-  const done = page.getByRole("button", { name: /^(?:Готово|Сдать)/u });
+  // Done is the footer's primary for every open task (feedback 5: no "Submit N" any more).
+  const done = page.getByRole("button", { name: /^Готово/u });
   await expect(done).toBeVisible();
   await done.hover();
   // What Done does; the way to another time is the button beside it (QA 20 L3).

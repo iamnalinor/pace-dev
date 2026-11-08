@@ -31,7 +31,7 @@ export const PAGE_SIZE = 30;
 
 /** The rows turning to dust after their check, and the ones whose dust has gone. */
 const useSettling = (rows: readonly NowRow[]) => {
-  const { check, doesOpenSheet } = useCheckTask();
+  const { check } = useCheckTask();
   // Rows turning to dust after their check; each closes once its dust has gone.
   const [dissolving, setDissolving] = useState<ReadonlySet<string>>(() => new Set());
   // Rows whose dust has gone: they leave the list at once, so the rows below move up as the
@@ -57,7 +57,7 @@ const useSettling = (rows: readonly NowRow[]) => {
     setGone((current) => keeping(current, (id) => id !== row.id));
     setDissolving((current) => keeping(current, (id) => id !== row.id));
   };
-  return { check, doesOpenSheet, dissolving, gone, setDissolving, settle };
+  return { dissolving, gone, setDissolving, settle };
 };
 
 /** The key of the first row of the second kind, with the boundary's name; none when only one kind is shown. */
@@ -93,7 +93,7 @@ export const TaskRows = ({
   const t = useT();
   const openTask = useOpenTask();
   const [shownCount, setShownCount] = useState(PAGE_SIZE);
-  const { check, dissolving, doesOpenSheet, gone, setDissolving, settle } = useSettling(rows);
+  const { dissolving, gone, setDissolving, settle } = useSettling(rows);
   const open = rows.filter((row) => !gone.has(row.id));
   const hidden = Math.max(0, open.length - shownCount);
   // A long list turns the layout animation off: sliding a page of rows is not worth the frames.
@@ -128,11 +128,7 @@ export const TaskRows = ({
               withTag={withTag}
               {...(!checked && {
                 onCheck: () => {
-                  if (doesOpenSheet(row)) {
-                    void check(row);
-                  } else {
-                    setDissolving((current) => new Set([...current, row.id]));
-                  }
+                  setDissolving((current) => new Set([...current, row.id]));
                 },
               })}
             />

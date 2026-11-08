@@ -26,7 +26,6 @@ const RESOLVE_PROBLEMS: Readonly<Record<ResolveErrorCode, Omit<Problem, "code">>
   "retro/future": { message: "The answer could not be written", status: 409 },
   "retro/nothing-to-submit": { message: "The answer could not be written", status: 409 },
   "retro/task-closed": { message: "The answer could not be written", status: 409 },
-  "subtask/submitted": { message: "The answer could not be written", status: 409 },
   "subtask/unknown": { message: "The answer could not be written", status: 409 },
   "task/unknown": { message: "The answer could not be written", status: 409 },
 };

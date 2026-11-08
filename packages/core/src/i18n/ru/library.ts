@@ -39,7 +39,7 @@ export const ruLibrary: { readonly [K in keyof typeof enLibrary]: string } = {
   "event.task.preset.set": "Пресет изменён",
   "event.task.overrides.set": "Переопределения изменены",
   "event.task.status.set": "Статус изменён",
-  "event.task.subtask.solved": "Подзадача решена",
+  "event.task.subtask.solved": "Подзадача выполнена",
   "event.task.subtask.removed": "Подзадача убрана",
   "event.task.subtasks.added": "Подзадачи добавлены",
   "event.task.submitted": "Сдано",

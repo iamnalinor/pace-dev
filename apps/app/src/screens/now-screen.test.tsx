@@ -23,9 +23,6 @@ const taskDetails = () => screen.queryByRole("button", { name: en("task.edit") }
 const titles = (runtime: PaceRuntime): readonly string[] =>
   Object.values(runtime.state.store.getState().tasks.byId).map((task) => task.title);
 
-/** The submit sheet a per-subtask task's check opens. */
-const submitSheet = () => screen.queryByText(en("close.subtitleSolved", { title: "Algebra HW 6" }));
-
 describe("NowScreen on a wide window", () => {
   it("opens the task just approved by the assistant in place of the previously picked task", async () => {
     const runtime = await createTestRuntime({
@@ -68,17 +65,6 @@ describe("NowScreen on a wide window", () => {
       expect(screen.getByRole("header", { name: "Write report" })).toBeOnTheScreen();
     });
     expect(screen.queryByRole("header", { name: "Algebra HW 6" })).toBeNull();
-  });
-
-  it("opens the submit sheet once: after the form has come and gone, the task is back without it", async () => {
-    await renderScreen(<NowScreen />, await createTestRuntime());
-    await fireEvent.press(screen.getByRole("checkbox", { name: "Mark Algebra HW 6 done" }));
-    expect(submitSheet()).toBeOnTheScreen();
-    await fireEvent.changeText(line(), "pay the rent");
-    await fireEvent.press(button("nav.newTask"));
-    await fireEvent.press(button("common.close"));
-    expect(taskDetails()).toBeOnTheScreen();
-    expect(submitSheet()).toBeNull();
   });
 
   it("keeps the line still while the pane's form holds its draft", async () => {

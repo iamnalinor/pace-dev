@@ -9,7 +9,7 @@ import { formatRelativeDay, type Language } from "@pace/core";
 
 import type { CloseForm } from "./use-close-form.ts";
 
-import { isLatePreview, stillOpen } from "./close-model.ts";
+import { isLatePreview } from "./close-model.ts";
 
 const Line = ({
   id,
@@ -50,18 +50,12 @@ const happenedText = (
     : `${formatRelativeDay(at, now, { language, tz })} ${clockTime(at, tz)}`;
 
 /**
-The key of the outcome's words, one word per outcome here and on the segment (QA21 L8): a
-submission is "Submitted", never "Done". Without a deadline there is nothing to be late for.
+The key of the outcome's words, one word per outcome here and on the segment (QA21 L8). Without a
+deadline there is nothing to be late for.
 */
 const outcomeKey = (view: TaskViewModel, form: CloseForm, isLate: boolean) => {
   if (form.mode === "other") {
     return `close.${form.outcome}` as const;
-  }
-  if (form.mode === "submit") {
-    if (view.stats.dueAt === null) {
-      return "close.submitted";
-    }
-    return isLate ? "close.submittedLate" : "close.submittedBeforeDeadline";
   }
   if (view.stats.dueAt === null) {
     return "outcome.done";
@@ -69,7 +63,7 @@ const outcomeKey = (view: TaskViewModel, form: CloseForm, isLate: boolean) => {
   return isLate ? "close.late" : "close.beforeDeadline";
 };
 
-/** What will be recorded: the outcome, what stays open, and recorded-vs-happened times. */
+/** What will be recorded: the outcome and recorded-vs-happened times. */
 export const ClosePreview = ({
   form,
   view,
@@ -79,7 +73,6 @@ export const ClosePreview = ({
 }) => {
   const t = useT();
   const { deviceTz, language, now } = useViewer();
-  const open = form.mode === "submit" ? stillOpen(view) : [];
   const isLate = isLatePreview(view, form.mode, form.at ?? now);
   const outcome = outcomeKey(view, form, isLate);
   // Its day too when it is not today: "yesterday 18:00", "Oct 31 09:30" (QA round 20 L5).
@@ -91,9 +84,6 @@ export const ClosePreview = ({
   return (
     <View className="gap-2 rounded-md bg-inset p-3">
       <Line id="outcome" label={t("close.recordsAs")} value={t(outcome)} />
-      {open.length === 0 ? null : (
-        <Line id="open" label={t("close.stillOpen")} value={open.join(", ")} />
-      )}
       <Line
         id="recorded"
         label={t("close.recorded")}

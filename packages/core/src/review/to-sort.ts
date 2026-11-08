@@ -15,9 +15,9 @@ events that would settle it. The keys are translated by the UI; the events are p
 inputs for the client's dispatch, which stamps its own source and device.
 */
 export type ReviewKind =
+  | "all-done"
   | "confirm-auto-outcome"
   | "deadline-passed"
-  | "submitted"
   | "unsorted-too-long";
 
 export type ReviewActionKey =
@@ -27,7 +27,6 @@ export type ReviewActionKey =
   | "mark-done"
   | "skip"
   | "sort"
-  | "submit-now"
   | "undo";
 
 export type ReviewAction = {
@@ -38,13 +37,13 @@ export type ReviewAction = {
 export type ReviewItem = {
   readonly kind: ReviewKind;
   readonly taskId: string;
-  /** When the condition started: the last solve, the due date, the capture, the automatic closure. */
+  /** When the condition started: the last subtask done, the due date, the capture, the automatic closure. */
   readonly since: string;
   readonly actions: readonly ReviewAction[];
 };
 
-/** A task fully solved but still open this long after the last solve is probably submitted. */
-const SUBMITTED_AFTER_MINUTES = 24 * 60;
+/** A task with everything done but still open this long after the last mark is probably finished. */
+const ALL_DONE_AFTER_MINUTES = 24 * 60;
 
 /** Distributive over the event union, so `type` and `payload` stay correlated in the spread. */
 type Payload<I = EventInput> = I extends { readonly type: unknown; readonly payload: unknown }
@@ -65,7 +64,7 @@ const closeAs = (task: Task, now: string, outcome: "cancelled" | "done" | "skipp
 /**
 "Keep open": the task stays as it is, and the question is answered. Its own status set again
 says so in the log (the reducer counts it as activity on the task), so the card goes: a passed
-deadline is answered, "submitted?" waits another day.
+deadline is answered, "all done?" waits another day.
 */
 const keepOpen = (task: Task, now: string): ReviewAction => ({
   key: "keep-open",
@@ -74,50 +73,31 @@ const keepOpen = (task: Task, now: string): ReviewAction => ({
   ],
 });
 
-/** The last solve for per-problem progress, else the last activity (the slider has no own instant). */
+/** The last done mark for per-problem progress, else the last activity (the slider has no own instant). */
 const byInstant = (a: string, b: string): number => Date.parse(a) - Date.parse(b);
 
 const fullSince = (task: Task, preset: ResolvedPreset): string => {
   const solves = task.subtasks
-    .map((item) => item.solvedAt)
-    .filter((solvedAt): solvedAt is string => solvedAt !== null);
+    .map((item) => item.doneAt)
+    .filter((doneAt): doneAt is string => doneAt !== null);
   const isBySubtasks = preset.progressMode === "subtasks" && solves.length > 0;
   return isBySubtasks ? (solves.toSorted(byInstant).at(-1) ?? task.lastEventAt) : task.lastEventAt;
 };
 
-/** Sending the solved problems closes the task when they are the last ones; otherwise close it as done. */
-const finishAction = (task: Task, preset: ResolvedPreset, now: string): ReviewAction => {
-  const pending = task.subtasks
-    .filter((item) => item.solvedAt !== null && item.submittedAt === null)
-    .map((item) => item.id);
-  if (preset.submission === "per_subtask" && pending.length > 0) {
-    return {
-      key: "submit-now",
-      events: [
-        suggested(now, {
-          type: "task.submitted",
-          payload: { taskId: task.id, subtaskIds: pending, closes: true },
-        }),
-      ],
-    };
-  }
-  return { key: "mark-done", events: [closeAs(task, now, "done")] };
-};
-
-/** Every problem solved (or the slider at the end) and the task still open a day later. */
-const submittedItem = (task: Task, preset: ResolvedPreset, now: string): ReviewItem | undefined => {
+/** Every problem done (or the slider at the end) and the task still open a day later. */
+const allDoneItem = (task: Task, preset: ResolvedPreset, now: string): ReviewItem | undefined => {
   if (progressOf(task, preset.progressMode) < 1) {
     return undefined;
   }
   const since = fullSince(task, preset);
-  // A day after the last solve, and after anything since (a Keep open asks again a day later).
+  // A day after the last done mark, and after anything since (a Keep open asks again a day later).
   const quietSince = [since, task.lastEventAt].toSorted(byInstant).at(-1) ?? since;
-  return minutesBetween(quietSince, now) >= SUBMITTED_AFTER_MINUTES
+  return minutesBetween(quietSince, now) >= ALL_DONE_AFTER_MINUTES
     ? {
-        kind: "submitted",
+        kind: "all-done",
         taskId: task.id,
         since,
-        actions: [finishAction(task, preset, now), keepOpen(task, now)],
+        actions: [{ key: "mark-done", events: [closeAs(task, now, "done")] }, keepOpen(task, now)],
       }
     : undefined;
 };
@@ -227,7 +207,7 @@ const itemFor = (state: CoreState, task: Task, ctx: QueryContext): ReviewItem | 
   }
   const preset = presetOf(state, task);
   return preset.ok && isActiveTask(task)
-    ? (submittedItem(task, preset.value, ctx.now) ?? deadlinePassedItem(task, ctx.now))
+    ? (allDoneItem(task, preset.value, ctx.now) ?? deadlinePassedItem(task, ctx.now))
     : undefined;
 };
 

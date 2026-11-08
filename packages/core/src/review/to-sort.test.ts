@@ -5,7 +5,6 @@ import type { CoreState } from "../materialize/core-state.ts";
 
 import { autoOutcomeId } from "../ids.ts";
 import { at, event, HW_ID, solved, TRK_ID } from "../materialize/task-fixture.fake.ts";
-import { autoOutcomeEvents } from "../outcomes/outcome.ts";
 import {
   artboardState,
   CALC_HW5_DUE,
@@ -90,14 +89,26 @@ const quiz = (): readonly Event[] => [
   }),
 ];
 
-/** The automatic outcomes due by `now`, as the client or the server would append them. */
-const autoClosed = (state: CoreState, now: string): readonly Event[] =>
-  autoOutcomeEvents({
-    tasks: state.tasks,
-    presets: state.presets,
-    now,
-    existingEventIds: new Set(),
-  }).map((auto, index) => event(200 + index, auto));
+/**
+The automatic misses an older version wrote for the tasks past their deadline (none is made any
+more, feedback 5; the old ones stay in logs), at each task's due date.
+*/
+const autoClosed = (state: CoreState, _now: string): readonly Event[] =>
+  [QUIZ_ID, CALC_HW5_ID].flatMap((taskId, index) => {
+    const dueAt = state.tasks.byId[taskId]?.dueAt;
+    return dueAt === undefined || dueAt === null
+      ? []
+      : [
+          event(200 + index, {
+            id: autoOutcomeId(taskId, "missed"),
+            type: "task.closed",
+            occurredAt: dueAt,
+            precision: "exact",
+            source: "system",
+            payload: { taskId, outcome: "cancelled_missed" },
+          }),
+        ];
+  });
 
 describe("reviewItems", () => {
   it("lists what needs sorting, oldest first: the stale inbox item, then the passed deadline", () => {
@@ -159,17 +170,14 @@ describe("reviewItems", () => {
     expect(reviewItems(state, ctx()).map((item) => item.taskId)).not.toContain(CALC_HW5_ID);
   });
 
-  it("asks 'submitted?' a day after the last problem was solved", () => {
+  it("asks 'all done, close it?' a day after the last problem was done", () => {
     const solvedWorld = allSolved();
     expect(taskIds(review(NOW, solvedWorld))).not.toContain(HW_ID);
     const item = itemFor(review(TOMORROW, solvedWorld), HW_ID);
-    expect(item).toMatchObject({ kind: "submitted", since: "2026-10-06T08:30:00.000Z" });
-    expect(item.actions.map((entry) => entry.key)).toEqual(["submit-now", "keep-open"]);
-    expect(action(item, "submit-now")).toEqual([
-      input(TOMORROW, {
-        type: "task.submitted",
-        payload: { taskId: HW_ID, subtaskIds: ["s3", "s4", "s5", "s6", "s7"], closes: true },
-      }),
+    expect(item).toMatchObject({ kind: "all-done", since: "2026-10-06T08:30:00.000Z" });
+    expect(item.actions.map((entry) => entry.key)).toEqual(["mark-done", "keep-open"]);
+    expect(action(item, "mark-done")).toEqual([
+      input(TOMORROW, { type: "task.closed", payload: { taskId: HW_ID, outcome: "done" } }),
     ]);
   });
 
@@ -177,7 +185,7 @@ describe("reviewItems", () => {
     const now = WEDNESDAY_MORNING;
     const solvedWorld = allSolved();
     const item = itemFor(review(now, solvedWorld), TRK_ID);
-    expect(item).toMatchObject({ kind: "submitted", since: "2026-10-06T11:00:00.000Z" });
+    expect(item).toMatchObject({ kind: "all-done", since: "2026-10-06T11:00:00.000Z" });
     expect(item.actions.map((entry) => entry.key)).toEqual(["mark-done", "keep-open"]);
     expect(action(item, "mark-done")).toEqual([
       input(now, { type: "task.closed", payload: { taskId: TRK_ID, outcome: "done" } }),

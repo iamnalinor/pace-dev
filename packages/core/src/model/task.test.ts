@@ -1,27 +1,19 @@
 import { describe, expect, it } from "vitest";
 
 import { subtask, taskFixture } from "../materialize/task-fixture.fake.ts";
-import {
-  INITIAL_TASKS_STATE,
-  isOpen,
-  progressOf,
-  solvedCount,
-  submittedCount,
-  taskById,
-  unsubmittedSubtasks,
-} from "./task.ts";
+import { doneCount, INITIAL_TASKS_STATE, isOpen, progressOf, taskById } from "./task.ts";
 
 const T1 = "2026-10-05T12:00:00.000Z";
 const T2 = "2026-10-05T13:00:00.000Z";
 
-/** 7 problems, 4 solved, 2 of them sent: the Algebra HW 6 card. */
+/** 7 problems, 4 done: the Algebra HW 6 card. */
 const hw6 = () =>
   taskFixture({
     subtasks: [
-      { ...subtask("s1", "Matrix rank", 1), solvedAt: T1, submittedAt: T2 },
-      { ...subtask("s2", "Gauss elimination", 2), solvedAt: T1, submittedAt: T2 },
-      { ...subtask("s3", "Inverse via adjugate", 3), solvedAt: T2 },
-      { ...subtask("s4", "Determinant 4×4", 4), solvedAt: T2 },
+      { ...subtask("s1", "Matrix rank", 1), doneAt: T1 },
+      { ...subtask("s2", "Gauss elimination", 2), doneAt: T1 },
+      { ...subtask("s3", "Inverse via adjugate", 3), doneAt: T2 },
+      { ...subtask("s4", "Determinant 4×4", 4), doneAt: T2 },
       subtask("s5", "Kronecker–Capelli", 5),
       subtask("s6", "Block matrices", 6),
       subtask("s7", "7a Bonus"),
@@ -60,24 +52,13 @@ describe("isOpen", () => {
 });
 
 describe("subtask counts", () => {
-  it("counts solved and submitted problems of the artboard card", () => {
-    expect(solvedCount(hw6())).toBe(4);
-    expect(submittedCount(hw6())).toBe(2);
-  });
-
-  it("lists the unsubmitted problems in order", () => {
-    expect(unsubmittedSubtasks(hw6()).map((item) => item.id)).toEqual([
-      "s3",
-      "s4",
-      "s5",
-      "s6",
-      "s7",
-    ]);
+  it("counts the done problems of the artboard card", () => {
+    expect(doneCount(hw6())).toBe(4);
   });
 });
 
 describe("progressOf", () => {
-  it("is the solved share in subtasks mode", () => {
+  it("is the done share in subtasks mode", () => {
     expect(progressOf(hw6(), "subtasks")).toBeCloseTo(4 / 7, 10);
   });
 

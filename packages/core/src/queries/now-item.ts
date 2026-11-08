@@ -4,7 +4,7 @@ import type { PresetError } from "../presets/resolve-preset.ts";
 import type { QueryContext } from "./context.ts";
 
 import { type Project, projectById } from "../model/project.ts";
-import { progressOf, solvedCount, submittedCount, type Task } from "../model/task.ts";
+import { doneCount, progressOf, type Task } from "../model/task.ts";
 import { presetById } from "../presets/preset-reducer.ts";
 import { type RepeatRule, taskRepeatRule } from "../recurrence/repeat-rule.ts";
 import { err, ok, type Result } from "../result.ts";
@@ -21,9 +21,9 @@ export type NowItem = {
   readonly importance: Importance;
   /** Progress 0..1 in the preset's progress mode. */
   readonly progress: number;
-  readonly solved: number;
+  /** Subtasks done (one mark per subtask since feedback 5). */
+  readonly done: number;
   readonly total: number;
-  readonly submitted: number;
   readonly dueAt: null | string;
   readonly dueTz: null | string;
   /** Minutes past the due date; `null` while on time or without a due date. */
@@ -59,9 +59,8 @@ export const nowItem = (
     project: task.projectId === null ? null : (projectById(state.projects, task.projectId) ?? null),
     importance: importanceOf(task, preset.value),
     progress: progressOf(task, preset.value.progressMode),
-    solved: solvedCount(task),
+    done: doneCount(task),
     total: task.subtasks.length,
-    submitted: submittedCount(task),
     dueAt: task.dueAt,
     dueTz: task.dueTz,
     lateMinutes,

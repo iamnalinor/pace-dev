@@ -155,11 +155,10 @@ export { DEFAULT_SETTINGS, type Settings } from "./model/settings.ts";
 export {
   type CloseOutcome,
   type Closure,
+  doneCount,
   INITIAL_TASKS_STATE,
   isOpen,
   progressOf,
-  solvedCount,
-  submittedCount,
   type Subtask,
   type Task,
   taskById,
@@ -167,7 +166,6 @@ export {
   type TaskSource,
   type TasksState,
   type TaskStatus,
-  unsubmittedSubtasks,
 } from "./model/task.ts";
 export {
   autoOutcomeEvents,
@@ -232,7 +230,6 @@ export {
 export { foldToLatin, suggestFor, type Suggestion } from "./queries/suggest.ts";
 export {
   estimateMinutesOf,
-  type SubmitPreview,
   type TaskView,
   taskView,
 } from "./queries/task-view.ts";

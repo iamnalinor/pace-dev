@@ -36,7 +36,7 @@ The breaks that exist today, per set, element by element. An overflowing element
 entry fails the case (a new break cannot hide behind an old one). An entry that matches nothing
 in any size or language of its set fails the set: the task that fixes a finding deletes its
 entries. Sideways scrolling of the page or the gallery is allowed only where an entry that says
-`scrolls` matched. F-DAT-01: the submit label lists every solved subtask. F-DAT-02: text in a
+`scrolls` matched (F-DAT-01, the submit label, went with the label in feedback 5). F-DAT-02: text in a
 flex row never shrinks (tags, labels, chips, long words and addresses). F-DAT-07: a text that
 ellipsizes carries neither `data-text-policy="truncate"` nor its full value.
 */

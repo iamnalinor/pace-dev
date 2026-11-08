@@ -10,11 +10,11 @@ const presets = INITIAL_PRESETS_STATE;
 const ctx = contextAt();
 
 describe("presetPreview", () => {
-  it("draws a homework sample: its color, a due tomorrow and the solved subtasks", () => {
+  it("draws a homework sample: its color, a due tomorrow and the done subtasks", () => {
     const preview = presetPreview(presets, newDraft("hw"), { ...ctx, zone: MOSCOW });
     expect(preview?.color).toBe("yellow");
     expect(preview?.progressMode).toBe("subtasks");
-    expect(preview?.meta.map((part) => part.kind)).toEqual(["importance", "due", "solved"]);
+    expect(preview?.meta.map((part) => part.kind)).toEqual(["importance", "due", "done"]);
   });
 
   it("shows importance and no pace for a slider preset", () => {

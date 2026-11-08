@@ -224,8 +224,14 @@ export const subtasks = sqliteTable(
     taskId: text().notNull(),
     number: integer(),
     label: text().notNull(),
+    /**
+    Before feedback 5: the two marks, no longer written (the projection writes `doneAt`). Kept
+    until a later release drops them (expand, then contract: a rollback still finds them).
+    */
     solvedAt: text(),
     submittedAt: text(),
+    /** When it was done: the one mark a subtask has (feedback 5). */
+    doneAt: text(),
   },
   (table) => [primaryKey({ columns: [table.taskId, table.id] })],
 );

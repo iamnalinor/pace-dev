@@ -33,7 +33,7 @@ export type GallerySubtask = {
   /** `null` for an item with no number (`7a Bonus`): its label stands in for the number. */
   readonly number: null | number;
   readonly label: string;
-  readonly isSolved: boolean;
+  readonly isDone: boolean;
 };
 
 export type GalleryRunning = {
@@ -78,7 +78,7 @@ export type GalleryData = {
   readonly ownerName: null | string;
   readonly projects: readonly GalleryProject[];
   readonly tasks: readonly GalleryTask[];
-  /** The subtasks of the task in the detail view (the footer's submit label lists the solved). */
+  /** The subtasks of the task in the detail view (the done ones carry their mark). */
   readonly subtasks: readonly GallerySubtask[];
   readonly inboxCount: number;
   /** The inbox captures shown as cards, the first one the longest. */

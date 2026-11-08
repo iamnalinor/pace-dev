@@ -12,14 +12,17 @@ export type TaskStatus = "in_progress" | "not_started" | "paused";
 
 export type CloseOutcome = z.output<typeof CloseOutcomeSchema>;
 
-/** Solved and submitted are independent marks: a solved problem is not sent until `submittedAt`. */
+/**
+One mark per subtask: done, with the instant it was done (feedback 5). Old logs had two marks,
+solved and submitted: either one reads as done, at the earlier of the two.
+*/
 export type Subtask = {
   readonly id: string;
   readonly label: string;
   /** Problem number for homework; `null` for free-form items. */
   readonly number: null | number;
-  readonly solvedAt: null | string;
-  readonly submittedAt: null | string;
+  /** When it was done (`task.subtask.solved`, or an old per-subtask `task.submitted`). */
+  readonly doneAt: null | string;
 };
 
 /** How and when a task was closed; `eventId` lets the review block undo an automatic outcome. */
@@ -78,7 +81,7 @@ export type Task = {
   /** True once the user did anything that implies work; survives the close for analytics. */
   readonly touched: boolean;
   readonly createdAt: string;
-  /** Whole-task submission; per-subtask submissions live on the subtasks. */
+  /** Whole-task submission (old logs' `task.submitted` without subtasks); subtasks carry `doneAt`. */
   readonly submittedAt: null | string;
   readonly closed: Closure | null;
   readonly reopenedAt: null | string;
@@ -95,14 +98,8 @@ export const taskById = (state: TasksState, id: string): Task | undefined =>
 
 export const isOpen = (task: Task): boolean => task.closed === null;
 
-export const solvedCount = (task: Task): number =>
-  task.subtasks.filter((item) => item.solvedAt !== null).length;
-
-export const submittedCount = (task: Task): number =>
-  task.subtasks.filter((item) => item.submittedAt !== null).length;
-
-export const unsubmittedSubtasks = (task: Task): readonly Subtask[] =>
-  task.subtasks.filter((item) => item.submittedAt === null);
+export const doneCount = (task: Task): number =>
+  task.subtasks.filter((item) => item.doneAt !== null).length;
 
 const SLIDER_MAX = 10;
 
@@ -118,7 +115,7 @@ export const progressOf = (task: Task, progressMode: ProgressMode): number => {
   }
   switch (progressMode) {
     case "subtasks": {
-      return task.subtasks.length === 0 ? 0 : solvedCount(task) / task.subtasks.length;
+      return task.subtasks.length === 0 ? 0 : doneCount(task) / task.subtasks.length;
     }
     case "slider": {
       return sliderProgress(task);

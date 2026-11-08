@@ -5,15 +5,12 @@ import {
   type Importance,
   resolvePreset,
   type TaskStatus,
-  unsubmittedSubtasks,
 } from "@pace/core";
 
 import {
   type ActionDeps,
   type ActionResult,
   emit,
-  fromStore,
-  presetOf,
   serially,
   stageEmit,
   stamp,
@@ -22,12 +19,6 @@ import {
 } from "./deps.ts";
 import { type SubtaskForm, subtaskInputs } from "./task-actions.ts";
 
-export type SubmitInput = When & {
-  readonly taskId: string;
-  /** Per-subtask tasks: which subtasks to send; default = every solved, unsent one. */
-  readonly subtaskIds?: readonly string[] | undefined;
-};
-
 export type CloseInput = When & {
   readonly taskId: string;
   readonly outcome: Exclude<CloseOutcome, "cancelled_missed">;
@@ -35,14 +26,13 @@ export type CloseInput = When & {
 };
 
 export type WorkActions = {
-  readonly markSolved: (taskId: string, subtaskId: string, when?: When) => ActionResult;
-  /** Revokes the latest solve of the subtask. */
-  readonly unmarkSolved: (taskId: string, subtaskId: string) => ActionResult;
+  /** Marks a subtask done at `when` (now by default): the one mark a subtask has (feedback 5). */
+  readonly markDone: (taskId: string, subtaskId: string, when?: When) => ActionResult;
+  /** Revokes the latest done mark of the subtask. */
+  readonly unmarkDone: (taskId: string, subtaskId: string) => ActionResult;
   readonly addSubtasks: (taskId: string, items: readonly (string | SubtaskForm)[]) => ActionResult;
-  /** Takes an unsent subtask off the task (History brings it back). */
+  /** Takes a subtask off the task (History brings it back). */
   readonly removeSubtask: (taskId: string, subtaskId: string) => ActionResult;
-  /** Per subtask: sends the given (or every solved) subtask, closing with the last one; whole: closes as done. */
-  readonly submit: (input: SubmitInput) => ActionResult;
   readonly closeTask: (input: CloseInput) => ActionResult;
   readonly reopen: (taskId: string) => ActionResult;
   readonly setStatus: (taskId: string, status: TaskStatus) => ActionResult;
@@ -59,83 +49,44 @@ export type WorkActions = {
 
 const SLIDER_MAX = 10;
 
-const unmarkSolved =
-  (deps: ActionDeps): WorkActions["unmarkSolved"] =>
-  async (taskId, subtaskId) => {
-    // Effective events are in canonical order, so the last match is the latest solve.
-    const latest = deps.state.store
-      .getState()
-      .events.findLast(
-        (event) =>
-          event.type === "task.subtask.solved" &&
-          event.payload.taskId === taskId &&
-          event.payload.subtaskId === subtaskId,
-      );
-    return latest === undefined
-      ? err("action/nothing-to-do")
-      : fromStore(await deps.state.revoke(latest.id));
-  };
-
-/** Which subtasks a submission sends and whether that is the last of them. */
-const submission = (
-  deps: ActionDeps,
-  input: SubmitInput,
-):
-  | { readonly ok: false; readonly error: ActionErrorOf }
-  | { readonly ok: true; readonly value: EventInput } => {
-  const task = taskOf(deps, input.taskId);
-  if (!task.ok) {
-    return task;
-  }
-  const preset = presetOf(deps, task.value);
-  if (!preset.ok) {
-    return preset;
-  }
-  if (preset.value.submission === "whole") {
-    return {
-      ok: true,
-      value: stamp(
+/**
+The corrections that take a subtask's done mark back: every effective `task.subtask.solved` of it
+revoked, and every old per-subtask `task.submitted` that names it amended to leave it out (or
+revoked when it named only this one), since either mark reads as done (feedback 5).
+*/
+const undoneBy = (deps: ActionDeps, taskId: string, subtaskId: string): readonly EventInput[] =>
+  deps.state.store.getState().events.flatMap((event): readonly EventInput[] => {
+    if (event.type === "task.subtask.solved") {
+      const isIt = event.payload.taskId === taskId && event.payload.subtaskId === subtaskId;
+      return isIt ? [stamp(deps, { type: "event.revoked", payload: { targetId: event.id } })] : [];
+    }
+    if (event.type !== "task.submitted" || event.payload.taskId !== taskId) {
+      return [];
+    }
+    const named = event.payload.subtaskIds ?? [];
+    if (!named.includes(subtaskId)) {
+      return [];
+    }
+    const rest = named.filter((id) => id !== subtaskId);
+    return [
+      stamp(
         deps,
-        { type: "task.submitted", payload: { taskId: input.taskId, closes: true } },
-        input,
+        rest.length === 0
+          ? { type: "event.revoked", payload: { targetId: event.id } }
+          : {
+              type: "event.amended",
+              payload: { targetId: event.id, patch: { subtaskIds: rest } },
+            },
       ),
-    };
-  }
-  const subtaskIds =
-    input.subtaskIds ??
-    task.value.subtasks
-      .filter((item) => item.solvedAt !== null && item.submittedAt === null)
-      .map((item) => item.id);
-  if (subtaskIds.length === 0) {
-    return err("action/nothing-to-do");
-  }
-  const isLast = unsubmittedSubtasks(task.value).every((item) => subtaskIds.includes(item.id));
-  return {
-    ok: true,
-    value: stamp(
-      deps,
-      {
-        type: "task.submitted",
-        payload: {
-          taskId: input.taskId,
-          subtaskIds: [...subtaskIds],
-          ...(isLast && { closes: true }),
-        },
-      },
-      input,
-    ),
+    ];
+  });
+
+const unmarkDone =
+  (deps: ActionDeps): WorkActions["unmarkDone"] =>
+  async (taskId, subtaskId) => {
+    const corrections = undoneBy(deps, taskId, subtaskId);
+    return corrections.length === 0 ? err("action/nothing-to-do") : await emit(deps, corrections);
   };
-};
-
-type ActionErrorOf = Extract<Awaited<ActionResult>, { readonly ok: false }>["error"];
-
-const submit =
-  (deps: ActionDeps): WorkActions["submit"] =>
-  async (input) =>
-    await serially(deps, async () => {
-      const prepared = submission(deps, input);
-      return prepared.ok ? await stageEmit(deps, [prepared.value]) : prepared;
-    });
 
 const closeTask =
   (deps: ActionDeps): WorkActions["closeTask"] =>
@@ -203,7 +154,7 @@ export const workActions = (deps: ActionDeps): WorkActions => ({
           }),
         ]),
   closeTask: closeTask(deps),
-  markSolved: async (taskId, subtaskId, when) =>
+  markDone: async (taskId, subtaskId, when) =>
     await emit(deps, [
       stamp(deps, { type: "task.subtask.solved", payload: { taskId, subtaskId } }, when),
     ]),
@@ -231,6 +182,5 @@ export const workActions = (deps: ActionDeps): WorkActions => ({
       : err("action/invalid-input"),
   setStatus: async (taskId, status) =>
     await emit(deps, [stamp(deps, { type: "task.status.set", payload: { taskId, status } })]),
-  submit: submit(deps),
-  unmarkSolved: unmarkSolved(deps),
+  unmarkDone: unmarkDone(deps),
 });

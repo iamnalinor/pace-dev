@@ -48,14 +48,13 @@ const ACTION_KEYS = [
   "mark-done",
   "skip",
   "sort",
-  "submit-now",
   "undo",
 ] as const;
 
 export const reviewAction = defineTool({
   annotations: { destructiveHint: true, idempotentHint: true, readOnlyHint: false },
   description:
-    "Runs one of the actions a review item offers (see list_review): submit-now / mark-done / keep-open for a task that looks finished, mark-done / cancel / skip / keep-open for a passed deadline, sort / cancel for an old inbox item, confirm / undo for an automatic outcome. keep-open keeps the task open and answers the question (the item goes; 'submitted?' asks again a day later).",
+    "Runs one of the actions a review item offers (see list_review): mark-done / keep-open for a task with everything done, mark-done / cancel / skip / keep-open for a passed deadline, sort / cancel for an old inbox item, confirm / undo for an automatic outcome. keep-open keeps the task open and answers the question (the item goes; 'all done?' asks again a day later).",
   handler: async (args, ctx) =>
     await runWrite(ctx, args, {
       build: forTask(args.taskId, (scope, when, task) => {

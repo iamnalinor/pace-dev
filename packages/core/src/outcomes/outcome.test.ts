@@ -13,7 +13,6 @@ import {
   HW_ID,
   hwCreated,
   solved,
-  submitted,
   subtask,
   taskFixture,
 } from "../materialize/task-fixture.fake.ts";
@@ -53,11 +52,8 @@ const closure = (outcome: Closure["outcome"], when: string): Closure => ({
 const closedTask = (outcome: Closure["outcome"], when: string, patch: Partial<Task> = {}): Task =>
   taskFixture({ closed: closure(outcome, when), ...patch });
 
-const sent = (id: string, when: null | string) => ({
-  ...subtask(id, id),
-  solvedAt: when ?? BEFORE,
-  submittedAt: when,
-});
+/** A subtask done at `when`, or still open (`null`). */
+const sent = (id: string, when: null | string) => ({ ...subtask(id, id), doneAt: when });
 
 const fold = (events: readonly Event[]): TasksState =>
   materialize(events, taskReducer, INITIAL_TASKS_STATE);
@@ -166,7 +162,7 @@ describe("finalDeadlineOf", () => {
 });
 
 describe("subtaskOutcome", () => {
-  it("is pending until submitted, then on time or late by the submission instant", () => {
+  it("is pending until done, then on time or late by the instant it was done", () => {
     expect(subtaskOutcome(sent("s1", null), HW_DUE)).toBe("pending");
     expect(subtaskOutcome(sent("s1", BEFORE), HW_DUE)).toBe("done");
     expect(subtaskOutcome(sent("s1", HW_DUE), HW_DUE)).toBe("done");
@@ -193,7 +189,7 @@ describe("taskOutcome: the spec table", () => {
     expect(taskOutcome(closedTask("done", AFTER, { dueAt: null, dueTz: null }), WORK)).toBe("done");
   });
 
-  it("derives per-subtask outcomes from the submissions", () => {
+  it("derives per-subtask outcomes from the done marks", () => {
     const onTime = closedTask("done", AFTER, {
       subtasks: [sent("s1", BEFORE), sent("s2", BEFORE)],
     });
@@ -204,16 +200,19 @@ describe("taskOutcome: the spec table", () => {
     expect(taskOutcome(someLate, HW)).toBe("done_late");
   });
 
-  it("ignores unsubmitted subtasks when the task was closed as done", () => {
+  it("ignores subtasks left open when the task was closed as done", () => {
     const left = closedTask("done", AFTER, { subtasks: [sent("s1", BEFORE), sent("s2", null)] });
     expect(taskOutcome(left, HW)).toBe("done");
     const leftLate = closedTask("done", AFTER, { subtasks: [sent("s1", AFTER), sent("s2", null)] });
     expect(taskOutcome(leftLate, HW)).toBe("done_late");
   });
 
-  it("falls back to the closing instant for a per-subtask task without subtasks", () => {
+  it("falls back to the closing instant for a per-subtask task without done subtasks", () => {
     expect(taskOutcome(closedTask("done", AFTER), HW)).toBe("done_late");
     expect(taskOutcome(closedTask("done", BEFORE), HW)).toBe("done");
+    const noneDone = { subtasks: [sent("s1", null), sent("s2", null)] };
+    expect(taskOutcome(closedTask("done", AFTER, noneDone), HW)).toBe("done_late");
+    expect(taskOutcome(closedTask("done", BEFORE, noneDone), HW)).toBe("done");
   });
 
   it("keeps late as late under a resubmission policy", () => {
@@ -248,27 +247,23 @@ describe("taskOutcome: retro done before the deadline beats the automatic miss",
   });
 });
 
+/** A recurring instance nobody filled in. */
+const emptyInstance = (taskId: string, presetId: string, dueAt: string) =>
+  at(1, HW_CREATED, {
+    type: "task.created",
+    payload: { taskId, title: "x", presetId, dueAt, dueTz: "UTC", subtasks: [], fields: {} },
+  });
+
 describe("autoOutcomeEvents", () => {
   const none = new Set<string>();
   const run = (events: readonly Event[], now: string, existing = none) =>
     autoOutcomeEvents({ tasks: fold(events), presets, now, existingEventIds: existing });
 
-  it("closes a task as missed once its final deadline has passed", () => {
+  it("never closes a task when its final deadline passes: it stays open, overdue (feedback 5)", () => {
     const hw6 = algebraHw6Events();
     expect(run(hw6, "2026-10-10T00:00:00.000Z")).toEqual([]);
-    expect(run(hw6, addMinutesIso(FINAL, 1))).toEqual([
-      {
-        id: autoOutcomeId(HW_ID, "missed"),
-        type: "task.closed",
-        occurredAt: FINAL,
-        precision: "exact",
-        source: "system",
-        payload: { taskId: HW_ID, outcome: "cancelled_missed" },
-      },
-    ]);
-  });
-
-  it("uses the due date under a hard policy and nothing without a final deadline", () => {
+    expect(run(hw6, addMinutesIso(FINAL, 1))).toEqual([]);
+    expect(run(hw6, "2027-06-01T00:00:00.000Z")).toEqual([]);
     const history = at(1, HW_CREATED, {
       type: "task.created",
       payload: {
@@ -281,39 +276,19 @@ describe("autoOutcomeEvents", () => {
         fields: {},
       },
     });
-    expect(run([history], AFTER)[0]).toMatchObject({
-      id: autoOutcomeId("hw:hw.history:2026-W41", "missed"),
-      occurredAt: HW_DUE,
-    });
-    expect(run([history], HW_DUE)).toEqual([]);
-    const noDue = at(2, HW_CREATED, {
-      type: "task.created",
-      payload: { taskId: "t", title: "x", presetId: "work", subtasks: [], fields: {} },
-    });
-    expect(run([noDue], "2027-01-01T00:00:00.000Z")).toEqual([]);
+    expect(run([history], AFTER)).toEqual([]);
   });
 
   it("skips closed tasks, unknown presets and ids already in the log", () => {
-    const done = [
-      ...algebraHw6Events(),
-      submitted(7, BEFORE, { subtaskIds: ["s3"], closes: true }),
-    ];
-    expect(run(done, addMinutesIso(FINAL, 1))).toEqual([]);
-    const orphan = at(1, HW_CREATED, {
-      type: "task.created",
-      payload: {
-        taskId: "t",
-        title: "x",
-        presetId: "nope",
-        dueAt: HW_DUE,
-        dueTz: "UTC",
-        subtasks: [],
-        fields: {},
-      },
+    const late = addMinutesIso(HW_DUE, 24 * 60 + 1);
+    const closed = at(2, BEFORE, {
+      type: "task.closed",
+      payload: { taskId: HW_ID, outcome: "done" },
     });
-    expect(run([orphan], AFTER)).toEqual([]);
-    const seen = new Set([autoOutcomeId(HW_ID, "missed")]);
-    expect(run(algebraHw6Events(), addMinutesIso(FINAL, 1), seen)).toEqual([]);
+    expect(run([emptyInstance(HW_ID, "hw.history", HW_DUE), closed], late)).toEqual([]);
+    expect(run([emptyInstance("hw:nope:2026-W41", "nope", HW_DUE)], late)).toEqual([]);
+    const seen = new Set([autoOutcomeId(HW_ID, "skipped")]);
+    expect(run([emptyInstance(HW_ID, "hw.history", HW_DUE)], late, seen)).toEqual([]);
   });
 
   it("closes an empty recurring instance as skipped a day after its due date, never as missed", () => {
@@ -337,40 +312,29 @@ describe("autoOutcomeEvents", () => {
     expect(run(empty, addMinutesIso(HW_DUE, 24 * 60 + 1), seen)).toEqual([]);
   });
 
-  it("treats an instance with any content as a real task", () => {
+  it("treats an instance with any content as a real task: never closed automatically", () => {
     const touched = [hwCreated(1), solved(2, BEFORE, "s1")];
-    expect(run(touched, addMinutesIso(FINAL, 1))[0]?.payload).toMatchObject({
-      outcome: "cancelled_missed",
-    });
+    expect(run(touched, addMinutesIso(FINAL, 1))).toEqual([]);
     const pasted = [hwCreated(1)].map((event) =>
       event.type === "task.created"
         ? { ...event, payload: { ...event.payload, subtasks: [], sourceText: "HW 6" } }
         : event,
     );
-    expect(run(pasted, addMinutesIso(FINAL, 1))[0]?.payload).toMatchObject({
-      outcome: "cancelled_missed",
-    });
+    expect(run(pasted, addMinutesIso(FINAL, 1))).toEqual([]);
   });
 
   it("is deterministic and ordered by instant, then task id", () => {
-    const second = at(3, HW_CREATED, {
-      type: "task.created",
-      payload: {
-        taskId: "hw:hw.history:2026-W41",
-        title: "History HW",
-        presetId: "hw.history",
-        dueAt: "2026-10-06T20:59:00.000Z",
-        dueTz: "UTC",
-        subtasks: [{ id: "a", label: "Essay" }],
-        fields: {},
-      },
-    });
-    const events = [...algebraHw6Events(), second];
+    const events = [
+      emptyInstance("hw:hw.history:2026-W42", "hw.history", HW_DUE),
+      emptyInstance("hw:hw.history:2026-W41", "hw.history", "2026-10-06T20:59:00.000Z"),
+      emptyInstance("hw:hw.history:2026-W40", "hw.history", HW_DUE),
+    ];
     const now = addMinutesIso(FINAL, 1);
     const first = run(events, now);
     expect(first.map((event) => event.id)).toEqual([
-      autoOutcomeId("hw:hw.history:2026-W41", "missed"),
-      autoOutcomeId(HW_ID, "missed"),
+      autoOutcomeId("hw:hw.history:2026-W41", "skipped"),
+      autoOutcomeId("hw:hw.history:2026-W40", "skipped"),
+      autoOutcomeId("hw:hw.history:2026-W42", "skipped"),
     ]);
     expect(run(events.toReversed(), now)).toEqual(first);
   });

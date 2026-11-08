@@ -254,11 +254,7 @@ describe("planAction: task.update", () => {
       error: "action/unknown-subtask",
       ok: false,
     });
-    // s1 was sent: it stays on the record; s3 is solved: renaming it would lose the mark.
-    expect(updateTask({ subtasks: { remove: ["s1"] } })).toEqual({
-      error: "subtask/submitted",
-      ok: false,
-    });
+    // s3 is done: renaming it would lose the mark (taking it off is allowed, History brings it back).
     expect(updateTask({ subtasks: { rename: [{ label: "x", subtaskId: "s3" }] } })).toEqual({
       error: "action/subtask-done",
       ok: false,

@@ -1,6 +1,6 @@
 import type { EventInput } from "../events/event-schema.ts";
 
-import { solvedCount, type Task, taskById, type TasksState } from "../model/task.ts";
+import { doneCount, type Task, taskById, type TasksState } from "../model/task.ts";
 import { presetById, type PresetsState } from "../presets/preset-reducer.ts";
 import { taskPreset } from "../presets/resolve-preset.ts";
 import { err, ok, type Result } from "../result.ts";
@@ -12,7 +12,6 @@ export type RetroError =
   | "retro/future"
   | "retro/nothing-to-submit"
   | "retro/task-closed"
-  | "subtask/submitted"
   | "subtask/unknown"
   | "task/unknown";
 
@@ -64,10 +63,13 @@ export const taskInstantProblem = (
 const checkPreset = (presets: PresetsState, presetId: string): RetroError | undefined =>
   presetById(presets, presetId) === undefined ? "preset/unknown" : undefined;
 
-/** A whole submission of a per-subtask task needs at least one solved problem to send. */
+/**
+Only an older client still writes `task.submitted` (feedback 5 made done the one mark): a whole
+submission of a per-subtask task needs a done problem, a per-subtask one names done problems.
+*/
 const isWholeSubmittable = (presets: PresetsState, task: Task): boolean => {
   const preset = taskPreset(presets, task);
-  return !preset.ok || preset.value.submission === "whole" || solvedCount(task) > 0;
+  return !preset.ok || preset.value.submission === "whole" || doneCount(task) > 0;
 };
 
 const checkSubmission = (
@@ -82,9 +84,7 @@ const checkSubmission = (
   if (picked.includes(undefined)) {
     return "subtask/unknown";
   }
-  const isSolved = picked.every((item) => item?.solvedAt !== null);
-  const isPending = picked.some((item) => item?.submittedAt === null);
-  return isSolved && isPending ? undefined : "retro/nothing-to-submit";
+  return picked.every((item) => item?.doneAt !== null) ? undefined : "retro/nothing-to-submit";
 };
 
 const checkDetails = (
@@ -97,13 +97,7 @@ const checkDetails = (
   }
   if (input.type === "task.subtask.solved" || input.type === "task.subtask.removed") {
     const subtask = task.subtasks.find((item) => item.id === input.payload.subtaskId);
-    if (subtask === undefined) {
-      return "subtask/unknown";
-    }
-    // A sent problem is on the record: it stays.
-    return input.type === "task.subtask.removed" && subtask.submittedAt !== null
-      ? "subtask/submitted"
-      : undefined;
+    return subtask === undefined ? "subtask/unknown" : undefined;
   }
   return input.type === "task.submitted"
     ? checkSubmission(presets, task, input.payload.subtaskIds)

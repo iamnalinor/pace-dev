@@ -174,9 +174,11 @@ describe("t", () => {
   });
 
   it("writes a numeric {count} grouped, so no caller formats counts by hand", () => {
-    expect(t("ru", "meta.sent", { count: 1284 })).toBe("1\u{202F}284 отправлено");
-    expect(t("en", "meta.sent", { count: 1284 })).toBe("1,284 sent");
-    expect(t("en", "meta.sent", { count: "many" })).toBe("many sent");
+    expect(t("ru", "meta.subtasksLeft.many", { count: 1284 })).toBe(
+      "осталось 1\u{202F}284 подзадач",
+    );
+    expect(t("en", "meta.subtasksLeft.other", { count: 1284 })).toBe("1,284 subtasks left");
+    expect(t("en", "meta.subtasksLeft.other", { count: "many" })).toBe("many subtasks left");
   });
 
   it("answers a key missing from the catalog with the key itself, never a throw", () => {

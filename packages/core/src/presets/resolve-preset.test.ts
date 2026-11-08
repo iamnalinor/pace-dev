@@ -399,7 +399,7 @@ describe("validatePresetInput", () => {
 });
 
 describe("taskPreset", () => {
-  const subtask = { id: "s1", label: "1", number: 1, solvedAt: null, submittedAt: null } as const;
+  const subtask = { id: "s1", label: "1", number: 1, doneAt: null } as const;
   const task = (presetId: string, subtasks: readonly (typeof subtask)[]) =>
     ({ overrides: null, presetId, subtasks }) as const;
 

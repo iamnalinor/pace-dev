@@ -1138,6 +1138,8 @@ once review, QA and CI are green.
 
 ## Lint baseline
 
+Feedback 5 item 10 (2026-11-08): `DESIGN_VALUE_WARNINGS` 23 (from 24): the subtask checklist's `opacity-50` for a sent subtask went with the sent mark.
+
 Tasks 4.8 + 4.9 (2026-11-06): `DESIGN_VALUE_WARNINGS` 26 (from 29), `BARE_PRESSABLE_WARNINGS` 7 (from 8): Projects, Presets list and Insights moved to the kit.
 
 Tasks 4.7 + 4.10 + 7.3 (2026-11-06): `DESIGN_VALUE_WARNINGS` 29 (from 32), `BARE_PRESSABLE_WARNINGS` 8 (from 9): the Inbox, Decisions, History and Notifications rows moved to the kit (`active:opacity-*` and a bare `Pressable` went). `KIT_PRIMITIVE_WARNINGS` unchanged.

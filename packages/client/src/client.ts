@@ -38,7 +38,7 @@ export type {
   StopWhen,
   TimeActions,
 } from "./actions/time-actions.ts";
-export type { CloseInput, SubmitInput, WorkActions } from "./actions/work-actions.ts";
+export type { CloseInput, WorkActions } from "./actions/work-actions.ts";
 export { createMemoryEventStore } from "./adapters/memory-event-store.ts";
 export { type ApiClient, ApiError, createApiClient } from "./api-client.ts";
 export { type AiOutcome, type Assistant, type Unread, unreadOf } from "./assistant.ts";
@@ -251,7 +251,6 @@ export { type ListedSessions, signInState } from "./view-models/sign-in-notice.t
 export {
   type OverrideSheet,
   type PrimaryAction,
-  submitLabel,
   type SubtaskRow,
   type SubtaskState,
   type TaskLink,

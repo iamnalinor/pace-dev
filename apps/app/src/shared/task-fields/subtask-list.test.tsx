@@ -31,12 +31,12 @@ const Harness = ({
 };
 
 const list = () => screen.getByLabelText(en("form.subtasks"));
-/** Each row's text, in order (a sent one's "Sent" aside). */
+/** Each row's text, in order (a done one's "Done" aside). */
 const rows = (): readonly string[] =>
   within(list())
     .getAllByText(/./u)
     .map((text) => text.props["children"] as string)
-    .filter((text) => text !== en("task.subtaskSentLabel"));
+    .filter((text) => text !== en("task.subtaskDoneLabel"));
 const addButton = () => screen.getByRole("button", { name: en("form.addSubtask") });
 const input = () => screen.getByPlaceholderText(en("form.addSubtask"));
 
@@ -86,30 +86,30 @@ describe("SubtaskList", () => {
     expect(input()).toHaveDisplayValue("Bonus");
   });
 
-  it("marks a sent one as sent with no remove; an unsent kept one can be taken off", async () => {
+  it("marks a done one as done; every kept one can be taken off (History brings it back)", async () => {
     const onRemoveKept = jest.fn();
     await renderScreen(
       <Harness
         initial={[]}
         kept={[
-          { id: "s1", isSent: true, label: "Matrix rank" },
-          { id: "s2", isSent: false, label: "Kronecker–Capelli" },
+          { id: "s1", isDone: true, label: "Matrix rank" },
+          { id: "s2", isDone: false, label: "Kronecker–Capelli" },
         ]}
         onRemoveKept={onRemoveKept}
       />,
       await createTestRuntime(),
     );
     expect(rows()).toEqual(["Matrix rank", "Kronecker–Capelli"]);
-    expect(within(list()).getByText(en("task.subtaskSentLabel"))).toBeOnTheScreen();
-    expect(
-      screen.queryByRole("button", { name: en("form.removeSubtask", { label: "Matrix rank" }) }),
-    ).toBeNull();
-    await fireEvent.press(
-      screen.getByRole("button", {
-        name: en("form.removeSubtask", { label: "Kronecker–Capelli" }),
-      }),
-    );
-    expect(onRemoveKept).toHaveBeenCalledWith("s2");
+    expect(within(list()).getAllByText(en("task.subtaskDoneLabel"))).toHaveLength(1);
+    for (const [label, id] of [
+      ["Matrix rank", "s1"],
+      ["Kronecker–Capelli", "s2"],
+    ] as const) {
+      await fireEvent.press(
+        screen.getByRole("button", { name: en("form.removeSubtask", { label }) }),
+      );
+      expect(onRemoveKept).toHaveBeenCalledWith(id);
+    }
   });
 
   it("names the parts in plain words", () => {

@@ -8,12 +8,12 @@ import { RadioChips } from "#app/ui/radio-chips.tsx";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
 
-import { type CloseMode, initialMode } from "./close-model.ts";
+import type { CloseMode } from "./close-model.ts";
+
 import { ClosePreview } from "./close-preview.tsx";
 import { GiveUpFields, OUTCOMES } from "./give-up-fields.tsx";
 import { type CloseForm, useCloseForm } from "./use-close-form.ts";
 import { useSubmitClose } from "./use-submit-close.ts";
-import { useSubmitTitle } from "./use-submit-title.ts";
 import { WhenPicker } from "./when-picker.tsx";
 
 /** Exactly or about then: both choices in sight as chips, like the rest of the sheet. */
@@ -36,33 +36,30 @@ const PrecisionRow = ({ form }: { readonly form: CloseForm }) => {
 };
 
 /**
-How the task ends, one choice in sight: Done (or Submit), Cancelled, Skipped. A choice made by
+How the task ends, one choice in sight: Done, Cancelled, Skipped. A choice made by
 mistake is undone in the same row, and the row stays where it is, so the focus on it stays in
 the sheet (QA round 19 M2, QA round 20 L6 and M2).
 */
 const OutcomeRow = ({
   form,
   onReasonWanted,
-  view,
 }: {
   readonly form: CloseForm;
   /** Cancelled or Skipped was pressed (not arrowed onto): the reason is what comes next. */
   readonly onReasonWanted: () => void;
-  readonly view: TaskViewModel;
 }) => {
   type Outcome = "cancelled" | "first" | "skipped";
   const t = useT();
-  const first = initialMode(view);
   return (
     <RadioChips
       choices={[
-        { text: t(first === "submit" ? "close.submit" : "outcome.done"), value: "first" },
+        { text: t("outcome.done"), value: "first" },
         ...OUTCOMES.map((outcome) => ({ text: t(`close.${outcome}`), value: outcome })),
       ]}
       label={t("close.outcome")}
       onChange={(next: Outcome, via) => {
         if (next === "first") {
-          form.setMode(first);
+          form.setMode("done");
           return;
         }
         form.setOutcome(next);
@@ -95,9 +92,7 @@ export const CloseSheet = ({
   const t = useT();
   const { deviceTz, now } = useViewer();
   const form = useCloseForm(view, { deviceTz, now }, startMode);
-  const submitTitle = useSubmitTitle(view);
   const submit = useSubmitClose(view, form, onClose);
-  const isSubmit = form.mode === "submit";
   // Each press of Cancelled or Skipped asks Reason for the cursor (with a keyboard), as opening
   // on them from "Close as…" does; an arrow moving through the outcomes keeps it in the row
   // (round 7 review 9).
@@ -105,13 +100,8 @@ export const CloseSheet = ({
   const primary = {
     done: t("common.done"),
     other: t("close.confirm", { outcome: t(`close.${form.outcome}`) }),
-    submit: t("close.submit"),
   }[form.mode];
-  const whenLabel = {
-    done: t("close.whenDone"),
-    other: t("close.whenClosed"),
-    submit: t("close.whenSubmitted"),
-  }[form.mode];
+  const whenLabel = { done: t("close.whenDone"), other: t("close.whenClosed") }[form.mode];
   return (
     <Sheet
       closeLabel={t("common.close")}
@@ -126,15 +116,14 @@ export const CloseSheet = ({
       name="close"
       onClose={onClose}
       open
-      subtitle={isSubmit ? t("close.subtitleSolved", { title: view.title }) : view.title}
-      title={isSubmit ? submitTitle : t("close.closeTitle")}
+      subtitle={view.title}
+      title={t("close.closeTitle")}
     >
       <OutcomeRow
         form={form}
         onReasonWanted={() => {
           setReasonAsked((count) => count + 1);
         }}
-        view={view}
       />
       {form.mode === "other" ? <GiveUpFields form={form} reasonAsked={reasonAsked} /> : null}
       <WhenPicker deviceTz={deviceTz} form={form} label={whenLabel} quickTimes={view.quickTimes} />

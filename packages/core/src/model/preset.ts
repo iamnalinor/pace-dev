@@ -41,6 +41,11 @@ export type Recurrence = {
   readonly due: WeekSlot;
   /** IANA zone the slots are read in. */
   readonly tz: string;
+  /**
+  The number in the first instance's title (`<preset name> <n>`); absent = 1. Instance titles
+  count on from it: the next one is `firstNumber` + the instances of the preset in the store.
+  */
+  readonly firstNumber?: number;
 };
 
 /** Which optional task fields the form shows. */

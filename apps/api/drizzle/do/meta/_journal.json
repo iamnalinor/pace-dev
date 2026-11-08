@@ -43,6 +43,13 @@
       "when": 1793548620147,
       "tag": "0005_striped_natasha_romanoff",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1794168938907,
+      "tag": "0006_sharp_vermin",
+      "breakpoints": true
     }
   ]
 }

@@ -44,9 +44,8 @@ export const TaskRowSchema = z.object({
   isLate: z.boolean(),
   lateMinutes: z.number().nullable(),
   progress: z.number().describe("0..1 in the preset's progress mode."),
-  solved: z.int(),
+  done: z.int().describe("Subtasks done (a subtask has one mark, done, with its instant)."),
   total: z.int().describe("Number of subtasks."),
-  submitted: z.int(),
   estimateMinutes: z.int().nullable(),
   outcome: z
     .string()
@@ -90,10 +89,9 @@ export const rowFromItem = (scope: Scope, item: NowItem): TaskRow => {
     progress: item.progress,
     projectId: task.projectId,
     projectName: item.project?.name ?? null,
-    solved: item.solved,
+    done: item.done,
     startAt: task.startAt,
     status: task.status,
-    submitted: item.submitted,
     title: task.title,
     total: item.total,
     url: taskUrl(scope.webOrigin, task.id),
@@ -137,7 +135,7 @@ export const projectRow = (scope: Scope, project: Project): ProjectRow => {
 export const describeRow = (row: TaskRow): string => {
   const late = row.isLate ? " (late)" : "";
   const due = row.dueAt === null ? "" : `, due ${row.dueAt}${late}`;
-  const progress = row.total > 0 ? `, ${row.solved}/${row.total} solved` : "";
+  const progress = row.total > 0 ? `, ${row.done}/${row.total} done` : "";
   return `${row.title} [${row.id}] (${row.importance}, ${row.presetName}${due}${progress})`;
 };
 

@@ -41,8 +41,7 @@ const toSubtask = (item: SubtaskInput): Subtask => ({
   id: item.id,
   label: item.label,
   number: item.number ?? null,
-  solvedAt: null,
-  submittedAt: null,
+  doneAt: null,
 });
 
 /** Appends the items whose id is new (the first occurrence wins inside one batch too). */
@@ -162,35 +161,33 @@ const statusSet: Handler<"task.status.set"> = (task, event) => {
   };
 };
 
-/** A solve is recorded once; a revoked solve disappears through re-materialization. */
-const subtaskSolved: Handler<"task.subtask.solved"> = (task, event) => {
-  const { subtaskId } = event.payload;
-  const target = task.subtasks.find((item) => item.id === subtaskId);
-  if (target?.solvedAt !== null) {
-    return task;
-  }
-  const subtasks = task.subtasks.map((item) =>
-    item.id === subtaskId ? { ...item, solvedAt: event.occurredAt } : item,
-  );
-  return touched({ ...task, subtasks }, event.occurredAt);
-};
-
-/** Only solved, not yet submitted subtasks among `ids` get the submission time. */
-const submitSubtasks = (task: Task, ids: readonly string[], at: string): Task => {
-  const isDue = (item: Subtask): boolean =>
-    ids.includes(item.id) && item.solvedAt !== null && item.submittedAt === null;
+/** The subtasks among `ids` not done yet, done at `at`; the task itself when none changes. */
+const markDone = (task: Task, ids: readonly string[], at: string): Task => {
+  const isDue = (item: Subtask): boolean => ids.includes(item.id) && item.doneAt === null;
   if (task.subtasks.every((item) => !isDue(item))) {
     return task;
   }
-  const subtasks = task.subtasks.map((item) => (isDue(item) ? { ...item, submittedAt: at } : item));
+  const subtasks = task.subtasks.map((item) => (isDue(item) ? { ...item, doneAt: at } : item));
   return { ...task, subtasks };
 };
 
+/**
+Done is recorded once, at the first mark (events fold in time order, so the earliest); a revoked
+mark disappears through re-materialization.
+*/
+const subtaskSolved: Handler<"task.subtask.solved"> = (task, event) => {
+  const marked = markDone(task, [event.payload.subtaskId], event.occurredAt);
+  return marked === task ? task : touched(marked, event.occurredAt);
+};
+
+/**
+Old logs only (nothing writes it since feedback 5): a per-subtask submission marks its subtasks
+done unless they already were (solved earlier); a whole one stamps the task. `closes` closes it.
+*/
 const submitted: Handler<"task.submitted"> = (task, event) => {
   const { subtaskIds, closes } = event.payload;
   const whole = task.submittedAt === null ? { ...task, submittedAt: event.occurredAt } : task;
-  const marked =
-    subtaskIds === undefined ? whole : submitSubtasks(task, subtaskIds, event.occurredAt);
+  const marked = subtaskIds === undefined ? whole : markDone(task, subtaskIds, event.occurredAt);
   return closes === true
     ? close(marked, event, { outcome: "done", reason: null, confirmed: false })
     : marked;

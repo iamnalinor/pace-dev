@@ -37,7 +37,7 @@ export const enLibrary = {
   "event.task.preset.set": "Preset changed",
   "event.task.overrides.set": "Overrides changed",
   "event.task.status.set": "Status changed",
-  "event.task.subtask.solved": "Subtask solved",
+  "event.task.subtask.solved": "Subtask done",
   "event.task.subtask.removed": "Subtask removed",
   "event.task.subtasks.added": "Subtasks added",
   "event.task.submitted": "Submitted",

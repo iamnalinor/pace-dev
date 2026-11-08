@@ -254,7 +254,7 @@ const ReviewItemSchema = z.object({
   actions: z.array(z.string()).describe("Keys accepted by review_action for this item."),
   kind: z
     .string()
-    .describe("submitted | deadline-passed | unsorted-too-long | confirm-auto-outcome"),
+    .describe("all-done | deadline-passed | unsorted-too-long | confirm-auto-outcome"),
   since: z.string(),
   taskId: z.string(),
   title: z.string(),
@@ -264,7 +264,7 @@ const ReviewItemSchema = z.object({
 export const listReview = defineTool({
   annotations: READ_ONLY,
   description:
-    "What the person forgot to tell the system, oldest first: tasks fully solved but still open a day later ('submitted?'), deadlines that passed with no news, inbox items unsorted for days, and automatic outcomes (missed, skipped) awaiting confirmation. Each item lists the action keys review_action accepts: submit-now, mark-done, cancel, skip, keep-open, sort, confirm, undo.",
+    "What the person forgot to tell the system, oldest first: tasks with every subtask done (or the slider full) but still open a day later ('all done, close it?'), deadlines that passed with no news, inbox items unsorted for days, and automatic outcomes awaiting confirmation (an empty homework instance skipped; a miss closed by an older version: nothing closes a task past its deadline any more, it stays open and overdue). Each item lists the action keys review_action accepts: mark-done, cancel, skip, keep-open, sort, confirm, undo.",
   handler: async (_args, ctx) =>
     await runRead(ctx, (scope) => {
       const items = reviewItems(scope.state, scope.qctx).map((item) => ({

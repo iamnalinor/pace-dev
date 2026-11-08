@@ -14,10 +14,9 @@ describe("metaTexts", () => {
     expect(
       texts([
         { at: HW_DUE, kind: "due", relative: "tomorrow", tz: MOSCOW, zoneDiffers: false },
-        { kind: "solved", solved: 4, total: 7 },
-        { kind: "sent", submitted: 2 },
+        { done: 4, kind: "done", total: 7 },
       ]),
-    ).toEqual(["plain:Due tomorrow 23:59", "plain:4/7 solved", "plain:2 sent"]);
+    ).toEqual(["plain:Due tomorrow 23:59", "plain:4/7 done"]);
     expect(
       texts([
         { importance: "prioritized", kind: "importance" },

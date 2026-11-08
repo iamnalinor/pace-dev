@@ -219,7 +219,7 @@ in gets a row and a test that submits from it.
 |---|---|---|
 | Composer (Now) | typed line + Enter; Send; + over a typed line; + over an empty line; New task request (N, the sidebar); pasted text; a share (`/add`); the assistant's reading (parsed, rules when it is down, queued); To Inbox | `composer.test.tsx`, `now-screen.test.tsx`, `e2e/composer.e2e.ts` |
 | Task edit sheet | the task screen's Edit; the wide pane's Edit | `task-screen.test.tsx` |
-| Close / submit sheet | the row's check on Now; the task screen's Done / Submit; "Close as…" (Cancelled · Skipped); a pill; a typed date and time | `close-sheet.test.tsx`, `close-times.test.ts` |
+| Close sheet | the row's check on Now; the task screen's Done; "Close as…" (Cancelled · Skipped); a pill; a typed date and time | `close-sheet.test.tsx`, `close-times.test.ts` |
 | Day's activity sheet | a block (edit); a gap's Log; Log past; a time ahead of now or into the next block | `activity-sheet.test.tsx`, `day-screen.test.tsx` |
 | Time bar | each button's picker (Calendar, Task, Chores, Rest); the typed field + Enter or ▶; Alongside; a re-pick of what runs; Stop | `time-bar.test.tsx`, `e2e/time.e2e.ts` |
 | Assistant preview (composer, time bar, Telegram) | Approve (button, Enter); a typed correction; a tap on a question's option (`#ask <title>`: in the task line the fake model asks one question with options and one without, in the time bar "How long?"); Approve while questions are open; Escape in the line; a paste followed by Enter (one request); text with nothing to do or start; a stale option button in Telegram | `composer.test.tsx`, `time-bar.test.tsx`, `preview.test.ts`, `bot.int.test.ts`, `e2e/assistant.e2e.ts` |
