@@ -54,7 +54,7 @@ describe("historyViewModel", () => {
 
   it("shows the board at an instant and the log newest first with what can be undone", async () => {
     const world = await setupActions();
-    const [solved] = unwrap(await world.actions.markSolved(HW_ID, "s5"));
+    const [solved] = unwrap(await world.actions.markDone(HW_ID, "s5"));
     const [revoked] = unwrap(await world.actions.undoLast());
     const history = historyViewModel(world.state.store.getState(), {
       atIso: NOW,

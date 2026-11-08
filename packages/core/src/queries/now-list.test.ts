@@ -63,11 +63,11 @@ describe("nowList", () => {
     expect(item(list, RFC_ID).task.status).toBe("in_progress");
   });
 
-  it("shows Algebra HW 6 due tomorrow 23:59 · 4/7 solved · 2 sent", () => {
+  it("shows Algebra HW 6 due tomorrow 23:59 · 4/7 done", () => {
     const hw = item(list, HW_ID);
     expect(hw.project?.name).toBe("Algebra");
     expect(hw.importance).toBe("normal");
-    expect(hw).toMatchObject({ solved: 4, total: 7, submitted: 2, dueAt: HW_DUE, dueTz: MOSCOW });
+    expect(hw).toMatchObject({ done: 4, total: 7, dueAt: HW_DUE, dueTz: MOSCOW });
     expect(hw.progress).toBeCloseTo(4 / 7, 10);
     expect(hw.isLate).toBe(false);
   });
@@ -86,9 +86,8 @@ describe("nowList", () => {
   it("shows Calculus HW 5 as late with 2 problems left", () => {
     const calc = item(list, CALC_HW5_ID);
     expect(calc).toMatchObject({
-      solved: 3,
+      done: 3,
       total: 5,
-      submitted: 3,
       dueAt: CALC_HW5_DUE,
       lateMinutes: 15 * 60 + 1,
       isLate: true,

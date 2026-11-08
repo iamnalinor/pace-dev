@@ -5,7 +5,7 @@ import type { QuickTimeKey, TaskViewModel } from "@pace/client";
 import { fromWallClock, type WallClock, wallClock } from "#app/format/time.ts";
 import { taskInstantProblem } from "@pace/core";
 
-import { type CloseMode, initialMode } from "./close-model.ts";
+import type { CloseMode } from "./close-model.ts";
 
 /** A pill, or the typed date and time. */
 export type TimeChoice = "custom" | QuickTimeKey;
@@ -52,9 +52,9 @@ const typedAt = (at: null | string, task: Pick<TaskViewModel, "createdAt">): nul
 export const useCloseForm = (
   view: TaskViewModel,
   { deviceTz, now }: { readonly deviceTz: string; readonly now: string },
-  startMode?: CloseMode,
+  startMode: CloseMode = "done",
 ): CloseForm => {
-  const [mode, setMode] = useState<CloseMode>(() => startMode ?? initialMode(view));
+  const [mode, setMode] = useState<CloseMode>(startMode);
   const [choice, setChoice] = useState<TimeChoice>("now");
   const [typed, setTyped] = useState<WallClock>({ date: "", time: "" });
   const [isExact, setIsExact] = useState(true);

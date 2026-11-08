@@ -45,7 +45,7 @@ tool error (`isError: true`, explaining which scope is missing) instead of runni
 | Scope | Lets a client | Tools |
 |---|---|---|
 | `tasks:read` | see tasks, subtasks, projects, presets, the inbox and the review block | `whoami`, `list_now`, `get_task`, `list_projects`, `list_project_tasks`, `list_presets`, `list_inbox`, `list_review`, `search`, `fetch`, `search_decisions` |
-| `tasks:write` | add and change tasks, projects and presets | `create_task`, `capture_inbox`, `mark_subtasks`, `submit`, `close_task`, `reopen`, `update_task`, `set_importance`, `set_status`, `add_subtasks`, `revoke_event`, `review_action`, `seed_example_presets`, `create_preset`, `update_preset`, `archive_preset` |
+| `tasks:write` | add and change tasks, projects and presets | `create_task`, `capture_inbox`, `mark_subtasks`, `close_task`, `reopen`, `update_task`, `set_importance`, `set_status`, `add_subtasks`, `revoke_event`, `review_action`, `seed_example_presets`, `create_preset`, `update_preset`, `archive_preset` |
 | `time:read` | see the time ledger: the day's blocks and gaps, sums by category and project, the time bar's buttons, the calendar copy and app usage on every device | `list_activity_buttons`, `get_day`, `summary_time`, `get_calendar`, `get_usage`, `get_week` |
 | `time:write` | start, stop and log activities | `start_activity`, `stop_activity`, `log_activity` |
 | `analytics:read` | query the store read-only, replay the reminder rules, export the log | `describe_schema`, `query_sql`, `simulate`, `export_all` |
@@ -73,7 +73,7 @@ shows.
 |---|---|---|---|
 | `whoami` | read | the account behind the token, its scopes, the server time | — |
 | `list_now` | read | the Now list (the nearest deadline first, undated tasks after) with lateness and progress, the tasks that start later (`future`), `inboxCount` | `projectId?` |
-| `get_task` | read | one task with subtasks, closure and derived outcome, work left, the submit preview | `id` |
+| `get_task` | read | every field of the task the store keeps (start and zone, estimate, own and effective importance, description, link, sources, series, status history), subtasks with their done instants, closure and derived outcome, work left; the text answer carries the same fields as JSON | `id` |
 | `list_projects` | read | projects (active first) with the project page's open count and links | — |
 | `list_project_tasks` | read | the project page: open (by deadline), future, done with outcomes (the latest deadline first), stats | `projectId` or `projectName` |
 | `list_presets` | read | built-in and user presets, each with its own definition and the resolved settings | — |
@@ -84,8 +84,7 @@ shows.
 | `search_decisions` | read | the decision log, newest first: notifications sent or held back and LLM parses, each with `rule`, `inputs`, `outcome`, `explanation` | `taskId?`, `from?`, `to?`, `q?`, `limit?` |
 | `create_task` | write | a task; project by id or name (created on the fly); subtasks as labels or `{ label, number }`; `dueTz` defaults to the account zone | `title`, `presetId?` (default `personal`), `projectId?`/`projectName?`, `importance?`, `dueAt?`, `dueTz?`, `startAt?`, `startTz?`, `estimateMinutes?`, `subtasks?`, `description?`, `sourceText?` |
 | `capture_inbox` | write | a verbatim text into the inbox (`inbox/empty` for blank text) | `text` |
-| `mark_subtasks` | write | marks subtasks solved by id or problem number (solved ≠ submitted); already solved ones are reported, not repeated | `taskId`, `subtaskIds?` or `numbers?` |
-| `submit` | write | what the task screen's Submit does: per-subtask presets send the solved, unsubmitted problems (or the ones named) and close with the last of them; whole-submission presets submit and close as done | `taskId`, `subtaskIds?` |
+| `mark_subtasks` | write | marks subtasks done by id or problem number, at `at` (a subtask has one mark, done, with its instant; there is no separate submit since feedback 5); already done ones are reported, not repeated | `taskId`, `subtaskIds?` or `numbers?` |
 | `close_task` | write | closes with `done` (`done_late` is derived), `cancelled` or `skipped` (+ reason) | `taskId`, `outcome`, `reason?` |
 | `reopen` | write | reopens a closed task, subtasks and history kept | `taskId` |
 | `update_task` | write | only the fields given: title, description (`null` clears), deadline, start, estimate (`null` clears), preset, project (by id or name) | `taskId`, `title?`, `description?`, `dueAt?`, `dueTz?`, `startAt?`, `startTz?`, `estimateMinutes?`, `presetId?`, `projectId?`/`projectName?` |
@@ -93,7 +92,7 @@ shows.
 | `set_status` | write | `in_progress` / `paused` / `not_started` | `taskId`, `status` |
 | `add_subtasks` | write | appends subtasks and answers their ids | `taskId`, `labels` (labels or `{ label, number }`) |
 | `revoke_event` | write | undoes one event by id (the log keeps it); revoking a revocation restores the original | `eventId`, `reason?` |
-| `review_action` | write | runs a review item's action (`submit-now`, `mark-done`, `cancel`, `skip`, `keep-open`, `sort`, `confirm`, `undo`; `review/no-item`, `review/no-action` otherwise) | `taskId`, `key` |
+| `review_action` | write | runs a review item's action (`mark-done`, `cancel`, `skip`, `keep-open`, `sort`, `confirm`, `undo`; `review/no-item`, `review/no-action` otherwise) | `taskId`, `key` |
 | `seed_example_presets` | write | the three example course presets, skipping existing ones | — |
 | `create_preset` | write | a user preset extending a built-in or another user preset, validated like the web editor (`preset/exists`, `preset/unknown-parent`, `preset/invalid-definition`, …) | `id`, `name`, `extends`, `definition` |
 | `update_preset` | write | a user preset's name, parent or definition (a definition replaces the stored one); built-ins are refused | `id`, `name?`, `extends?`, `definition?` |
@@ -117,7 +116,7 @@ shows.
 Every mutating tool takes three optional inputs on top of its own:
 
 - `at` — the ISO instant the event happened; defaults to the server time. A past instant
-  records something retroactively ("I solved 3 and 4 an hour ago"); the core retro rules
+  records something retroactively ("I did 3 and 4 an hour ago"); the core retro rules
   refuse what makes no sense (`retro/before-created`, `retro/task-closed`, `retro/future`
   beyond five minutes of clock skew).
 - `precision` — `exact` (default) or `approx` when `at` is an estimate.
@@ -146,8 +145,8 @@ Claude, Cursor and the Inspector as usual.
 - "Add homework 3, 4 and 7 for Algebra due Thursday evening" → `create_task` with
   `presetId: "hw.algebra"` (or `projectName: "Algebra"`), `subtasks: ["3", "4", "7"]`,
   `dueAt` + `dueTz`.
-- "I solved 3 and 4 an hour ago" → `mark_subtasks` with `numbers: [3, 4]` and `at`.
-- "Send them" → `submit`; "mark the report done" → `close_task` or `submit`.
+- "I solved 3 and 4 an hour ago" (or "handed in") → `mark_subtasks` with `numbers: [3, 4]` and `at`.
+- "Mark the report done" → `close_task` with `outcome: "done"`.
 - "What is due first?" → `list_now` (ordered by deadline).
 - "Undo that" → `revoke_event` with the id from the previous answer.
 - "Anything to sort out?" → `list_review`, then `review_action`.
@@ -245,7 +244,7 @@ The same flow runs in workerd in `apps/api/tests/oauth.int.test.ts` (discovery, 
 the PKCE dance, refresh rotation, revocation, whitelist, scope checks, grants) and
 `apps/api/tests/mcp.int.test.ts` (initialize, tools/list, whoami, 403 for a token whose
 Telegram id is not allowed), `apps/api/tests/mcp-tools.int.test.ts` (every tool through the
-endpoint: create → pull → list_now, project on the fly, inbox, mark + submit closes,
+endpoint: create → pull → list_now, project on the fly, inbox, marks done + close,
 retroactive `at`/`precision`, search/fetch with a Cyrillic query, review, presets; and a
 contract over **every** write tool: `dryRun` writes nothing, a read-only grant is refused
 before the store, each refusal is an `isError` result starting with its Result code) and

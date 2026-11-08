@@ -73,13 +73,13 @@ const worstTasks = (language: Language): readonly GalleryTask[] => [
 const worstSubtasks = (language: Language): readonly GallerySubtask[] => [
   ...Array.from({ length: 36 }, (_, index) => ({
     id: `subtask-${String(index + 1)}`,
-    isSolved: true,
+    isDone: true,
     label: String(index + 1),
     number: index + 1,
   })),
   {
     id: "subtask-37",
-    isSolved: true,
+    isDone: true,
     label: filler(PHRASES[language], ACTION_LIMITS.subtaskLabel),
     number: null,
   },

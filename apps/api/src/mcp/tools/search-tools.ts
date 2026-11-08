@@ -108,14 +108,10 @@ const line = (label: string, value: null | number | string | undefined): readonl
 
 const box = (isDone: boolean): string => (isDone ? "[x]" : "[ ]");
 
-const subtaskLine = (item: Task["subtasks"][number]): string => {
-  const marks = [
-    ...(item.solvedAt === null ? [] : [`solved ${item.solvedAt}`]),
-    ...(item.submittedAt === null ? [] : [`submitted ${item.submittedAt}`]),
-  ];
-  const suffix = marks.length === 0 ? "" : ` (${marks.join(", ")})`;
-  return `- ${box(item.solvedAt !== null)} ${item.label}${suffix}`;
-};
+const subtaskLine = (item: Task["subtasks"][number]): string =>
+  item.doneAt === null
+    ? `- ${box(false)} ${item.label}`
+    : `- ${box(true)} ${item.label} (done ${item.doneAt})`;
 
 /** A section with a heading, or nothing when it is empty. */
 const section = (heading: string, lines: readonly string[]): readonly string[] =>

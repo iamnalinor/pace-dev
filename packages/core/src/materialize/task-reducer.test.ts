@@ -54,7 +54,7 @@ const revoke = (index: number, occurredAt: string, targetId: string): Event =>
   at(index, occurredAt, { type: "event.revoked", payload: { targetId } });
 
 describe("taskReducer: artboard scenarios", () => {
-  it("materializes Algebra HW 6 with 7 problems, 4 solved and 2 sent", () => {
+  it("materializes Algebra HW 6 with 7 problems, 4 done (2 of them sent in the old log)", () => {
     const task = hw(algebraHw6Events());
     expect(task).toMatchObject({
       id: HW_ID,
@@ -70,16 +70,15 @@ describe("taskReducer: artboard scenarios", () => {
       lastEventAt: "2026-10-06T08:00:00.000Z",
     });
     expect(task.subtasks).toHaveLength(7);
-    expect(task.subtasks.filter((item) => item.solvedAt !== null)).toHaveLength(4);
-    expect(task.subtasks.filter((item) => item.submittedAt !== null)).toHaveLength(2);
+    expect(task.subtasks.filter((item) => item.doneAt !== null)).toHaveLength(4);
+    // Solved, then sent: done at the earlier of the two marks.
     expect(task.subtasks[0]).toEqual({
       id: "s1",
       label: "Matrix rank",
       number: 1,
-      solvedAt: "2026-10-05T12:00:00.000Z",
-      submittedAt: "2026-10-05T13:00:00.000Z",
+      doneAt: "2026-10-05T12:00:00.000Z",
     });
-    expect(task.subtasks[6]).toMatchObject({ id: "s7", number: null, solvedAt: null });
+    expect(task.subtasks[6]).toMatchObject({ id: "s7", number: null, doneAt: null });
     expect(progressOf(task, "subtasks")).toBeCloseTo(4 / 7, 10);
   });
 
@@ -239,9 +238,9 @@ describe("taskReducer: status", () => {
 });
 
 describe("taskReducer: subtasks", () => {
-  it("sets solvedAt once and keeps the first solve", () => {
+  it("sets doneAt once and keeps the first mark", () => {
     const task = hw([hwCreated(1), solved(2, T(9), "s3"), solved(3, T(10), "s3")]);
-    expect(task.subtasks[2]?.solvedAt).toBe(T(9));
+    expect(task.subtasks[2]?.doneAt).toBe(T(9));
     const state = fold([hwCreated(1), solved(2, T(9), "s3")]);
     const again = solved(3, T(10), "s3");
     const unknown = solved(4, T(10), "nope");
@@ -256,7 +255,7 @@ describe("taskReducer: subtasks", () => {
       revoke(3, T(10), solved(2, T(9), "s1").id),
     ];
     const task = hw(events);
-    expect(task.subtasks[0]?.solvedAt).toBeNull();
+    expect(task.subtasks[0]?.doneAt).toBeNull();
     expect(task.status).toBe("not_started");
     expect(task.touched).toBe(false);
   });
@@ -278,8 +277,7 @@ describe("taskReducer: subtasks", () => {
       id: "s8",
       label: "Extra",
       number: null,
-      solvedAt: null,
-      submittedAt: null,
+      doneAt: null,
     });
     const state = fold([hwCreated(1)]);
     const onlyDup = at(3, T(9), {
@@ -290,21 +288,23 @@ describe("taskReducer: subtasks", () => {
   });
 });
 
-describe("taskReducer: submission", () => {
-  it("marks only solved subtasks as submitted, keeping the first submission time", () => {
+describe("taskReducer: submission (old logs: one done mark since feedback 5)", () => {
+  it("reads a solved or a sent subtask as done, at the earlier of its marks", () => {
     const task = hw([
       hwCreated(1),
       solved(2, T(9), "s1"),
       submitted(3, T(10), { subtaskIds: ["s1", "s2"] }),
       submitted(4, T(11), { subtaskIds: ["s1"] }),
+      solved(5, T(12), "s2"),
     ]);
-    expect(task.subtasks[0]?.submittedAt).toBe(T(10));
-    expect(task.subtasks[1]?.submittedAt).toBeNull();
+    expect(task.subtasks[0]?.doneAt).toBe(T(9));
+    expect(task.subtasks[1]?.doneAt).toBe(T(10));
+    expect(task.subtasks[2]?.doneAt).toBeNull();
     expect(task.submittedAt).toBeNull();
     expect(task.closed).toBeNull();
-    const state = fold([hwCreated(1)]);
-    const unsolved = submitted(5, T(12), { subtaskIds: ["s2"] });
-    expect(taskReducer(state, unsolved)).toBe(state);
+    const state = fold([hwCreated(1), solved(2, T(9), "s1")]);
+    const again = submitted(5, T(12), { subtaskIds: ["s1"] });
+    expect(taskReducer(state, again)).toBe(state);
   });
 
   it("closes the task as done in the same event when closes is set", () => {

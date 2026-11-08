@@ -4,18 +4,13 @@ import type { PresetError } from "../presets/resolve-preset.ts";
 import type { QueryContext } from "./context.ts";
 
 import { type Project, projectById } from "../model/project.ts";
-import { isOpen, progressOf, type Task, taskById, type TaskStatus } from "../model/task.ts";
+import { progressOf, type Task, taskById, type TaskStatus } from "../model/task.ts";
 import { err, ok, type Result } from "../result.ts";
 import { zonesDiffer } from "../time.ts";
 import { taskTrackedMinutes } from "../tracking/insights.ts";
 import { importanceOf, presetOf } from "./classify.ts";
 
-/** What the Submit / Done button will do: send the solved problems, or close the whole task. */
-export type SubmitPreview =
-  | { readonly kind: "per_subtask"; readonly subtaskIds: readonly string[] }
-  | { readonly kind: "whole"; readonly canClose: boolean };
-
-/** The task screen: the stats card and the submit preview. */
+/** The task screen: the stats card. */
 export type TaskView = {
   readonly task: Task;
   readonly preset: ResolvedPreset;
@@ -28,18 +23,7 @@ export type TaskView = {
   readonly trackedMinutes: number;
   /** The due date was set in a zone whose offset differs from the device's. */
   readonly dueZoneDiffers: boolean;
-  readonly submitPreview: SubmitPreview;
 };
-
-const submitPreviewOf = (task: Task, preset: ResolvedPreset): SubmitPreview =>
-  preset.submission === "per_subtask"
-    ? {
-        kind: "per_subtask",
-        subtaskIds: task.subtasks
-          .filter((item) => item.solvedAt !== null && item.submittedAt === null)
-          .map((item) => item.id),
-      }
-    : { kind: "whole", canClose: isOpen(task) };
 
 /** The task's own estimate, else the preset's default. */
 export const estimateMinutesOf = (task: Task, preset: ResolvedPreset): number =>
@@ -74,6 +58,5 @@ export const taskView = (
     ),
     trackedMinutes: taskTrackedMinutes(state, task.id, ctx.now),
     dueZoneDiffers: isDueZoneDifferent(task, ctx.deviceTz),
-    submitPreview: submitPreviewOf(task, preset.value),
   });
 };

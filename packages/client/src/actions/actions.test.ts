@@ -438,28 +438,52 @@ describe("deleteTask", () => {
 });
 
 describe("subtasks", () => {
-  it("marks a subtask solved at the given instant and unmarks it by revoking", async () => {
+  it("marks a subtask done at the given instant and unmarks it by revoking", async () => {
     const world = await setupActions();
     const [solved] = unwrap(
-      await world.actions.markSolved(HW_ID, "s5", { at: HOUR_AGO, precision: "approx" }),
+      await world.actions.markDone(HW_ID, "s5", { at: HOUR_AGO, precision: "approx" }),
     );
+    // The one done mark is the `task.subtask.solved` event, at the instant given (feedback 5).
+    expect(solved?.type).toBe("task.subtask.solved");
     expect(solved !== undefined && envelope(solved)).toEqual({
       occurredAt: HOUR_AGO,
       precision: "approx",
       source: "web",
     });
-    expect(taskOf(world, HW_ID)?.subtasks.find((item) => item.id === "s5")?.solvedAt).toBe(
-      HOUR_AGO,
-    );
-    const [revoked] = unwrap(await world.actions.unmarkSolved(HW_ID, "s5"));
+    expect(taskOf(world, HW_ID)?.subtasks.find((item) => item.id === "s5")?.doneAt).toBe(HOUR_AGO);
+    const [revoked] = unwrap(await world.actions.unmarkDone(HW_ID, "s5"));
     expect(revoked?.type === "event.revoked" && revoked.payload.targetId).toBe(solved?.id);
-    expect(taskOf(world, HW_ID)?.subtasks.find((item) => item.id === "s5")?.solvedAt).toBeNull();
-    await expect(world.actions.unmarkSolved(HW_ID, "s5")).resolves.toEqual({
+    expect(taskOf(world, HW_ID)?.subtasks.find((item) => item.id === "s5")?.doneAt).toBeNull();
+    await expect(world.actions.unmarkDone(HW_ID, "s5")).resolves.toEqual({
       error: "action/nothing-to-do",
       ok: false,
     });
-    await expect(world.actions.markSolved(HW_ID, "s9")).resolves.toEqual({
+    await expect(world.actions.markDone(HW_ID, "s9")).resolves.toEqual({
       error: "subtask/unknown",
+      ok: false,
+    });
+  });
+
+  it("unmarks a subtask an old log also sent: its solve revoked, the send amended to leave it out", async () => {
+    const world = await setupActions();
+    const doneAt = (id: string) =>
+      taskOf(world, HW_ID)?.subtasks.find((item) => item.id === id)?.doneAt ?? null;
+    // The fixture's old log: s1 and s2 solved, then sent together in one `task.submitted`.
+    expect(doneAt("s1")).not.toBeNull();
+    expect(doneAt("s2")).not.toBeNull();
+    const written = unwrap(await world.actions.unmarkDone(HW_ID, "s1"));
+    expect(written.map((event) => event.type)).toEqual(
+      expect.arrayContaining(["event.amended", "event.revoked"]),
+    );
+    expect(written).toHaveLength(2);
+    expect(doneAt("s1")).toBeNull();
+    // The other subtask of the same send stays done.
+    expect(doneAt("s2")).not.toBeNull();
+    // Its only send left: that send is revoked as well.
+    unwrap(await world.actions.unmarkDone(HW_ID, "s2"));
+    expect(doneAt("s2")).toBeNull();
+    await expect(world.actions.unmarkDone(HW_ID, "s2")).resolves.toEqual({
+      error: "action/nothing-to-do",
       ok: false,
     });
   });
@@ -482,7 +506,7 @@ describe("subtasks", () => {
 });
 
 describe("removing a subtask", () => {
-  it("takes an unsent subtask off the task; a sent or unknown one stays", async () => {
+  it("takes a subtask off the task, a done one too; an unknown one is refused", async () => {
     const world = await setupActions();
     const [removed] = unwrap(await world.actions.removeSubtask(HW_ID, "s7"));
     expect(removed?.type).toBe("task.subtask.removed");
@@ -491,70 +515,19 @@ describe("removing a subtask", () => {
       error: "subtask/unknown",
       ok: false,
     });
-    await expect(world.actions.removeSubtask(HW_ID, "s1")).resolves.toEqual({
-      error: "subtask/submitted",
-      ok: false,
-    });
-  });
-});
-
-describe("submit", () => {
-  it("sends the solved subtasks by default and closes with the last ones", async () => {
-    const world = await setupActions();
-    const [partial] = unwrap(await world.actions.submit({ taskId: HW_ID }));
-    expect(partial?.type === "task.submitted" && partial.payload).toEqual({
-      subtaskIds: ["s3", "s4"],
-      taskId: HW_ID,
-    });
-    expect(taskOf(world, HW_ID)?.closed).toBeNull();
-    for (const id of ["s5", "s6", "s7"]) {
-      unwrap(await world.actions.markSolved(HW_ID, id));
-    }
-    const [last] = unwrap(await world.actions.submit({ at: HOUR_AGO, taskId: HW_ID }));
-    expect(last?.type === "task.submitted" && last.payload).toEqual({
-      closes: true,
-      subtaskIds: ["s5", "s6", "s7"],
-      taskId: HW_ID,
-    });
-    expect(taskOf(world, HW_ID)?.closed).toMatchObject({ at: HOUR_AGO, outcome: "done" });
-  });
-
-  it("submits a whole task without ids and closes it", async () => {
-    const world = await setupActions();
-    const [sent] = unwrap(await world.actions.submit({ taskId: TRK_ID }));
-    expect(sent?.type === "task.submitted" && sent.payload).toEqual({
-      closes: true,
-      taskId: TRK_ID,
-    });
-    expect(taskOf(world, TRK_ID)?.closed?.outcome).toBe("done");
-  });
-
-  it("refuses when there is nothing to send", async () => {
-    const world = await setupActions();
-    await expect(world.actions.submit({ subtaskIds: ["s1"], taskId: HW_ID })).resolves.toEqual({
-      error: "retro/nothing-to-submit",
-      ok: false,
-    });
-    await expect(world.actions.submit({ taskId: CALC_HW5_ID })).resolves.toEqual({
-      error: "action/nothing-to-do",
-      ok: false,
-    });
+    unwrap(await world.actions.removeSubtask(HW_ID, "s1"));
+    expect(taskOf(world, HW_ID)?.subtasks.map((item) => item.id)).not.toContain("s1");
   });
 });
 
 describe("closing and reopening", () => {
-  it("closes or submits once when tapped twice at the same moment", async () => {
+  it("closes once when tapped twice at the same moment", async () => {
     const world = await setupActions();
     const closes = await Promise.all([
       world.actions.closeTask({ outcome: "done", taskId: TRK_ID }),
       world.actions.closeTask({ outcome: "done", taskId: TRK_ID }),
     ]);
     expect(closes.map((result) => result.ok)).toEqual([true, false]);
-    const sends = await Promise.all([
-      world.actions.submit({ taskId: HW_ID }),
-      world.actions.submit({ taskId: HW_ID }),
-    ]);
-    expect(sends.map((result) => result.ok)).toEqual([true, false]);
   });
 
   it("closes with an outcome and a reason, then reopens", async () => {
@@ -567,7 +540,7 @@ describe("closing and reopening", () => {
       reason: "moved",
       taskId: RFC_ID,
     });
-    await expect(world.actions.markSolved(RFC_ID, "x")).resolves.toEqual({
+    await expect(world.actions.markDone(RFC_ID, "x")).resolves.toEqual({
       error: "retro/task-closed",
       ok: false,
     });
@@ -1005,7 +978,7 @@ describe("settings", () => {
 describe("undo", () => {
   it("revokes by id and undoes the latest own event", async () => {
     const world = await setupActions();
-    const [solved] = unwrap(await world.actions.markSolved(HW_ID, "s5"));
+    const [solved] = unwrap(await world.actions.markDone(HW_ID, "s5"));
     const [undone] = unwrap(await world.actions.undoLast());
     expect(undone?.type === "event.revoked" && undone.payload.targetId).toBe(solved?.id);
     await expect(world.actions.revoke("missing")).resolves.toEqual({

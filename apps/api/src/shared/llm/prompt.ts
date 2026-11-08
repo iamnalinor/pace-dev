@@ -40,7 +40,7 @@ Rules:
 - category: for a task an id from Categories, for an activity one of ${ACTIVITY_CATEGORIES.join(", ")}; null when unsure.
 - project: only a name from Projects below; null if the requested project is not in the list. Never propose a new project. importance only when the message says it.
 - link: a web address the message gives, verbatim.
-- task.update: only the fields that change; clear lists what to empty; subtasks to add, subtaskRefs (label or number) to remove, renames. task.markSubtasks: subtaskRefs solved. task.close: outcome.
+- task.update: only the fields that change; clear lists what to empty; subtasks to add, subtaskRefs (label or number) to remove, renames. task.markSubtasks: subtaskRefs to mark done (a subtask has one mark, done: solved, submitted, sent and handed in all mean done). task.close: outcome.
 - activity.log: time already spent, with start and end. activity.start: going on now (start only when it began earlier; expectMinutes when a length is said). activity.update: start, end, label or category. label: 2–4 words in the message's language. Times are "YYYY-MM-DD HH:MM" on the clock below.
 - Never invent numbers, dates or times. For dueDate, dueTime, estimateMinutes, expectMinutes, start and end add an evidence entry quoting the exact words they come from.
 - When something is ambiguous, ask in questions with options, in the interface language.`;

@@ -58,19 +58,19 @@ const lateness = (at: string, dueAt: null | string): "done" | "done_late" =>
   dueAt !== null && isAfter(at, dueAt) ? "done_late" : "done";
 
 export const subtaskOutcome = (subtask: Subtask, dueAt: null | string): SubtaskOutcome =>
-  subtask.submittedAt === null ? "pending" : lateness(subtask.submittedAt, dueAt);
+  subtask.doneAt === null ? "pending" : lateness(subtask.doneAt, dueAt);
 
 /**
-Per-subtask submission: the submitted problems decide, and the ones still unsubmitted
-when the task was closed as done were simply not needed. Whole submission (or a
-per-subtask task without problems) goes by the closing instant.
+Per-subtask submission: the done problems decide (each by when it was done), and the ones
+still open when the task was closed as done were simply not needed. Whole submission (or a
+per-subtask task without problems, or with none done) goes by the closing instant.
 */
 const doneOutcome = (
   task: Task,
   closedAt: string,
   preset: ResolvedPreset,
 ): "done" | "done_late" => {
-  if (preset.submission === "per_subtask" && task.subtasks.length > 0) {
+  if (preset.submission === "per_subtask" && task.subtasks.some((item) => item.doneAt !== null)) {
     const isLate = task.subtasks.some((item) => subtaskOutcome(item, task.dueAt) === "done_late");
     return isLate ? "done_late" : "done";
   }

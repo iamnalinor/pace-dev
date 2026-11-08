@@ -94,7 +94,7 @@ export const ModelActionSchema = z.strictObject({
   link: z.string().max(2000).nullable(),
   /** Subtasks to add (a create's, an edit's or an add's). */
   subtasks: z.array(ParsedSubtaskSchema).max(100),
-  /** Existing subtasks by label or number: to mark solved, or (an edit) to remove. */
+  /** Existing subtasks by label or number: to mark done, or (an edit) to remove. */
   subtaskRefs: z.array(SubtaskNameSchema).max(100),
   /** An edit's renamed subtasks: the existing one by label or number, its new label. */
   renames: z.array(RenameSchema).max(50),

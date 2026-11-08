@@ -52,11 +52,8 @@ const closure = (outcome: Closure["outcome"], when: string): Closure => ({
 const closedTask = (outcome: Closure["outcome"], when: string, patch: Partial<Task> = {}): Task =>
   taskFixture({ closed: closure(outcome, when), ...patch });
 
-const sent = (id: string, when: null | string) => ({
-  ...subtask(id, id),
-  solvedAt: when ?? BEFORE,
-  submittedAt: when,
-});
+/** A subtask done at `when`, or still open (`null`). */
+const sent = (id: string, when: null | string) => ({ ...subtask(id, id), doneAt: when });
 
 const fold = (events: readonly Event[]): TasksState =>
   materialize(events, taskReducer, INITIAL_TASKS_STATE);
@@ -165,7 +162,7 @@ describe("finalDeadlineOf", () => {
 });
 
 describe("subtaskOutcome", () => {
-  it("is pending until submitted, then on time or late by the submission instant", () => {
+  it("is pending until done, then on time or late by the instant it was done", () => {
     expect(subtaskOutcome(sent("s1", null), HW_DUE)).toBe("pending");
     expect(subtaskOutcome(sent("s1", BEFORE), HW_DUE)).toBe("done");
     expect(subtaskOutcome(sent("s1", HW_DUE), HW_DUE)).toBe("done");
@@ -192,7 +189,7 @@ describe("taskOutcome: the spec table", () => {
     expect(taskOutcome(closedTask("done", AFTER, { dueAt: null, dueTz: null }), WORK)).toBe("done");
   });
 
-  it("derives per-subtask outcomes from the submissions", () => {
+  it("derives per-subtask outcomes from the done marks", () => {
     const onTime = closedTask("done", AFTER, {
       subtasks: [sent("s1", BEFORE), sent("s2", BEFORE)],
     });
@@ -203,16 +200,19 @@ describe("taskOutcome: the spec table", () => {
     expect(taskOutcome(someLate, HW)).toBe("done_late");
   });
 
-  it("ignores unsubmitted subtasks when the task was closed as done", () => {
+  it("ignores subtasks left open when the task was closed as done", () => {
     const left = closedTask("done", AFTER, { subtasks: [sent("s1", BEFORE), sent("s2", null)] });
     expect(taskOutcome(left, HW)).toBe("done");
     const leftLate = closedTask("done", AFTER, { subtasks: [sent("s1", AFTER), sent("s2", null)] });
     expect(taskOutcome(leftLate, HW)).toBe("done_late");
   });
 
-  it("falls back to the closing instant for a per-subtask task without subtasks", () => {
+  it("falls back to the closing instant for a per-subtask task without done subtasks", () => {
     expect(taskOutcome(closedTask("done", AFTER), HW)).toBe("done_late");
     expect(taskOutcome(closedTask("done", BEFORE), HW)).toBe("done");
+    const noneDone = { subtasks: [sent("s1", null), sent("s2", null)] };
+    expect(taskOutcome(closedTask("done", AFTER, noneDone), HW)).toBe("done_late");
+    expect(taskOutcome(closedTask("done", BEFORE, noneDone), HW)).toBe("done");
   });
 
   it("keeps late as late under a resubmission policy", () => {

@@ -55,8 +55,7 @@ const subtaskRows = (task: Task): readonly SubtaskRow[] =>
     id: item.id,
     label: item.label,
     number: item.number,
-    solvedAt: item.solvedAt,
-    submittedAt: item.submittedAt,
+    doneAt: item.doneAt,
     taskId: task.id,
   }));
 

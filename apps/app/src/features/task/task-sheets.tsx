@@ -308,7 +308,7 @@ export const EditTaskSheet = ({
           .filter((subtask) => !removed.includes(subtask.id))
           .map((subtask) => ({
             id: subtask.id,
-            isSent: subtask.submittedAt !== null,
+            isDone: subtask.doneAt !== null,
             label: subtask.label,
           }))}
         onChange={setAdded}

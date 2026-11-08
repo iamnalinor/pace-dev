@@ -187,9 +187,7 @@ describe("NowBoard", () => {
       "Mark RFC: dedicated runner pool done",
       "Mark Return library books done",
     ]);
-    expect(
-      screen.getByText("Due tomorrow 23:59 · 1d 8h left · 4/7 solved · 2 sent"),
-    ).toBeOnTheScreen();
+    expect(screen.getByText("Due tomorrow 23:59 · 1d 8h left · 4/7 done")).toBeOnTheScreen();
     // The project (else the category) is a tag and a non-Normal importance a word; Normal says nothing.
     expect(screen.getAllByText("ASAP").length).toBeGreaterThan(0);
     expect(screen.queryByText("Normal")).not.toBeOnTheScreen();
@@ -344,12 +342,20 @@ describe("NowBoard", () => {
     }
   });
 
-  it("opens the submit sheet for a per-subtask task instead of closing it", async () => {
-    const runtime = await createTestRuntime();
-    await renderScreen(<Board />, runtime);
-    await fireEvent.press(screen.getByRole("checkbox", { name: "Mark Algebra HW 6 done" }));
-    expect(router.push).toHaveBeenCalledWith(`/task/${HW_ID}?close=1`);
-    expect(runtime.state.store.getState().tasks.byId[HW_ID]?.closed).toBeNull();
+  it("closes a per-subtask task as done from its check, like any other (no submit sheet)", async () => {
+    jest.useFakeTimers();
+    try {
+      const runtime = await createTestRuntime();
+      await renderScreen(<Board />, runtime);
+      await fireEvent.press(screen.getByRole("checkbox", { name: "Mark Algebra HW 6 done" }));
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(DISSOLVE_MS + 50);
+      });
+      expect(router.push).not.toHaveBeenCalled();
+      expect(runtime.state.store.getState().tasks.byId[HW_ID]?.closed?.outcome).toBe("done");
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("filters by project and folds the tasks that start later under In future", async () => {

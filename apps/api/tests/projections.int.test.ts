@@ -78,7 +78,7 @@ describe("projections", () => {
         touched: true,
       });
       const subtasks = await instance.db.select().from(schema.subtasks);
-      expect(subtasks.map((row) => [row.id, row.number, row.solvedAt])).toEqual([
+      expect(subtasks.map((row) => [row.id, row.number, row.doneAt])).toEqual([
         ["s1", 1, SOLVED_AT],
         ["s2", 2, null],
       ]);
@@ -106,7 +106,7 @@ describe("projections", () => {
       await instance.append([taskCreated(taskId), solve], { now: NOW });
       await instance.append([envelope("event.revoked", { targetId: solve["id"] })], { now: NOW });
       const rows = await instance.db.select().from(schema.subtasks);
-      expect(rows.find((row) => row.id === "s1")?.solvedAt).toBeNull();
+      expect(rows.find((row) => row.id === "s1")?.doneAt).toBeNull();
       const [task] = await instance.db.select().from(schema.tasks);
       expect(task?.progress).toBe(0);
     });

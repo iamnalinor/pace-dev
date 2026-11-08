@@ -50,7 +50,7 @@ const taskSheet = (state: CoreState, now: string): ExportSheet => ({
 });
 
 const subtaskSheet = (state: CoreState): ExportSheet => ({
-  columns: ["taskId", "task", "number", "label", "solvedAt", "submittedAt"],
+  columns: ["taskId", "task", "number", "label", "doneAt"],
   name: "subtasks",
   rows: Object.values(state.tasks.byId).flatMap((task) =>
     task.subtasks.map((subtask) => [
@@ -58,8 +58,7 @@ const subtaskSheet = (state: CoreState): ExportSheet => ({
       task.title,
       subtask.number,
       subtask.label,
-      subtask.solvedAt,
-      subtask.submittedAt,
+      subtask.doneAt,
     ]),
   ),
 });

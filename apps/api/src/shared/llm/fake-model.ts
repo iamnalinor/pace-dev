@@ -196,7 +196,7 @@ const list = (text: string): readonly string[] =>
 /**
 What the fake understands besides a plain message, so tests and e2e can ask for every kind of
 action: "delete task <title>", "close task <title>", "rename task <title> to <new>",
-"add to <title>: a, b", "solved in <title>: 1, 2", "delete activity <label>",
+"add to <title>: a, b", "done in <title>: 1, 2" (or "solved in"), "delete activity <label>",
 "rename activity <label> to <new>". Names match the lists in the prompt.
 */
 const COMMANDS: readonly Command[] = [
@@ -226,7 +226,7 @@ const COMMANDS: readonly Command[] = [
       }),
   },
   {
-    pattern: /^solved in (.+): (.+)$/iu,
+    pattern: /^(?:done|solved) in (.+): (.+)$/iu,
     read: (match, system) =>
       taskAction(system, match[1] ?? "", {
         kind: "task.markSubtasks",

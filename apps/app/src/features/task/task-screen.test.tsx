@@ -47,29 +47,31 @@ describe("TaskScreen — homework", () => {
     expect(screen.getByText("1h 43m")).toBeOnTheScreen();
     expect(screen.getByText(en("task.start"))).toBeOnTheScreen();
     expect(screen.queryByText(/of window gone/u)).toBeNull();
-    expect(screen.getByText(en("task.subtasksSummary", { sent: 2, solved: 4 }))).toBeOnTheScreen();
-    expect(screen.getByRole("checkbox", { name: "Kronecker–Capelli" })).toBeOnTheScreen();
-    expect(screen.getByRole("checkbox", { name: "Matrix rank" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Submit 3 and 4" })).toBeOnTheScreen();
+    expect(screen.getByText(en("task.subtasksSummary", { done: 4, total: 7 }))).toBeOnTheScreen();
+    expect(screen.getByRole("checkbox", { name: "Kronecker–Capelli" })).not.toBeChecked();
+    // Solved, then sent in the old log: one mark, done, at the earlier time (feedback 5).
+    expect(screen.getByRole("checkbox", { name: "Matrix rank" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Matrix rank" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: en("task.done") })).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: /^Submit/u })).toBeNull();
   });
 
-  it("marks a subtask solved on Space, and leaves a sent one as it is (a disabled control gets no action)", async () => {
+  it("marks a subtask done on Space and takes a done one back, sent in the old log or not", async () => {
     const runtime = await hwScreen();
-    const solved = () => screen.getByText(en("task.subtasksSummary", { sent: 2, solved: 4 }));
-    expect(solved()).toBeOnTheScreen();
-    // Control: Space on a pending subtask is a press.
+    const summary = (done: number) =>
+      screen.getByText(en("task.subtasksSummary", { done, total: 7 }));
+    expect(summary(4)).toBeOnTheScreen();
     await pressSpace(screen.getByRole("checkbox", { name: "Kronecker–Capelli" }));
     await waitFor(() => {
-      expect(
-        screen.getByText(en("task.subtasksSummary", { sent: 2, solved: 5 })),
-      ).toBeOnTheScreen();
+      expect(summary(5)).toBeOnTheScreen();
     });
-    // A sent subtask is disabled: Space must not revoke its mark.
-    const unmark = jest.spyOn(runtime.actions, "unmarkSolved");
-    const mark = jest.spyOn(runtime.actions, "markSolved");
+    // One mark, done: a subtask the old log also sent is a checkbox like any other (feedback 5).
+    const unmark = jest.spyOn(runtime.actions, "unmarkDone");
     await pressSpace(screen.getByRole("checkbox", { name: "Matrix rank" }));
-    expect(unmark).not.toHaveBeenCalled();
-    expect(mark).not.toHaveBeenCalled();
+    expect(unmark).toHaveBeenCalledWith(HW_ID, "s1");
+    await waitFor(() => {
+      expect(summary(4)).toBeOnTheScreen();
+    });
   });
 
   it("focuses on the task from the footer and stops again", async () => {
@@ -104,7 +106,7 @@ describe("TaskScreen — homework", () => {
     expect(screen.queryByRole("button", { name: "Focusing" })).toBeNull();
   });
 
-  it("toggles a subtask solved and back", async () => {
+  it("toggles a subtask done, shows when, and takes it back; Done stays the one action", async () => {
     const runtime = await hwScreen();
     const subtask = screen.getByRole("checkbox", { name: "Kronecker–Capelli" });
     expect(subtask).not.toBeChecked();
@@ -112,13 +114,16 @@ describe("TaskScreen — homework", () => {
     await waitFor(() => {
       expect(screen.getByRole("checkbox", { name: "Kronecker–Capelli" })).toBeChecked();
     });
-    expect(screen.getByRole("button", { name: "Submit 3, 4 and 5" })).toBeOnTheScreen();
+    // Marked now (the test clock): its day and time beside it, and no "Submit N" anywhere.
+    expect(screen.getByText(en("task.subtaskDoneAt", { when: "Wed 12:50" }))).toBeOnTheScreen();
+    expect(screen.queryByText(/^Submit/u)).toBeNull();
+    expect(screen.getByRole("button", { name: en("task.done") })).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("checkbox", { name: "Kronecker–Capelli" }));
     await waitFor(() => {
       expect(screen.getByRole("checkbox", { name: "Kronecker–Capelli" })).not.toBeChecked();
     });
     const task = runtime.state.store.getState().tasks.byId[HW_ID];
-    expect(task?.subtasks.find((item) => item.id === "s5")?.solvedAt).toBeNull();
+    expect(task?.subtasks.find((item) => item.id === "s5")?.doneAt).toBeNull();
   });
 
   it("goes back, and moves the task to another project from the header chip", async () => {
@@ -223,12 +228,13 @@ describe("TaskScreen — editing subtasks", () => {
     });
   });
 
-  it("takes an unsent subtask off in the editor; a sent one has no remove", async () => {
+  it("takes a subtask off in the editor, a done one too (History brings it back)", async () => {
     const runtime = await hwScreen();
     await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
+    // A done one says so beside its remove (feedback 5: no "sent" record keeps it on).
     expect(
-      screen.queryByRole("button", { name: en("form.removeSubtask", { label: "Matrix rank" }) }),
-    ).toBeNull();
+      screen.getByRole("button", { name: en("form.removeSubtask", { label: "Matrix rank" }) }),
+    ).toBeOnTheScreen();
     await fireEvent.press(
       screen.getByRole("button", {
         name: en("form.removeSubtask", { label: "Kronecker–Capelli" }),

@@ -40,7 +40,7 @@ describe.each(LANGUAGES)("galleryData in %s", (language) => {
       expect(project.name.length).toBeLessThanOrEqual(ACTION_LIMITS.projectName);
     }
     expect(worst.subtasks).toHaveLength(37);
-    expect(worst.subtasks.every((subtask) => subtask.isSolved)).toBe(true);
+    expect(worst.subtasks.every((subtask) => subtask.isDone)).toBe(true);
     expect(Math.max(...worst.subtasks.map((subtask) => subtask.label.length))).toBe(
       ACTION_LIMITS.subtaskLabel,
     );

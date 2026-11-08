@@ -5,7 +5,6 @@ import {
   extractLink,
   finalDeadlineOf,
   type Importance,
-  type Language,
   linkHost,
   type Outcome,
   presetById,
@@ -17,8 +16,6 @@ import {
   type RepeatRule,
   type Result,
   type Submission,
-  type SubmitPreview,
-  t,
   type Task,
   taskOutcome,
   taskRepeatRule,
@@ -35,21 +32,20 @@ export type TaskTag =
   | { readonly kind: "status"; readonly status: TaskStatus }
   | { readonly kind: "submission"; readonly submission: Submission };
 
-export type SubtaskState = "pending" | "solved" | "submitted";
+/** One mark per subtask since feedback 5: done (with its instant) or not yet. */
+export type SubtaskState = "done" | "pending";
 
 export type SubtaskRow = {
   readonly id: string;
   readonly number: null | number;
   readonly label: string;
   readonly state: SubtaskState;
-  readonly solvedAt: null | string;
-  readonly submittedAt: null | string;
+  /** When it was done; `null` while pending. */
+  readonly doneAt: null | string;
 };
 
-export type PrimaryAction =
-  | { readonly kind: "done" }
-  | { readonly kind: "none" }
-  | { readonly kind: "submit"; readonly subtaskIds: readonly string[] };
+/** The footer's primary button: Done closes an open task; a closed one has none. */
+export type PrimaryAction = { readonly kind: "done" } | { readonly kind: "none" };
 
 /** What the override sheet edits: the effective values and whether the task set them itself. */
 export type OverrideSheet = {
@@ -134,13 +130,6 @@ export type TaskViewModel = {
   readonly outcome: null | Outcome;
 };
 
-const subtaskState = (solvedAt: null | string, submittedAt: null | string): SubtaskState => {
-  if (submittedAt !== null) {
-    return "submitted";
-  }
-  return solvedAt === null ? "pending" : "solved";
-};
-
 const tags = (view: TaskView, outcome: null | Outcome): readonly TaskTag[] => [
   { kind: "importance", importance: view.importance },
   // A closed task shows how it ended, not the status it had while open.
@@ -151,14 +140,9 @@ const tags = (view: TaskView, outcome: null | Outcome): readonly TaskTag[] => [
     : []),
 ];
 
-const primaryAction = (preview: SubmitPreview): PrimaryAction => {
-  if (preview.kind === "per_subtask") {
-    return preview.subtaskIds.length === 0
-      ? { kind: "none" }
-      : { kind: "submit", subtaskIds: preview.subtaskIds };
-  }
-  return { kind: preview.canClose ? "done" : "none" };
-};
+const primaryAction = (task: Task): PrimaryAction => ({
+  kind: task.closed === null ? "done" : "none",
+});
 
 const overrideSheet = (state: CoreState, view: TaskView): OverrideSheet => {
   const { task, preset } = view;
@@ -197,9 +181,8 @@ const subtaskRows = (task: Task): readonly SubtaskRow[] =>
     id: item.id,
     number: item.number,
     label: item.label,
-    state: subtaskState(item.solvedAt, item.submittedAt),
-    solvedAt: item.solvedAt,
-    submittedAt: item.submittedAt,
+    state: item.doneAt === null ? "pending" : "done",
+    doneAt: item.doneAt,
   }));
 
 const normalized = (text: string): string => text.trim().replaceAll(/\s+/gu, " ").toLowerCase();
@@ -251,38 +234,11 @@ export const taskViewModel = (
         slider: task.slider,
       },
       subtasks: subtaskRows(task),
-      primaryAction: primaryAction(view.submitPreview),
+      primaryAction: primaryAction(task),
       quickTimes: quickTimes({ deviceTz: ctx.deviceTz, now: () => ctx.now }, task),
       overrideSheet: overrideSheet(state, view),
       closed: task.closed,
       outcome: taskOutcome(task, preset),
     },
   };
-};
-
-/** Most subtasks whose names the submit button spells out; more are counted. */
-const SUBMIT_NAMES_MAX = 3;
-/** Most characters of the joined names on the button: it is one line at half a phone's width. */
-const SUBMIT_NAMES_FIT = 14;
-
-/**
-The submit button's words (F-DAT-01): the sent subtasks' names when up to three short ones read
-on one line ("Submit 290 and 292"), otherwise their count ("Submit 37"). A button's label is
-chrome, so a label from data never sets its length.
-*/
-export const submitLabel = (view: TaskViewModel, language: Language): string => {
-  const ids = view.primaryAction.kind === "submit" ? new Set(view.primaryAction.subtaskIds) : null;
-  const names = view.subtasks
-    .filter((subtask) => ids?.has(subtask.id) === true)
-    .map((subtask) => (subtask.number === null ? subtask.label : String(subtask.number)));
-  const last = names.at(-1);
-  const joined =
-    last === undefined || names.length === 1
-      ? (last ?? "")
-      : `${names.slice(0, -1).join(", ")} ${t(language, "common.and")} ${last}`;
-  const isSpelledOut =
-    names.length > 0 && names.length <= SUBMIT_NAMES_MAX && joined.length <= SUBMIT_NAMES_FIT;
-  return t(language, "task.submitSubtasks", {
-    subtasks: isSpelledOut ? joined : String(names.length),
-  });
 };

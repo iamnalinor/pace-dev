@@ -22,6 +22,8 @@ export type MetaPart =
   /** How long an undated task has been open. */
   | { readonly kind: "age"; readonly minutes: number }
   /** Paused by the person: shown so a paused task does not look like the others. */
+  | { readonly kind: "done"; readonly done: number; readonly total: number }
+  /** The hard end of a two-stage deadline, once the main due date is behind and it is not. */
   | {
       readonly kind: "due";
       readonly at: string;
@@ -30,20 +32,17 @@ export type MetaPart =
       /** The due was set in a zone whose offset differs from the device's: show both times. */
       readonly zoneDiffers: boolean;
     }
-  /** The hard end of a two-stage deadline, once the main due date is behind and it is not. */
-  | { readonly kind: "final"; readonly at: string; readonly tz: string }
   /** Past the main due date and the final deadline too. */
+  | { readonly kind: "final"; readonly at: string; readonly tz: string }
   | { readonly kind: "final-passed"; readonly at: string; readonly tz: string }
   | { readonly kind: "importance"; readonly importance: Importance }
-  | { readonly kind: "late"; readonly minutes: number; readonly isSoft: boolean }
   /** `isSoft`: a resubmission deadline, whose lateness is never told in minutes. */
-  | { readonly kind: "left"; readonly minutes: number }
+  | { readonly kind: "late"; readonly minutes: number; readonly isSoft: boolean }
   /** Time until the due, shown next to it: "6d 12h left". */
-  | { readonly kind: "paused" }
+  | { readonly kind: "left"; readonly minutes: number }
   /** Another instance of its series (or weekly homework) follows: the row carries a repeat mark. */
+  | { readonly kind: "paused" }
   | { readonly kind: "repeats" }
-  | { readonly kind: "sent"; readonly submitted: number }
-  | { readonly kind: "solved"; readonly solved: number; readonly total: number }
   | { readonly kind: "starts"; readonly at: string; readonly tz: string }
   /** A start still ahead: the row waits under "In future". */
   | { readonly kind: "subtasks-left"; readonly count: number };
@@ -145,16 +144,12 @@ const duePart = (item: NowItem, ctx: QueryContext): readonly MetaPart[] => {
   return dueDatePart(task, ctx);
 };
 
-/** Subtasks solved and sent; a late sheet shows what is still owed. */
+/** Subtasks done of all; a late sheet shows what is still owed. */
 const progressParts = (item: NowItem): readonly MetaPart[] => {
   if (item.total > 0) {
-    if (item.isLate) {
-      return [{ kind: "subtasks-left", count: item.total - item.submitted }];
-    }
-    return [
-      { kind: "solved", solved: item.solved, total: item.total },
-      ...(item.submitted > 0 ? [{ kind: "sent" as const, submitted: item.submitted }] : []),
-    ];
+    return item.isLate
+      ? [{ kind: "subtasks-left", count: item.total - item.done }]
+      : [{ kind: "done", done: item.done, total: item.total }];
   }
   return [];
 };

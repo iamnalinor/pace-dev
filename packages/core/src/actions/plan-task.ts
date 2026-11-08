@@ -97,8 +97,8 @@ const renamed = (task: Task, rename: Rename): Result<readonly SubtaskDraft[], Ac
   if (!subtask.ok) {
     return subtask;
   }
-  // A solved or sent one keeps its name: taking it off would lose the mark.
-  if (subtask.value.solvedAt !== null || subtask.value.submittedAt !== null) {
+  // A done one keeps its name: taking it off would lose the mark.
+  if (subtask.value.doneAt !== null) {
     return err("action/subtask-done");
   }
   return isBlank(rename.label)
@@ -221,7 +221,10 @@ const updateBodies = (world: World, task: Task, patch: TaskPatch): Bodies => {
   return bodies.length === 0 ? err("action/empty-patch") : ok(bodies);
 };
 
-/** The named problems not solved yet, marked solved; nothing left to mark is an empty patch. */
+/**
+The named problems not done yet, marked done (the `task.subtask.solved` event, at the action's
+instant); nothing left to mark is an empty patch.
+*/
 const markBodies = (task: Task, subtaskIds: readonly string[]): Bodies => {
   const open = collectAll(subtaskIds, (id) => {
     const subtask = subtaskById(task, id);
@@ -229,7 +232,7 @@ const markBodies = (task: Task, subtaskIds: readonly string[]): Bodies => {
       return subtask;
     }
     return ok(
-      subtask.value.solvedAt === null
+      subtask.value.doneAt === null
         ? [{ payload: { subtaskId: id, taskId: task.id }, type: "task.subtask.solved" } as const]
         : [],
     );

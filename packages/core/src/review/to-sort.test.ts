@@ -170,17 +170,14 @@ describe("reviewItems", () => {
     expect(reviewItems(state, ctx()).map((item) => item.taskId)).not.toContain(CALC_HW5_ID);
   });
 
-  it("asks 'submitted?' a day after the last problem was solved", () => {
+  it("asks 'all done, close it?' a day after the last problem was done", () => {
     const solvedWorld = allSolved();
     expect(taskIds(review(NOW, solvedWorld))).not.toContain(HW_ID);
     const item = itemFor(review(TOMORROW, solvedWorld), HW_ID);
-    expect(item).toMatchObject({ kind: "submitted", since: "2026-10-06T08:30:00.000Z" });
-    expect(item.actions.map((entry) => entry.key)).toEqual(["submit-now", "keep-open"]);
-    expect(action(item, "submit-now")).toEqual([
-      input(TOMORROW, {
-        type: "task.submitted",
-        payload: { taskId: HW_ID, subtaskIds: ["s3", "s4", "s5", "s6", "s7"], closes: true },
-      }),
+    expect(item).toMatchObject({ kind: "all-done", since: "2026-10-06T08:30:00.000Z" });
+    expect(item.actions.map((entry) => entry.key)).toEqual(["mark-done", "keep-open"]);
+    expect(action(item, "mark-done")).toEqual([
+      input(TOMORROW, { type: "task.closed", payload: { taskId: HW_ID, outcome: "done" } }),
     ]);
   });
 
@@ -188,7 +185,7 @@ describe("reviewItems", () => {
     const now = WEDNESDAY_MORNING;
     const solvedWorld = allSolved();
     const item = itemFor(review(now, solvedWorld), TRK_ID);
-    expect(item).toMatchObject({ kind: "submitted", since: "2026-10-06T11:00:00.000Z" });
+    expect(item).toMatchObject({ kind: "all-done", since: "2026-10-06T11:00:00.000Z" });
     expect(item.actions.map((entry) => entry.key)).toEqual(["mark-done", "keep-open"]);
     expect(action(item, "mark-done")).toEqual([
       input(now, { type: "task.closed", payload: { taskId: TRK_ID, outcome: "done" } }),

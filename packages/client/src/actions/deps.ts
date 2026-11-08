@@ -8,12 +8,10 @@ import {
   type ActionError as PlannedActionError,
   type PresetError,
   type PresetValidationError,
-  type ResolvedPreset,
   type Result,
   type RetroError,
   type Task,
   taskById,
-  taskPreset,
   validateEventInput,
 } from "@pace/core";
 
@@ -173,7 +171,3 @@ export const taskOf = (deps: ActionDeps, taskId: string): Result<Task, "task/unk
   const task = taskById(deps.state.store.getState().tasks, taskId);
   return task === undefined ? err("task/unknown") : ok(task);
 };
-
-/** The task's preset chain with its own overrides on top, shaped by its subtasks. */
-export const presetOf = (deps: ActionDeps, task: Task): Result<ResolvedPreset, PresetError> =>
-  taskPreset(deps.state.store.getState().presets, task);
