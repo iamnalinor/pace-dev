@@ -14,6 +14,8 @@ type Props = {
   /** Accessible name for the button iframe the script injects (it ships without one). */
   readonly label: string;
   readonly onAuth: (user: TelegramLogin) => void;
+  /** The button could not load (its script failed): the page makes another way in the main one. */
+  readonly onFailed?: (() => void) | undefined;
   readonly texts: { readonly loading: string; readonly slow: string; readonly failed: string };
 };
 
@@ -58,15 +60,17 @@ const watchFrames = (host: HTMLElement, label: string, onFrame: () => void): (()
 The Telegram Login Widget (web only): after a login Telegram redirects to `/auth/telegram`,
 which hands the signed payload back to this widget on the page that started the flow.
 */
-export const TelegramWidget = ({ botUsername, label, onAuth, texts }: Props) => {
+export const TelegramWidget = ({ botUsername, label, onAuth, onFailed, texts }: Props) => {
   type Phase = "failed" | "loading" | "ready" | "slow";
   const hostRef = useRef<HTMLDivElement>(null);
   const onAuthRef = useRef(onAuth);
+  const onFailedRef = useRef(onFailed);
   const [phase, setPhase] = useState<Phase>("loading");
 
   useEffect(() => {
     onAuthRef.current = onAuth;
-  }, [onAuth]);
+    onFailedRef.current = onFailed;
+  }, [onAuth, onFailed]);
 
   // Coming back from Telegram's redirect: finish the login the return page stored.
   useEffect(() => {
@@ -84,6 +88,7 @@ export const TelegramWidget = ({ botUsername, label, onAuth, texts }: Props) => 
     const script = widgetScript(botUsername, telegramAuthUrl(globalThis.location));
     const onError = (): void => {
       setPhase("failed");
+      onFailedRef.current?.();
     };
     script.addEventListener("error", onError);
     host.append(script);

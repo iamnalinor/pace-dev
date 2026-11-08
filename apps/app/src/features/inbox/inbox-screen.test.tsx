@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
@@ -8,6 +8,29 @@ import { INBOX_CABLE_ID, INBOX_TEXTS } from "@pace/core/testing";
 import { InboxScreen } from "./inbox-screen.tsx";
 
 const LONG = `${"A long note about the whole afternoon. ".repeat(20)}END`;
+
+const layoutOf = (height: number) => ({
+  nativeEvent: { layout: { height, width: 300, x: 0, y: 0 } },
+});
+
+/** The capture's clamped title box (four 24 px lines). */
+const CLAMPED = 96;
+
+/** Plays the layout of the one capture's title: its clamped box, then its whole text's box. */
+const laidOut = async (whole: number) => {
+  await act(async () => {
+    await fireEvent(
+      screen.getByTestId("clamped-title", { includeHiddenElements: true }),
+      "layout",
+      layoutOf(CLAMPED),
+    );
+    await fireEvent(
+      screen.getByTestId("clamped-title-whole", { includeHiddenElements: true }),
+      "layout",
+      layoutOf(whole),
+    );
+  });
+};
 
 describe("InboxScreen", () => {
   it("clamps a long capture to four lines and opens the whole text under «Show all»", async () => {
@@ -22,6 +45,27 @@ describe("InboxScreen", () => {
     await waitFor(() => {
       expect(screen.getAllByText(LONG)).toHaveLength(2);
     });
+  });
+
+  it("offers «Show all» when a short capture of many lines is clamped, measured (F-DAT-06)", async () => {
+    const lines = "one\ntwo\nthree\nfour\nfive\nsix";
+    const runtime = await createTestRuntime({ world: "empty" });
+    await runtime.actions.captureInbox(lines);
+    await renderScreen(<InboxScreen />, runtime);
+    // Under the length rule (160) nothing is offered before layout.
+    expect(screen.queryByRole("button", { name: en("task.showFull") })).toBeNull();
+    await laidOut(144);
+    expect(screen.getByRole("button", { name: en("task.showFull") })).toBeOnTheScreen();
+  });
+
+  it("offers no «Show all» for a long capture that fits its four lines, measured", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    await runtime.actions.captureInbox(LONG);
+    await renderScreen(<InboxScreen />, runtime);
+    // Before layout the length rule stands in.
+    expect(screen.getByRole("button", { name: en("task.showFull") })).toBeOnTheScreen();
+    await laidOut(CLAMPED);
+    expect(screen.queryByRole("button", { name: en("task.showFull") })).toBeNull();
   });
 
   it("offers no «Show all» for a short capture", async () => {

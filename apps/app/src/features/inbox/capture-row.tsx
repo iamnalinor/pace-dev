@@ -13,12 +13,14 @@ import { toastQuote } from "#app/ui/toast.tsx";
 import { useCaptureActions } from "./use-capture-actions.ts";
 import { useGuess } from "./use-guess.ts";
 
-/** Lines of a capture before «Show all»; a text this long may run past them. */
+/** Lines of a capture before «Show all». */
 const CAPTURE_LINES = 4;
+/** Before the row is laid out (or where it never is): a text this long may run past them. */
 const LONG_CAPTURE = 160;
 
 /**
-A capture verbatim (four lines at most, «Show all» opens the rest in a disclosure), its guess
+A capture verbatim (four lines at most; «Show all» opens the rest in a disclosure, offered when the
+clamp cut the text as laid out, by length only until then), its guess
 under it, and a compact Accept with Delete beside it: tonal, so N captures are not N accent bars
 (F-CMP-15). The actions sit beside the row, not in it (a control in a button is nested
 interactive); the row itself opens the details.
@@ -36,6 +38,9 @@ export const CaptureRow = ({
   const guess = useGuess(card);
   const { accept, remove } = useCaptureActions(card);
   const [isFull, setIsFull] = useState(false);
+  // Measured once laid out; `null` until then, when the length stands in.
+  const [isClamped, setIsClamped] = useState<boolean | null>(null);
+  const isCut = isClamped ?? card.text.length > LONG_CAPTURE;
   const quote = toastQuote(card.text);
   return (
     <View>
@@ -43,6 +48,7 @@ export const CaptureRow = ({
         <View className="min-w-0 flex-1">
           <ListRow
             onPress={onOpen}
+            onTitleClamped={setIsClamped}
             selected={isSelected}
             subtitle={guess.line}
             testID="inbox-capture"
@@ -73,7 +79,7 @@ export const CaptureRow = ({
           </Button>
         </View>
       </View>
-      {card.text.length > LONG_CAPTURE ? (
+      {isCut || isFull ? (
         <Disclosure
           label={t("task.showFull")}
           onToggle={() => {

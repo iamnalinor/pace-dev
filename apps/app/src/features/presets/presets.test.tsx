@@ -32,6 +32,11 @@ const presetOf = (runtime: PaceRuntime, id: string) =>
   runtime.state.store.getState().presets.byId[id];
 
 describe("PresetsList", () => {
+  it("says each row's «Default» or «Yours» to a screen reader too, not the name alone (bug class 141 sweep)", async () => {
+    await renderScreen(<PresetsList />, await createTestRuntime({ world: "empty" }));
+    expect(screen.getByRole("link", { name: "Work, Default" })).toBeOnTheScreen();
+  });
+
   it("lists the defaults in picker order, opens one and moves one", async () => {
     const runtime = await createTestRuntime({ world: "empty" });
     await renderScreen(<PresetsList />, runtime);

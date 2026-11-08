@@ -36,6 +36,21 @@ describe("InsightsScreen", () => {
     expect(screen.getByLabelText("Typical focus block: 1h 30m")).toBeOnTheScreen();
   });
 
+  it("draws no empty hours for a week with no focus, only a line that says so (QA round 22 R22-18)", async () => {
+    const runtime = await createTestRuntime();
+    await runtime.actions.logPast({
+      category: "sleep",
+      endAt: "2026-10-06T04:00:00.000Z",
+      label: "Sleep",
+      startAt: "2026-10-05T20:30:00.000Z",
+    });
+    await renderScreen(<InsightsScreen />, runtime);
+    expect(screen.getByText("Focus by hour of day")).toBeOnTheScreen();
+    expect(screen.getByText("No focus time this week.")).toBeOnTheScreen();
+    expect(screen.queryByTestId("hours-chart")).toBeNull();
+    expect(screen.queryByText(/^Most focus/u)).toBeNull();
+  });
+
   it("draws a bar with no project in a data colour, never the disabled one (V2-04)", async () => {
     const runtime = await createTestRuntime();
     await runtime.actions.logPast({

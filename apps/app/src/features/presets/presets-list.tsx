@@ -41,11 +41,16 @@ const PresetRow = ({
   const presets = useAppState((state) => state.presets);
   const resolved = resolvePreset(presets, preset.id);
   const name = presetLabel(preset, language);
+  const kind = [
+    ...(preset.archived ? [t("presets.archivedBadge")] : []),
+    t(preset.builtIn ? "presets.builtIn" : "presets.yours"),
+  ].join(" · ");
   return (
     <View className="flex-row items-center">
       <View className="min-w-0 flex-1">
         <ListRow
-          label={name}
+          // The label stands in for everything the row shows: the name and its kind (class 141).
+          label={`${name}, ${kind}`}
           leading={<HueTile hue={resolved.ok ? resolved.value.color : "slate"} icon="repeat" />}
           onPress={() => {
             router.push({ params: { id: preset.id }, pathname: "/presets/[id]" });
@@ -56,10 +61,7 @@ const PresetRow = ({
           trailing={
             <View className="flex-row items-center gap-2">
               <Text role="footnote" tone="secondary">
-                {[
-                  ...(preset.archived ? [t("presets.archivedBadge")] : []),
-                  t(preset.builtIn ? "presets.builtIn" : "presets.yours"),
-                ].join(" · ")}
+                {kind}
               </Text>
               <Icon name="chevron-right" size="inline" tone="tertiary" />
             </View>
