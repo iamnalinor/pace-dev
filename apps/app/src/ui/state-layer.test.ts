@@ -99,6 +99,14 @@ describe("the web state layer (global.css, spec §3.7)", () => {
     );
   });
 
+  it("lets a small visual's drawing take no pointer, so a press that redraws it still clicks", () => {
+    // The check circle draws its tick on press-in: the tick under the pointer took the mouseup,
+    // the press and release had different targets and Chrome fired no click (journeys e2e).
+    expect(declarations("[data-pace-inner] > [data-pace-visual]")).toContain(
+      "pointer-events: none",
+    );
+  });
+
   it("selects no text and opens no callout on a long press (F-WEB-10)", () => {
     expect(declarations(MARK)).toEqual(
       expect.arrayContaining(["user-select: none", "-webkit-touch-callout: none"]),

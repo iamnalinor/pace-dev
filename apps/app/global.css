@@ -187,6 +187,15 @@ control's rule above.
   display: none;
 }
 
+/*
+The visual is drawing only: the pointer lands on the target. A visual that redraws on press-in (the
+check circle's tick) otherwise takes the mouseup itself, the press and the release have different
+targets, and the browser fires no click (bug-lessons class 138).
+*/
+[data-pace-inner] > [data-pace-visual] {
+  pointer-events: none;
+}
+
 [data-pace-inner]:not([aria-disabled="true"]):active > [data-pace-visual]::after {
   background-color: var(--pace-fill-2);
   transition-duration: 0s;

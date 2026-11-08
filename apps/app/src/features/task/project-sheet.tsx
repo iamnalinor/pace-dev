@@ -1,5 +1,3 @@
-import { View } from "react-native";
-
 import type { TaskViewModel } from "@pace/client";
 import type { ProjectColorName } from "@pace/core";
 
@@ -8,15 +6,12 @@ import { useRunAction } from "#app/shared/use-run-action.ts";
 import { ListRow } from "#app/ui/list-row.tsx";
 import { RadioGroup } from "#app/ui/radio-group.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
-import { Dot } from "#app/ui/tag.tsx";
+import { HueTile } from "#app/ui/tag.tsx";
 
-/** A project as a value (spec §4.2.7): its dot before the name; "No project" has an empty ring. */
-const ProjectDot = ({ color }: { readonly color: null | ProjectColorName }) =>
-  color === null ? (
-    <View className="size-2 rounded-pill border border-outline" />
-  ) : (
-    <Dot hue={color} />
-  );
+/** A project as a value: its colour tile before the name; "No project" a neutral one (never a dot). */
+const ProjectDot = ({ color }: { readonly color: null | ProjectColorName }) => (
+  <HueTile hue={color} icon="folder" />
+);
 
 /** "No project" among the project ids (a radio needs a value; no id is empty). */
 const NO_PROJECT = "";

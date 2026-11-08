@@ -118,6 +118,17 @@ describe("Button", () => {
     );
   });
 
+  it("is never wider than its row: a long label wraps inside it («Это не я — завершить сеанс» at 320)", async () => {
+    await render(
+      <ThemeProvider>
+        <Button onPress={() => undefined}>A long label</Button>
+      </ThemeProvider>,
+    );
+    expect(String(screen.getByRole("button").props["className"]).split(" ")).toContain(
+      "max-w-full",
+    );
+  });
+
   it("draws its visual inside the target: 48 on a phone, 40 on a desktop, 32 small (one geometry per size)", async () => {
     await render(
       <ThemeProvider>

@@ -49,6 +49,7 @@ import {
 
 import { type ColorRole, size as SIZE } from "@pace/core";
 
+import { hueOf, type TagColor } from "./hue.ts";
 import { useTheme } from "./theme-provider.tsx";
 
 /**
@@ -148,6 +149,8 @@ export type IconProps = {
   readonly name: IconName;
   readonly size?: IconSize | undefined;
   readonly tone?: IconTone | undefined;
+  /** Drawn in a hue's ink instead of a tone (a coloured tile: `HueTile`). */
+  readonly hue?: TagColor | undefined;
   /** Filled in its tone (the selected tab on Android; spec §3.6). */
   readonly filled?: boolean | undefined;
   /** What a screen reader says for it; without one the icon is hidden (its control is named). */
@@ -163,6 +166,7 @@ a `label` (F-A11Y-19).
 */
 export const Icon = ({
   filled = false,
+  hue,
   label,
   name,
   size = "control",
@@ -170,7 +174,8 @@ export const Icon = ({
 }: IconProps) => {
   const { palette } = useTheme();
   const Glyph = ICONS[name];
-  const color = palette[TONE_ROLE[tone]];
+  const role: ColorRole = hue === undefined ? TONE_ROLE[tone] : `hue.${hueOf(hue)}.ink`;
+  const color = palette[role];
   const pixels = SIZE.icon[size];
   return (
     <Glyph

@@ -88,10 +88,19 @@ describe("Chip (spec §4.2.6)", () => {
     }).rejects.toThrow(/RadioGroup/u);
   });
 
-  it("draws a project as a dot before its name, never a coloured chip", async () => {
-    await renderScreen(<Group />, await empty());
-    expect(within(screen.getByRole("radio", { name: "Dark" })).getByTestId("dot")).toBeTruthy();
-    expect(pillOf("radio", "Dark").join(" ")).not.toContain("hue-");
+  it("draws a coloured chip at rest in its hue's tint under its ink, never a dot (owner 2026-11-08)", async () => {
+    await renderScreen(
+      <RadioGroup label="Project" onChange={NOTHING} value="all" values={["all", "work"]}>
+        <Chip value="all">All</Chip>
+        <Chip hue="green" value="work">
+          Work
+        </Chip>
+      </RadioGroup>,
+      await empty(),
+    );
+    expect(within(screen.getByRole("radio", { name: "Work" })).queryByTestId("dot")).toBeNull();
+    expect(pillOf("radio", "Work")).toContain("bg-hue-green-tint");
+    expect(String(screen.getByText("Work").props["className"])).toContain("text-hue-green-ink");
   });
 
   it("draws its inline icon in the colour of the chip: onAccent when on, secondary off", async () => {

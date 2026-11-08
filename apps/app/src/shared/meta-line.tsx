@@ -78,7 +78,7 @@ export const MetaLine = ({
   return (
     <View className="flex-row items-center gap-x-2">
       {tag === null || tagLabel === null ? null : (
-        <View className="max-w-1/2 shrink">
+        <View className="max-w-1/2 shrink-0">
           <Tag hue={tag.color}>{tagLabel}</Tag>
         </View>
       )}
@@ -94,7 +94,13 @@ export const MetaLine = ({
       ))}
       {isRepeating ? <RepeatMark /> : null}
       {texts.length === 0 ? null : (
-        <Text numeric policy="truncate" role="footnote" tone="secondary">
+        <Text
+          full={texts.map((piece) => piece.text).join(" · ")}
+          numeric
+          policy="truncate"
+          role="footnote"
+          tone="secondary"
+        >
           {texts.map((piece, index) => (
             // eslint-disable-next-line @eslint-react/no-array-index-key -- positional pieces without ids; a text can repeat
             <Fragment key={index}>

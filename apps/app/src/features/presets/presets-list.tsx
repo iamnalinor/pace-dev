@@ -12,7 +12,7 @@ import { Icon } from "#app/ui/icon.tsx";
 import { ListRow } from "#app/ui/list-row.tsx";
 import { SectionHeader } from "#app/ui/section-header.tsx";
 import { SwitchRow } from "#app/ui/switch-row.tsx";
-import { Dot } from "#app/ui/tag.tsx";
+import { HueTile } from "#app/ui/tag.tsx";
 import { Text } from "#app/ui/text.tsx";
 import {
   byPresetOrder,
@@ -46,7 +46,7 @@ const PresetRow = ({
       <View className="min-w-0 flex-1">
         <ListRow
           label={name}
-          leading={<Dot hue={resolved.ok ? resolved.value.color : "slate"} />}
+          leading={<HueTile hue={resolved.ok ? resolved.value.color : "slate"} icon="repeat" />}
           onPress={() => {
             router.push({ params: { id: preset.id }, pathname: "/presets/[id]" });
           }}

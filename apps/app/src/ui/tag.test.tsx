@@ -4,7 +4,7 @@ import { View } from "react-native";
 import { renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 
-import { Dot, Tag } from "./tag.tsx";
+import { HueTile, Tag } from "./tag.tsx";
 
 const LONG = "Междисциплинарная курсовая работа ".repeat(4).slice(0, 120);
 
@@ -50,11 +50,22 @@ describe("Tag (spec §4.2.7)", () => {
   });
 });
 
-describe("Dot", () => {
-  it("is an 8 px mark in the hue's stroke that never shrinks", async () => {
-    await renderScreen(<Dot hue="violet" />, await createTestRuntime({ world: "empty" }));
-    expect(classesOf("dot")).toEqual(
-      expect.arrayContaining(["size-2", "shrink-0", "rounded-pill", "bg-hue-violet-stroke"]),
+describe("HueTile (owner 2026-11-08: colour is never a dot)", () => {
+  it("is a 32 tile in the hue's tint with its icon in the hue's ink", async () => {
+    await renderScreen(
+      <HueTile hue="violet" icon="folder" />,
+      await createTestRuntime({ world: "empty" }),
     );
+    expect(classesOf("hue-tile")).toEqual(
+      expect.arrayContaining(["size-8", "shrink-0", "rounded-md", "bg-hue-violet-tint"]),
+    );
+  });
+
+  it("is neutral without a colour (No project)", async () => {
+    await renderScreen(
+      <HueTile hue={null} icon="folder" />,
+      await createTestRuntime({ world: "empty" }),
+    );
+    expect(classesOf("hue-tile")).toContain("bg-fill-4");
   });
 });

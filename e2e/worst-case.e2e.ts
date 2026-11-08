@@ -40,11 +40,7 @@ entries. Sideways scrolling of the page or the gallery is allowed only where an 
 flex row never shrinks (tags, labels, chips, long words and addresses). F-DAT-07: a text that
 ellipsizes carries neither `data-text-policy="truncate"` nor its full value.
 */
-const REALISTIC: readonly Known[] = [
-  { finding: "F-DAT-02", match: /: (Домашка по алгебре 6|Algebra homework 6)$/u },
-  { finding: "F-DAT-02", match: /: (Алгебра|Algebra)$/u },
-  { finding: "F-DAT-02", match: /: (Это не я|Not me)/u },
-];
+const REALISTIC: readonly Known[] = [{ finding: "F-DAT-02", match: /: (Алгебра|Algebra)$/u }];
 const KNOWN: Readonly<Record<(typeof SETS)[number], readonly Known[]>> = {
   demo: REALISTIC,
   empty: [],
@@ -52,7 +48,6 @@ const KNOWN: Readonly<Record<(typeof SETS)[number], readonly Known[]>> = {
   worst: [
     { finding: "F-DAT-02", match: /: \d+\. (Междисциплинарная|Interdisciplinary)/u, scrolls: true },
     { finding: "F-DAT-02", match: /: (Чтение предложений|Reading the committee)/u },
-    { finding: "F-DAT-02", match: /: (Это не я|Not me)/u },
     { finding: "F-DAT-07", match: /: 🍽️ Обед/u },
   ],
 };

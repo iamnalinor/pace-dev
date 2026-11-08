@@ -349,7 +349,7 @@ class 13). Activity categories get twelve distinct hues in `packages/core/src/tr
 work blue · study violet · task green · food orange · commute lime · hygiene cyan · rest teal ·
 chores amber · social pink · sport red · sleep indigo · other slate.
 
-**Usage rule (P1).** Category = a line or dot in its stroke plus the name in `label.*`; project = a
+**Usage rule (P1; superseded 2026-11-08: no dots — a `Tag`, a tinted chip or a `HueTile`, see `docs/design.md`).** Category = a line or dot in its stroke plus the name in `label.*`; project = a
 tag (tint + ink); importance = Urgent as a word in `status.danger`, Priority as a word in `label.primary` 600, Low with no word but the row's title in `label.secondary`, Normal shows nothing (Q3); status = a word, except «В работе» / In progress, which is a tag in the indigo hue (owner, feedback-3) (F-COL-04).
 A screen at rest shows at most one filled accent element.
 
@@ -690,7 +690,7 @@ PRODUCT principle 2); Cancel exists only in confirmations.
 - **Worst case.** Aligned to the centre of the title's first line, so a 2-line title does not drift it.
 - **Fixes.** F-MOT-01, F-CMP-01, F-AND-01, F-A11Y-01, F-CMP-14.
 
-#### 4.2.6 `chip.tsx` — **rewrite** (neutral chips; colour only as a dot)
+#### 4.2.6 `chip.tsx` — **rewrite** (neutral chips; a coloured chip is its tint, never a dot — owner 2026-11-08, `docs/design.md`)
 - **Anatomy.** Visual height `space.8` (32), `radius.pill`, padX `space.4`; [leading: `Icon` `icon.inline` or an 8 px hue dot] · label `type.subhead` · [selected check `icon.inline`]. Target via `hitSlop`. Two kinds: `filter` (Now's project filter, toggle) and `choice` (one of ≤ 4 options in a `radiogroup`: close-sheet time, Importance, assistant answers). Six-plus option sets are not chips any more (task-fields, 4.3.10; F-CMP-08).
 - **Tokens / states.** rest: `fill.2`, `label.secondary` (no 2 px coloured outline; the form's 12 coloured outlines go, F-COL-02) · hover `fill.1` on top · pressed ripple `fill.3` / `fill.2` overlay · focus-visible `focus` ring (pill-shaped) · selected: **solid `accent` fill and edge, `accent.on` label and `accent.on` leading icon** (decided in the batch 1+2 visual fix, V2-02: the `accent.quiet` tint measures 1.1:1 against the cell, so a chosen chip could not be told from the others, WCAG 1.4.11 wants 3:1; `accent` against every ground is ≥ 3:1 and `accent.on` on it 6.9:1 / 8.7:1; a leading icon takes its colour from the chip, `Chip`'s `leading` is a function of it; a check glyph may still be added as a non-colour carrier, forced colours `Highlight`). Do not go back to the quiet tint · disabled `fill.1` + `label.quaternary` (a new prop; today none) · loading/error N/A. Project identity = an 8 px `hue.<n>.stroke` dot before the name, never a filled chip.
 - **Phone / desktop / Android.** Compact: a single scrolling row with `snapToInterval`, an edge fade and `overscroll-behavior-x: contain`; expanded: the strip **wraps** (no hidden scroller), and past 2 rows the rest collapses into a «Ещё N» chip opening a `Popover` (F-DAT-02: 10 of 12 filters were unreachable by mouse). Android ripple bounded to the pill.

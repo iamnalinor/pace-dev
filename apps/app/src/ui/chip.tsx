@@ -1,14 +1,13 @@
 import type { View } from "react-native";
 
-import type { TagColor } from "./hue.ts";
 import type { TextTone } from "./text-props.ts";
 
 import { cx } from "./cx.ts";
+import { type TagColor, tintClass } from "./hue.ts";
 import { Icon, type IconName, type IconTone } from "./icon.tsx";
 import { DISABLED } from "./pressable-props.ts";
 import { Pressable } from "./pressable.tsx";
 import { type RadioValue, useRadio } from "./radio-group.tsx";
-import { Dot } from "./tag.tsx";
 import { Text } from "./text.tsx";
 
 type Look = {
@@ -17,7 +16,10 @@ type Look = {
   readonly label?: string | undefined;
   /** An inline icon before the text, in the chip's label colour. */
   readonly icon?: IconName | undefined;
-  /** A project or a category: an 8 px dot in its hue before the name (never a coloured chip). */
+  /**
+  A project or a category: at rest the chip is the hue's tint under its ink, as a tag is (owner
+  2026-11-08: a dot's colour cannot be told; never a dot). Chosen, it is the accent like any chip.
+  */
   readonly hue?: null | TagColor | undefined;
   readonly disabled?: boolean | undefined;
   /** 40 instead of 32: the time pills of the close sheet. */
@@ -75,23 +77,32 @@ const tonesOf = (isOn: boolean, isDisabled: boolean): Tones => {
     : { fill: "bg-fill-2", icon: "secondary", text: "secondary" };
 };
 
-/** The pill: [icon or hue dot] · the label (one line, `size.chip.max` at most, "…" past it). */
-const visualOf = (isOn: boolean, { disabled = false, tall = false }: Look): string =>
+/** The pill: [icon] · the label (one line, `size.chip.max` at most, "…" past it). */
+const visualOf = (isOn: boolean, { disabled = false, hue, tall = false }: Look): string =>
   cx(
     "min-w-8 max-w-chip-max flex-row items-center justify-center gap-2 px-3",
     tall ? "h-10" : "h-8",
-    tonesOf(isOn, disabled).fill,
+    hasHue(isOn, disabled, hue) ? tintClass(hue) : tonesOf(isOn, disabled).fill,
   );
+
+/** A coloured chip at rest (not chosen, not disabled) wears its hue. */
+const hasHue = (isOn: boolean, isDisabled: boolean, hue: Look["hue"]): hue is TagColor =>
+  !isOn && !isDisabled && hue !== undefined && hue !== null;
 
 const Inside = ({ isOn, look }: { readonly isOn: boolean; readonly look: Look }) => {
   const tones = tonesOf(isOn, look.disabled === true);
   return (
     <>
       {look.icon === undefined ? null : <Icon name={look.icon} size="inline" tone={tones.icon} />}
-      {look.hue === undefined || look.hue === null ? null : <Dot hue={look.hue} />}
-      <Text policy="truncate" role="subhead" tone={tones.text}>
-        {look.children}
-      </Text>
+      {hasHue(isOn, look.disabled === true, look.hue) ? (
+        <Text hue={look.hue} policy="truncate" role="subhead">
+          {look.children}
+        </Text>
+      ) : (
+        <Text policy="truncate" role="subhead" tone={tones.text}>
+          {look.children}
+        </Text>
+      )}
     </>
   );
 };
@@ -122,7 +133,7 @@ const RadioChip = ({ look, value }: { readonly look: Look; readonly value: Radio
 A 32 pill (40 when tall) in a 48 dp / 44 px target (the small-visual pattern of the kit's
 Pressable: the target is the layout box, no negative margin, so two rows of chips never overlap
 their targets; QA21 L1, pr48-followups "chip rows give about 40 px"). Neutral; the accent marks the
-chosen one; colour enters only as a dot (spec §4.2.6).
+chosen one; a coloured chip at rest is its hue's tint under its ink, never a dot (owner 2026-11-08).
 */
 export const Chip = (props: ChipProps) => {
   const { checked, expanded, onPress, value, ...look } = props;

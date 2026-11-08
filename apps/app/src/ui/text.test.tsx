@@ -11,6 +11,16 @@ describe("Text (the kit's type roles, spec §3.2, §4.1.2)", () => {
     expect(screen.getByText("Algebra homework")).toHaveStyle({ flexShrink: 1, minWidth: 0 });
   });
 
+  it("keeps its width when the caller says shrink-0 (a word that must not break: ASAP)", async () => {
+    // The inline yield used to win over the class, and "ASAP" broke into "AS / AP" at 390 px.
+    await render(
+      <Text className="shrink-0 font-semibold" role="footnote">
+        ASAP
+      </Text>,
+    );
+    expect(screen.getByText("ASAP")).not.toHaveStyle({ flexShrink: 1 });
+  });
+
   it("truncates to one line with policy truncate, and still yields", async () => {
     await render(
       <Text policy="truncate" role="footnote">

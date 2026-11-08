@@ -5,7 +5,7 @@ import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
 import { cx } from "#app/ui/cx.ts";
-import { Dot } from "#app/ui/tag.tsx";
+import { HueTile } from "#app/ui/tag.tsx";
 import { Text } from "#app/ui/text.tsx";
 import { PACE_STATUS_TEXT, type RunningView } from "@pace/client";
 import { formatDuration } from "@pace/core";
@@ -119,7 +119,7 @@ const StillGoing = ({ running }: { readonly running: RunningView }) => {
 };
 
 /**
-One running activity (spec §4.3.8): its category's dot and name (cut before Stop, never under it),
+One running activity (spec §4.3.8): its category's tile and name (cut before Stop, never under it),
 Stop; the time so far and the Expect; the ink line; and, past twice the Expect, the question with
 "Yes, still". Not a live region: the ticking time is silent, and the bar announces a start, a stop
 and "past expected" once each (F-A11Y-10).
@@ -127,7 +127,7 @@ and "past expected" once each (F-A11Y-10).
 export const RunningCard = ({ running }: { readonly running: RunningView }) => (
   <View className="gap-3 rounded-lg bg-cell p-4" testID="running-card">
     <View className="flex-row items-center gap-3">
-      <Dot hue={running.color} />
+      <HueTile hue={running.color} icon="timer" />
       <Text className="flex-1" policy="truncate" role="headline">
         {running.label}
       </Text>

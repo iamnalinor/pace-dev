@@ -282,6 +282,10 @@ const measureTextBoxes = async (page: Page): Promise<readonly TextBox[]> =>
         );
     // eslint-disable-next-line unicorn/consistent-function-scoping -- runs in the page (page.evaluate), where the module's scope is out of reach
     const isOutsideControl = (element: Element): boolean => {
+      // A count badge hangs off its icon's corner by design (`BadgeAnchor`, F-DAT-10).
+      if (element.closest("[data-pace-hangs]") !== null) {
+        return false;
+      }
       const control = element.parentElement?.closest('button, [role="button"], a, [role="link"]');
       const frame = control?.getBoundingClientRect();
       const box = element.getBoundingClientRect();

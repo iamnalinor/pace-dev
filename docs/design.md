@@ -106,3 +106,10 @@ folds. Sources: spec §12, `context/design/findings.md`.
 2026-11-06 (owner): Now's task list is one plain list — tasks with a deadline, one edge-to-edge hairline (a labelled `separator` for screen readers), then tasks without one; no group headers, no preview or «Show all». «In future» stays a fold.
 
 2026-11-06 (owner): Settings sessions show the real device. The server parses the stored User-Agent (`userAgentDetails`: browser + major version, OS + version where the UA carries it, Android model, form factor; unknown parts absent) and the phone app sends brand, model and Android version at login (`expo-device`; optional fields, D1 migration `0009`, old rows null). `GET /api/sessions` returns `device`, with `name` kept for old clients. The row title is the device ("Samsung Galaxy S23", "Chrome 131 on macOS"), the parts the title does not say go under it, and old rows fall back to their name. Left: no tablet icon in the kit (a phone browser gets the smartphone icon), no PWA/standalone detection (the UA does not differ), UA reduction hides macOS/Android model on some Chromes.
+
+2026-11-08 (owner): **colour is never shown as a dot** («по точкам цвет определить невозможно»). A
+coloured chip at rest is its hue's tint under its ink (chosen, the accent like any chip); a
+project, category or running activity in a row leads with a 32 `HueTile` (the hue's tint, an icon in
+its ink); the task page's category is a `Tag`. Status dots that carry no colour meaning (unread,
+the now-line's end) stay. Spec §4.2.6, §4.2.7 and the P1 usage rule are superseded where they say
+"dot".

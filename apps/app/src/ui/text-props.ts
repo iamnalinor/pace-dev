@@ -108,6 +108,13 @@ const CHROME_FONT_SCALE = 1.6;
 /** Text yields, controls do not (spec §4.1.2 rule 1): React Native's default is `flexShrink: 0`. */
 const YIELD = { flexShrink: 1, minWidth: 0 } as const;
 
+/**
+A caller's `shrink-0` keeps the text whole (a word such as "ASAP" beside a yielding tag): the inline
+yield would otherwise win over the class, silently (bug-lessons class 139).
+*/
+const yieldOf = (className: string | undefined) =>
+  className?.split(/\s+/u).includes("shrink-0") === true ? undefined : YIELD;
+
 /** How many lines a policy allows; `undefined` wraps. */
 const linesOf = (policy: TextProps["policy"], lines: number | undefined): number | undefined => {
   if (policy === "truncate") {
@@ -144,7 +151,7 @@ export const textProps = ({
       toneClass(tone, hue),
       className,
     ),
-    style: [YIELD, style],
+    style: [yieldOf(className), style],
     ...(numberOfLines !== undefined && { ellipsizeMode: "tail", numberOfLines }),
     ...(chrome && { maxFontSizeMultiplier: CHROME_FONT_SCALE }),
     ...(level !== undefined && { accessibilityRole: "header" }),

@@ -10,7 +10,14 @@ import { addMinutesIso, type CalendarEvent } from "@pace/core";
 import { NOW } from "@pace/core/testing";
 
 import { BOTTOM_PX, LABELS_PX } from "./week-grid.tsx";
-import { COLUMN_INSET_PX, laneStyle, PHONE_COLUMN_MAX_PX, phoneColumnPx } from "./week-lanes.ts";
+import {
+  COLUMN_INSET_PX,
+  lanesThatFit,
+  laneStyle,
+  MAX_LANES,
+  PHONE_COLUMN_MAX_PX,
+  phoneColumnPx,
+} from "./week-lanes.ts";
 import { WeekScreen } from "./week-screen.tsx";
 
 /** 12:30–14:00 in Moscow today, with everything a phone's calendar can tell about it. */
@@ -346,5 +353,23 @@ describe("phoneColumnPx", () => {
       const width = phoneColumnPx(lanes, 72);
       expect((width - COLUMN_INSET_PX) * (1 / lanes - 0.01)).toBeGreaterThanOrEqual(44);
     }
+  });
+});
+
+describe("lanesThatFit (a computer's columns do not widen)", () => {
+  it("folds a run before a lane gets under 44 px: three lanes of a 120 px column were 38 wide", () => {
+    for (const columnPx of [60, 120, 160, 240, 400]) {
+      const lanes = lanesThatFit(columnPx);
+      expect(lanes).toBeGreaterThanOrEqual(1);
+      expect(lanes).toBeLessThanOrEqual(MAX_LANES);
+      if (lanes > 1) {
+        expect((columnPx - COLUMN_INSET_PX) * (1 / lanes - 0.01)).toBeGreaterThanOrEqual(44);
+      }
+    }
+    expect(lanesThatFit(120)).toBe(2);
+  });
+
+  it("keeps the cap before the column is measured", () => {
+    expect(lanesThatFit(0)).toBe(MAX_LANES);
   });
 });

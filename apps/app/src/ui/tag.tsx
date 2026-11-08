@@ -1,7 +1,8 @@
 import { View } from "react-native";
 
 import { cx } from "./cx.ts";
-import { fillClass, type TagColor, tintClass } from "./hue.ts";
+import { type TagColor, tintClass } from "./hue.ts";
+import { Icon, type IconName } from "./icon.tsx";
 import { Text } from "./text.tsx";
 
 /**
@@ -19,7 +20,7 @@ export const Tag = ({
 }) => (
   <View
     className={cx(
-      "min-h-5 min-w-0 shrink flex-row items-center self-start rounded-pill px-2",
+      "min-h-5 min-w-0 max-w-full shrink flex-row items-center self-start rounded-pill px-2",
       hue === null ? "bg-fill-4" : tintClass(hue),
     )}
     testID="tag"
@@ -37,10 +38,25 @@ export const Tag = ({
 );
 
 /**
-An 8 px dot in the hue's stroke (≥ 3:1 on the grounds): a project before its name in a picker or
-a chip, the running activity's category (static: the live time is the motion, spec §6), a legend.
-Decorative: the name beside it is the text.
+A coloured thing's leading mark in a row (a project, a category, a running activity): a 32 tile in
+the hue's tint with an icon in its ink. Owner 2026-11-08: a dot's colour cannot be told, so colour
+is never shown as a dot. Decorative: the name beside it is the text.
 */
-export const Dot = ({ hue }: { readonly hue: TagColor }) => (
-  <View className={cx("size-2 shrink-0 rounded-pill", fillClass(hue))} testID="dot" />
+export const HueTile = ({
+  hue,
+  icon,
+}: {
+  /** `null`: no colour (a neutral `fill.4` tile, "No project"). */
+  readonly hue: null | TagColor;
+  readonly icon: IconName;
+}) => (
+  <View
+    className={cx(
+      "size-8 shrink-0 items-center justify-center rounded-md",
+      hue === null ? "bg-fill-4" : tintClass(hue),
+    )}
+    testID="hue-tile"
+  >
+    <Icon hue={hue ?? undefined} name={icon} size="inline" />
+  </View>
 );

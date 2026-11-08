@@ -56,5 +56,24 @@ export const laneStyle = ({
   width: `${Math.max(100 / lanes - LANE_GAP_PERCENT, 100 / lanes / 2)}%`,
 });
 
+/**
+How many lanes a column of `columnPx` draws at a thumb's width each (a computer's columns share the
+window and never widen): a run needing more folds into «+N» (spec §5.6 ruling: the 44 px target
+wins). Unmeasured (0), the cap.
+*/
+export const lanesThatFit = (columnPx: number): number => {
+  if (columnPx <= 0) {
+    return MAX_LANES;
+  }
+  let lanes = MAX_LANES;
+  while (
+    lanes > 1 &&
+    (columnPx - COLUMN_INSET_PX) * (1 / lanes - LANE_GAP_PERCENT / 100) < LANE_TARGET_PX
+  ) {
+    lanes -= 1;
+  }
+  return lanes;
+};
+
 /** Minutes of a day's column as pixels at `hourPx` an hour. */
 export const px = (minutes: number, hourPx: number): number => (minutes / 60) * hourPx;

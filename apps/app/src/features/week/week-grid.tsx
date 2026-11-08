@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { View } from "react-native";
 
 import type { CalendarEvent, Language, UsageRow } from "@pace/core";
@@ -16,7 +17,7 @@ import {
 import { DayHeader } from "./day-strip.tsx";
 import { SidewaysDays } from "./sideways-days.tsx";
 import { FoldBox, ItemBox, MIN_TARGET_PX, pickOf } from "./week-boxes.tsx";
-import { MAX_LANES, phoneColumnPx, px } from "./week-lanes.ts";
+import { lanesThatFit, MAX_LANES, phoneColumnPx, px } from "./week-lanes.ts";
 import { type Picked, pickedKey } from "./week-picked.ts";
 
 export type GridProps = {
@@ -33,6 +34,9 @@ export type GridProps = {
   /** A phone keeps each day readable at this width and scrolls the week sideways. */
   readonly minColumnPx: number;
 };
+
+/** The grid's side padding (`px-3`, both sides) and the hour gutter (`w-8`): the days share the rest. */
+const CHROME_PX = 24 + 32;
 
 /** The hours down the left edge: "07", "08", … Decoration: the grid's lines say the time. */
 const HourGutter = ({
@@ -151,6 +155,9 @@ block or calendar event of the week (or at midnight with night hours). On a phon
 a readable width and the week scrolls sideways, snapping to whole days.
 */
 export const WeekGrid = ({ calendar, minColumnPx, ...props }: GridProps) => {
+  // A computer's seven columns share the grid's width: measured, so a run folds before a lane gets
+  // narrower than a thumb (0 until the first layout).
+  const [widthPx, setWidthPx] = useState(0);
   const fromHour = gridFromHour(props.week, calendar);
   const week = { ...props.week, fromHour };
   const where = { fromHour, zone: week.zone };
@@ -159,7 +166,8 @@ export const WeekGrid = ({ calendar, minColumnPx, ...props }: GridProps) => {
     days: week.days,
     fromHour,
     hourPx: props.hourPx,
-    maxLanes: MAX_LANES,
+    // A phone's column widens for its lanes; a computer's shares the window, so a run folds sooner.
+    maxLanes: minColumnPx === 0 ? lanesThatFit(Math.max(0, widthPx - CHROME_PX) / 7) : MAX_LANES,
     minPx: MIN_TARGET_PX,
     zone: week.zone,
   });
@@ -179,7 +187,12 @@ export const WeekGrid = ({ calendar, minColumnPx, ...props }: GridProps) => {
       : [<DayColumn key={column.day.date} {...props} {...column} layout={layout} week={week} />],
   );
   return (
-    <View className="flex-row px-3">
+    <View
+      className="flex-row px-3"
+      onLayout={(event) => {
+        setWidthPx(event.nativeEvent.layout.width);
+      }}
+    >
       <HourGutter fromHour={fromHour} hourPx={props.hourPx} />
       {minColumnPx === 0 ? (
         days

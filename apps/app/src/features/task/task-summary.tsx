@@ -11,7 +11,7 @@ import { Group } from "#app/ui/group.tsx";
 import { STATUS_HUES, type TagColor } from "#app/ui/hue.ts";
 import { Icon } from "#app/ui/icon.tsx";
 import { Link } from "#app/ui/link.tsx";
-import { Dot, Tag } from "#app/ui/tag.tsx";
+import { Tag } from "#app/ui/tag.tsx";
 import { Text } from "#app/ui/text.tsx";
 import { describeRepeatRule, formatDuration, presetLabel } from "@pace/core";
 
@@ -103,10 +103,7 @@ const MetaTokens = ({
       className="h-5 flex-row items-center gap-2 overflow-hidden"
       testID="task-meta"
     >
-      <Dot hue={category.color} />
-      <Text policy="truncate" role="footnote" tone="secondary">
-        {name}
-      </Text>
+      <Tag hue={category.color}>{name}</Tag>
       {words.map((word) =>
         word.tag.kind === "importance" ? (
           <Text className="shrink-0" key={word.key} role="footnote" tone="secondary">

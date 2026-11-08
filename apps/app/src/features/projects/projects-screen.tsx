@@ -12,7 +12,7 @@ import { Icon } from "#app/ui/icon.tsx";
 import { ListRow } from "#app/ui/list-row.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
-import { Dot } from "#app/ui/tag.tsx";
+import { HueTile } from "#app/ui/tag.tsx";
 import { Text } from "#app/ui/text.tsx";
 import { openTasksLabel } from "@pace/client";
 
@@ -89,7 +89,7 @@ export const ProjectsScreen = () => {
           <ListRow
             key={project.id}
             label={project.name}
-            leading={<Dot hue={project.color ?? "slate"} />}
+            leading={<HueTile hue={project.color ?? "slate"} icon="folder" />}
             onPress={() => {
               router.push(`/project/${project.id}`);
             }}

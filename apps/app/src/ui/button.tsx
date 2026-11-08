@@ -102,15 +102,20 @@ const useWidthStyle = (width: ButtonWidth | undefined): typeof AT_TEXT_WIDTH | u
   return chosen === "hug" || (isWide && chosen === "auto") ? AT_TEXT_WIDTH : undefined;
 };
 
-/** The shortcut after the label, the way this computer names it; nothing without a keyboard. */
+/**
+The shortcut after the label, the way this computer names it; nothing without a keyboard, and
+nothing on a phone-width window, where it squeezed the label into a letter a line (bug-lessons
+class 139). The shortcut itself still works (`useShortcut`).
+*/
 export const KeyHint = ({
   hotkey,
   variant,
 }: {
   readonly hotkey: Hotkey | undefined;
   readonly variant: ButtonVariant;
-}) =>
-  hotkey === undefined || KEYBOARD === null ? null : (
+}) => {
+  const isWide = useIsWide();
+  return hotkey === undefined || KEYBOARD === null || !isWide ? null : (
     <NativeText
       aria-hidden
       className={cx("font-sans text-footnote font-normal tabular-nums", HINT[variant])}
@@ -118,6 +123,7 @@ export const KeyHint = ({
       {formatHotkey(hotkey, KEYBOARD)}
     </NativeText>
   );
+};
 
 /** Presses the button on its shortcut while it can be pressed; says the shortcut to screen readers. */
 const useShortcut = (
@@ -245,6 +251,8 @@ export const Button = ({
       {...keyshortcuts}
       accessibilityHint={hint}
       aria-busy={busy}
+      // Never wider than its row: a long label wraps inside the button (worst-case gallery, RU at 320).
+      className="max-w-full"
       disabled={isBlocked}
       haptic={haptic}
       label={label}
