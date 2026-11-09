@@ -140,7 +140,6 @@ export {
   type ProgressMode,
   type Recurrence,
   type ResolvedPreset,
-  type Submission,
   type Weekday,
   type WeekSlot,
 } from "./model/preset.ts";

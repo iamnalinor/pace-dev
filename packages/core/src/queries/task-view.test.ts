@@ -40,7 +40,6 @@ describe("taskView", () => {
 
   it("shows Algebra HW 6 on Wednesday: ~1 h 40 m left", () => {
     const hw = view(HW_ID, HW_VIEW_NOW);
-    expect(hw.preset.submission).toBe("per_subtask");
     expect(hw.status).toBe("in_progress");
     // 4 h estimate, 4 of 7 solved: 240 × 3/7 = 102.86 → 103 min, shown as "~1h 40m".
     expect(hw.workLeftMinutes).toBe(103);

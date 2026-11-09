@@ -83,7 +83,7 @@ export const rowFromItem = (scope: Scope, item: NowItem): TaskRow => {
     importance: item.importance,
     isLate: item.isLate,
     lateMinutes: item.lateMinutes,
-    outcome: taskOutcome(task, item.preset),
+    outcome: taskOutcome(task),
     presetId: task.presetId,
     presetName: presetNameOf(scope.state, task),
     progress: item.progress,

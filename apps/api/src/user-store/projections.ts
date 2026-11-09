@@ -38,7 +38,7 @@ const taskRow = (state: CoreState, task: Task): TaskRow => {
     estimateMinutes: task.estimateMinutes,
     id: task.id,
     importance: preset.ok ? importanceOf(task, preset.value) : (task.importance ?? "normal"),
-    outcome: preset.ok ? taskOutcome(task, preset.value) : (task.closed?.outcome ?? null),
+    outcome: taskOutcome(task),
     presetId: task.presetId,
     progress: preset.ok ? progressOf(task, preset.value.progressMode) : 0,
     projectId: task.projectId,

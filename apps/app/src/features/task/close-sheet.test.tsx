@@ -6,11 +6,20 @@ import { HW_ID, HW_VIEW_NOW, TRK_ID } from "@pace/core/testing";
 
 import { TaskScreen } from "./task-screen.tsx";
 
+/** The task screen with its close sheet open, from the footer's "Done at another time". */
+const renderClosing = async (
+  taskId: string,
+  runtime: Awaited<ReturnType<typeof createTestRuntime>>,
+): Promise<void> => {
+  await renderScreen(<TaskScreen id={taskId} />, runtime);
+  await fireEvent.press(screen.getByRole("button", { name: en("task.doneOther") }));
+};
+
 const HOUR_AGO = "2026-10-07T08:50:00.000Z";
 
 const openClose = async (now = HW_VIEW_NOW) => {
   const runtime = await createTestRuntime({ now });
-  await renderScreen(<TaskScreen id={HW_ID} openClose />, runtime);
+  await renderClosing(HW_ID, runtime);
   return runtime;
 };
 
@@ -22,7 +31,7 @@ describe("CloseSheet — a task without a deadline", () => {
     const result = await runtime.actions.createTask({ presetId: "personal", title: "Call mom" });
     const [created] = result.ok ? result.value : [];
     const taskId = created?.type === "task.created" ? created.payload.taskId : "";
-    await renderScreen(<TaskScreen id={taskId} openClose />, runtime);
+    await renderClosing(taskId, runtime);
     expect(preview("outcome")).toHaveTextContent(`${en("close.recordsAs")}${en("outcome.done")}`);
     expect(screen.queryByRole("radio", { name: en("quickTime.at-deadline") })).toBeNull();
   });
@@ -133,7 +142,7 @@ describe("CloseSheet — a homework task (one done mark per subtask, nothing to 
 describe("CloseSheet — closing a whole task", () => {
   it("previews a late close after the due and closes as done", async () => {
     const runtime = await createTestRuntime({ deviceTz: "UTC", now: "2026-10-10T10:00:00.000Z" });
-    await renderScreen(<TaskScreen id={TRK_ID} openClose />, runtime);
+    await renderClosing(TRK_ID, runtime);
     expect(screen.getByRole("header", { name: en("close.closeTitle") })).toBeOnTheScreen();
     expect(preview("outcome")).toHaveTextContent(en("close.late"), { exact: false });
     await fireEvent.press(screen.getByRole("radio", { name: en("quickTime.at-deadline") }));
@@ -148,7 +157,7 @@ describe("CloseSheet — closing a whole task", () => {
 /** The tracker's close sheet, the day after its deadline. */
 const openTrk = async () => {
   const runtime = await createTestRuntime({ deviceTz: "UTC", now: "2026-10-10T10:00:00.000Z" });
-  await renderScreen(<TaskScreen id={TRK_ID} openClose />, runtime);
+  await renderClosing(TRK_ID, runtime);
   return runtime;
 };
 
@@ -195,7 +204,7 @@ describe("CloseSheet — the outcome and the time, one choice each (QA round 20)
     const result = await runtime.actions.createTask({ presetId: "personal", title: "Call mom" });
     const [created] = result.ok ? result.value : [];
     const taskId = created?.type === "task.created" ? created.payload.taskId : "";
-    await renderScreen(<TaskScreen id={taskId} openClose />, runtime);
+    await renderClosing(taskId, runtime);
     await fireEvent.press(screen.getByRole("radio", { name: en("close.pickExact") }));
     expect(screen.queryByText(en("actionError.retro/before-created"))).toBeNull();
     expect(screen.getByRole("button", { name: en("common.done") })).toBeEnabled();

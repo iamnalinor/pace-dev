@@ -45,6 +45,20 @@ separate PR" and "all in a separate PR").
     instant (the event's `occurredAt`).
     Alternative that lost: done = the old "submitted" only (solved-only would read as not done).
 
+### Presets, after the round (2026-11-09, owner)
+11. **The preset field `submission` (`whole` / `per_subtask`, «Сдача по подзадачам») is removed**
+    (the core report's open question). A task's check always closes it (Undo as today);
+    subtasks are marked done one by one and show progress. Lateness no longer asks the preset: a
+    task with done subtasks is judged by their instants, otherwise by the closing time. The key
+    is no longer written, shown or offered (preset editor, task tags, MCP descriptions, base and
+    example presets, i18n); old presets, overrides and events that carry it still parse, and
+    `parsePresetDefinition` drops it (an optional, deprecated, ignored schema key), so old logs
+    and old clients keep working. An old client's whole `task.submitted` is no longer refused
+    for want of a done subtask. Numbered problems in quick input are read for `hw` and the
+    presets built on it (they were read for `per_subtask` presets). No D1/DO column was involved.
+    Alternatives that lost: rename the setting; keep it hidden with `per_subtask` for `hw`
+    only (lateness by closing time for every other preset).
+
 ## Open questions (with the default taken)
 - Item 6 on Android: the same params drive the native stack; deep links from outside the app
   (`pace://`) are not added in this round. Default: web URLs only, native keeps its stack.

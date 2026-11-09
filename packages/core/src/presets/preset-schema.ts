@@ -118,6 +118,13 @@ const FieldsSchema = z.preprocess(
 );
 
 /**
+Legacy: the submission mode (`whole` / `per_subtask`) went on 2026-11-09 (a task's check closes
+it, subtasks are marked one by one). Accepted so old events and old clients parse, then dropped
+(`parsePresetDefinition`); nothing reads it.
+*/
+const LegacySubmissionSchema = z.enum(["per_subtask", "whole"]);
+
+/**
 Legacy: notification thresholds no feature ever read (score alerts and the waiting status went
 in stage 6, the rest in stage 8). Accepted so old events parse, then dropped
 (`parsePresetDefinition`).
@@ -140,7 +147,8 @@ export const PresetDefinitionSchema = z.strictObject({
   urgencyPolicy: z.enum(["age", "lag", "pace", "resubmission"]).exactOptional(),
   defaultImportance: ImportanceSchema.exactOptional(),
   deadlinePolicy: DeadlinePolicySchema.exactOptional(),
-  submission: z.enum(["per_subtask", "whole"]).exactOptional(),
+  // Deprecated (2026-11-09): read and dropped, see `LegacySubmissionSchema`.
+  submission: LegacySubmissionSchema.exactOptional(),
   progressMode: z.enum(["none", "slider", "subtasks"]).exactOptional(),
   recurrence: RecurrenceSchema.nullable().exactOptional(),
   fields: FieldsSchema.exactOptional(),
@@ -161,11 +169,11 @@ const describeIssues = (issues: readonly z.core.$ZodIssue[]): string =>
     })
     .join("; ");
 
-/** A stored or entered definition, checked; the legacy notification thresholds are dropped. */
+/** A stored or entered definition, checked; the legacy thresholds and submission mode are dropped. */
 export const parsePresetDefinition = (value: unknown): Result<PresetDefinition, string> => {
   const parsed = PresetDefinitionSchema.safeParse(value);
   if (parsed.success) {
-    const { notify: _legacy, ...definition } = parsed.data;
+    const { notify: _thresholds, submission: _submission, ...definition } = parsed.data;
     return ok(definition);
   }
   return err(describeIssues(parsed.error.issues));

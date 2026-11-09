@@ -37,8 +37,6 @@ export const enBoard = {
   "status.not_started": "Not started",
   "status.in_progress": "In progress",
   "status.paused": "Paused",
-  "submission.per_subtask": "Per-subtask submission",
-  "submission.whole": "Submit whole",
   "outcome.done": "Done",
   "outcome.done_late": "Done late",
   "outcome.cancelled": "Cancelled",

@@ -45,8 +45,9 @@ describe("PresetDefinitionSchema", () => {
       submission: "per_subtask",
       urgencyPolicy: "resubmission",
     };
-    // The notification thresholds were never used (stage 8): old presets parse, they are dropped.
-    const { notify: _thresholds, ...kept } = full;
+    // The notification thresholds were never used (stage 8) and the submission mode went
+    // (2026-11-09): old presets parse, both are dropped.
+    const { notify: _thresholds, submission: _submission, ...kept } = full;
     expect(parsePresetDefinition(full)).toEqual({ ok: true, value: kept });
   });
 
@@ -122,6 +123,15 @@ describe("PresetDefinitionSchema", () => {
 
   it("rejects an explicit undefined (exact optional keys)", () => {
     expect(PresetDefinitionSchema.safeParse({ urgencyPolicy: undefined }).success).toBe(false);
+  });
+
+  it("reads an old preset's submission mode and drops it (no longer a setting)", () => {
+    for (const submission of ["per_subtask", "whole"]) {
+      expect(parsePresetDefinition({ color: "blue", submission })).toEqual({
+        ok: true,
+        value: { color: "blue" },
+      });
+    }
   });
 
   it("accepts null recurrence (removes an inherited schedule)", () => {

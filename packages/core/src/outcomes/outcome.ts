@@ -61,16 +61,12 @@ export const subtaskOutcome = (subtask: Subtask, dueAt: null | string): SubtaskO
   subtask.doneAt === null ? "pending" : lateness(subtask.doneAt, dueAt);
 
 /**
-Per-subtask submission: the done problems decide (each by when it was done), and the ones
-still open when the task was closed as done were simply not needed. Whole submission (or a
-per-subtask task without problems, or with none done) goes by the closing instant.
+Done subtasks decide (each by when it was done), and the ones still open when the task was
+closed as done were simply not needed. A task without subtasks, or with none done, goes by the
+closing instant. The preset no longer has a say (its `submission` mode went, 2026-11-09).
 */
-const doneOutcome = (
-  task: Task,
-  closedAt: string,
-  preset: ResolvedPreset,
-): "done" | "done_late" => {
-  if (preset.submission === "per_subtask" && task.subtasks.some((item) => item.doneAt !== null)) {
+const doneOutcome = (task: Task, closedAt: string): "done" | "done_late" => {
+  if (task.subtasks.some((item) => item.doneAt !== null)) {
     const isLate = task.subtasks.some((item) => subtaskOutcome(item, task.dueAt) === "done_late");
     return isLate ? "done_late" : "done";
   }
@@ -82,13 +78,13 @@ const doneOutcome = (
 "done before the deadline" because the reducer keeps the earliest closure; the action
 layer also revokes the automatic event so the log tells the same story.
 */
-export const taskOutcome = (task: Task, preset: ResolvedPreset): null | Outcome => {
+export const taskOutcome = (task: Task): null | Outcome => {
   if (task.closed === null) {
     return null;
   }
   switch (task.closed.outcome) {
     case "done": {
-      return doneOutcome(task, task.closed.at, preset);
+      return doneOutcome(task, task.closed.at);
     }
     case "cancelled":
     case "cancelled_missed":

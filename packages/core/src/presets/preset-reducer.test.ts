@@ -149,11 +149,16 @@ describe("presetReducer: preset.updated", () => {
   });
 
   it("replaces the whole definition", () => {
+    const state = fold([base, updated(2, { definition: { color: "blue" }, id: "hw.algebra" })]);
+    expect(state.byId["hw.algebra"]?.definition).toEqual({ color: "blue" });
+  });
+
+  it("reads an old event's submission mode and drops it", () => {
     const state = fold([
       base,
-      updated(2, { definition: { submission: "whole" }, id: "hw.algebra" }),
+      updated(2, { definition: { color: "blue", submission: "whole" }, id: "hw.algebra" }),
     ]);
-    expect(state.byId["hw.algebra"]?.definition).toEqual({ submission: "whole" });
+    expect(state.byId["hw.algebra"]?.definition).toEqual({ color: "blue" });
   });
 
   it("keeps createdAt, archived and builtIn", () => {

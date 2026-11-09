@@ -1,5 +1,6 @@
+import type { ReactNode } from "react";
+
 import { useRouter } from "expo-router";
-import { type ReactNode, useCallback, useEffect, useState } from "react";
 
 import type { SharedIn } from "#app/platform/shared-line.ts";
 
@@ -14,30 +15,18 @@ import { useSearchParam } from "#app/shared/use-search-param.ts";
 import { useIsWide } from "#app/ui/layout.ts";
 import { Shell } from "#app/ui/shell.tsx";
 
-type Picked = { readonly id: string; readonly close: boolean };
-
 /**
 The task open beside the list, from the address (`?task=<id>`, feedback 5 item 6): a reload, a
 link and the browser's history open the same one. An id the store does not know (a deleted task,
 a mistyped link, the log still loading) leaves the pane closed and the address as it is: nothing
-is written back, so nothing loops (bug-lessons 1). Whether the submit sheet opens with it is not
-in the address: it opens once, on the tap that asked for it.
+is written back, so nothing loops (bug-lessons 1).
 */
-const usePickedTask = (): readonly [null | Picked, (picked: null | Picked) => void] => {
+const usePickedTask = (): readonly [null | string, (taskId: null | string) => void] => {
   const [taskId, setTaskId] = useSearchParam("task");
-  const [closeFor, setCloseFor] = useState<null | string>(null);
   const isKnown = useAppState(
     (state) => taskId !== null && Object.hasOwn(state.tasks.byId, taskId),
   );
-  const pick = useCallback(
-    (next: null | Picked): void => {
-      setCloseFor(next?.close === true ? next.id : null);
-      setTaskId(next?.id ?? null);
-    },
-    [setTaskId],
-  );
-  const picked = taskId !== null && isKnown ? { close: closeFor === taskId, id: taskId } : null;
-  return [picked, pick];
+  return [taskId !== null && isKnown ? taskId : null, setTaskId];
 };
 
 /** The inspector's task: the picked one, with its pane's close. */
@@ -45,11 +34,11 @@ const PickedTask = ({
   onClose,
   picked,
 }: {
-  readonly picked: Picked;
+  readonly picked: string;
   readonly onClose: () => void;
 }) => (
   <TaskPaneProvider onClose={onClose}>
-    <TaskScreen id={picked.id} key={picked.id} openClose={picked.close} />
+    <TaskScreen id={picked} key={picked} />
   </TaskPaneProvider>
 );
 
@@ -65,8 +54,8 @@ const NowSplit = ({
   picked,
 }: {
   readonly isComposerFocused: boolean;
-  readonly picked: null | Picked;
-  readonly onPick: (picked: null | Picked) => void;
+  readonly picked: null | string;
+  readonly onPick: (picked: null | string) => void;
 }) => {
   const t = useT();
   const flow = useComposerFlow();
@@ -84,20 +73,13 @@ const NowSplit = ({
       />
     );
   }
-  // The check's submit sheet opens once: the form taking the pane over has used it up, so
-  // the task coming back after the form does not open the sheet again by itself.
-  useEffect(() => {
-    if (flow.form !== null && picked?.close === true) {
-      onPick({ ...picked, close: false });
-    }
-  }, [flow.form, onPick, picked]);
   return (
     <TaskOpenerProvider
-      open={(id, options) => {
+      open={(id) => {
         flow.hide();
-        onPick({ close: options?.close === true, id });
+        onPick(id);
       }}
-      selectedId={flow.form === null ? (picked?.id ?? null) : null}
+      selectedId={flow.form === null ? picked : null}
     >
       <Shell
         content={<NowBoard isComposerFocused={isComposerFocused} />}
@@ -148,7 +130,7 @@ export const NowScreen = ({
       lineDraftKey={lineDraftKey}
       onCreatedTask={(taskId) => {
         if (isWide) {
-          setPicked({ close: false, id: taskId });
+          setPicked(taskId);
         } else {
           router.push(`/task/${taskId}`);
         }

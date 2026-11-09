@@ -64,7 +64,6 @@ const walk = (
 const merge = (base: ResolvedPreset, delta: PresetDefinition): ResolvedPreset => ({
   defaultImportance: delta.defaultImportance ?? base.defaultImportance,
   deadlinePolicy: delta.deadlinePolicy ?? base.deadlinePolicy,
-  submission: delta.submission ?? base.submission,
   progressMode: delta.progressMode ?? base.progressMode,
   // `null` is a value here (it removes the inherited schedule), so `??` would be wrong.
   recurrence: delta.recurrence === undefined ? base.recurrence : delta.recurrence,
@@ -101,6 +100,12 @@ export const presetChain = (
   return chain.ok ? ok(chain.value.presets) : chain;
 };
 
+/** Homework or a course built on it: the chain ends at the built-in `hw`. */
+export const isHomeworkPreset = (state: PresetsState, presetId: string): boolean => {
+  const chain = walk(state, presetId, []);
+  return chain.ok && chain.value.base.id === "hw";
+};
+
 /**
 Base preset → user presets along the chain → the task's own overrides, later wins.
 Archived presets resolve, so existing tasks keep working.
@@ -123,19 +128,14 @@ export const resolvePreset = (
 };
 
 /**
-How a task actually tracks progress, whatever its preset prefers: with subtasks, by subtasks
-(and per-subtask submission only then); without, on the 0–10 bar and submitted whole. A
-preset without progress stays without.
+How a task actually tracks progress, whatever its preset prefers: with subtasks, by subtasks;
+without, on the 0–10 bar. A preset without progress stays without.
 */
 export const shapeForTask = (preset: ResolvedPreset, hasSubtasks: boolean): ResolvedPreset => {
   if (hasSubtasks) {
     return preset.progressMode === "subtasks" ? preset : { ...preset, progressMode: "subtasks" };
   }
-  return {
-    ...preset,
-    submission: "whole",
-    progressMode: preset.progressMode === "none" ? "none" : "slider",
-  };
+  return { ...preset, progressMode: preset.progressMode === "none" ? "none" : "slider" };
 };
 
 /** The task's preset chain with its own overrides on top, shaped by whether it has subtasks. */

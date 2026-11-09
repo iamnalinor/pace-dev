@@ -19,8 +19,6 @@ export type DeadlinePolicy =
       readonly finalTz: null | string;
     };
 
-export type Submission = "per_subtask" | "whole";
-
 export type ProgressMode = "none" | "slider" | "subtasks";
 
 /** ISO weekday: 1 = Monday … 7 = Sunday. */
@@ -60,7 +58,6 @@ export type PresetFields = {
 export type PresetDefinition = {
   readonly defaultImportance?: Importance;
   readonly deadlinePolicy?: DeadlinePolicy;
-  readonly submission?: Submission;
   readonly progressMode?: ProgressMode;
   /** `null` removes an inherited recurrence. */
   readonly recurrence?: null | Recurrence;
@@ -73,7 +70,6 @@ export type PresetDefinition = {
 export type ResolvedPreset = {
   readonly defaultImportance: Importance;
   readonly deadlinePolicy: DeadlinePolicy;
-  readonly submission: Submission;
   readonly progressMode: ProgressMode;
   readonly recurrence: null | Recurrence;
   readonly fields: PresetFields;

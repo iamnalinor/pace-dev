@@ -548,8 +548,9 @@ describe("presets", () => {
     expect(algebra).toMatchObject({
       builtIn: false,
       extends: "hw",
-      resolved: { submission: "per_subtask" },
+      resolved: { deadlinePolicy: { kind: "resubmission" } },
     });
+    expect(algebra?.["resolved"]).not.toHaveProperty("submission");
     expect(listed.find((preset) => preset["id"] === "hw")).toMatchObject({ builtIn: true });
 
     await okTool(token, "create_preset", {
@@ -593,6 +594,24 @@ describe("presets", () => {
       name: "Operations",
     });
     expect(await errorText(token, "archive_preset", { id: "inbox" })).toContain("preset/built-in");
+  });
+
+  it("takes an old client's submission mode and writes nothing of it (2026-11-09)", async () => {
+    const token = await readWriteToken();
+    await okTool(token, "create_preset", {
+      definition: { defaultEstimateMinutes: 20, submission: "whole" },
+      extends: "hw",
+      id: "hw.old",
+      name: "Old client",
+    });
+    const created = (await pull()).events.find(
+      (event) => event.type === "preset.created" && event.payload["id"] === "hw.old",
+    );
+    expect(created?.payload["definition"]).toEqual({ defaultEstimateMinutes: 20 });
+    const listed = rows((await okTool(token, "list_presets"))["presets"]);
+    const old = listed.find((preset) => preset["id"] === "hw.old");
+    expect(old?.["resolved"]).not.toHaveProperty("submission");
+    expect(old?.["definition"]).not.toHaveProperty("submission");
   });
 
   it("reads weekday names, stores their numbers, numbers from firstNumber and says what is wrong (feedback 5)", async () => {

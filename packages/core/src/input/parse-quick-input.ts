@@ -2,7 +2,7 @@ import type { CoreState } from "../materialize/core-state.ts";
 import type { Importance } from "../model/preset.ts";
 
 import { extractLink } from "../links.ts";
-import { resolvePreset } from "../presets/resolve-preset.ts";
+import { isHomeworkPreset, resolvePreset } from "../presets/resolve-preset.ts";
 import { accountTz, type QueryContext } from "../queries/context.ts";
 import { suggestFor } from "../queries/suggest.ts";
 import { findDate } from "./quick-date.ts";
@@ -118,8 +118,8 @@ export const parseQuickInput = (text: string, state: CoreState, ctx: QueryContex
   const words = mask(dated.rest, [...estimate.spans, ...named.spans]);
   const suggestion = suggestFor(state, words, ctx);
   const preset = resolvePreset(state.presets, suggestion.presetId);
-  // Numbered problems belong to homework-like presets, where each one is submitted.
-  const hasProblems = preset.ok && preset.value.submission === "per_subtask";
+  // Numbered problems belong to homework and the courses built on it.
+  const hasProblems = isHomeworkPreset(state.presets, suggestion.presetId);
   const problems = hasProblems ? problemsOf(words) : { spans: [], subtasks: [] };
   const spans = inOrder(linkSpans, [
     ...dated.spans,

@@ -15,7 +15,6 @@ import {
   type QueryContext,
   type RepeatRule,
   type Result,
-  type Submission,
   type Task,
   taskOutcome,
   taskRepeatRule,
@@ -29,8 +28,7 @@ import { type QuickTime, quickTimes } from "../clock.ts";
 export type TaskTag =
   | { readonly kind: "importance"; readonly importance: Importance }
   | { readonly kind: "outcome"; readonly outcome: Outcome }
-  | { readonly kind: "status"; readonly status: TaskStatus }
-  | { readonly kind: "submission"; readonly submission: Submission };
+  | { readonly kind: "status"; readonly status: TaskStatus };
 
 /** One mark per subtask since feedback 5: done (with its instant) or not yet. */
 export type SubtaskState = "done" | "pending";
@@ -134,10 +132,6 @@ const tags = (view: TaskView, outcome: null | Outcome): readonly TaskTag[] => [
   { kind: "importance", importance: view.importance },
   // A closed task shows how it ended, not the status it had while open.
   outcome === null ? { kind: "status", status: view.status } : { kind: "outcome", outcome },
-  // Only a task with subtasks can be submitted piece by piece; "whole" goes without saying.
-  ...(view.preset.submission === "per_subtask"
-    ? [{ kind: "submission" as const, submission: view.preset.submission }]
-    : []),
 ];
 
 const primaryAction = (task: Task): PrimaryAction => ({
@@ -226,7 +220,7 @@ export const taskViewModel = (
         id: task.presetId,
         name: presetById(state.presets, task.presetId)?.name ?? task.presetId,
       },
-      tags: tags(view, taskOutcome(task, preset)),
+      tags: tags(view, taskOutcome(task)),
       stats: stats(state, view, ctx),
       progress: {
         mode: preset.progressMode,
@@ -238,7 +232,7 @@ export const taskViewModel = (
       quickTimes: quickTimes({ deviceTz: ctx.deviceTz, now: () => ctx.now }, task),
       overrideSheet: overrideSheet(state, view),
       closed: task.closed,
-      outcome: taskOutcome(task, preset),
+      outcome: taskOutcome(task),
     },
   };
 };
