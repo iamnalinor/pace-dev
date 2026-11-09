@@ -263,6 +263,69 @@ test.describe("Back and forward follow the screen (feedback 5 item 6, QA round 2
     await expect(page).toHaveURL(/\/day$/u);
   });
 
+  test("a switch in the sidebar is a step on the web: Back returns to the screen it left (review minor 8)", async ({
+    page,
+  }) => {
+    await page.setViewportSize(DESKTOP);
+    await loginViaApi(page);
+    await page.goto("/");
+    const nav = page.getByRole("navigation", { name: "Main" });
+    await nav.getByRole("link", { exact: true, name: "Day" }).click();
+    await expect(page).toHaveURL(/\/day$/u);
+    await nav.getByRole("link", { name: /^Inbox/u }).click();
+    await expect(page).toHaveURL(/\/inbox$/u);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/day$/u);
+    await page.goBack();
+    await expect(page).toHaveURL(/localhost:\d+\/$/u);
+    await page.goForward();
+    await expect(page).toHaveURL(/\/day$/u);
+  });
+
+  test("at a phone's width: the tab bar's switches and a task are steps, Back retraces them (review minor 8)", async ({
+    page,
+  }) => {
+    await page.setViewportSize(PHONE);
+    await loginViaApi(page);
+    await page.goto("/");
+    await addTask(page, "Phone back task");
+    await page.goto("/");
+    const bar = page.getByRole("navigation", { name: "Main" });
+    await bar.getByRole("link", { exact: true, name: "Day" }).click();
+    await expect(page).toHaveURL(/\/day$/u);
+    await page.goBack();
+    await expect(page).toHaveURL(/localhost:\d+\/$/u);
+    await nowTasks(page).getByText("Phone back task").click();
+    await expect(page).toHaveURL(/\/task\//u);
+    await page.goBack();
+    await expect(page).toHaveURL(/localhost:\d+\/$/u);
+    await expect(taskHeader(page, "Phone back task")).toHaveCount(0);
+  });
+
+  test("an entry recorded on a wide window with a task open becomes the task's page at a phone's width; Back and Forward do not loop (review minor 8)", async ({
+    page,
+  }) => {
+    await page.setViewportSize(DESKTOP);
+    await loginViaApi(page);
+    await page.goto("/");
+    await addTask(page, "Narrowed task");
+    await page.getByRole("button", { exact: true, name: "Close" }).first().click();
+    await nowTasks(page)
+      .getByRole("link", { name: /^Narrowed task/u })
+      .click();
+    await expect(page).toHaveURL(/[?&]task=/u);
+    await page.setViewportSize(PHONE);
+    // The Redirect replaces the entry: the task's own page, as a phone opens it.
+    await expect(page).toHaveURL(/\/task\//u);
+    await expect(taskHeader(page, "Narrowed task")).toBeVisible();
+    await page.goBack();
+    await expect(page).toHaveURL(/localhost:\d+\/$/u);
+    await expect(taskHeader(page, "Narrowed task")).toHaveCount(0);
+    await page.goForward();
+    await expect(taskHeader(page, "Narrowed task")).toBeVisible();
+    await expect(page).toHaveURL(/\/task\//u);
+  });
+
   test("Week (in More's stack): another week is a step; Back and Forward move between them", async ({
     page,
   }) => {

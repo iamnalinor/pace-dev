@@ -643,6 +643,35 @@ describe("client.assistant", () => {
     expect(sent.filter(({ init }) => init.keepalive === true)).toHaveLength(1);
   });
 
+  it("sends the answer again without keepalive when a browser refuses the keepalive request (review minor 7)", async () => {
+    const sent: { url: string; init: RequestInit }[] = [];
+    const api = createFakeFetch({
+      ...emptySyncRoutes,
+      "GET /api/me": () => fakeMe,
+      "POST /api/decisions/resolve": () => ({ resolved: 1 }),
+    });
+    const client = createPaceClient({
+      baseUrl: "https://api.test",
+      deviceId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+      fetch: async (url, init) => {
+        sent.push({ init, url });
+        if (init.keepalive === true) {
+          // A browser that does not take keepalive with a preflight rejects before the network.
+          throw new TypeError("Failed to fetch");
+        }
+        return await api.fetch(url, init);
+      },
+      now: () => "2026-10-06T12:00:00.000Z",
+      session: createMemorySessionStore(),
+      source: "web",
+      store: createMemoryEventStore(),
+    });
+    await client.auth.ready;
+    await client.assistant.resolve(["01ARZ3NDEKTSV4RRFFQ69G5FAA"], "approved", null);
+    const resolves = sent.filter(({ url }) => url.endsWith("/api/decisions/resolve"));
+    expect(resolves.map(({ init }) => init.keepalive === true)).toEqual([true, false]);
+  });
+
   it("turns the parse into composer edits", async () => {
     const { client } = await setup({ "POST /api/parse": () => parsed });
     const outcome = await client.assistant.read("разобрать почту, полтора часа");

@@ -50,10 +50,12 @@ export const withEntryPushed = <State extends TabState>(state: State): State => 
 After `GO_BACK` (`after`) from `before`: the screen gets back what its entry showed, the params
 (`fullHistory` does that already) and its own navigator's state.
 */
-export const withEntryRestored = <State extends TabState>(
-  before: State,
-  after: null | State,
-): null | State => {
+export const withEntryRestored = <
+  After extends null | { readonly routes: readonly { readonly key?: string | undefined }[] },
+>(
+  before: TabState,
+  after: After,
+): After => {
   const back = before.history.at(-2);
   if (after === null || back?.shown === undefined) {
     return after;
@@ -64,6 +66,37 @@ export const withEntryRestored = <State extends TabState>(
       route.key === back.key ? { ...route, params: back.params, state: back.shown?.state } : route,
     ),
   };
+};
+
+/** Whether `source` is a tab other than the one in front (a tab left behind). */
+const isOtherTab = (state: TabState, source: string | undefined): boolean =>
+  state.routes.some((route, index) => index !== state.index && route.key === source);
+
+/** A navigator as a screen's `navigation` reaches it, the parts the step looks at. */
+type NavigatorLike = {
+  readonly getParent: () => NavigatorLike | undefined;
+  readonly getState: () => undefined | { readonly type?: string };
+  readonly isFocused: () => boolean;
+};
+
+/**
+Whether a screen may take a step: it is in front (`isFocused` looks through its parents) and sits
+in the tabs, directly or in a tab's own stack (More's). A screen outside the tabs (a task's own
+page) or a tab left behind (an answer landing after a switch) takes none, so no phantom entry is
+written. The navigator's copy of a tab's stack is not kept up to date (its routes have no keys
+until it changes), so this is asked where the screen is known, not in the router (review of round
+24, minor 6).
+*/
+export const isStepScreen = (navigation: NavigatorLike): boolean => {
+  if (!navigation.isFocused()) {
+    return false;
+  }
+  for (let at: NavigatorLike | undefined = navigation; at !== undefined; at = at.getParent()) {
+    if (at.getState()?.type === "tab") {
+      return true;
+    }
+  }
+  return false;
 };
 
 /** A history entry (as `TabRouter` keeps it) of the route `key`. */
@@ -103,23 +136,30 @@ export const isStepBackWithout = (
   return [...keys].every((key) => expected[key] === shown[key]);
 };
 
-type Router<State, Action, Options> = {
-  readonly getStateForAction: (state: State, action: Action, options: Options) => unknown;
+type Router<State, Action, Options, Result> = {
+  readonly getStateForAction: (state: State, action: Action, options: Options) => Result;
 };
 
-/** The tab navigator's router with `PUSH_ENTRY` and the `GO_BACK` that restores an entry. */
+/**
+The tab navigator's router with `PUSH_ENTRY` and the `GO_BACK` that restores an entry. A step
+asked by a tab left behind (the action's `source`) is left to the tab router, which does not
+handle it; `isStepScreen` keeps the rest from asking (review of round 24, minor 6).
+*/
 export const tabHistoryRouter = <
   State extends TabState,
-  Action extends { readonly type: string },
+  Action extends { readonly source?: string | undefined; readonly type: string },
   Options,
+  Result extends null | { readonly routes: readonly { readonly key?: string | undefined }[] },
 >(
-  original: Router<State, Action, Options>,
+  original: Router<State, Action, Options, Result>,
 ) => ({
-  getStateForAction: (state: State, action: Action, options: Options) => {
-    if (action.type === PUSH_ENTRY) {
+  // eslint-disable-next-line sonarjs/function-return-type -- a router answers the library's own union (a full state, a partial one or null); the step is a full state
+  getStateForAction: (state: State, action: Action, options: Options): Result | State => {
+    if (action.type === PUSH_ENTRY && !isOtherTab(state, action.source)) {
       return withEntryPushed(state);
     }
+    // Every other action, a step asked from elsewhere included (the tab router leaves it unhandled).
     const next = original.getStateForAction(state, action, options);
-    return action.type === "GO_BACK" ? withEntryRestored(state, next as null | State) : next;
+    return action.type === "GO_BACK" ? withEntryRestored(state, next) : next;
   },
 });

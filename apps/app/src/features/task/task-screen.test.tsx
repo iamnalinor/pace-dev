@@ -381,6 +381,10 @@ describe("TaskScreen — work", () => {
     await renderScreen(<TaskScreen id={HW_ID} />, runtime);
     expect(screen.getAllByRole("link", { name: /example\.com\/a/u })).toHaveLength(1);
     expect(screen.getByRole("link", { name: "https://example.com/a" })).toBeOnTheScreen();
+    // While the description is a text field its links are not links: the header shows it then.
+    await fireEvent.press(screen.getByText(/^See /u));
+    expect(screen.getByLabelText(en("edit.description"))).toBeOnTheScreen();
+    expect(screen.getAllByRole("link", { name: /example\.com\/a/u })).toHaveLength(1);
   });
 
   it("keeps a description being edited through a reload, and drops it on Cancel (feedback 5 item 7)", async () => {

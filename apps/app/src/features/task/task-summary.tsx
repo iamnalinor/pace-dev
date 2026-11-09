@@ -178,9 +178,12 @@ const RepeatAndFinal = ({ stats }: { readonly stats: TaskViewModel["stats"] }) =
 
 /** Title, link and tags; the stats card: start, due, repeat, final deadline, work left, tracked. */
 export const TaskSummary = ({
+  isDescriptionEditing = false,
   view,
   workLeftMinutes = view.stats.workLeftMinutes,
 }: {
+  /** The description is a text field now: its links are not shown there, so the header shows it. */
+  readonly isDescriptionEditing?: boolean;
   readonly view: TaskViewModel;
   /** The work left at the progress being dragged, before it is saved. */
   readonly workLeftMinutes?: number;
@@ -206,7 +209,8 @@ export const TaskSummary = ({
           {view.title}
         </Text>
         <MetaTokens category={view.category} tags={view.tags} />
-        {view.link === null || isInDescription(view.link.url, view.description) ? null : (
+        {view.link === null ||
+        (!isDescriptionEditing && isInDescription(view.link.url, view.description)) ? null : (
           <TaskLinkRow url={view.link.url} />
         )}
       </View>

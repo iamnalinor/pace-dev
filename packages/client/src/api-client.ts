@@ -104,12 +104,6 @@ const reach = async (doFetch: FetchLike, url: string, init: RequestInit): Promis
   }
 };
 
-/**
-The answer's body. A connection cut while it is read fails as the fetch itself does (a
-`TypeError`, per the Fetch standard) and is `ApiUnreachable` too: the headers came, the answer did
-not (QA round 17 round-3 review m-b). A body that is not JSON (`SyntaxError`) is an answer, and one
-its caller gave up on (`AbortError`) is rethrown for the caller to read.
-*/
 /** The request as `fetch` takes it, with what the caller added (a signal, keepalive). */
 const requestInit = (
   {
@@ -126,6 +120,12 @@ const requestInit = (
   ...(keepalive === true && { keepalive: true }),
 });
 
+/**
+The answer's body. A connection cut while it is read fails as the fetch itself does (a
+`TypeError`, per the Fetch standard) and is `ApiUnreachable` too: the headers came, the answer did
+not (QA round 17 round-3 review m-b). A body that is not JSON (`SyntaxError`) is an answer, and one
+its caller gave up on (`AbortError`) is rethrown for the caller to read.
+*/
 const readAnswer = async (response: Response, init: RequestInit): Promise<unknown> => {
   try {
     return await response.json();

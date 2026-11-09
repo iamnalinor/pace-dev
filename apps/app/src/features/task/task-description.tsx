@@ -186,8 +186,16 @@ const DescriptionText = ({
 };
 
 /** A quick description edit on the task itself, without opening the full task form. */
-export const TaskDescription = ({ view }: { readonly view: TaskViewModel }) => {
-  const [isEditing, setIsEditing] = useState(false);
+export const TaskDescription = ({
+  isEditing,
+  onEditing: setIsEditing,
+  view,
+}: {
+  /** Whether the description is open in its editor (the summary shows its link meanwhile). */
+  readonly isEditing: boolean;
+  readonly onEditing: (isEditing: boolean) => void;
+  readonly view: TaskViewModel;
+}) => {
   const [draft, setDraft] = useState(view.description ?? "");
   // An edit left unsaved by a reload comes back open (feedback 5 item 7); saved or cancelled, it goes.
   const draftKey = `task.${view.id}.about`;

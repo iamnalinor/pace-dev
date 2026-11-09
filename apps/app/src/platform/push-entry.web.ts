@@ -1,7 +1,7 @@
 import { useNavigation } from "expo-router";
 import { useCallback } from "react";
 
-import { isStepBackWithout, PUSH_ENTRY } from "#app/ui/tab-history.ts";
+import { isStepBackWithout, isStepScreen, PUSH_ENTRY } from "#app/ui/tab-history.ts";
 
 /** One step per action: a pick that also clears another param (a week and its block) is one. */
 const step = { isTaken: false };
@@ -14,7 +14,7 @@ address instead of replacing it. More's stack hands the action up to the tabs.
 export const usePushEntry = (): (() => void) => {
   const navigation = useNavigation();
   return useCallback(() => {
-    if (step.isTaken) {
+    if (step.isTaken || !isStepScreen(navigation)) {
       return;
     }
     step.isTaken = true;

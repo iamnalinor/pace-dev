@@ -29,13 +29,19 @@ type Open = "close" | "close-as" | "edit" | "project" | null;
 const TaskBody = ({ view }: { readonly view: TaskViewModel }) => {
   const live = useLiveProgress(view);
   const isSlider = view.progress.mode === "slider" && view.closed === null;
+  const [isDescriptionEditing, setIsDescriptionEditing] = useState(false);
   return (
     <View className="gap-5 pt-1">
       <TaskSummary
+        isDescriptionEditing={isDescriptionEditing}
         view={view}
         {...(isSlider && { workLeftMinutes: workLeftAt(view, live.step) })}
       />
-      <TaskDescription view={view} />
+      <TaskDescription
+        isEditing={isDescriptionEditing}
+        onEditing={setIsDescriptionEditing}
+        view={view}
+      />
       <WorkProgress live={live} view={view} />
       <SubtaskChecklist view={view} />
       <SourceText text={view.sourceText} />

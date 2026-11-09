@@ -24,7 +24,7 @@ export default function TabsLayout() {
       screenLayout={({ children }) => <ScreenScene>{children}</ScreenScene>}
       screenOptions={{ headerShown: false, tabBarPosition: isCompact ? "bottom" : "left" }}
       tabBar={(props) => <TabBar {...props} isFront={isFront} />}
-      UNSTABLE_router={(original) => tabHistoryRouter(original) as Partial<typeof original>}
+      UNSTABLE_router={(original) => tabHistoryRouter(original)}
     >
       <Tabs.Screen name="index" options={{ title: t("nav.now") }} />
       <Tabs.Screen name="day" options={{ title: t("nav.day") }} />
