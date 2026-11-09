@@ -172,6 +172,14 @@ describe("TaskScreen — homework", () => {
     await fireEvent.press(screen.getByRole("button", { name: "Back" }));
     expect(router.back).toHaveBeenCalled();
   });
+
+  it("goes to Now when there is nothing to go back to (opened by its link, or Now's `?task=` handed over at a phone's width)", async () => {
+    await hwScreen();
+    router.canGoBack.mockReturnValueOnce(false);
+    await fireEvent.press(screen.getByRole("button", { name: "Back" }));
+    expect(router.back).not.toHaveBeenCalled();
+    expect(router.replace).toHaveBeenCalledWith("/");
+  });
 });
 
 /** The rent instance's screen at `now`, its series repeating until `until` (no end by default). */
