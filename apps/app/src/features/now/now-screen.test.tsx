@@ -187,7 +187,8 @@ describe("NowBoard", () => {
       "Mark RFC: dedicated runner pool done",
       "Mark Return library books done",
     ]);
-    expect(screen.getByText("Due tomorrow 23:59 · 1d 8h left · 4/7 done")).toBeOnTheScreen();
+    // On a phone the date goes last: the line's cut takes it, not the countdown (design review 2 N10).
+    expect(screen.getByText("1d 8h left · 4/7 done · Due tomorrow 23:59")).toBeOnTheScreen();
     // The project (else the category) is a tag and a non-Normal importance a word; Normal says nothing.
     expect(screen.getAllByText("ASAP").length).toBeGreaterThan(0);
     expect(screen.queryByText("Normal")).not.toBeOnTheScreen();

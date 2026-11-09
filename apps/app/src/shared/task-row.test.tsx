@@ -4,7 +4,9 @@ import type { NowRow } from "@pace/client";
 
 import { renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
-import { SELECTED_ROW_FILL } from "@pace/core";
+import { withWindowWidth } from "#app/test/window.ts";
+import { addMinutesIso, SELECTED_ROW_FILL } from "@pace/core";
+import { NOW } from "@pace/core/testing";
 
 import { TaskOpenerProvider } from "./task-opener.tsx";
 import { TaskRow } from "./task-row.tsx";
@@ -62,5 +64,45 @@ describe("TaskRow", () => {
     const check = screen.getByRole("checkbox");
     const open = screen.getByRole("link", { name: /Write the intro/u });
     expect(open).not.toContainElement(check);
+  });
+});
+
+const DUE_SOON: NowRow = {
+  ...ROW,
+  meta: [
+    {
+      at: addMinutesIso(NOW, 1438),
+      kind: "due",
+      relative: "tomorrow",
+      tz: "Europe/Moscow",
+      zoneDiffers: false,
+    },
+    { kind: "left", minutes: 1438 },
+  ],
+};
+
+const renderDueSoon = async () => {
+  await renderScreen(
+    <TaskOpenerProvider open={jest.fn()} selectedId={null}>
+      <TaskRow onOpen={jest.fn()} row={DUE_SOON} />
+    </TaskOpenerProvider>,
+    await createTestRuntime({ world: "empty" }),
+  );
+  // The line itself: the one text that holds both pieces.
+  return screen.getByText(/Due[\s\S]*left|left[\s\S]*Due/u);
+};
+
+describe("TaskRow's meta line on a phone (design review 2 N10)", () => {
+  it("puts the countdown before the date, so the date is what the line's end cuts", async () => {
+    // «Срок завтра 19:30 · осталос…»: the cut ate the one value that matters.
+    expect(await renderDueSoon()).toHaveTextContent(/left · Due/u);
+  });
+});
+
+describe("TaskRow's meta line on a computer", () => {
+  withWindowWidth(1440);
+
+  it("keeps the date first where the line has room", async () => {
+    expect(await renderDueSoon()).toHaveTextContent(/Due .* · .*left/u);
   });
 });
