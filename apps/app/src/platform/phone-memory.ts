@@ -5,6 +5,7 @@ import { createStore } from "zustand/vanilla";
 import type { PhoneCalendarEvent } from "./phone-calendar.ts";
 
 import { createSecureSessionStore } from "./secure-session.ts";
+import { serially } from "./serially.ts";
 import { readServer } from "./server.ts";
 import { sessionHashOf } from "./session-fingerprint.ts";
 import { readSessionValue, writeSessionValue } from "./session-value.ts";
@@ -62,16 +63,18 @@ const keyList = (storeKey: string) => {
   };
   return {
     add: async (key: string): Promise<void> => {
-      const session = await currentSession();
-      if (session === null) {
-        return;
-      }
-      const current = await load(session);
-      await writePrivate(
-        storeKey,
-        session,
-        [...current.filter((item) => item !== key), key].slice(-KEEP),
-      );
+      await serially(storeKey, async () => {
+        const session = await currentSession();
+        if (session === null) {
+          return;
+        }
+        const current = await load(session);
+        await writePrivate(
+          storeKey,
+          session,
+          [...current.filter((item) => item !== key), key].slice(-KEEP),
+        );
+      });
     },
     all: async (): Promise<ReadonlySet<string>> => {
       const session = await currentSession();
@@ -115,29 +118,25 @@ export const seriesRules = async (): Promise<readonly SeriesRule[]> => {
   return Array.isArray(parsed) ? parsed.filter((item) => isRule(item)) : [];
 };
 
+/** Changes the rules in turn: each reads, changes and writes back the one record. */
+const changeRules = async (
+  change: (rules: readonly SeriesRule[]) => readonly SeriesRule[],
+): Promise<void> => {
+  await serially(RULES_KEY, async () => {
+    const session = await currentSession();
+    if (session === null) {
+      return;
+    }
+    await writePrivate(RULES_KEY, session, change(await seriesRules()));
+  });
+};
+
 export const setSeriesRule = async (rule: SeriesRule): Promise<void> => {
-  const session = await currentSession();
-  if (session === null) {
-    return;
-  }
-  const current = await seriesRules();
-  await writePrivate(RULES_KEY, session, [
-    ...current.filter((item) => item.series !== rule.series),
-    rule,
-  ]);
+  await changeRules((rules) => [...rules.filter((item) => item.series !== rule.series), rule]);
 };
 
 export const removeSeriesRule = async (series: string): Promise<void> => {
-  const session = await currentSession();
-  if (session === null) {
-    return;
-  }
-  const current = await seriesRules();
-  await writePrivate(
-    RULES_KEY,
-    session,
-    current.filter((item) => item.series !== series),
-  );
+  await changeRules((rules) => rules.filter((item) => item.series !== series));
 };
 
 const CALENDAR_SYNC_KEY = "pace.phone.calendarSync";

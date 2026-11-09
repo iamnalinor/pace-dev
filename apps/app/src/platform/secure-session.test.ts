@@ -59,6 +59,32 @@ describe("createSecureEndedSessionStore (R22-02)", () => {
     await expect(a.list()).resolves.toEqual(["tok_2"]);
   });
 
+  it("loses no token when a keep and a removal overlap (bug-lessons 185)", async () => {
+    const a = createSecureEndedSessionStore(A);
+    await a.add("tok_old");
+    // `retry` removes in parallel while a fresh log-out keeps its token.
+    await Promise.all([a.remove("tok_old"), a.add("tok_new"), a.add("tok_newer")]);
+    await expect(a.list()).resolves.toEqual(["tok_new", "tok_newer"]);
+  });
+
+  it("loses no token when two servers' stores write at once (they share one key)", async () => {
+    await Promise.all([
+      createSecureEndedSessionStore(A).add("tok_a"),
+      createSecureEndedSessionStore(B).add("tok_b"),
+    ]);
+    await expect(createSecureEndedSessionStore(A).list()).resolves.toEqual(["tok_a"]);
+    await expect(createSecureEndedSessionStore(B).list()).resolves.toEqual(["tok_b"]);
+  });
+
+  it("goes on writing after a write the keystore refused", async () => {
+    const a = createSecureEndedSessionStore(A);
+    mockSecureStore.writes.isRefused = true;
+    await expect(a.add("tok_1")).rejects.toThrow("keystore refused");
+    mockSecureStore.writes.isRefused = false;
+    await a.add("tok_2");
+    await expect(a.list()).resolves.toEqual(["tok_2"]);
+  });
+
   it("reads a damaged entry as nothing kept", async () => {
     mockSecureStore.values.set("pace.ended-sessions", "not json");
     await expect(createSecureEndedSessionStore(A).list()).resolves.toEqual([]);

@@ -15,7 +15,7 @@ import { calendarAccess, calendarEvents } from "./phone-calendar.ts";
 import { appLabels, readPhoneEvents } from "./phone-data.ts";
 import { isCalendarSyncOn, seriesRules, setUsageCursor, usageCursor } from "./phone-memory.ts";
 import { phoneName } from "./phone-name.ts";
-import { seriallyBySession } from "./session-poll-queue.ts";
+import { serially } from "./serially.ts";
 
 /** The calendar copy covers last week and the next two. */
 const CALENDAR_BACK_MINUTES = 7 * 24 * 60;
@@ -73,14 +73,14 @@ const uploadCalendar = async (api: ApiClient, deviceId: string, now: string): Pr
   if (session === undefined) {
     return;
   }
-  await seriallyBySession(`calendar:${session}`, async () => {
+  await serially(`calendar:${session}`, async () => {
     await syncCalendar(api, { deviceId, now, session });
   });
 };
 
 /** Clears this session's calendar copy after any upload already in flight has finished. */
 export const clearPhoneCalendar = async (api: ApiClient, session: string): Promise<void> => {
-  await seriallyBySession(`calendar:${session}`, async () => {
+  await serially(`calendar:${session}`, async () => {
     const deviceId = await loadDeviceId();
     if (api.isCurrentSession(session)) {
       await api.call(endpoints.calendar.clear, { query: { deviceId } });

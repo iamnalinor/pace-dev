@@ -3,6 +3,7 @@ import * as SecureStore from "expo-secure-store";
 import type { PaceClientOptions, SessionStore } from "@pace/client";
 
 import { API_BASE_URL } from "./api-base.ts";
+import { serially } from "./serially.ts";
 
 const SESSION_KEY = "pace.session";
 const ENDED_KEY = "pace.ended-sessions";
@@ -92,13 +93,16 @@ only ever sent to its own server, and only to end itself.
 */
 export const createSecureEndedSessionStore = (origin: string): EndedSessionStore => {
   const write = async (change: (tokens: readonly string[]) => readonly string[]): Promise<void> => {
-    const all = await readEnded();
-    const next = change(all[origin] ?? []);
-    const { [origin]: _mine, ...others } = all;
-    const kept = next.length === 0 ? others : { ...others, [origin]: next };
-    await (Object.keys(kept).length === 0
-      ? SecureStore.deleteItemAsync(ENDED_KEY)
-      : SecureStore.setItemAsync(ENDED_KEY, JSON.stringify(kept)));
+    // One key holds every server's list: changes run in turn, or overlapping ones drop each other's.
+    await serially(ENDED_KEY, async () => {
+      const all = await readEnded();
+      const next = change(all[origin] ?? []);
+      const { [origin]: _mine, ...others } = all;
+      const kept = next.length === 0 ? others : { ...others, [origin]: next };
+      await (Object.keys(kept).length === 0
+        ? SecureStore.deleteItemAsync(ENDED_KEY)
+        : SecureStore.setItemAsync(ENDED_KEY, JSON.stringify(kept)));
+    });
   };
   return {
     add: async (token) => {
