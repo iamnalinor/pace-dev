@@ -616,6 +616,33 @@ describe("client.assistant", () => {
     status: "parsed",
   };
 
+  it("sends the answer to the assistant's log with keepalive, so a page closed right after the press still sends it (bug-lessons 192)", async () => {
+    const sent: { url: string; init: RequestInit }[] = [];
+    const api = createFakeFetch({
+      ...emptySyncRoutes,
+      "GET /api/me": () => fakeMe,
+      "POST /api/decisions/resolve": () => ({ resolved: 1 }),
+    });
+    const client = createPaceClient({
+      baseUrl: "https://api.test",
+      deviceId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+      fetch: async (url, init) => {
+        sent.push({ init, url });
+        return await api.fetch(url, init);
+      },
+      now: () => "2026-10-06T12:00:00.000Z",
+      session: createMemorySessionStore(),
+      source: "web",
+      store: createMemoryEventStore(),
+    });
+    await client.auth.ready;
+    await client.assistant.resolve(["01ARZ3NDEKTSV4RRFFQ69G5FAA"], "approved", null);
+    const resolve = sent.find(({ url }) => url.endsWith("/api/decisions/resolve"));
+    expect(resolve?.init.keepalive).toBe(true);
+    // Every other call is an ordinary one.
+    expect(sent.filter(({ init }) => init.keepalive === true)).toHaveLength(1);
+  });
+
   it("turns the parse into composer edits", async () => {
     const { client } = await setup({ "POST /api/parse": () => parsed });
     const outcome = await client.assistant.read("разобрать почту, полтора часа");

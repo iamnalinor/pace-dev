@@ -49,6 +49,38 @@ test("the assistant reads a line, the task is added, the decision is logged", as
   await expect(page).toHaveURL(/\/task\//u);
 });
 
+// Bug-lessons 192: the approval's answer to the log goes with keepalive, so leaving the page right
+// after the press does not cancel it. The answer is held back past the reload to make the race
+// certain (without keepalive the browser drops it as the page goes).
+test("the log hears an approval though the page is left right after the press", async ({
+  page,
+}) => {
+  await loginViaApi(page);
+  await page.goto("/");
+  await page.route("**/api/decisions/resolve", async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.continue();
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await route.continue();
+  });
+  const line = page.getByRole("textbox", { name: "New task" });
+  await line.pressSequentially("сдать отчёт");
+  await line.press("Enter");
+  await expect(page.getByText("The assistant will create “сдать отчёт”")).toBeVisible();
+  await approve(page);
+  await expect(line).toHaveValue("");
+  await page.goto("/decisions");
+  await page.unrouteAll({ behavior: "wait" });
+  const row = page.getByRole("button", { name: "Created task “сдать отчёт”" });
+  await expect(async () => {
+    await page.reload();
+    await expect(row).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: 15_000 });
+  await expect(row.getByText("You approved it")).toBeVisible();
+});
+
 // `#ask <title>`: the fake model asks when (Today / Tomorrow) and whether it is for work or
 // home, and on an answer asks only what the answer did not quote.
 test("an assistant question is answered with one click, by keyboard too", async ({ page }) => {

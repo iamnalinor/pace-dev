@@ -89,6 +89,20 @@ describe("createApiClient", () => {
     });
   });
 
+  it("asks the browser to keep a call alive past the page when the caller says so (bug-lessons 192)", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse(200, { ok: true }));
+    const client = createApiClient({
+      baseUrl: "https://api.test",
+      fetch: fetchMock,
+      token: () => undefined,
+    });
+    await client.call(endpoints.auth.logout, {}, { credential: "ending", keepalive: true });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.test/api/auth/logout",
+      expect.objectContaining({ keepalive: true }),
+    );
+  });
+
   it("a call held for a session check gives up at once when its caller aborts it (CI fix review I1)", async () => {
     const fetchMock = vi.fn(async () =>
       jsonResponse(200, { deliveries: {}, items: [], more: false }),

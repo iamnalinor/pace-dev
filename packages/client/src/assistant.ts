@@ -112,6 +112,12 @@ const localReading = (
   };
 };
 
+/**
+The log's answer is sent without awaiting after an Approve: a reload or a closed tab right after
+the press must not cancel it (bug-lessons 192). Its body is a few ids, far under keepalive's 64 KB.
+*/
+const OUTLIVES_PAGE = { keepalive: true } as const;
+
 export const createAssistant = (deps: AssistantDeps): Assistant => ({
   propose: async (text, domain, thread) => {
     try {
@@ -148,7 +154,8 @@ export const createAssistant = (deps: AssistantDeps): Assistant => ({
       return;
     }
     try {
-      await deps.api.call(endpoints.decisions.resolve, { body: { decisions: [...answers] } });
+      const body = { decisions: [...answers] };
+      await deps.api.call(endpoints.decisions.resolve, { body }, OUTLIVES_PAGE);
     } catch {
       // The log is a record for the person, not a step of the action: nothing to undo.
     }
