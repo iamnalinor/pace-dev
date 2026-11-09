@@ -28,7 +28,7 @@ import { runEach } from "./alarm.ts";
 import { describeTables, runReadOnly, simulate } from "./analytics.ts";
 import { CloudStore } from "./cloud-store.ts";
 import { insertDecisions, listDecisions, resolveDecisions } from "./decision-log.ts";
-import { DERIVE_STEPS } from "./derive-steps.ts";
+import { DERIVE_STEPS, type DeriveStep } from "./derive-steps.ts";
 import * as eventLog from "./event-log.ts";
 import { announceChange } from "./live-sockets.ts";
 import * as log from "./log-queries.ts";
@@ -41,7 +41,7 @@ import { runSleepPass, sleepAtAlarm } from "./sleep-pass.ts";
 import { StateCache } from "./state-cache.ts";
 import { prepareBatch, toRpcState } from "./state.ts";
 import { openStore, resetStore, SCHEMA_TAG, storeIdOf } from "./store-identity.ts";
-import { SERVER_DEVICE_ID, stampSystem, withRetiredMisses } from "./system-events.ts";
+import { SERVER_DEVICE_ID, stampedOrNone, withRetiredMisses } from "./system-events.ts";
 
 type Db = DrizzleSqliteDODatabase<typeof schema>;
 
@@ -59,6 +59,9 @@ export class UserStore extends CloudStore {
   readonly #state: StateCache;
 
   readonly #pool: NotificationPool;
+
+  /** What `derive` runs, in order (`DERIVE_STEPS`; tests swap it through `useDeriveSteps`). */
+  #deriveSteps: readonly DeriveStep[] = DERIVE_STEPS;
 
   readonly db: Db;
 
@@ -118,14 +121,21 @@ export class UserStore extends CloudStore {
     });
     // An older client's automatic miss is taken and revoked at once, in the same write.
     const { ids } = await this.#state.current();
-    await this.#insert(isClientPush ? withRetiredMisses(events, ids, options.now) : events);
+    await this.#insert(
+      isClientPush ? withRetiredMisses(events, { known: ids, now: options.now }) : events,
+    );
     await this.derive(options.now);
     await this.#pool.afterWrite(options.now);
     return { accepted, rejected, seq: await log.latestSeq(this.db) };
   }
 
-  async #system(inputs: readonly EventInput[], now: string): Promise<readonly Event[]> {
-    return await this.#insert(stampSystem(inputs, now));
+  /** The store's own events as one group; one that does not parse is reported and left out. */
+  async #system(
+    inputs: readonly EventInput[],
+    now: string,
+    where: string,
+  ): Promise<readonly Event[]> {
+    return await this.#insert(stampedOrNone(inputs, now, where));
   }
   protected override get pool(): NotificationPool {
     return this.#pool;
@@ -265,7 +275,7 @@ export class UserStore extends CloudStore {
     return await runSleepPass(
       {
         insert: async (inputs, at) => {
-          const made = await this.#system(inputs, at);
+          const made = await this.#system(inputs, at, "sleep pass");
           if (made.length > 0) {
             await this.derive(at);
             await this.#pool.afterWrite(at);
@@ -387,16 +397,21 @@ export class UserStore extends CloudStore {
     });
   }
 
+  /** A seam for tests: a step that writes a bad event is skipped, not fatal (bug-lessons 184). */
+  useDeriveSteps(steps: readonly DeriveStep[]): void {
+    this.#deriveSteps = steps;
+  }
+
   /**
   Appends the system events the state calls for at `now` (see `DERIVE_STEPS`). Deterministic ids
   make this idempotent against clients that derived the same events. Returns their ids.
   */
   async derive(now: string): Promise<readonly string[]> {
     const made: string[] = [];
-    for (const step of DERIVE_STEPS) {
+    for (const [index, step] of this.#deriveSteps.entries()) {
       const current = await this.#state.current();
       const events = step({ ...current.state, existingEventIds: current.ids, now });
-      const appended = await this.#system(events, now);
+      const appended = await this.#system(events, now, `derive step ${String(index)}`);
       made.push(...appended.map((event) => event.id));
     }
     return made;
