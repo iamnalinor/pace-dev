@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 
 import { en, renderScreen } from "#app/test/render.tsx";
 import { paramsSet, searchParams, setSearchParams } from "#app/test/router.ts";
@@ -14,6 +14,24 @@ jest.mock("#app/ui/layout.ts", (): unknown => ({
 }));
 
 const pane = () => screen.queryByLabelText(en("inbox.details"));
+
+/** The shortcuts registered while mounted, by key: the web build's keyboard, as a test drives it. */
+const mockHotkeys = new Map<string, () => void>();
+jest.mock("#app/ui/use-hotkey.tsx", (): unknown => ({
+  ...jest.requireActual("#app/ui/use-hotkey.tsx"),
+  useHotkey: (hotkey: undefined | { readonly key: string }, onPress: () => void) => {
+    if (hotkey !== undefined) {
+      mockHotkeys.set(hotkey.key, onPress);
+    }
+  },
+}));
+
+/** Escape, as the web build's keyboard hands it to the shortcut registered last. */
+const pressEscape = async (): Promise<void> => {
+  await act(() => {
+    mockHotkeys.get("Escape")?.();
+  });
+};
 
 describe("InboxScreen on a wide window", () => {
   it("opens a capture in the inspector, collapsed while nothing is selected, and closes it once accepted", async () => {
@@ -51,5 +69,17 @@ describe("InboxScreen on a wide window", () => {
     await renderScreen(<InboxScreen />, await createTestRuntime());
     expect(pane()).toBeNull();
     expect(paramsSet).not.toHaveBeenCalled();
+  });
+
+  it("closes the details on Escape (UI review I4)", async () => {
+    await renderScreen(<InboxScreen />, await createTestRuntime());
+    const [row] = screen.getAllByTestId("inbox-capture");
+    await fireEvent.press(row as never);
+    expect(pane()).toBeOnTheScreen();
+    await pressEscape();
+    await waitFor(() => {
+      expect(pane()).toBeNull();
+    });
+    expect(searchParams()).toEqual({});
   });
 });

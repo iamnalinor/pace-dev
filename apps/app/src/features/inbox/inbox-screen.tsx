@@ -174,6 +174,7 @@ export const InboxScreen = () => {
         inspector={picked === null ? undefined : <InboxPane onClose={close} picked={picked} />}
         inspectorLabel={t("inbox.details")}
         inspectorOpen={picked !== null}
+        onInspectorClose={close}
       />
     );
   }
