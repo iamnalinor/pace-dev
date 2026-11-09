@@ -92,15 +92,8 @@ const Navigator = () => {
                 <Stack.Screen name="login" options={{ animation: "fade" }} />
                 <Stack.Screen name="auth/index" options={{ animation: "fade" }} />
                 <Stack.Screen name="task/[id]" />
-                <Stack.Screen name="project/[id]" />
-                <Stack.Screen name="projects" />
-                <Stack.Screen name="week" />
-                <Stack.Screen name="insights" />
-                <Stack.Screen name="settings" />
                 <Stack.Screen name="review" />
-                <Stack.Screen name="history" />
                 <Stack.Screen name="permissions" />
-                <Stack.Screen name="notifications" />
                 <Stack.Screen
                   name="onboarding"
                   options={{ animation: "fade", gestureEnabled: false }}

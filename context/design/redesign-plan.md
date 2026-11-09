@@ -789,7 +789,8 @@ Deferred (batch 8): phone per-kind notification rows with a channel sheet (the c
 
 **Files:** `app/(tabs)/more.tsx`, `src/screens/login-screen*.tsx`, `app/oauth/authorize.tsx`,
 `app/onboarding.tsx`, `app/permissions.tsx`, `app/+not-found.tsx` (+ tests).
-- [x] More as a grouped list; pushed destinations keep the tab bar (F-AND-03 residue); login with a
+- [x] More as a grouped list; pushed destinations keep the tab bar (F-AND-03 residue; built in
+      `tabbar-stack`: the `app/(tabs)/(more)/` stack, same addresses); login with a
       graceful Telegram-widget failure state (F-CMP-17); onboarding/permissions in the template;
       not-found with a way home. Commit.
 

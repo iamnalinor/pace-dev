@@ -18,7 +18,7 @@ import { useBreakpoint } from "./use-breakpoint.ts";
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>["tabBar"]>>[0] & {
   /**
-  Whether the tabs are the screen in front: a screen pushed over them (a task, Week) leaves the bar
+  Whether the tabs are the screen in front: a screen pushed over them (a task) leaves the bar
   mounted underneath, and it must not lift the toast while it is out of sight.
   */
   readonly isFront?: boolean;
@@ -26,7 +26,8 @@ type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>["tabBar"]>
 
 /**
 The tabs a phone shows, in order, with their addresses; New task is the composer on Now, not a tab
-of its own. Week, Projects, Insights, History and Settings are behind More.
+of its own. Week, Projects, Insights, History and Settings are behind More, in its stack (the
+bar stays under them, F-AND-03).
 */
 const TABS: Readonly<
   Record<string, { readonly icon: IconName; readonly href: TabItemProps["href"] }>
@@ -34,7 +35,8 @@ const TABS: Readonly<
   day: { href: "/day", icon: "clock" },
   inbox: { href: "/inbox", icon: "inbox" },
   index: { href: "/", icon: "zap" },
-  more: { href: "/more", icon: "ellipsis" },
+  // More's stack: its list and the destinations it opens (Week, Settings…), More selected on all.
+  "(more)": { href: "/more", icon: "ellipsis" },
 };
 
 /** The tab that carries a count badge, with its accessibility label (it takes the `{count}`). */
