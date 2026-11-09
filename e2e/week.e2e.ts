@@ -217,6 +217,23 @@ for (const size of SIZES) {
       await expect(page.getByTestId("day-timeline").getByTestId("group-separator")).toHaveCount(
         entries,
       );
+      // The rail lines up with the rows (owner 2026-11-09): one bar per row, at its row's top and
+      // height, measured in the browser (not jest's layout events).
+      const bars = page.getByTestId("rail-bar");
+      await expect(bars).toHaveCount(entries);
+      const boxes = async (testID: string) =>
+        await page
+          .getByTestId(testID)
+          .evaluateAll((nodes) =>
+            nodes
+              .map((node) => node.getBoundingClientRect())
+              .map(({ height, y }) => ({ height, y })),
+          );
+      const [rowBoxes, barBoxes] = [await boxes("day-entry"), await boxes("rail-bar")];
+      for (const [index, row] of rowBoxes.entries()) {
+        expect(Math.abs((barBoxes[index]?.y ?? NaN) - row.y)).toBeLessThanOrEqual(1);
+        expect(Math.abs((barBoxes[index]?.height ?? NaN) - row.height)).toBeLessThanOrEqual(1);
+      }
       await shoot(page, `day-gaps-${size.name}`, (name) => info.outputPath(name));
       await expectNoA11yViolations(page);
       await gap.click();
