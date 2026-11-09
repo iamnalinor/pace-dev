@@ -481,6 +481,26 @@ describe("live sync channel, pace.v2", () => {
     v1.socket.close();
   });
 
+  it("announces an old client's automatic miss and its revoke in one write: no device sees the miss alone", async () => {
+    const token = await loginAsDev("1001");
+    const before = await latestSeq(token);
+    const v2 = await openV2(token, "laptop-1");
+    const created = event();
+    const miss = {
+      ...event(),
+      deviceId: "phone-old",
+      id: `auto:${created.payload.taskId}:missed`,
+      payload: { outcome: "cancelled_missed", taskId: created.payload.taskId },
+      source: "system",
+      type: "task.closed",
+    };
+    await pushEvents(token, [created, miss]);
+    const [, events] = await v2.until("events");
+    expect(events).toMatchObject({ more: false, seq: before + 3, since: before });
+    expect(idsOf(events.events)).toEqual([created.id, miss.id, `${miss.id}:retired`]);
+    v2.socket.close();
+  });
+
   it("announces a batch too big for one message as more, for a pull", async () => {
     const token = await loginAsDev("1001");
     const before = await latestSeq(token);
