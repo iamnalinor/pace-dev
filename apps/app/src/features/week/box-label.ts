@@ -1,5 +1,9 @@
-/** Roughly how wide a caption letter is: it decides only between wrapping and one cut line. */
-const CAPTION_LETTER_PX = 7;
+/**
+Roughly how wide a caption letter is, on the wide side: it decides only between wrapping and one
+cut line, and a guess too narrow let «Домашка» (58 px) wrap into a 56 px box and stick out
+(worst-case sweep). Cyrillic caption letters run 8–8.5 px.
+*/
+const CAPTION_LETTER_PX = 9;
 
 /** The box's side padding (`px-1` on each side). */
 const BOX_PADDING_PX = 8;

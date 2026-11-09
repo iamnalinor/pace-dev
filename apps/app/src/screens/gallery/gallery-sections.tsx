@@ -305,8 +305,8 @@ export const TaskSections = ({ data }: { readonly data: GalleryData }) => {
             {t("dev.gallery.nothing")}
           </Text>
         ) : (
-          // The pane at its narrowest (360): the halves keep whole words (design review B1).
-          <View className="w-inspector-min">
+          // The pane at its narrowest (360, or the window under it): the halves keep whole words (B1).
+          <View className="w-full max-w-inspector-min">
             <TaskPaneProvider onClose={NOTHING}>
               <TaskFooter onClose={NOTHING} view={view} />
             </TaskPaneProvider>

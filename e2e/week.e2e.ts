@@ -367,8 +367,19 @@ test("narrow side-by-side blocks say their whole name on hover, and a 0-minute b
   await page.goto("/week");
   const email = page.getByRole("button", { name: /, Email the dean$/u });
   await expect(email).toBeVisible();
+  // The narrow box cannot show the whole name (it is cut to one line with an ellipsis, design
+  // review H6); the tooltip says it with the times. Scoped to the bubble: the box keeps the whole
+  // name in its own text and title too.
+  expect(
+    await email.evaluate((box) => {
+      const label = box.querySelector<HTMLElement>('[data-text-policy="truncate"]');
+      return label !== null && label.scrollWidth > label.clientWidth;
+    }),
+  ).toBe(true);
   await email.hover();
-  await expect(page.getByText(/^Email the dean, \d\d:\d\d–\d\d:\d\d$/u)).toBeVisible();
+  await expect(
+    page.getByRole("tooltip").filter({ hasText: /^Email the dean, \d\d:\d\d–\d\d:\d\d$/u }),
+  ).toBeVisible();
   // No lane under a thumb's width: the run of four is one «+N» block (spec §5.6 ruling).
   for (const name of [/, Snack$/u, /, Walk$/u, /, Read$/u, /, Stretch$/u]) {
     await expect(page.getByRole("button", { name })).toHaveCount(0);
