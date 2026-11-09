@@ -249,7 +249,9 @@ test("the form's close drops its draft: New task opens an empty form again (QA 1
   await formByHand(page).click();
   await expect(title).toHaveValue("");
   await expect(form.getByRole("radio", { name: "Does not repeat" })).toBeChecked();
-  await expect(form.getByRole("button", { name: /^Create/u })).toBeDisabled();
+  // A fresh form: Create stays live (it asks for a title when pressed, R24-06), and the form does
+  // not open blaming the empty title.
+  await expect(form.getByText("Give the task a title.")).toHaveCount(0);
 });
 
 /**
