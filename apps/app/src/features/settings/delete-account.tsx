@@ -184,6 +184,7 @@ const DangerOpeners = ({
 /** Wipe or Delete, then its warning with Cancel; focus goes to Cancel and back to the opener (class 5). */
 const DangerPrompt = ({ flow }: { readonly flow: ReturnType<typeof useDangerFlow> }) => {
   const t = useT();
+  const isWide = useIsWide();
   const focus = useConfirmFocus();
   const warning = t(
     flow.action === "wipe" ? "settings.wipe.warning" : "settings.deleteAccount.warning",
@@ -209,6 +210,7 @@ const DangerPrompt = ({ flow }: { readonly flow: ReturnType<typeof useDangerFlow
           cancelRef={focus.cancelRef(warning)}
           isBusy={flow.isBusy}
           isDestructive
+          isStacked={!isWide}
           onCancel={() => {
             focus.toOpener(flow.action ?? undefined);
             flow.setAction(null);

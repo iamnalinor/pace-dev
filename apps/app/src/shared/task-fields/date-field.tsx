@@ -61,6 +61,7 @@ export const DateChip = ({
     <Chip
       expanded={isOpen}
       icon={DATE_ICONS[kind]}
+      isWhole
       label={`${t(dateLabel(kind))}: ${text}`}
       onPress={onToggle}
     >

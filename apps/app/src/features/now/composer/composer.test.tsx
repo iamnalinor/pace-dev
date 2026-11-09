@@ -129,7 +129,10 @@ describe("Composer", () => {
     await fireEvent.press(button("nav.newTask"));
     await fireEvent.press(screen.getByRole("radio", { name: "Homework" }));
     await fireEvent.press(screen.getByRole("button", { name: /^Estimate: /u }));
-    expect(screen.getByRole("button", { name: "Estimate: Default (1h)" })).toBeExpanded();
+    const chip = screen.getByRole("button", { name: "Estimate: Default (1h)" });
+    expect(chip).toBeExpanded();
+    // The chip shows the value, never cut: «По умолчанию (3…» lost the number (design review H3).
+    expect(chip).toHaveTextContent("~1h");
     expect(screen.queryByRole("radio", { name: "Default (1h)" })).toBeNull();
     expect(screen.queryByRole("radio", { name: "1h" })).toBeNull();
     await fireEvent.press(screen.getByRole("radio", { name: "30m" }));
