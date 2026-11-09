@@ -85,7 +85,7 @@ shows.
 | `create_task` | write | a task; project by id or name (created on the fly); subtasks as labels or `{ label, number }`; `dueTz` defaults to the account zone | `title`, `presetId?` (default `personal`), `projectId?`/`projectName?`, `importance?`, `dueAt?`, `dueTz?`, `startAt?`, `startTz?`, `estimateMinutes?`, `subtasks?`, `description?`, `sourceText?` |
 | `capture_inbox` | write | a verbatim text into the inbox (`inbox/empty` for blank text) | `text` |
 | `mark_subtasks` | write | marks subtasks done by id or problem number, at `at` (a subtask has one mark, done, with its instant; there is no separate submit since feedback 5); already done ones are reported, not repeated | `taskId`, `subtaskIds?` or `numbers?` |
-| `close_task` | write | closes with `done` (`done_late` is derived), `cancelled` or `skipped` (+ reason) | `taskId`, `outcome`, `reason?` |
+| `close_task` | write | closes with `done` (`done_late` is derived: by the latest done subtask when every subtask is done, else by the closing instant), `cancelled` or `skipped` (+ reason) | `taskId`, `outcome`, `reason?` |
 | `reopen` | write | reopens a closed task, subtasks and history kept | `taskId` |
 | `update_task` | write | only the fields given: title, description (`null` clears), deadline, start, estimate (`null` clears), preset, project (by id or name) | `taskId`, `title?`, `description?`, `dueAt?`, `dueTz?`, `startAt?`, `startTz?`, `estimateMinutes?`, `presetId?`, `projectId?`/`projectName?` |
 | `set_importance` | write | `asap` / `prioritized` / `normal` / `nice_to_have` | `taskId`, `importance` |

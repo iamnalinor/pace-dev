@@ -117,6 +117,19 @@ const pushOldMiss = async (taskId: string): Promise<void> => {
 };
 
 describe("MCP tools catalogue", () => {
+  it("tells an agent core's lateness rule in close_task (owner, 2026-11-09; bug-lessons 187)", async () => {
+    const token = await readWriteToken();
+    const { tools } = await mcpResult<{ tools: { name: string; description?: string }[] }>(
+      token,
+      "tools/list",
+    );
+    const description = tools.find((tool) => tool.name === "close_task")?.description ?? "";
+    expect(description).not.toContain("when it is past the deadline");
+    // `doneLateness`: every subtask done → the latest done instant; otherwise the closing instant.
+    expect(description).toMatch(/every subtask is done.*latest done instant/u);
+    expect(description).toMatch(/otherwise by the closing instant/u);
+  });
+
   it("lists every tool with annotations, a title and an LLM-facing description", async () => {
     type Listed = {
       name: string;
