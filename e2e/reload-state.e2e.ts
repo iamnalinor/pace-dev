@@ -116,7 +116,7 @@ test("a link in a task's description opens in a new tab without starting to edit
     "Notes at https://example.com/notes/a-very-long-path-that-must-wrap-inside-the-pane-without-overflowing and more",
   );
   await page.getByRole("button", { exact: true, name: "Save" }).click();
-  // The address in the text (exact: the task's link row above, named "<url> ↗", is the same address).
+  // The address in the text, shown once (R24-08: no link row above the facts repeats it).
   const link = page.getByRole("link", {
     exact: true,
     name: "https://example.com/notes/a-very-long-path-that-must-wrap-inside-the-pane-without-overflowing",

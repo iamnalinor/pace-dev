@@ -375,6 +375,14 @@ describe("TaskScreen — work", () => {
     open.mockRestore();
   });
 
+  it("shows an address once: the one in the description is not repeated above the facts (QA round 24 R24-08)", async () => {
+    const runtime = await createTestRuntime({ now: HW_VIEW_NOW });
+    await runtime.actions.updateTask(HW_ID, { description: "See https://example.com/a first." });
+    await renderScreen(<TaskScreen id={HW_ID} />, runtime);
+    expect(screen.getAllByRole("link", { name: /example\.com\/a/u })).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "https://example.com/a" })).toBeOnTheScreen();
+  });
+
   it("keeps a description being edited through a reload, and drops it on Cancel (feedback 5 item 7)", async () => {
     const runtime = await createTestRuntime({ deviceTz: "UTC", now: TRK_NOW });
     jest.spyOn(runtime.api, "currentSessionToken").mockReturnValue("session-1");

@@ -15,7 +15,7 @@ import { Icon } from "#app/ui/icon.tsx";
 import { Link } from "#app/ui/link.tsx";
 import { Tag } from "#app/ui/tag.tsx";
 import { Text } from "#app/ui/text.tsx";
-import { describeRepeatRule, formatDuration, presetLabel } from "@pace/core";
+import { describeRepeatRule, formatDuration, presetLabel, splitLinks } from "@pace/core";
 
 /**
 The title block's horizontal inset: the gutter, a computer's wider one on the page (the pane keeps
@@ -124,6 +124,14 @@ const MetaTokens = ({
   );
 };
 
+/**
+Whether the description already shows this address as a link of its own (feedback 5 item 8): the
+row above the facts would show it twice (QA round 24 R24-08).
+*/
+const isInDescription = (url: string, description: null | string): boolean =>
+  description !== null &&
+  splitLinks(description).some((part) => part.kind === "link" && part.url === url);
+
 /** The link on one line, its middle cut (the host and the end stay): a real link with the full URL. */
 const TaskLinkRow = ({ url }: { readonly url: string }) => (
   <Link
@@ -198,7 +206,9 @@ export const TaskSummary = ({
           {view.title}
         </Text>
         <MetaTokens category={view.category} tags={view.tags} />
-        {view.link === null ? null : <TaskLinkRow url={view.link.url} />}
+        {view.link === null || isInDescription(view.link.url, view.description) ? null : (
+          <TaskLinkRow url={view.link.url} />
+        )}
       </View>
       <Group>
         <StatRow>
