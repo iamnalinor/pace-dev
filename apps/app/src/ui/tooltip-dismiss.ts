@@ -52,11 +52,18 @@ export const useDismiss = (isShown: boolean, hide: () => void): void => {
       forgetControls();
       hideRef.current();
     };
+    // A press anywhere (the trigger itself included) is the person acting: the tooltip goes at
+    // once, so a grace left running cannot take the Escape meant for the sheet the press opened.
+    const onPress = (): void => {
+      hideRef.current();
+    };
     globalThis.addEventListener("scroll", dismiss, { capture: true });
     globalThis.addEventListener("resize", dismiss);
+    globalThis.addEventListener("pointerdown", onPress, { capture: true });
     return () => {
       globalThis.removeEventListener("scroll", dismiss, { capture: true });
       globalThis.removeEventListener("resize", dismiss);
+      globalThis.removeEventListener("pointerdown", onPress, { capture: true });
     };
   }, [isShown]);
 };

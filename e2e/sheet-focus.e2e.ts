@@ -253,6 +253,10 @@ const checkSheet = async (page: Page, opener: Opener, seeded: LivedIn) => {
   // The modal moves focus after it mounts: given a moment.
   await expect.poll(async () => (await focus(page)).isInSheet, { message: opener.via }).toBe(true);
   const landed = await focus(page);
+  // The header's close joins the tab order as the sheet settles (it can still be entering): polled.
+  await expect
+    .poll(async () => await closeTabStops(page), { message: opener.via })
+    .toBeGreaterThan(0);
   const closeStops = await closeTabStops(page);
   // Shift+Tab wraps inside the sheet, never onto the full-screen dim (QA 19 L1).
   await page.keyboard.press("Shift+Tab");

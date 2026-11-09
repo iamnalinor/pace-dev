@@ -140,6 +140,23 @@ describe("Escape at a shown tooltip on the web (review of 293b78c..9039ae6, I1)"
     expect(onModalClose).toHaveBeenCalledTimes(1);
   });
 
+  it('a field that only keeps its typing keys ("own": a time field, the composer) lets Escape close its sheet', () => {
+    const { escape } = loaded();
+    escape.listenForEscape();
+    const onModalClose = jest.fn();
+    cleanups.push(listenLikeModal(onModalClose));
+    const field = document.createElement("input");
+    field.dataset["paceKeys"] = "own";
+    document.body.append(field);
+    cleanups.push(() => {
+      field.remove();
+    });
+    for (const type of ["keydown", "keyup"] as const) {
+      field.dispatchEvent(new KeyboardEvent(type, { bubbles: true, key: "Escape" }));
+    }
+    expect(onModalClose).toHaveBeenCalledTimes(1);
+  });
+
   it("leaves a chord with Escape alone", () => {
     const { escape } = loaded();
     const onTooltipEscape = jest.fn();

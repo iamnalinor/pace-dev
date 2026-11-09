@@ -200,6 +200,16 @@ describe("Tooltip on the web (spec §4.2.31, §6 tooltip)", () => {
     expect(isShown(LABEL)).toBe(false);
   });
 
+  it("a press anywhere takes it away at once: its grace cannot hold the next Escape from a sheet just opened", async () => {
+    await renderTriggers(<Trigger isImmediate label={LABEL} name="Send" />);
+    await fireEvent(button("Send"), "pointerEnter", pointer("mouse"));
+    expect(isShown(LABEL)).toBe(true);
+    await act(() => {
+      page.dispatchEvent(new Event("pointerdown"));
+    });
+    expect(isShown(LABEL)).toBe(false);
+  });
+
   it("a pointer moving elsewhere leaves a keyboard-focus tooltip up", async () => {
     await renderTriggers(<Trigger label={LABEL} name="Send" />);
     await fireEvent(sendWrapper(), "focus", {});

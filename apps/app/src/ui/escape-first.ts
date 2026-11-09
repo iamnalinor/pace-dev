@@ -65,8 +65,12 @@ const onKeyUp = (event: EscapeKey): void => {
   event.stopImmediatePropagation();
 };
 
-/** A field that handles Escape itself (a subtask being typed closes on it, `use-hotkey.web.tsx`). */
-const FIELD_OWNS_ESCAPE = '[data-pace-keys="own"], [data-pace-keys="escape"]';
+/**
+A field that handles Escape itself (a subtask being typed closes on it, `use-hotkey.web.tsx`). A
+field that only keeps its typing keys ("own": a time field, the composer) does not: Escape there
+still closes the sheet around it.
+*/
+const FIELD_OWNS_ESCAPE = '[data-pace-keys="escape"]';
 
 const onKeyDown = (event: EscapeKey & { readonly target: EventTarget | null }): void => {
   if (!isBareEscape(event) || didTakeEscape(event)) {
