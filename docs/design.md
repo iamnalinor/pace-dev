@@ -125,3 +125,5 @@ that names the account.
 2026-11-09 (owner): **the fourth time-bar tile is «Прочее» / "Misc"**, and its picker holds «Отдых» / "Rest"
 among Short break, Walk, Workout, Nap and Sleep (no choice named after its picker, R22-22).
 EN says "Misc", not "Other", which is a category's name. A workout is expected to take 3 h.
+
+2026-11-09 (owner): **lateness by subtasks only once all are done.** A task closed as done is as late as its latest done subtask only when every subtask is done; while any is left open (or with none) the closing time decides. Core's `doneLateness` is the one rule, read by the outcome and the close sheet's preview.

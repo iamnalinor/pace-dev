@@ -55,14 +55,11 @@ const pass = async (ms: number): Promise<void> => {
   });
 };
 
-/** Whether the bubble that says `label` is shown (a hidden one stays in the page, unseen). */
+/** Whether the bubble that says `label` is shown (a hidden one is not in the page at all). */
 const isShown = (label: string): boolean =>
   screen
     .queryAllByTestId("tooltip-bubble")
-    .some(
-      (bubble) =>
-        bubble.props["aria-hidden"] === false && within(bubble).queryByText(label) !== null,
-    );
+    .some((bubble) => within(bubble).queryByText(label) !== null);
 
 describe("Tooltip on the web (spec §4.2.31, §6 tooltip)", () => {
   afterEach(async () => {
@@ -143,6 +140,48 @@ describe("Tooltip on the web (spec §4.2.31, §6 tooltip)", () => {
     await fireEvent(button("Send"), "pointerLeave", pointer("mouse"));
     await pass(HOVER_GRACE_MS * 3);
     expect(isShown(LABEL)).toBe(true);
+  });
+
+  it("mounts no bubble until it is first shown, and takes it away when hidden (UI review I3)", async () => {
+    await renderTriggers(
+      <>
+        <Trigger label={LABEL} name="Send" />
+        <Trigger label={OTHER} name="Close" />
+      </>,
+    );
+    expect(screen.queryAllByTestId("tooltip-bubble", { includeHiddenElements: true })).toHaveLength(
+      0,
+    );
+    // The description the trigger points at is there all along, unseen and never laid out.
+    const descriptions = screen.getAllByTestId("tooltip-description", {
+      includeHiddenElements: true,
+    });
+    expect(descriptions).toHaveLength(2);
+    for (const [index, text] of [LABEL, OTHER].entries()) {
+      const description = descriptions[index];
+      if (description === undefined) {
+        throw new Error("a description is missing");
+      }
+      expect(within(description).getByText(text, { includeHiddenElements: true })).toBeTruthy();
+    }
+    expect(descriptions[0]?.props["style"]).toMatchObject({ display: "none" });
+    await fireEvent(button("Send"), "pointerEnter", pointer("mouse"));
+    await pass(HOVER_DELAY_MS);
+    expect(screen.getAllByTestId("tooltip-bubble")).toHaveLength(1);
+    await fireEvent(button("Send"), "pointerLeave", pointer("mouse"));
+    await pass(HOVER_GRACE_MS);
+    expect(screen.queryAllByTestId("tooltip-bubble", { includeHiddenElements: true })).toHaveLength(
+      0,
+    );
+  });
+
+  it("on Escape only the tooltip goes: the key stops there (the dialog under it stays)", async () => {
+    await renderTriggers(<Trigger label={LABEL} name="Send" />);
+    await fireEvent(sendWrapper(), "focus", {});
+    const stopPropagation = jest.fn();
+    await fireEvent(button("Send"), "keyDown", { key: "Escape", stopPropagation });
+    expect(isShown(LABEL)).toBe(false);
+    expect(stopPropagation).toHaveBeenCalled();
   });
 
   it("on a touch screen shows nothing: the tap runs the control", async () => {

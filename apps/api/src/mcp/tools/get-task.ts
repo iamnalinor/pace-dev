@@ -63,6 +63,46 @@ const TASK_FIELDS = {
 /** " done <instant>" after a done subtask's line; nothing while it is open. */
 const doneNote = (doneAt: null | string): string => (doneAt === null ? "" : ` done ${doneAt}`);
 
+/** "№3 " before a numbered subtask's label (the number mark_subtasks takes). */
+const numberNote = (number: null | number): string =>
+  number === null ? "" : `№${String(number)} `;
+
+/** The closure as a line, with what its JSON would have said: the event to revoke, the reason. */
+const closedLine = (closed: NonNullable<Task["closed"]>): string =>
+  [
+    `Closed: ${closed.outcome} at ${closed.at} by ${closed.source}`,
+    closed.confirmed ? ", confirmed" : "",
+    `; event ${closed.eventId}`,
+    closed.reason === null ? "" : `; reason: ${closed.reason}`,
+    ".",
+  ].join("");
+
+/** How much of one text field the text answer shows; the structured content has it whole. */
+const TEXT_FIELD_CHARS = 200;
+
+/** A string cut to `TEXT_FIELD_CHARS` with an ellipsis; other values as they are, nested ones too. */
+const cut = (value: unknown): unknown => {
+  if (typeof value === "string") {
+    return value.length > TEXT_FIELD_CHARS ? `${value.slice(0, TEXT_FIELD_CHARS)}…` : value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => cut(item));
+  }
+  return typeof value === "object" && value !== null
+    ? Object.fromEntries(Object.entries(value).map(([key, item]) => [key, cut(item)]))
+    : value;
+};
+
+/**
+The fields as the text answer carries them (session review minor 8): the subtasks and the closure
+are already lines above, and long text (description, source text, sources) is cut short, so a
+client that reads both answers does not pay for the task twice.
+*/
+const textFields = (structured: Readonly<Record<string, unknown>>): string => {
+  const { closed: _closed, subtasks: _subtasks, ...rest } = structured;
+  return JSON.stringify(cut(rest));
+};
+
 /** The task screen as structured data: the whole projection, with the row the list tools answer. */
 const render = (view: TaskView, row: TaskRow): Rendered => {
   const { importance: ownImportance, ...task } = view.task;
@@ -77,13 +117,13 @@ const render = (view: TaskView, row: TaskRow): Rendered => {
     summary: [
       describeRow(row),
       `Status ${task.status}; progress ${Math.round(row.progress * 100)}%.`,
-      ...(task.closed === null ? [] : [`Closed: ${task.closed.outcome} at ${task.closed.at}.`]),
+      ...(task.closed === null ? [] : [closedLine(task.closed)]),
       ...task.subtasks.map(
         (item) =>
-          `- ${item.doneAt === null ? "[ ]" : "[x]"} ${item.label} (${item.id})${doneNote(item.doneAt)}`,
+          `- ${item.doneAt === null ? "[ ]" : "[x]"} ${numberNote(item.number)}${item.label} (${item.id})${doneNote(item.doneAt)}`,
       ),
-      // The whole task as data: a client that shows only the text still sees every field.
-      `Fields: ${JSON.stringify(structured)}`,
+      // Every other field as data: a client that shows only the text still sees each one.
+      `Fields (long text cut; the structured content has it whole): ${textFields(structured)}`,
     ].join("\n"),
   };
 };
@@ -91,7 +131,7 @@ const render = (view: TaskView, row: TaskRow): Rendered => {
 export const taskTool = defineTool({
   annotations: { destructiveHint: false, idempotentHint: true, readOnlyHint: true },
   description:
-    "Everything about one task: every field the store keeps (start and its zone, estimate, own and effective importance, description, link, sources, series, status history), its subtasks with their done marks, the closure and derived outcome, progress and the work left. The text answer carries the same fields as JSON. Use it before mark_subtasks (to learn subtask ids and numbers) or to answer questions about a task.",
+    "Everything about one task: every field the store keeps (start and its zone, estimate, own and effective importance, description, link, sources, series, status history), its subtasks with their done marks, the closure and derived outcome, progress and the work left. The text answer carries the same fields as JSON, long text cut short (the structured content has it whole). Use it before mark_subtasks (to learn subtask ids and numbers) or to answer questions about a task.",
   handler: async (args, ctx) =>
     await runRead(ctx, (scope) => {
       const view = taskView(scope.state, args.id, scope.qctx);

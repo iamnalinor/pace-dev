@@ -20,6 +20,7 @@ import {
   MOSCOW,
   NOW,
   RFC_ID,
+  submitted,
   TRK_ID,
   WORK_ID,
 } from "@pace/core/testing";
@@ -486,6 +487,25 @@ describe("subtasks", () => {
       error: "action/nothing-to-do",
       ok: false,
     });
+  });
+
+  it("refuses to take a mark back on a closed task: an old closing send would reopen it", async () => {
+    // An old client's last per-subtask send closed the task (`closes: true`): revoking it to
+    // untick the subtask would silently reopen the task (session review #3).
+    const closingSend = submitted(990, "2026-10-06T10:00:00.000Z", {
+      subtaskIds: ["s5"],
+      closes: true,
+    });
+    const world = await setupActions([...artboardEvents(), closingSend]);
+    expect(taskOf(world, HW_ID)?.closed).not.toBeNull();
+    const before = world.state.store.getState().log.length;
+    await expect(world.actions.unmarkDone(HW_ID, "s5")).resolves.toEqual({
+      error: "retro/task-closed",
+      ok: false,
+    });
+    expect(world.state.store.getState().log).toHaveLength(before);
+    expect(taskOf(world, HW_ID)?.closed).not.toBeNull();
+    expect(taskOf(world, HW_ID)?.subtasks.find((item) => item.id === "s5")?.doneAt).not.toBeNull();
   });
 
   it("adds subtasks with fresh ids", async () => {

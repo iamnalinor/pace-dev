@@ -18,9 +18,20 @@ type Box = {
   readonly y: number;
 };
 
-/** Where the anchor is in the window, measured when the popover opens. */
+/**
+Where the anchor is in the window, measured each time the popover opens. The last box is kept
+through the exit (it fades where it was) and forgotten as it opens again, so a reopened popover
+waits out of sight for the fresh measure instead of showing for a frame where its anchor was.
+*/
 const useAnchorBox = (anchor: RefObject<null | View>, isOpen: boolean): Box | null => {
   const [box, setBox] = useState<Box | null>(null);
+  const [wasOpen, setWasOpen] = useState(isOpen);
+  if (wasOpen !== isOpen) {
+    setWasOpen(isOpen);
+    if (isOpen) {
+      setBox(null);
+    }
+  }
   useEffect(() => {
     if (!isOpen) {
       return;

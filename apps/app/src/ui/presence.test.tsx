@@ -3,6 +3,7 @@ import { AccessibilityInfo, Text } from "react-native";
 
 import { presenceFrom, presenceTiming } from "./motion-presets.ts";
 import { Presence } from "./presence.tsx";
+import { forgetReducedMotion, seedReducedMotion } from "./use-reduced-motion.ts";
 
 /** The animations started, with the callbacks that finish them (the test decides when). */
 const mockTimings: {
@@ -127,15 +128,16 @@ describe("Presence (spec §4.1.1, §6)", () => {
 
   it("with reduced motion, the drawn start frame has no travel", async () => {
     jest.spyOn(AccessibilityInfo, "isReduceMotionEnabled").mockResolvedValue(true);
+    // The app asks once at its start (UI review I1): the first render already knows.
+    forgetReducedMotion();
+    await act(async () => {
+      await seedReducedMotion();
+    });
     const view = await render(
       <Presence enter="rise" show={false} testID="presence">
         <Text>Card</Text>
       </Presence>,
     );
-    // The system's answer arrives after the first render.
-    await act(async () => {
-      await Promise.resolve();
-    });
     await view.rerender(
       <Presence enter="rise" initial show testID="presence">
         <Text>Card</Text>
@@ -144,5 +146,6 @@ describe("Presence (spec §4.1.1, §6)", () => {
     const style = screen.getByTestId("presence").props["style"] as unknown;
     expect(JSON.stringify(style)).not.toContain("translateY");
     jest.restoreAllMocks();
+    forgetReducedMotion();
   });
 });

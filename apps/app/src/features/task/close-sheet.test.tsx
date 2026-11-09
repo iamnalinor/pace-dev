@@ -139,6 +139,28 @@ describe("CloseSheet — a homework task (one done mark per subtask, nothing to 
   });
 });
 
+describe("CloseSheet — lateness by the subtasks only once all are done (owner, 2026-11-09)", () => {
+  const DAY_AFTER = "2026-10-08T10:00:00.000Z";
+  const EARLY = "2026-10-07T09:00:00.000Z";
+
+  it("reads late while a subtask is left open, closed after the due", async () => {
+    await openClose(DAY_AFTER);
+    expect(preview("outcome")).toHaveTextContent(en("close.late"), { exact: false });
+  });
+
+  it("reads on time when every subtask was done before the due, closed after it", async () => {
+    const runtime = await createTestRuntime({ now: DAY_AFTER });
+    const subtasks = runtime.state.store.getState().tasks.byId[HW_ID]?.subtasks ?? [];
+    for (const item of subtasks) {
+      if (item.doneAt === null) {
+        await runtime.actions.markDone(HW_ID, item.id, { at: EARLY });
+      }
+    }
+    await renderClosing(HW_ID, runtime);
+    expect(preview("outcome")).toHaveTextContent(en("close.beforeDeadline"), { exact: false });
+  });
+});
+
 describe("CloseSheet — closing a whole task", () => {
   it("previews a late close after the due and closes as done", async () => {
     const runtime = await createTestRuntime({ deviceTz: "UTC", now: "2026-10-10T10:00:00.000Z" });

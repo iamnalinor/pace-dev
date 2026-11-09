@@ -279,6 +279,7 @@ export const WeekScreen = () => {
         }
         inspectorLabel={t("week.details")}
         inspectorOpen={picked !== null}
+        onInspectorClose={close}
       />
     );
   }

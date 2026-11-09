@@ -3,17 +3,23 @@ import { fireEvent, screen, waitFor } from "@testing-library/react-native";
 import type { PaceRuntime } from "#app/runtime.ts";
 
 import { en, renderScreen } from "#app/test/render.tsx";
-import { paramsSet, searchParams, setSearchParams } from "#app/test/router.ts";
+import { paramsSet, redirected, searchParams, setSearchParams } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { HW_ID } from "@pace/core/testing";
 
 import { NowScreen } from "./now-screen.tsx";
 
-// A computer's window: the list with a pane beside it.
+// A computer's window: the list with a pane beside it (a test may narrow it to a phone's).
+const mockWindow = { isWide: true };
 jest.mock("#app/ui/layout.ts", (): unknown => ({
   ...jest.requireActual("#app/ui/layout.ts"),
-  useIsWide: () => true,
+  useIsWide: () => mockWindow.isWide,
 }));
+
+beforeEach(() => {
+  mockWindow.isWide = true;
+  redirected.mockClear();
+});
 
 const button = (key: Parameters<typeof en>[0]) => screen.getByRole("button", { name: en(key) });
 /** The line (its label, "New task", is the + button's name as well). */
@@ -165,6 +171,23 @@ describe("NowScreen: the open task is in the address (feedback 5 item 6)", () =>
     await renderScreen(<NowScreen />, await createTestRuntime());
     expect(taskDetails()).toBeNull();
     expect(screen.queryByText(en("task.notFound"))).toBeNull();
+    expect(paramsSet).not.toHaveBeenCalled();
+  });
+});
+
+describe("NowScreen: a ?task= link opened at a phone's width (session review minor 6)", () => {
+  it("opens the task on its own page, as a phone opens it", async () => {
+    mockWindow.isWide = false;
+    setSearchParams({ task: HW_ID });
+    await renderScreen(<NowScreen />, await createTestRuntime());
+    expect(redirected).toHaveBeenCalledWith(`/task/${HW_ID}`);
+  });
+
+  it("stays on the list for an unknown task, and writes nothing back", async () => {
+    mockWindow.isWide = false;
+    setSearchParams({ task: "no-such-task" });
+    await renderScreen(<NowScreen />, await createTestRuntime());
+    expect(redirected).not.toHaveBeenCalled();
     expect(paramsSet).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,4 @@
-import { fireEvent, screen } from "@testing-library/react-native";
+import { act, fireEvent, screen } from "@testing-library/react-native";
 
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
@@ -15,6 +15,24 @@ jest.mock("#app/ui/layout.ts", (): unknown => ({
 
 /** The details pane: the shell's inspector, named for screen readers. */
 const pane = () => screen.queryByLabelText(en("week.details"));
+
+/** The shortcuts registered while mounted, by key: the web build's keyboard, as a test drives it. */
+const mockHotkeys = new Map<string, () => void>();
+jest.mock("#app/ui/use-hotkey.tsx", (): unknown => ({
+  ...jest.requireActual("#app/ui/use-hotkey.tsx"),
+  useHotkey: (hotkey: undefined | { readonly key: string }, onPress: () => void) => {
+    if (hotkey !== undefined) {
+      mockHotkeys.set(hotkey.key, onPress);
+    }
+  },
+}));
+
+/** Escape, as the web build's keyboard hands it to the shortcut registered last. */
+const pressEscape = async (): Promise<void> => {
+  await act(() => {
+    mockHotkeys.get("Escape")?.();
+  });
+};
 
 describe("WeekScreen on a wide window", () => {
   it("shows what was picked in the pane beside the grid, the picked one marked", async () => {
@@ -98,5 +116,20 @@ describe("WeekScreen on a wide window", () => {
     await fireEvent.press(screen.getByRole("button", { name: en("period.thisWeek") }));
     expect(pane()).toBeNull();
     expect(block()).not.toHaveProp("aria-current", "true");
+  });
+
+  it("closes the pane on Escape (UI review I4)", async () => {
+    const runtime = await createTestRuntime();
+    await runtime.actions.logPast({
+      category: "study",
+      endAt: addMinutesIso(NOW, -180),
+      label: "Lecture notes",
+      startAt: addMinutesIso(NOW, -240),
+    });
+    await renderScreen(<WeekScreen />, runtime);
+    await fireEvent.press(await screen.findByRole("button", { name: /, Lecture notes$/u }));
+    expect(pane()).toBeOnTheScreen();
+    await pressEscape();
+    expect(pane()).toBeNull();
   });
 });

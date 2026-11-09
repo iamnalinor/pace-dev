@@ -170,6 +170,56 @@ describe("UserStore.append validation seam", () => {
   });
 });
 
+/** The automatic miss an older client still writes at a task's final deadline (feedback 5). */
+const oldMiss = (taskId: string) =>
+  event({
+    deviceId: "dev-old",
+    id: `auto:${taskId}:missed`,
+    occurredAt: "2026-10-06T09:30:00.000Z",
+    payload: { outcome: "cancelled_missed", taskId },
+    recordedAt: "2026-10-06T09:30:01.000Z",
+    source: "system",
+    type: "task.closed",
+  });
+
+describe("an older client's automatic miss (no auto-close since feedback 5)", () => {
+  it("is taken, so the old client stops sending it, and revoked at once: the task stays open", async () => {
+    type PulledEvent = {
+      id: string;
+      type: string;
+      source: string;
+      payload: Record<string, unknown>;
+    };
+    const token = await loginAsDev("1002");
+    const created = event();
+    const miss = oldMiss(created.payload.taskId);
+    const pushed = await push(token, [created, miss]);
+    // Accepted: an old client keeps a rejected event in its outbox and sends it on every sync.
+    expect(pushed).toMatchObject({ accepted: [created.id, miss.id], rejected: [] });
+    const { events } = await json<{ events: PulledEvent[] }>("/api/sync/pull", { token });
+    const revoke = events.find((item) => item.type === "event.revoked");
+    expect(revoke).toMatchObject({
+      id: `${miss.id}:retired`,
+      payload: { targetId: miss.id },
+      source: "system",
+    });
+    // Sent again (a retry): nothing new is written, the network goes quiet.
+    const again = await push(token, [miss]);
+    expect(again).toMatchObject({ accepted: [miss.id], rejected: [], seq: pushed.seq });
+  });
+
+  it("stays standing in a log written in-process (old logs keep their automatic closes)", async () => {
+    const stub = env.USER_STORE.get(env.USER_STORE.idFromName(`old-miss-${newId()}`));
+    const created = event();
+    const miss = oldMiss(created.payload.taskId);
+    const page = await runInDurableObject(stub, async (instance: UserStore) => {
+      await instance.append([created, miss], { now: "2026-10-06T10:00:00.000Z" });
+      return await instance.list(0, 10);
+    });
+    expect(page.events.map((item) => item.id)).toEqual([created.id, miss.id]);
+  });
+});
+
 /** A store of its own, reached directly (no user, no login). */
 const freshStub = () => env.USER_STORE.get(env.USER_STORE.idFromName(`epoch-${newId()}`));
 

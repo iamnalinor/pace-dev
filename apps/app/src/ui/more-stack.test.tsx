@@ -214,4 +214,8 @@ describe("anchoredAtMore", () => {
       }),
     ).toBeNull();
   });
+
+  it("leaves an empty stack alone: nothing in front to put More under (session review minor 10)", () => {
+    expect(anchoredAtMore({ index: 0, routes: [] })).toBeNull();
+  });
 });

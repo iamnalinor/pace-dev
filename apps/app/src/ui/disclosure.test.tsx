@@ -5,7 +5,7 @@ import { Text } from "react-native";
 import { renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 
-import { Disclosure } from "./disclosure.tsx";
+import { Disclosure, shrinkFrom } from "./disclosure.tsx";
 
 /** The animations started, with the callbacks that finish them (the test decides when). */
 const mockTimings: {
@@ -135,5 +135,12 @@ describe("Disclosure (spec §4.1.1, §6 disclosure)", () => {
     });
     await finishAll();
     expect(onShown).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes mid-open from where the growth had got to, never jumping to the full height first", () => {
+    // Shown: the height is kept in step with the content, so the close starts from its measure.
+    expect(shrinkFrom({ current: 120, measured: 160, phase: "shown" })).toBe(160);
+    // Still growing: from the height it has reached (UI review minor).
+    expect(shrinkFrom({ current: 40, measured: 160, phase: "opening" })).toBe(40);
   });
 });

@@ -32,9 +32,12 @@ const Mark = ({ state }: { readonly state: SubtaskRow["state"] }) => (
 );
 
 const SubtaskItem = ({
+  isClosed,
   subtask,
   taskId,
 }: {
+  /** A closed task's marks are read-only, both ways (session review #3): reopen it first. */
+  readonly isClosed: boolean;
   readonly subtask: SubtaskRow;
   readonly taskId: string;
 }) => {
@@ -50,6 +53,9 @@ const SubtaskItem = ({
           when: `${weekday(subtask.doneAt, deviceTz, language)} ${clockTime(subtask.doneAt, deviceTz)}`,
         });
   const toggle = (): void => {
+    if (isClosed) {
+      return;
+    }
     void run(
       subtask.state === "pending"
         ? actions.markDone(taskId, subtask.id)
@@ -62,10 +68,11 @@ const SubtaskItem = ({
     <Pressable
       checked={subtask.state !== "pending"}
       className="flex-row items-start gap-1 pl-2 pr-row-x"
+      disabled={isClosed}
       label={subtask.label}
       onPress={toggle}
       role="checkbox"
-      {...spacePress(toggle)}
+      {...spacePress(toggle, isClosed)}
     >
       <Mark state={subtask.state} />
       <View className="min-w-0 flex-1 flex-row items-start gap-2 py-3">
@@ -87,7 +94,10 @@ const SubtaskItem = ({
   );
 };
 
-/** The subtasks with their done marks; a tap marks one done (now) or takes that back. */
+/**
+The subtasks with their done marks; a tap marks one done (now) or takes that back. On a closed
+task the list is read-only: ticking is refused there, and taking a mark back could reopen it.
+*/
 export const SubtaskChecklist = ({ view }: { readonly view: TaskViewModel }) => {
   const t = useT();
   if (view.subtasks.length === 0) {
@@ -106,7 +116,12 @@ export const SubtaskChecklist = ({ view }: { readonly view: TaskViewModel }) => 
       />
       <Group separatorInset="check">
         {view.subtasks.map((subtask) => (
-          <SubtaskItem key={subtask.id} subtask={subtask} taskId={view.id} />
+          <SubtaskItem
+            isClosed={view.closed !== null}
+            key={subtask.id}
+            subtask={subtask}
+            taskId={view.id}
+          />
         ))}
       </Group>
     </View>

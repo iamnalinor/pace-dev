@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { useRouter } from "expo-router";
+import { Redirect, useRouter } from "expo-router";
 
 import type { SharedIn } from "#app/platform/shared-line.ts";
 
@@ -121,6 +121,11 @@ export const NowScreen = ({
   const router = useRouter();
   const isWide = useIsWide();
   const [picked, setPicked] = usePickedTask();
+  // A `?task=` link copied on a computer and opened at a phone's width (or a window narrowed with
+  // a task open) opens the task on its own page, as a phone opens one (session review minor 6).
+  if (!isWide && picked !== null) {
+    return <Redirect href={`/task/${picked}`} />;
+  }
   const isComposerFocused = compose !== undefined;
   return (
     <ComposerProvider

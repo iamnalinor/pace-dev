@@ -39,6 +39,8 @@ separate PR" and "all in a separate PR").
    past its final deadline stays open and reads as overdue. Old automatic closures in the log stay
    as they are (they can be reopened as before).
    Alternative that lost: also reopen the tasks already auto-closed once.
+   Older clients still write the automatic miss until updated: a client push of one is taken and
+   revoked at once by the server (bug-lessons 150), so the task stays open everywhere.
 10. **A subtask has one mark, done, with its date and time.** The separate "solved" and "submitted"
     (`sent`) marks become one `done` mark. Old logs: a subtask with either mark reads as done, at
     the earlier of the two times. The «Сдать N» / "Submit N" actions go; marking done records the
@@ -58,6 +60,16 @@ separate PR" and "all in a separate PR").
     presets built on it (they were read for `per_subtask` presets). No D1/DO column was involved.
     Alternatives that lost: rename the setting; keep it hidden with `per_subtask` for `hw`
     only (lateness by closing time for every other preset).
+12. **Subtasks decide lateness only when every one is done** (owner, 2026-11-09, after the
+    session review). A task closed as done whose subtasks are all done is as late as the latest
+    done instant (problems done before the deadline and the task closed after it reads on time);
+    while any subtask is left open, or with no subtasks, the closing time decides (one of five
+    checklist items ticked early and the task closed a week late reads late). Supersedes the
+    lateness sentence of item 11. One rule in core (`doneLateness`), read by the outcome and by
+    the close sheet's preview. Old logs follow the same rule after deploy (the projection is
+    rewritten with the new build).
+    Alternatives that lost: any done subtask decides (item 11 as first written: a partly ticked
+    checklist hid a late close); subtask instants for `hw`-based presets only.
 
 ## Open questions (with the default taken)
 - Item 6 on Android: the same params drive the native stack; deep links from outside the app

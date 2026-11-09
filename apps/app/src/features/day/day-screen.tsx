@@ -271,6 +271,7 @@ export const DayScreen = () => {
       inspector={pane}
       inspectorLabel={t("day.details")}
       inspectorOpen={sheet !== null}
+      onInspectorClose={closeSheet}
     />
   );
 };

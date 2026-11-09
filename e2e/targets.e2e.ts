@@ -49,15 +49,28 @@ const measure = async (
       const selector = roleList
         .map((role) => (role === "link" ? '[role="link"], a' : `[role="${role}"]`))
         .join(", ");
-      const isInSight = (box: DOMRect): boolean =>
-        box.width > 0 &&
-        box.top >= 0 &&
-        box.left >= 0 &&
-        box.bottom <= globalThis.innerHeight &&
-        box.right <= globalThis.innerWidth;
       const isLandingOn = (control: Element, x: number, y: number): boolean => {
         const hit = globalThis.document.elementFromPoint(x, y);
         return hit !== null && control.contains(hit);
+      };
+      // Its whole box in the window and in its scroll view's sight (its top, middle and bottom
+      // land on it): a control in the strip between the scroll view's bottom and the window's,
+      // clipped behind the phone's tab bar, is not in sight, and a press there presses the bar
+      // (the preset page's lowest switch once a row above it went, PR #54). Its own size is
+      // what `small` measures, from the middle out.
+      const isInSight = (control: Element): boolean => {
+        const box = control.getBoundingClientRect();
+        const x = box.left + box.width / 2;
+        return (
+          box.width > 0 &&
+          box.top >= 0 &&
+          box.left >= 0 &&
+          box.bottom <= globalThis.innerHeight &&
+          box.right <= globalThis.innerWidth &&
+          [box.top + 1, box.top + box.height / 2, box.bottom - 1].every((y) =>
+            isLandingOn(control, x, y),
+          )
+        );
       };
       const controls = [...globalThis.document.querySelectorAll(selector)]
         .filter((control) => control.closest('[aria-hidden="true"]') === null)
@@ -66,7 +79,7 @@ const measure = async (
             named.length === 0 ||
             named.some((word) => (control.getAttribute("aria-label") ?? "").includes(word)),
         )
-        .filter((control) => isInSight(control.getBoundingClientRect()));
+        .filter((control) => isInSight(control));
       const small = controls.filter((control) => {
         const box = control.getBoundingClientRect();
         const x = box.left + box.width / 2;
@@ -110,7 +123,17 @@ const screensOf = (openTaskId: string): readonly Measured[] => [
   // A block's name ends in its times ("Музыка, 12:40–14:10").
   { atLeast: 2, isWidthOnly: true, names: ["–"], path: "/week", roles: ["button"] },
   { atLeast: 3, path: "/settings", roles: ["switch"] },
-  { atLeast: 3, path: "/presets/hw", roles: ["switch"] },
+  {
+    atLeast: 3,
+    path: "/presets/hw",
+    // The Work section's switches in the middle of the screen, where each is wholly in sight.
+    prepare: async (page) => {
+      await page.getByRole("switch", { name: "Переопределить: Прогресс" }).evaluate((element) => {
+        element.scrollIntoView({ block: "center" });
+      });
+    },
+    roles: ["switch"],
+  },
 ];
 
 test.describe("tap targets at 390 (QA round 18 L6)", () => {

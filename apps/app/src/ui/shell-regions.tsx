@@ -1,10 +1,13 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { usePaneFocus } from "../platform/pane-focus.ts";
 import { useContentRegionLayout } from "./float-layer.ts";
+import { HOTKEYS } from "./hotkeys.ts";
 import { useIsWide } from "./layout.ts";
 import { Presence } from "./presence.tsx";
+import { useHotkey } from "./use-hotkey.tsx";
 
 export type ShellProps = {
   /** The navigation region (`Navigation`: sidebar, rail or nothing); left out by a nested shell. */
@@ -16,6 +19,41 @@ export type ShellProps = {
   readonly inspectorOpen?: boolean;
   /** What the inspector holds, for screen readers ("Details"). */
   readonly inspectorLabel?: string;
+  /** Closes what the inspector shows: Escape calls it while the pane is open (UI review I4). */
+  readonly onInspectorClose?: () => void;
+};
+
+/**
+The pane's own frame while it is drawn: Escape closes what it shows, and focus moves into it as it
+opens and back to the control that opened it as it closes (UI review I4). One wrapper for every
+inspector (Now, Inbox, Week, Day), so none of them can miss it.
+*/
+const InspectorFrame = ({
+  children,
+  isShown,
+  label,
+  onClose,
+}: {
+  readonly children: ReactNode;
+  readonly isShown: boolean;
+  readonly label: string | undefined;
+  readonly onClose: (() => void) | undefined;
+}) => {
+  const paneRef = useRef<View>(null);
+  useHotkey(isShown && onClose !== undefined ? HOTKEYS.escape : undefined, () => {
+    onClose?.();
+  });
+  usePaneFocus(paneRef, isShown);
+  return (
+    <View
+      accessibilityLabel={label}
+      className="h-full w-inspector min-w-inspector-min max-w-inspector-max border-l border-separator bg-app"
+      ref={paneRef}
+      role="region"
+    >
+      {children}
+    </View>
+  );
 };
 
 /**
@@ -29,7 +67,8 @@ export const Inspector = ({
   inspector,
   inspectorLabel,
   inspectorOpen = false,
-}: Pick<ShellProps, "inspector" | "inspectorLabel" | "inspectorOpen">) => {
+  onInspectorClose,
+}: Pick<ShellProps, "inspector" | "inspectorLabel" | "inspectorOpen" | "onInspectorClose">) => {
   const isWide = useIsWide();
   // What the pane last showed: it stays through the exit, after the screen has let go of it.
   const [kept, setKept] = useState<ReactNode>(inspector);
@@ -45,13 +84,9 @@ export const Inspector = ({
       }}
       show={isShown}
     >
-      <View
-        accessibilityLabel={inspectorLabel}
-        className="h-full w-inspector min-w-inspector-min max-w-inspector-max border-l border-separator bg-app"
-        role="region"
-      >
+      <InspectorFrame isShown={isShown} label={inspectorLabel} onClose={onInspectorClose}>
         {kept}
-      </View>
+      </InspectorFrame>
     </Presence>
   ) : null;
 };

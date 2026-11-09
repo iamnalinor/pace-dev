@@ -1,15 +1,35 @@
+import type { ReactNode } from "react";
+
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { Linking } from "react-native";
+
+import type { PopoverProps } from "#app/ui/popover.tsx";
 
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { withWindowWidth } from "#app/test/window.ts";
 import { HW_ID, HW_VIEW_NOW, RENT_ID, rentSeriesEvents, TRK_ID, TRK_NOW } from "@pace/core/testing";
 
 import { TaskScreen } from "./task-screen.tsx";
 
 beforeEach(() => {
   jest.clearAllMocks();
+});
+
+/** Each `open` the kit popover is drawn with (the wide ⋯ menu's). */
+const mockPopoverOpen = jest.fn<undefined, [boolean]>();
+jest.mock("#app/ui/popover.tsx", (): unknown => {
+  const actual = jest.requireActual<{ readonly Popover: (props: PopoverProps) => ReactNode }>(
+    "#app/ui/popover.tsx",
+  );
+  return {
+    ...actual,
+    Popover: (props: PopoverProps) => {
+      mockPopoverOpen(props.open);
+      return actual.Popover(props);
+    },
+  };
 });
 
 // jest renders the phone, where Space is no key; the web's handler is the one under test here.
@@ -125,6 +145,21 @@ describe("TaskScreen — homework", () => {
     });
     const task = runtime.state.store.getState().tasks.byId[HW_ID];
     expect(task?.subtasks.find((item) => item.id === "s5")?.doneAt).toBeNull();
+  });
+
+  it("keeps a closed task's checklist read-only: no mark taken back, nothing reopened", async () => {
+    const runtime = await createTestRuntime({ now: HW_VIEW_NOW });
+    await runtime.actions.closeTask({ taskId: HW_ID, outcome: "done" });
+    await renderScreen(<TaskScreen id={HW_ID} />, runtime);
+    const done = screen.getByRole("checkbox", { name: "Matrix rank" });
+    expect(done).toBeChecked();
+    expect(done).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "Kronecker–Capelli" })).toBeDisabled();
+    await fireEvent.press(done);
+    await pressSpace(done);
+    const task = runtime.state.store.getState().tasks.byId[HW_ID];
+    expect(task?.closed).not.toBeNull();
+    expect(task?.subtasks.find((item) => item.id === "s1")?.doneAt).not.toBeNull();
   });
 
   it("goes back, and moves the task to another project from the header chip", async () => {
@@ -650,5 +685,48 @@ describe("TaskScreen — work", () => {
     expect(screen.getByText(en("task.notFound"))).toBeOnTheScreen();
     // No project picker over a task that is not there (QA 17 L11).
     expect(screen.queryByText(en("task.noProject"))).toBeNull();
+  });
+});
+
+/** Every host element in the tree that says it is a menu (accessible or not). */
+const menus = () =>
+  screen.root?.queryAll(
+    (node) =>
+      typeof node.type === "string" &&
+      (node.props["role"] === "menu" || node.props["accessibilityRole"] === "menu"),
+  ) ?? [];
+
+/** Opens the ⋯ menu and its delete confirm, and finds no menu role anywhere. */
+const checkRoles = async (): Promise<void> => {
+  await trkScreen();
+  await openMenu();
+  // Its rows are plain buttons in a dialog: a menu would promise arrow keys and menuitems.
+  expect(await screen.findByRole("button", { name: en("task.delete") })).toBeOnTheScreen();
+  expect(menus()).toHaveLength(0);
+  await fireEvent.press(screen.getByRole("button", { name: en("task.delete") }));
+  expect(screen.getByText(en("task.deleteAsk"))).toBeOnTheScreen();
+  expect(menus()).toHaveLength(0);
+};
+
+describe("TaskScreen — the ⋯ menu's roles (UI review I2: no nested menu, no confirm inside one)", () => {
+  it("on a phone: the sheet holds buttons, never a menu", async () => {
+    await checkRoles();
+  });
+
+  describe("on a computer", () => {
+    withWindowWidth(1440);
+
+    it("the popover is a dialog named by the menu's label, its rows buttons", async () => {
+      await checkRoles();
+    });
+
+    it("keeps the popover mounted as it closes, so it plays its exit (UI review minor)", async () => {
+      await trkScreen();
+      await openMenu();
+      expect(mockPopoverOpen).toHaveBeenLastCalledWith(true);
+      await requestClose();
+      // Told to close, not taken away: it fades and scales out before it lets go.
+      expect(mockPopoverOpen).toHaveBeenLastCalledWith(false);
+    });
   });
 });

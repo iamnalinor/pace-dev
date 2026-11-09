@@ -84,4 +84,40 @@ describe("Popover (spec §4.2.21, §6 popover)", () => {
     });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it("forgets where its anchor was once closed: reopened, it waits for a fresh measure", async () => {
+    const Controlled = ({ open }: { readonly open: boolean }) => {
+      const anchorRef = useRef<View>(null);
+      return (
+        <ThemeProvider forced="light">
+          <View ref={anchorRef} testID="anchor" />
+          <Popover anchor={anchorRef} label="Project" onClose={jest.fn()} open={open}>
+            <Text>Algebra</Text>
+          </Popover>
+        </ThemeProvider>
+      );
+    };
+    const view = await render(<Controlled open />);
+    expect(JSON.stringify(screen.getByTestId("popover-frame").props["style"])).toContain(
+      '"left":600',
+    );
+    await view.rerender(<Controlled open={false} />);
+    // The anchor moved while it was closed, and has not answered yet.
+    const pending: ((...box: [number, number, number, number]) => void)[] = [];
+    jest.spyOn(View.prototype, "measureInWindow").mockImplementation((report) => {
+      pending.push(report);
+    });
+    await view.rerender(<Controlled open />);
+    const frame = JSON.stringify(
+      screen.getByTestId("popover-frame", { includeHiddenElements: true }).props["style"],
+    );
+    expect(frame).not.toContain('"left":600');
+    expect(frame).toContain('"opacity":0');
+    await act(() => {
+      pending.at(-1)?.(200, 300, 120, 44);
+    });
+    expect(JSON.stringify(screen.getByTestId("popover-frame").props["style"])).toContain(
+      '"left":200',
+    );
+  });
 });

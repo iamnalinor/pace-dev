@@ -42,6 +42,15 @@ describe("TextField (spec §4.2.28, §7 Fields)", () => {
     expect(field().props["aria-invalid"]).toBe(true);
   });
 
+  it("tells a screen reader a field is invalid when only its border says so (isInvalid)", async () => {
+    await render(
+      <ThemeProvider forced="light">
+        <TextField isInvalid label="Title" purpose="title" value="25:99" />
+      </ThemeProvider>,
+    );
+    expect(field().props["aria-invalid"]).toBe(true);
+  });
+
   it("says the error once a submit was tried, even untouched", async () => {
     await render(<Required isSubmitted />);
     expect(screen.getByText("Type a title.")).toBeOnTheScreen();

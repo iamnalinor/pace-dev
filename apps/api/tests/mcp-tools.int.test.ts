@@ -91,22 +91,29 @@ const createTask = async (token: string, args: Record<string, unknown>): Promise
   return String(result["taskId"]);
 };
 
-/** The automatic miss an older version wrote at the deadline (none is made since feedback 5). */
+/**
+The automatic miss an older version wrote at the deadline (none is made since feedback 5), already
+in the log: written in-process, since one an older client pushes now is revoked at once.
+*/
 const pushOldMiss = async (taskId: string): Promise<void> => {
   // The deadline of the overdue tasks below.
   const at = "2026-09-10T10:00:00.000Z";
-  await pushEvents(await loginAsDev("1001"), [
-    {
-      deviceId: "server",
-      id: `auto:${taskId}:missed`,
-      occurredAt: at,
-      payload: { outcome: "cancelled_missed", taskId },
-      precision: "exact",
-      recordedAt: at,
-      source: "system",
-      type: "task.closed",
-    },
-  ]);
+  const me = await json<{ id: string }>("/api/me", { token: await loginAsDev("1001") });
+  await env.USER_STORE.get(env.USER_STORE.idFromName(me.id)).append(
+    [
+      {
+        deviceId: "server",
+        id: `auto:${taskId}:missed`,
+        occurredAt: at,
+        payload: { outcome: "cancelled_missed", taskId },
+        precision: "exact",
+        recordedAt: at,
+        source: "system",
+        type: "task.closed",
+      },
+    ],
+    { now: new Date().toISOString() },
+  );
 };
 
 describe("MCP tools catalogue", () => {
@@ -392,6 +399,30 @@ describe("progress and closing", () => {
     const text = result.content[0]?.text ?? "";
     expect(text).toContain(startAt);
     expect(text).toContain("estimateMinutes");
+  });
+});
+
+describe("get_task's text answer (session review minor 8)", () => {
+  it("does not repeat long fields: the text cuts them short, the structured content keeps them whole", async () => {
+    const token = await readWriteToken();
+    const description = `${"Long description. ".repeat(100)}END-OF-DESCRIPTION`;
+    const sourceText = `${"Pasted source. ".repeat(100)}END-OF-SOURCE`;
+    const taskId = await createTask(token, {
+      description,
+      presetId: "hw",
+      sourceText,
+      subtasks: ["Problem with a distinctive label"],
+      title: "Long",
+    });
+    const result = await callTool(token, "get_task", { id: taskId });
+    expect(result.structuredContent).toMatchObject({ description, sourceText });
+    const text = result.content[0]?.text ?? "";
+    expect(text).not.toContain("END-OF-DESCRIPTION");
+    expect(text).not.toContain("END-OF-SOURCE");
+    // The subtasks are listed once, as lines, not again inside the fields.
+    expect(text.split("Problem with a distinctive label")).toHaveLength(2);
+    expect(text.length).toBeLessThan(description.length);
+    expect(text).toContain("Long description.");
   });
 });
 
