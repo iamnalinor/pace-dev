@@ -283,18 +283,24 @@ export const notIntoNext = (read: Read, nextStart: null | string): Read => {
     : { faults: { ...read.faults, to: "day.overlapsNext" }, range: null };
 };
 
-/** The start of the live main activity after this block, if any. */
-export const nextStartOf = (time: TimeState, target: SheetTarget): null | string => {
-  if (target.kind !== "edit") {
-    return null;
-  }
+/**
+The start of the next main activity after `startAt` (live or logged; not the block being edited,
+not one run alongside), if any. One rule for every way a block is written (the edit form, a gap's
+Log and Log past; QA round 25 R25-01): a block may not run into the next one, because the
+timeline would cut one of them back without a word (a later live start wins over a live block, a
+logged block wins over the live time it covers).
+*/
+export const nextStartOf = (
+  time: TimeState,
+  target: SheetTarget,
+  startAt: string = target.startAt,
+): null | string => {
   const later = Object.values(time.activities)
     .filter(
       (activity) =>
-        activity.id !== target.activityId &&
+        (target.kind !== "edit" || activity.id !== target.activityId) &&
         !activity.isAlongside &&
-        !activity.isLogged &&
-        Date.parse(activity.startAt) > Date.parse(target.startAt),
+        Date.parse(activity.startAt) > Date.parse(startAt),
     )
     .map((activity) => activity.startAt)
     .toSorted((a, b) => Date.parse(a) - Date.parse(b));

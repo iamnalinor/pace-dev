@@ -230,8 +230,10 @@ export const useActivityEditor = ({ onClose, target, zone }: ActivitySheetProps)
   const [draft, patch] = useDraft(() => activityFormOf(target, (atIso) => clockTime(atIso, zone)));
   const [hasTriedToSave, setHasTriedToSave] = useState(false);
   const { now } = useViewer();
-  const nextStart = useAppState((state) => nextStartOf(state.time, target));
-  const { faults, range } = notIntoNext(notAhead(readDraft(draft, target, zone), now), nextStart);
+  const read = notAhead(readDraft(draft, target, zone), now);
+  const startAt = read.range?.startAt ?? target.startAt;
+  const nextStart = useAppState((state) => nextStartOf(state.time, target, startAt));
+  const { faults, range } = notIntoNext(read, nextStart);
   const save = async (): Promise<void> => {
     setHasTriedToSave(true);
     if (range === null || hasFault(faults)) {

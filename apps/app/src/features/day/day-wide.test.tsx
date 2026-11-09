@@ -58,4 +58,27 @@ describe("DayScreen on a wide window", () => {
     });
     expect(inspector()).toBeOnTheScreen();
   });
+
+  it("refuses a gap's Log over the next activity in the inspector too (QA round 25 R25-01)", async () => {
+    const runtime = await createTestRuntime();
+    await runtime.actions.logPast({
+      category: "food",
+      endAt: addMinutesIso(NOW, -240),
+      label: "Breakfast",
+      startAt: addMinutesIso(NOW, -270),
+    });
+    await runtime.actions.startActivity(
+      { category: "study", label: "Lecture" },
+      { at: addMinutesIso(NOW, -120) },
+    );
+    await renderScreen(<DayScreen />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: /2h not logged/u }));
+    await fireEvent.changeText(screen.getByLabelText("What"), "Reading");
+    await fireEvent.changeText(screen.getByLabelText("To"), "13:30");
+    await fireEvent.press(screen.getByRole("button", { name: "Save" }));
+    expect(
+      await screen.findByText("That runs into the next activity: move its start first."),
+    ).toBeOnTheScreen();
+    expect(inspector()).toBeOnTheScreen();
+  });
 });

@@ -10,6 +10,26 @@ import { NOW } from "@pace/core/testing";
 
 import { DayScreen } from "./day-screen.tsx";
 
+/** Breakfast logged 10:30–11:00 and a Lecture running since 13:00: the gap between is 11:00–13:00. */
+const overlapWorld = async () => {
+  const runtime = await createTestRuntime();
+  await runtime.actions.logPast({
+    category: "food",
+    endAt: addMinutesIso(NOW, -240),
+    label: "Breakfast",
+    startAt: addMinutesIso(NOW, -270),
+  });
+  // Running since 13:00: the gap before it is 11:00–13:00.
+  await runtime.actions.startActivity(
+    { category: "study", label: "Lecture" },
+    { at: addMinutesIso(NOW, -120) },
+  );
+  return runtime;
+};
+const lectureStart = (runtime: Awaited<ReturnType<typeof overlapWorld>>) =>
+  Object.values(runtime.state.store.getState().time.activities).find(
+    (activity) => activity.label === "Lecture",
+  )?.startAt;
 describe("DayScreen", () => {
   it("logs a past block and shows it with the gap before it", async () => {
     const runtime = await createTestRuntime();
@@ -292,6 +312,60 @@ describe("DayScreen", () => {
     await fireEvent.press(gap);
     expect(await screen.findByLabelText("From")).toHaveProp("value", "11:00");
     expect(screen.getByLabelText("To")).toHaveProp("value", "13:00");
+  });
+
+  describe("a block written over the next one is refused from every way in (QA round 25 R25-01)", () => {
+    const overlap = "That runs into the next activity: move its start first.";
+
+    it("from a gap's Log", async () => {
+      const runtime = await overlapWorld();
+      await renderScreen(<DayScreen />, runtime);
+      await fireEvent.press(screen.getByRole("button", { name: /2h not logged/u }));
+      await fireEvent.changeText(await screen.findByLabelText("What"), "Reading");
+      await fireEvent.changeText(screen.getByLabelText("To"), "13:30");
+      await fireEvent.press(screen.getByRole("button", { name: "Save" }));
+      expect(await screen.findByText(overlap)).toBeOnTheScreen();
+      expect(lectureStart(runtime)).toBe(addMinutesIso(NOW, -120));
+      expect(screen.queryByText("Reading")).toBeNull();
+    });
+
+    it("from Log past activity", async () => {
+      const runtime = await overlapWorld();
+      await renderScreen(<DayScreen />, runtime);
+      await fireEvent.press(screen.getByRole("button", { name: "Log past activity" }));
+      await fireEvent.changeText(await screen.findByLabelText("What"), "Reading");
+      await fireEvent.changeText(screen.getByLabelText("From"), "12:00");
+      await fireEvent.changeText(screen.getByLabelText("To"), "13:30");
+      await fireEvent.press(screen.getByRole("button", { name: "Save" }));
+      expect(await screen.findByText(overlap)).toBeOnTheScreen();
+      expect(lectureStart(runtime)).toBe(addMinutesIso(NOW, -120));
+      // Up to the next one's start is fine.
+      await fireEvent.changeText(screen.getByLabelText("To"), "13:00");
+      await fireEvent.press(screen.getByRole("button", { name: "Save" }));
+      expect(await screen.findByText("Reading")).toBeOnTheScreen();
+      expect(lectureStart(runtime)).toBe(addMinutesIso(NOW, -120));
+    });
+
+    it("from a block's own form, into a logged block after it", async () => {
+      const runtime = await createTestRuntime();
+      // Rest 10:00–11:00 as tracked live, Lunch 11:00–12:00 logged after it.
+      await runtime.actions.startActivity(
+        { category: "rest", label: "Rest" },
+        { at: addMinutesIso(NOW, -300) },
+      );
+      await runtime.actions.stopActivity({ at: addMinutesIso(NOW, -240) });
+      await runtime.actions.logPast({
+        category: "food",
+        endAt: addMinutesIso(NOW, -180),
+        label: "Lunch",
+        startAt: addMinutesIso(NOW, -240),
+      });
+      await renderScreen(<DayScreen />, runtime);
+      await fireEvent.press(screen.getByRole("button", { name: /Rest/u }));
+      await fireEvent.changeText(await screen.findByLabelText("To"), "11:30");
+      await fireEvent.press(screen.getByRole("button", { name: "Save" }));
+      expect(await screen.findByText(overlap)).toBeOnTheScreen();
+    });
   });
 
   it("stands each rail bar beside its row: the bar takes the row's measured top and height (owner 2026-11-09)", async () => {
