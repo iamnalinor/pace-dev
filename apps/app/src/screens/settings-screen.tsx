@@ -203,14 +203,18 @@ export const SettingsScreen = () => {
       ) : null}
       {/* The account's own actions last: export (the web's download), log out, the danger zone. */}
       <View className="mx-gutter gap-3 py-6">
-        {owner === null ? null : (
-          <Text role="footnote" tone="secondary">
-            {t("nav.signedInAs", { name: owner })}
-          </Text>
-        )}
-        <View className={cx("gap-3", isWide && "flex-row flex-wrap")}>
-          {IS_PHONE ? null : <ExportRow />}
-          <LogoutButton />
+        {/* Bare text and loose buttons start at the section headers' text inset, not the
+        groups' edge (design review 2 N6). */}
+        <View className="gap-3 px-row-x">
+          {owner === null ? null : (
+            <Text role="footnote" tone="secondary">
+              {t("nav.signedInAs", { name: owner })}
+            </Text>
+          )}
+          <View className={cx("gap-3", isWide && "flex-row flex-wrap")}>
+            {IS_PHONE ? null : <ExportRow />}
+            <LogoutButton />
+          </View>
         </View>
         <DangerZone />
       </View>

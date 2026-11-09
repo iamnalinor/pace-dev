@@ -7,6 +7,7 @@ import { requestNewTask } from "#app/shared/new-task-request.ts";
 import { classLinePx, classPx } from "#app/test/class-px.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { withWindowWidth } from "#app/test/window.ts";
 import { FAKE_STORE_ID, fakeUser } from "@pace/client/testing";
 import { HW_ID, WORK_ID } from "@pace/core/testing";
 
@@ -923,5 +924,21 @@ describe("Composer", () => {
         ),
       ).toHaveLength(1);
     });
+  });
+});
+
+describe("the line on a computer (design review 2 N5)", () => {
+  withWindowWidth(1440);
+
+  it("keeps the + slot while the line is empty, so the field does not move when + comes", async () => {
+    await renderComposer(await createTestRuntime());
+    // F-CMP-18: no + at rest (the sidebar's New task is the entry), but its place is kept: the field
+    // jumped 42 px sideways the moment text came.
+    expect(screen.queryByRole("button", { name: en("nav.newTask") })).toBeNull();
+    const slot = screen.getByTestId("line-plus-slot", { includeHiddenElements: true });
+    expect(slot).toHaveProp("aria-hidden", true);
+    await fireEvent.changeText(line(), "Buy milk");
+    expect(screen.getByRole("button", { name: en("nav.newTask") })).toBeOnTheScreen();
+    expect(screen.queryByTestId("line-plus-slot", { includeHiddenElements: true })).toBeNull();
   });
 });

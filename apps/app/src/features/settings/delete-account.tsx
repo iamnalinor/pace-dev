@@ -154,7 +154,7 @@ const DangerOpeners = ({
   // Both outlined, side by side on a computer and full width on a phone, like Export data and
   // Log out above them (QA round 15 L6: Delete was a bare link beside a bordered Wipe).
   return (
-    <View className={cx("gap-2", isWide && "flex-row flex-wrap")}>
+    <View className={cx("gap-2 px-row-x", isWide && "flex-row flex-wrap")}>
       <Button
         onPress={() => {
           focus.toCancel();
@@ -255,13 +255,15 @@ export const DangerZone = () => {
     <View className="mt-3 gap-3 border-t border-separator pt-5">
       <Text
         accessibilityRole="header"
-        className="font-sans text-subhead font-semibold text-label-secondary"
+        // At the section headers' text inset, as the account's actions above (N6); the confirm's
+        // bordered box keeps the groups' edge.
+        className="px-row-x font-sans text-subhead font-semibold text-label-secondary"
       >
         {t("settings.danger")}
       </Text>
       <DangerPrompt flow={flow} />
       {flow.notice === null ? null : (
-        <Text accessibilityRole="alert" className="font-sans text-footnote text-danger">
+        <Text accessibilityRole="alert" className="px-row-x font-sans text-footnote text-danger">
           {t(NOTICE_KEY[flow.notice])}
         </Text>
       )}

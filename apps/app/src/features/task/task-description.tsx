@@ -4,14 +4,18 @@ import { View } from "react-native";
 import type { TaskViewModel } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
+import { useIsInPane } from "#app/shared/task-opener.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button } from "#app/ui/button.tsx";
+import { cx } from "#app/ui/cx.ts";
 import { Pressable } from "#app/ui/pressable.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 import { TextLink } from "#app/ui/text-link.tsx";
 import { Text } from "#app/ui/text.tsx";
 import { useDiscardDraft, useDraft } from "#app/ui/use-draft.ts";
 import { splitLinks, type TextPart } from "@pace/core";
+
+import { titleInset } from "./task-summary.tsx";
 
 /** Lines of the description before «Show all». */
 const DESCRIPTION_LINES = 6;
@@ -137,10 +141,12 @@ const DescriptionText = ({
 }) => {
   const t = useT();
   const [isFull, setIsFull] = useState(false);
+  // Where the title starts: at the gutter it stood a row inset short of it on a computer (N6).
+  const inset = titleInset(useIsInPane());
   if (view.description === null || view.description === "") {
     return (
       <Pressable
-        className="mx-gutter min-h-hit-web justify-center"
+        className={cx("min-h-hit-web justify-center", inset)}
         label={t("task.addDescription")}
         onPress={onEdit}
         role="button"
@@ -154,7 +160,7 @@ const DescriptionText = ({
   // Only a text that may run past six lines offers the rest (a clamped text cannot say it was cut).
   const isCut = view.description.length > LONG_DESCRIPTION && !isFull;
   return (
-    <View className="mx-gutter gap-1">
+    <View className={cx("gap-1", inset)} testID="task-description">
       <DescriptionBody description={view.description} isCut={isCut} onEdit={onEdit} />
       {isCut ? (
         <Button

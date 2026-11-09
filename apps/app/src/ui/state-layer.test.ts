@@ -113,6 +113,24 @@ describe("the web state layer (global.css, spec §3.7)", () => {
     );
   });
 
+  describe("a row whose check sits beside its press area (data-pace-row, design review 2 N7)", () => {
+    const ROW = "[data-pace-row]";
+
+    it("hovers the whole row, check column included, not the press area alone", () => {
+      const block = mediaBlock(HOVER_MEDIA);
+      // The press area's own overlay started at the title (x = 312), the check left on white.
+      expect(declarations(`${ROW} > ${ENABLED}:hover::after`, block)).toContain(
+        "background-color: transparent",
+      );
+      expect(declarations(`${ROW}:has(> ${ENABLED}:hover)::after`, block)).toContain(
+        "background-color: var(--pace-fill-1)",
+      );
+      expect(declarations(`${ROW}::after`, outsideForced())).toEqual(
+        expect.arrayContaining(["position: absolute", "inset: 0", "pointer-events: none"]),
+      );
+    });
+  });
+
   describe("a small visual inside its target (data-pace-inner)", () => {
     const INNER = "[data-pace-inner]";
     const VISUAL = `${INNER} > [data-pace-visual]`;

@@ -5,7 +5,7 @@ import { useAppState, useT } from "#app/app-state.tsx";
 import { isDeadlineChoiceValid } from "#app/shared/task-fields/deadline-choice.ts";
 import { SubtaskList } from "#app/shared/task-fields/subtask-list.tsx";
 import { TaskFields, type TaskFormValues } from "#app/shared/task-fields/task-fields.tsx";
-import { Button } from "#app/ui/button.tsx";
+import { Button, KeyHintRoomContext } from "#app/ui/button.tsx";
 import { HOTKEYS } from "#app/ui/hotkeys.ts";
 import { IconButton } from "#app/ui/icon-button.tsx";
 import { RadioChips } from "#app/ui/radio-chips.tsx";
@@ -113,9 +113,13 @@ const FormHeader = ({
         {title}
       </Text>
       <View className="shrink">
-        <Button disabled={!canAdd} onPress={onAdd} shortcut={HOTKEYS.primary} shortcutMode="hint">
-          {actionLabel}
-        </Button>
+        {/* In the 400 px pane the header has no room for the shortcut (the activity pane's title
+        wrapped beside it, design review 2 N11); the shortcut still works. */}
+        <KeyHintRoomContext value={variant !== "pane"}>
+          <Button disabled={!canAdd} onPress={onAdd} shortcut={HOTKEYS.primary} shortcutMode="hint">
+            {actionLabel}
+          </Button>
+        </KeyHintRoomContext>
       </View>
       <IconButton icon={closeIcon} label={t("common.close")} onPress={onClose} />
     </View>

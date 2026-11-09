@@ -83,12 +83,38 @@ const pushRoutes = () => {
   };
 };
 
+/** A node's NativeWind classes, as one string. */
+const classesOf = (node: { readonly props: Record<string, unknown> }): string => {
+  const name = node.props["className"];
+  return typeof name === "string" ? name : "";
+};
+
+/** Whether the text, or a box around it, carries the rows' text inset. */
+const insetOf = (text: string): string | undefined => {
+  let node: null | ReturnType<typeof screen.getByText> = screen.getByText(text);
+  while (node !== null && !/\bpx-row-x\b/u.test(classesOf(node))) {
+    node = node.parent;
+  }
+  return node === null ? undefined : "px-row-x";
+};
+
 describe("SettingsScreen", () => {
   it("says who is signed in by the account's actions, the one place the name is shown (owner 2026-11-08)", async () => {
     const runtime = await createTestRuntime({ world: "empty" });
     await runtime.auth.me();
     await renderScreen(<SettingsScreen />, runtime);
     expect(screen.getByText(en("nav.signedInAs", { name: "Ann" }))).toBeOnTheScreen();
+  });
+
+  it("starts the account's own text and buttons at the section headers' text inset (design review 2 N6)", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    await runtime.auth.me();
+    await renderScreen(<SettingsScreen />, runtime);
+    // «Вы вошли как…», Export/Log out and «Опасные действия» stood at the group's edge (264 / 16)
+    // while every section header's text starts a row inset in (280 / 32).
+    expect(insetOf(en("nav.signedInAs", { name: "Ann" }))).toBe("px-row-x");
+    expect(insetOf(en("settings.danger"))).toBe("px-row-x");
+    expect(insetOf(en("settings.logout"))).toBe("px-row-x");
   });
 
   it("saves digest times as they are typed, adds and removes one", async () => {

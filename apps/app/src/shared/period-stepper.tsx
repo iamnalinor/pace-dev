@@ -59,7 +59,8 @@ const PeriodLabel = ({
 }: Pick<PeriodStepperProps, "label" | "labelAction" | "onLabel">) => {
   const anchorRef = useRef<View>(null);
   const text = (
-    <Text accessibilityLiveRegion="polite" numeric role="headline">
+    // A control's label never wraps (design review 2 N2: the week's month went under its days).
+    <Text accessibilityLiveRegion="polite" numeric policy="truncate" role="headline">
       {label}
     </Text>
   );

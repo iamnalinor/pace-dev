@@ -304,6 +304,21 @@ describe("Tooltip on the web (spec §4.2.31, §6 tooltip)", () => {
     page.removeEventListener("keyup", onSheetKey, { capture: true });
   });
 
+  it("shows no hover tooltip where the device cannot hover finely, whatever pointer type a tap reports (design review 2 N4)", async () => {
+    const coarse = jest.fn((query: string) => ({ matches: !query.includes("hover") }));
+    Object.assign(globalThis, { matchMedia: coarse });
+    try {
+      await renderTriggers(<Trigger label={LABEL} name="Send" />);
+      // A phone's browser can send a tap's compatibility events as a mouse's.
+      await fireEvent(button("Send"), "pointerEnter", pointer("mouse"));
+      await pass(HOVER_DELAY_MS * 2);
+      expect(isShown(LABEL)).toBe(false);
+      expect(coarse).toHaveBeenCalledWith("(hover: hover) and (pointer: fine)");
+    } finally {
+      Reflect.deleteProperty(globalThis, "matchMedia");
+    }
+  });
+
   it("on a touch screen shows nothing: the tap runs the control", async () => {
     const onPress = jest.fn();
     await renderTriggers(<Trigger label={LABEL} name="Send" onPress={onPress} />);

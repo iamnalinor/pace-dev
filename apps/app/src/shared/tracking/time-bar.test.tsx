@@ -53,6 +53,12 @@ const choicesIn = async (name: string): Promise<readonly string[]> =>
     .getAllByRole("button")
     .map((button): string => String(button.props["accessibilityLabel"]));
 
+/** A node's NativeWind classes. */
+const classesOf = (node: { readonly props: Record<string, unknown> }): readonly string[] => {
+  const name = node.props["className"];
+  return typeof name === "string" ? name.split(" ") : [];
+};
+
 /** A promise the test settles when it wants to. */
 const deferred = <T,>() => {
   const settle: { resolve: (value: T) => void } = { resolve: () => undefined };
@@ -172,6 +178,19 @@ describe("TimeBar", () => {
     // Nothing folds under the finger: the field and the buttons are still there.
     expect(screen.getByLabelText(en("time.whatDoing"))).toBeOnTheScreen();
     expect(screen.getByRole("button", { name: "Chores" })).toBeOnTheScreen();
+  });
+
+  it("sets «Start something else» on the card's edge with no gap around it (design review 2 N3)", async () => {
+    const runtime = await createTestRuntime();
+    await startBoth(runtime);
+    await renderScreen(<TimeBar />, runtime);
+    const more = screen.getByRole("button", { name: en("time.startOther") });
+    // Indented to the list's row inset it stood at x = 44 beside a card and tiles at 12.
+    expect(classesOf(more)).not.toContain("mx-gutter");
+    expect(classesOf(more)).not.toContain("px-row-x");
+    // Its own target's air is the gap: the bar's 8 px above and below it left ~34 px of nothing.
+    const bar = screen.getByLabelText(en("time.bar"));
+    expect(classesOf(bar)).not.toContain("gap-2");
   });
 
   it("keeps the typed text when the bar folds and unfolds", async () => {

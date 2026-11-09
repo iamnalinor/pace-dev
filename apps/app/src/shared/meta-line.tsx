@@ -7,6 +7,7 @@ import { useT } from "#app/app-state.tsx";
 import { metaTexts, type MetaTone } from "#app/format/meta.ts";
 import { cx } from "#app/ui/cx.ts";
 import { Icon } from "#app/ui/icon.tsx";
+import { useIsWide } from "#app/ui/layout.ts";
 import { Tag } from "#app/ui/tag.tsx";
 import { Text, type TextProps } from "#app/ui/text.tsx";
 import { type Importance, type Language, presetLabel } from "@pace/core";
@@ -35,6 +36,20 @@ const IMPORTANCE_LOOK: Readonly<
   prioritized: { className: "font-semibold", tone: "primary" },
 };
 
+/**
+The pieces in the order the line keeps them. A phone's line is cut at its end, so there the due
+date, the longest and least urgent piece, goes after the rest: «Срок завтра 19:30 · осталос…» lost
+the countdown, the one value that matters (design review 2 N10). A wide line keeps the reading
+order, date first.
+*/
+const inCutOrder = (parts: readonly MetaPart[], isWide: boolean): readonly MetaPart[] =>
+  isWide
+    ? parts
+    : [
+        ...parts.filter((part) => part.kind !== "due"),
+        ...parts.filter((part) => part.kind === "due"),
+      ];
+
 /** A small repeat mark: the row is one of a series (or a weekly homework). */
 export const RepeatMark = () => {
   const t = useT();
@@ -49,7 +64,7 @@ export const RepeatMark = () => {
 A row's meta line, one line (spec 4.3.2): the project (else the category) as a tag that yields
 first (at most half the line), the importance word when it is not Normal, a repeat mark for a
 series, then `by end of day · 2 subtasks left` in the footnote's tabular figures, ending in "…"
-when it does not fit. Lateness is red.
+when it does not fit (on a phone the due date goes last, so it is what yields). Lateness is red.
 */
 export const MetaLine = ({
   asOf,
@@ -72,7 +87,11 @@ export const MetaLine = ({
     .map((part) => part.importance)
     .filter((importance) => importance !== "normal");
   const isRepeating = showRepeat && parts.some((part) => part.kind === "repeats");
-  const rest = parts.filter((part) => part.kind !== "importance" && part.kind !== "repeats");
+  const isWide = useIsWide();
+  const rest = inCutOrder(
+    parts.filter((part) => part.kind !== "importance" && part.kind !== "repeats"),
+    isWide,
+  );
   const texts = metaTexts(rest, viewer);
   const tagLabel = tag === null ? null : rowTagLabel(tag.tag, viewer.language);
   return (

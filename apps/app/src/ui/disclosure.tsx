@@ -11,6 +11,7 @@ import { scheduleOnRN } from "react-native-worklets";
 import { useLanguage } from "#app/app-state.tsx";
 import { formatCount, motion } from "@pace/core";
 
+import { cx } from "./cx.ts";
 import { Icon } from "./icon.tsx";
 import { EASING } from "./motion-presets.ts";
 import { Pressable } from "./pressable.tsx";
@@ -198,6 +199,12 @@ export type DisclosureProps = {
   readonly onShown?: (() => void) | undefined;
   readonly children: ReactNode;
   readonly testID?: string | undefined;
+  /**
+  Where the trigger's label starts: `row` (default) at a list row's text inset, `edge` on its
+  container's own edge (the time bar's «Start something else», in line with the card and the
+  tiles: design review 2 N3).
+  */
+  readonly inset?: "edge" | "row" | undefined;
 };
 
 /**
@@ -210,6 +217,7 @@ tech and takes no touches.
 export const Disclosure = ({
   children,
   count,
+  inset = "row",
   label,
   onShown,
   onToggle,
@@ -222,7 +230,10 @@ export const Disclosure = ({
   return (
     <View testID={testID}>
       <Pressable
-        className="mx-gutter flex-row items-center gap-2 rounded-md px-row-x"
+        className={cx(
+          "flex-row items-center gap-2 rounded-md",
+          inset === "row" && "mx-gutter px-row-x",
+        )}
         expanded={open}
         label={count === undefined ? label : `${label} · ${formatCount(count, language)}`}
         onPress={onToggle}
