@@ -1,4 +1,4 @@
-import { sliceWhole } from "../format/initials.ts";
+import { sliceWhole } from "../format/cut-text.ts";
 
 /**
 The bounds of a action, read by its schema and by the code that makes one: what the server
