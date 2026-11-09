@@ -34,3 +34,24 @@ describe("the phone's calendar events", () => {
     ]);
   });
 });
+
+describe("the calendar's long texts (bug-lessons 186)", () => {
+  it("are cut within the server's UTF-16 limit and never between the halves of an emoji", async () => {
+    calendar.state.status = "granted";
+    calendar.state.events = [
+      {
+        allDay: false,
+        endDate: "2026-10-14T12:20:00.000Z",
+        id: "ev-2",
+        location: `${"a".repeat(499)}🚀`,
+        notes: `${"a".repeat(1999)}🚀`,
+        recurrenceRule: null,
+        startDate: "2026-10-14T09:15:00.000Z",
+        title: "Seminar",
+      },
+    ];
+    const [event] = await calendarEvents("2026-10-13T21:00:00.000Z", "2026-10-14T21:00:00.000Z");
+    expect(event?.notes).toBe("a".repeat(1999));
+    expect(event?.location).toBe("a".repeat(499));
+  });
+});

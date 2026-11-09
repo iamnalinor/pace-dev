@@ -8,6 +8,7 @@ import {
   isLockedAt,
   type PhoneEvent,
   phoneUses,
+  sliceWhole,
 } from "@pace/core";
 
 import { loadDeviceId } from "./device-id.ts";
@@ -58,12 +59,12 @@ const syncCalendar = async (
       deviceId,
       events: events.slice(0, MAX_EVENTS).map((event) => ({
         ...event,
-        series: event.series?.slice(0, 300) ?? null,
-        title: event.title.slice(0, 200),
+        series: event.series === null ? null : sliceWhole(event.series, 300),
+        title: sliceWhole(event.title, 200),
       })),
       from,
       to,
-      ruledSeries: rules.map((rule) => rule.series.slice(0, 300)).slice(0, 500),
+      ruledSeries: rules.map((rule) => sliceWhole(rule.series, 300)).slice(0, 500),
     },
   });
 };
