@@ -39,8 +39,6 @@ export const ruBoard: { readonly [K in keyof typeof enBoard]: string } = {
   "status.not_started": "Не начата",
   "status.in_progress": "В работе",
   "status.paused": "На паузе",
-  "submission.per_subtask": "Сдача по подзадачам",
-  "submission.whole": "Сдача целиком",
   "outcome.done": "Сделано",
   "outcome.done_late": "Сделано с опозданием",
   "outcome.cancelled": "Отменена",

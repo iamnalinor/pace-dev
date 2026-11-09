@@ -117,3 +117,5 @@ the now-line's end) stay. Spec §4.2.6, §4.2.7 and the P1 usage rule are supers
 2026-11-08 (owner): **no profile name in the chrome.** The sidebar's header is the mark, «Pace» and
 the bell; More has no owner row. Settings says «Вы вошли как {name}» above Log out, the one place
 that names the account.
+
+2026-11-09 (owner): **no «Сдача по подзадачам» / submission setting.** The preset field `submission` (`whole` / `per_subtask`) is gone from the preset editor, the task page's tags, MCP and the seeds; a task's check always closes it (with Undo), subtasks are marked done one by one and show progress, and lateness goes by the done subtasks' instants (else the closing time) whatever the preset. Old presets and events that carry the key still parse and it is dropped.

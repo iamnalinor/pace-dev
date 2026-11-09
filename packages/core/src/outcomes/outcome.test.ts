@@ -173,52 +173,46 @@ describe("subtaskOutcome", () => {
 
 describe("taskOutcome: the spec table", () => {
   it("is null while the task is open", () => {
-    expect(taskOutcome(taskFixture(), HW)).toBeNull();
+    expect(taskOutcome(taskFixture())).toBeNull();
   });
 
   it("passes cancelled, cancelled_missed and skipped through", () => {
-    expect(taskOutcome(closedTask("cancelled", BEFORE), WORK)).toBe("cancelled");
-    expect(taskOutcome(closedTask("cancelled_missed", AFTER), HW)).toBe("cancelled_missed");
-    expect(taskOutcome(closedTask("skipped", AFTER), HW)).toBe("skipped");
+    expect(taskOutcome(closedTask("cancelled", BEFORE))).toBe("cancelled");
+    expect(taskOutcome(closedTask("cancelled_missed", AFTER))).toBe("cancelled_missed");
+    expect(taskOutcome(closedTask("skipped", AFTER))).toBe("skipped");
   });
 
-  it("splits done by the closing instant for whole submission", () => {
-    expect(taskOutcome(closedTask("done", BEFORE), WORK)).toBe("done");
-    expect(taskOutcome(closedTask("done", HW_DUE), WORK)).toBe("done");
-    expect(taskOutcome(closedTask("done", AFTER), WORK)).toBe("done_late");
-    expect(taskOutcome(closedTask("done", AFTER, { dueAt: null, dueTz: null }), WORK)).toBe("done");
+  it("splits done by the closing instant for a task without subtasks", () => {
+    expect(taskOutcome(closedTask("done", BEFORE))).toBe("done");
+    expect(taskOutcome(closedTask("done", HW_DUE))).toBe("done");
+    expect(taskOutcome(closedTask("done", AFTER))).toBe("done_late");
+    expect(taskOutcome(closedTask("done", AFTER, { dueAt: null, dueTz: null }))).toBe("done");
   });
 
-  it("derives per-subtask outcomes from the done marks", () => {
+  it("derives the outcome from the done marks, whatever the preset (no submission mode)", () => {
     const onTime = closedTask("done", AFTER, {
       subtasks: [sent("s1", BEFORE), sent("s2", BEFORE)],
     });
-    expect(taskOutcome(onTime, HW)).toBe("done");
+    expect(taskOutcome(onTime)).toBe("done");
     const someLate = closedTask("done", AFTER, {
       subtasks: [sent("s1", BEFORE), sent("s2", AFTER)],
     });
-    expect(taskOutcome(someLate, HW)).toBe("done_late");
+    expect(taskOutcome(someLate)).toBe("done_late");
   });
 
   it("ignores subtasks left open when the task was closed as done", () => {
     const left = closedTask("done", AFTER, { subtasks: [sent("s1", BEFORE), sent("s2", null)] });
-    expect(taskOutcome(left, HW)).toBe("done");
+    expect(taskOutcome(left)).toBe("done");
     const leftLate = closedTask("done", AFTER, { subtasks: [sent("s1", AFTER), sent("s2", null)] });
-    expect(taskOutcome(leftLate, HW)).toBe("done_late");
+    expect(taskOutcome(leftLate)).toBe("done_late");
   });
 
-  it("falls back to the closing instant for a per-subtask task without done subtasks", () => {
-    expect(taskOutcome(closedTask("done", AFTER), HW)).toBe("done_late");
-    expect(taskOutcome(closedTask("done", BEFORE), HW)).toBe("done");
+  it("falls back to the closing instant for a task without done subtasks", () => {
+    expect(taskOutcome(closedTask("done", AFTER))).toBe("done_late");
+    expect(taskOutcome(closedTask("done", BEFORE))).toBe("done");
     const noneDone = { subtasks: [sent("s1", null), sent("s2", null)] };
-    expect(taskOutcome(closedTask("done", AFTER, noneDone), HW)).toBe("done_late");
-    expect(taskOutcome(closedTask("done", BEFORE, noneDone), HW)).toBe("done");
-  });
-
-  it("keeps late as late under a resubmission policy", () => {
-    expect(taskOutcome(closedTask("done", AFTER), { ...RESUBMISSION, submission: "whole" })).toBe(
-      "done_late",
-    );
+    expect(taskOutcome(closedTask("done", AFTER, noneDone))).toBe("done_late");
+    expect(taskOutcome(closedTask("done", BEFORE, noneDone))).toBe("done");
   });
 });
 
@@ -237,13 +231,13 @@ describe("taskOutcome: retro done before the deadline beats the automatic miss",
   it("wins once the action layer revokes the automatic event", () => {
     const revoke = at(9, AFTER, { type: "event.revoked", payload: { targetId: missed.id } });
     const task = fold([...algebraHw6Events(), missed, revoke, doneRetro]).byId[HW_ID];
-    expect(task === undefined ? null : taskOutcome(task, HW)).toBe("done");
+    expect(task === undefined ? null : taskOutcome(task)).toBe("done");
   });
 
   it("wins by time even before the revocation, because the first closure stays", () => {
     const task = fold([...algebraHw6Events(), missed, doneRetro]).byId[HW_ID];
     expect(task?.closed?.eventId).toBe(doneRetro.id);
-    expect(task === undefined ? null : taskOutcome(task, HW)).toBe("done");
+    expect(task === undefined ? null : taskOutcome(task)).toBe("done");
   });
 });
 

@@ -121,7 +121,6 @@ export const enLibrary = {
   "presets.section.fields": "Task fields",
   "presets.field.defaultImportance": "Default importance",
   "presets.field.deadlinePolicy": "Deadline",
-  "presets.field.submission": "Submission",
   "presets.field.progressMode": "Progress",
   "presets.field.defaultEstimateMinutes": "Default estimate (minutes)",
   "presets.field.color": "Color",

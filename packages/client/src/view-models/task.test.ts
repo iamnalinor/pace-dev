@@ -118,7 +118,7 @@ describe("taskViewModel", () => {
     expect(trk.outcome).toBeNull();
   });
 
-  it("shows Algebra HW 6 on Wednesday: the subtasks done or not, Done, and the quick times", () => {
+  it("shows Algebra HW 6 on Wednesday: the subtasks done or not, Done, the quick times, no submission tag", () => {
     const hw = view(HW_ID, HW_VIEW_NOW);
     expect(hw.subtasks.map((subtask) => [subtask.number, subtask.state])).toEqual([
       [1, "done"],
@@ -149,7 +149,6 @@ describe("taskViewModel", () => {
     expect(hw.tags).toEqual([
       { importance: "normal", kind: "importance" },
       { kind: "status", status: "in_progress" },
-      { kind: "submission", submission: "per_subtask" },
     ]);
   });
 

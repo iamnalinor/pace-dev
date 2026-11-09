@@ -36,9 +36,6 @@ const tagKey = (tag: TaskTag) => {
     case "status": {
       return `status.${tag.status}` as const;
     }
-    case "submission": {
-      return `submission.${tag.submission}` as const;
-    }
   }
 };
 

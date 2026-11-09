@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
 import { createContext, type ReactNode, use, useCallback } from "react";
 
-export type OpenTask = (taskId: string, options?: { readonly close?: boolean }) => void;
+export type OpenTask = (taskId: string) => void;
 
 /** A list that has a detail pane next to it opens tasks there instead of a new screen. */
 const OpenerContext = createContext<null | OpenTask>(null);
@@ -42,8 +42,8 @@ export const useOpenTask = (): OpenTask => {
   const router = useRouter();
   const pane = use(OpenerContext);
   const push = useCallback<OpenTask>(
-    (taskId, options) => {
-      router.push(`/task/${taskId}${options?.close === true ? "?close=1" : ""}`);
+    (taskId) => {
+      router.push(`/task/${taskId}`);
     },
     [router],
   );

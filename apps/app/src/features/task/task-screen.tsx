@@ -75,20 +75,13 @@ const OpenSheet = ({
 
 /**
 The task (artboards 2 and 3): summary, progress or subtasks, the source text; the footer
-holds Focus and Done / Submit.
+holds Focus and Done.
 */
-export const TaskScreen = ({
-  id,
-  openClose = false,
-}: {
-  readonly id: string;
-  /** Lands with the close sheet open (a per-subtask check on Now). */
-  readonly openClose?: boolean;
-}) => {
+export const TaskScreen = ({ id }: { readonly id: string }) => {
   const t = useT();
   const { hooks } = usePace();
   const view = hooks.useTaskView(id);
-  const [open, setOpen] = useState<Open>(openClose ? "close" : null);
+  const [open, setOpen] = useState<Open>(null);
   if (!view.ok) {
     return (
       <Screen header={<TaskHeader />}>

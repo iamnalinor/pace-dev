@@ -7,6 +7,7 @@ import { BASE_PRESET_IDS, BASE_PRESETS } from "./base-presets.ts";
 import { INITIAL_PRESETS_STATE, type PresetsState } from "./preset-reducer.ts";
 import { PresetDefinitionSchema } from "./preset-schema.ts";
 import {
+  isHomeworkPreset,
   presetChain,
   type PresetInput,
   resolvePreset,
@@ -398,23 +399,40 @@ describe("validatePresetInput", () => {
   });
 });
 
+describe("isHomeworkPreset", () => {
+  it("is homework and the presets built on it, nothing else", () => {
+    const state = stateWith(user("hw.algebra", "hw", {}), user("course", "hw.algebra", {}));
+    expect(isHomeworkPreset(state, "hw")).toBe(true);
+    expect(isHomeworkPreset(state, "hw.algebra")).toBe(true);
+    expect(isHomeworkPreset(state, "course")).toBe(true);
+    expect(isHomeworkPreset(state, "work")).toBe(false);
+    expect(isHomeworkPreset(state, "nope")).toBe(false);
+  });
+});
+
 describe("taskPreset", () => {
   const subtask = { id: "s1", label: "1", number: 1, doneAt: null } as const;
   const task = (presetId: string, subtasks: readonly (typeof subtask)[]) =>
     ({ overrides: null, presetId, subtasks }) as const;
 
-  it("tracks subtasks when there are some, with the preset's submission", () => {
+  it("tracks subtasks when there are some", () => {
     expect(taskPreset(INITIAL_PRESETS_STATE, task("hw", [subtask]))).toMatchObject({
-      value: { progressMode: "subtasks", submission: "per_subtask" },
+      value: { progressMode: "subtasks" },
     });
     expect(taskPreset(INITIAL_PRESETS_STATE, task("work", [subtask]))).toMatchObject({
-      value: { progressMode: "subtasks", submission: "whole" },
+      value: { progressMode: "subtasks" },
     });
   });
 
-  it("falls back to the bar and a whole submission without subtasks", () => {
+  it("has no submission mode, even when an old override carries one", () => {
+    const old = { ...task("hw", [subtask]), overrides: { submission: "whole" } };
+    const resolved = taskPreset(INITIAL_PRESETS_STATE, old);
+    expect(resolved.ok && "submission" in resolved.value).toBe(false);
+  });
+
+  it("falls back to the bar without subtasks", () => {
     expect(taskPreset(INITIAL_PRESETS_STATE, task("hw", []))).toMatchObject({
-      value: { progressMode: "slider", submission: "whole" },
+      value: { progressMode: "slider" },
     });
     expect(taskPreset(INITIAL_PRESETS_STATE, task("deferred", []))).toMatchObject({
       value: { progressMode: "none" },

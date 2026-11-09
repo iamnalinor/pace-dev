@@ -38,7 +38,7 @@ const PRESET_ID = z.string().min(1).describe("Lowercase slug, e.g. hw.algebra or
 const DEFINITION = z
   .record(z.string(), z.unknown())
   .describe(
-    "Only the keys to change: urgencyPolicy (age|lag|pace|resubmission), defaultImportance, deadlinePolicy ({kind:'hard'} or {kind:'resubmission', softDays, finalAt, finalTz}), submission (whole|per_subtask), progressMode (subtasks|slider|none), recurrence ({issued:{weekday,time}, due:{weekday,time}, tz, firstNumber?} or null; see the tool description), fields ({link,description,startAt,submitVia}), defaultEstimateMinutes, color.",
+    "Only the keys to change: urgencyPolicy (age|lag|pace|resubmission), defaultImportance, deadlinePolicy ({kind:'hard'} or {kind:'resubmission', softDays, finalAt, finalTz}), progressMode (subtasks|slider|none), recurrence ({issued:{weekday,time}, due:{weekday,time}, tz, firstNumber?} or null; see the tool description), fields ({link,description,startAt,submitVia}), defaultEstimateMinutes, color.",
   );
 
 /** A refusal; an invalid definition says which key and why (`recurrence.due.weekday: …`). */

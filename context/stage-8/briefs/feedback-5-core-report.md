@@ -93,7 +93,7 @@ drafts, clickable description links) belong to the other branch and are not touc
   `task.submitted` and `task.subtask.solved` events on purpose: they are old-log coverage.
 - **Open.** The preset field `submission` (`whole` / `per_subtask`) still exists and still decides
   how lateness is judged; its tag on the task screen reads "Per-subtask submission" /
-  «Сдача по подзадачам». Renaming or dropping it is a product question left for the owner.
+  «Сдача по подзадачам». Renaming or dropping it is a product question left for the owner. *Decided 2026-11-09: dropped (brief item 11).*
   The event type keeps its name `task.subtask.solved` (events are never rewritten); its History
   label reads "Subtask done".
 

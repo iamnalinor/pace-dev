@@ -123,7 +123,6 @@ export const ruLibrary: { readonly [K in keyof typeof enLibrary]: string } = {
   "presets.section.fields": "Поля задачи",
   "presets.field.defaultImportance": "Важность по умолчанию",
   "presets.field.deadlinePolicy": "Срок",
-  "presets.field.submission": "Сдача",
   "presets.field.progressMode": "Прогресс",
   "presets.field.defaultEstimateMinutes": "Оценка по умолчанию (минуты)",
   "presets.field.color": "Цвет",

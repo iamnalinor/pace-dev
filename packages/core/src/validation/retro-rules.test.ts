@@ -212,9 +212,9 @@ describe("validateEventInput: subtasks and submissions", () => {
     expect(errorOf(removed)).toBe("ok");
   });
 
-  it("requires a solved subtask for a whole submission of a per-subtask task", () => {
+  it("lets an older client's whole submission through, done subtasks or not (no submission mode)", () => {
     const fresh = stateOf([algebraHw6Events()[0] ?? solved(0, T(0), "s1")]);
-    expect(errorOf(submitted(20, AT, {}), fresh)).toBe("retro/nothing-to-submit");
+    expect(errorOf(submitted(20, AT, {}), fresh)).toBe("ok");
     expect(errorOf(submitted(21, AT, {}))).toBe("ok");
     expect(errorOf(submitted(22, AT, { closes: true, taskId: TRK_ID }))).toBe("ok");
   });

@@ -342,7 +342,7 @@ describe("NowBoard", () => {
     }
   });
 
-  it("closes a per-subtask task as done from its check, like any other (no submit sheet)", async () => {
+  it("closes a homework task as done from its check, like any other (no submit sheet)", async () => {
     jest.useFakeTimers();
     try {
       const runtime = await createTestRuntime();

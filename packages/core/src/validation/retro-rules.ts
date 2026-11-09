@@ -1,8 +1,7 @@
 import type { EventInput } from "../events/event-schema.ts";
 
-import { doneCount, type Task, taskById, type TasksState } from "../model/task.ts";
+import { type Task, taskById, type TasksState } from "../model/task.ts";
 import { presetById, type PresetsState } from "../presets/preset-reducer.ts";
-import { taskPreset } from "../presets/resolve-preset.ts";
 import { err, ok, type Result } from "../result.ts";
 import { addMinutesIso } from "../time.ts";
 
@@ -64,21 +63,16 @@ const checkPreset = (presets: PresetsState, presetId: string): RetroError | unde
   presetById(presets, presetId) === undefined ? "preset/unknown" : undefined;
 
 /**
-Only an older client still writes `task.submitted` (feedback 5 made done the one mark): a whole
-submission of a per-subtask task needs a done problem, a per-subtask one names done problems.
+Only an older client still writes `task.submitted` (feedback 5 made done the one mark): one that
+names subtasks names done ones. A whole one is a stamp, let through: the preset's submission
+mode that once refused it went on 2026-11-09.
 */
-const isWholeSubmittable = (presets: PresetsState, task: Task): boolean => {
-  const preset = taskPreset(presets, task);
-  return !preset.ok || preset.value.submission === "whole" || doneCount(task) > 0;
-};
-
 const checkSubmission = (
-  presets: PresetsState,
   task: Task,
   ids: readonly string[] | undefined,
 ): RetroError | undefined => {
   if (ids === undefined) {
-    return isWholeSubmittable(presets, task) ? undefined : "retro/nothing-to-submit";
+    return undefined;
   }
   const picked = ids.map((id) => task.subtasks.find((item) => item.id === id));
   if (picked.includes(undefined)) {
@@ -100,7 +94,7 @@ const checkDetails = (
     return subtask === undefined ? "subtask/unknown" : undefined;
   }
   return input.type === "task.submitted"
-    ? checkSubmission(presets, task, input.payload.subtaskIds)
+    ? checkSubmission(task, input.payload.subtaskIds)
     : undefined;
 };
 
