@@ -89,8 +89,10 @@ const MenuItems = ({
   readonly onDelete: () => void;
 }) => {
   const t = useT();
+  // Plain buttons in the popover's (or the sheet's) dialog, not a `menu`: a menu promises
+  // menuitems and arrow keys, and the delete confirm in place is no menu item (UI review I2).
   return (
-    <View role="menu">
+    <View>
       {view.closed === null ? (
         <ListRow
           leading={<Icon name="calendar-clock" />}
@@ -110,7 +112,8 @@ const MenuItems = ({
 /**
 The ⋯ menu: «Close as…» (the visible twin of Done's long press) and «Delete the task», which
 turns into its own confirm in place. Escape (or a tap outside) first cancels the confirm and only
-then closes the menu. A popover under the button on a computer, a sheet on a phone.
+then closes the menu. A popover under the button on a computer, a sheet on a phone; either is a
+dialog named by the menu's label, holding buttons.
 */
 export const TaskMenu = ({
   onCloseAs,
@@ -168,7 +171,7 @@ export const TaskMenu = ({
         />
       </View>
       {isWide && isOpen ? (
-        <Popover anchor={anchorRef} label={t("task.menu")} onClose={dismiss} open role="menu">
+        <Popover anchor={anchorRef} label={t("task.menu")} onClose={dismiss} open>
           {items}
         </Popover>
       ) : null}
