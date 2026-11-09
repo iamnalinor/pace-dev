@@ -4,7 +4,7 @@ import type { PaceRuntime } from "#app/runtime.ts";
 import type { ParseField, TaskDraft } from "@pace/core";
 
 import { requestNewTask } from "#app/shared/new-task-request.ts";
-import { classLinePx } from "#app/test/class-px.ts";
+import { classLinePx, classPx } from "#app/test/class-px.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { FAKE_STORE_ID, fakeUser } from "@pace/client/testing";
@@ -108,13 +108,19 @@ describe("Composer", () => {
     expect(line().props["onContentSizeChange"]).toBe(before);
   });
 
+  it("is one line of text plus its own padding when empty: the placeholder is never cut (2026-11-09 shots)", async () => {
+    await renderComposer(await createTestRuntime());
+    const empty = (line().props as { style: { height: number } }).style.height;
+    expect(empty).toBe(classLinePx(line()) + 2 * classPx(line(), "py"));
+  });
+
   it("grows the line with its text up to eight lines of its type, then scrolls inside (bug-lessons 11, mirrors)", async () => {
     await renderComposer(await createTestRuntime());
     await fireEvent.changeText(line(), "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten");
     await fireEvent(line(), "contentSizeChange", {
       nativeEvent: { contentSize: { height: 1000, width: 300 } },
     });
-    const eightLines = 8 * classLinePx(line());
+    const eightLines = 8 * classLinePx(line()) + 2 * classPx(line(), "py");
     expect((line().props as { style: { height: number } }).style.height).toBe(eightLines);
   });
 

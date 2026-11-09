@@ -2030,3 +2030,9 @@ New bugs go here with their class; a new class gets its own section above.
 - **Missed because.** The test pinned the fields that were listed, not the projection; a field added to `Task` later had nothing to fail.
 - **Class.** A full view of a model written as a hand-picked list: it drifts from the model silently with every new field.
 - **Sweep and guard.** `get_task` now spreads the whole projection, and its output schema's extra fields are typed `satisfies Record<Exclude<keyof Task, …>, z.ZodType>`, so a new `Task` field fails the type check until it is answered; the text answer carries the same fields as JSON. Other answers (`list_now` rows, `fetch`) are summaries by design and say so.
+
+### 147. A height set on a padded field counts only its text
+- **Bug.** Now's composer cut its placeholder («Добавьте задачу или текст») in half on every width (seen in the 2026-11-09 shots): the line set its height to one line of text, and the kit `TextField` input carries `py-2`, which a border-box textarea counts inside that height.
+- **Missed because.** The composer test pinned the height to the line's type metrics only; no visual check of the empty composer after the kit moved the padding onto the input.
+- **Class.** An explicit height or minimum computed from content metrics, set on an element whose padding is inside its box.
+- **Sweep and guard.** The composer is the only caller that sets a field's height (`isGrowing` and `contentSize` searched); its empty and eight-line heights now add the input's padding, and `composer.test.tsx` reads both from the field's own classes.

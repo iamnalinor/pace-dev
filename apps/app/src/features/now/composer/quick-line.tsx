@@ -34,10 +34,15 @@ The field's own text and padding: a `text-body` line (the kit `TextField`, 16 so
 never zooms) inside a box of `py-2` and a 1 px border; the line grows from one line to eight.
 */
 const LINE_PX = typeRole("body", "phone").line;
+/**
+The field's own `py-2`, above and below: the height set on it includes it (a web textarea is
+border-box), so one line set to `LINE_PX` alone cut the placeholder in half (2026-11-09 shots).
+*/
+const PADDING_PX = 2 * 8;
 /** One line of text. */
-const MIN_INPUT_HEIGHT = LINE_PX;
+const MIN_INPUT_HEIGHT = LINE_PX + PADDING_PX;
 /** Eight lines: a longer message scrolls inside. */
-const MAX_INPUT_HEIGHT = 8 * LINE_PX;
+const MAX_INPUT_HEIGHT = 8 * LINE_PX + PADDING_PX;
 
 const heightOf = (content: number): number =>
   Math.min(MAX_INPUT_HEIGHT, Math.max(MIN_INPUT_HEIGHT, Math.ceil(content)));
