@@ -27,13 +27,14 @@ export type EndedSessions = {
 };
 
 /**
-Answers that settle an ended session: the server ended it, or it no longer knows it (401, the
-answer to a repeated log-out), or it refuses the request for good. A timeout, a rate limit, an app
-too old for the server, a server error and no network keep it for the next try.
+The one answer besides success that settles an ended session: the server's own 401
+`auth/unauthorized` (it no longer knows the session, the answer to a repeated log-out). Anything
+else (a timeout, a rate limit, a server error, no network, and a 4xx a proxy or a captive portal
+gives) keeps it for the next try: dropping it on those left the session alive on the server
+(security review M1).
 */
-const RETRYABLE = new Set([408, 426, 429]);
 const isSettled = (error: unknown): boolean =>
-  error instanceof ApiError && error.status < 500 && !RETRYABLE.has(error.status);
+  error instanceof ApiError && error.status === 401 && error.code === "auth/unauthorized";
 
 /** Asks the server to end `token`: whether it is settled (ended, or unknown to the server). */
 const isEnded = async (api: ApiClient, token: string): Promise<boolean> => {

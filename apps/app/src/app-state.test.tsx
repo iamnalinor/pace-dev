@@ -462,6 +462,17 @@ describe("PaceProvider", () => {
     expect(retry).toHaveBeenCalledTimes(1);
   });
 
+  it("forgets the fields' drafts when it starts signed out (a token that expired while away)", async () => {
+    const { runtime } = await setup();
+    mockForgetDrafts.mockClear();
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    expect(mockForgetDrafts).toHaveBeenCalledTimes(1);
+  });
+
   it("clears local data on logout", async () => {
     const { runtime } = await setup();
     await runtime.auth.loginWithDev("1");
@@ -478,6 +489,7 @@ describe("PaceProvider", () => {
       });
     });
     expect(screen.getByTestId("title")).toHaveTextContent("Сейчас");
+    mockForgetDrafts.mockClear();
     await act(async () => {
       await runtime.auth.logout();
     });

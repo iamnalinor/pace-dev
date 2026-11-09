@@ -27,7 +27,8 @@ export type AnchorProps = Omit<PressableProps, "checked" | "role" | "selected"> 
 };
 
 /** An address outside the app (spec §7): a new tab on the web, the browser on a phone. */
-export const EXTERNAL = { rel: "noopener", target: "_blank" } as const;
+/** No opener and no referrer: the app's address carries screen state (`?task=`, `?open=`). */
+export const EXTERNAL = { rel: "noopener noreferrer", target: "_blank" } as const;
 
 export const isExternal = (href: Href): boolean =>
   typeof href === "string" && /^https?:\/\//u.test(href);

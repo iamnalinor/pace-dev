@@ -82,6 +82,6 @@ describe("Link on the web", () => {
     );
     const link = screen.getByRole("link", { name: "Algebra" });
     expect(link.props["href"]).toBe("https://example.com/algebra");
-    expect(link.props["hrefAttrs"]).toEqual({ rel: "noopener", target: "_blank" });
+    expect(link.props["hrefAttrs"]).toEqual({ rel: "noopener noreferrer", target: "_blank" });
   });
 });

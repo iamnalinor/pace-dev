@@ -112,6 +112,26 @@ describe("createAuth: a Log out the server did not hear is kept until it does (R
     expect(auth.endedSessions.getState()).toEqual({ pending: true });
   });
 
+  it.each([
+    [403, "forbidden"],
+    [404, "not_found"],
+    [407, "proxy"],
+    [400, "bad_request"],
+  ])(
+    "a %i that is not the server's own answer (a proxy, a captive portal) keeps it",
+    async (status, code) => {
+      const stores = await signedInStores();
+      const { auth } = await start(
+        { "POST /api/auth/logout": () => problem(status, code) },
+        stores,
+      );
+      await auth.logout();
+      await auth.retryEndedSessions();
+      await expect(stores.ended.list()).resolves.toEqual(["stored"]);
+      expect(auth.endedSessions.getState()).toEqual({ pending: true });
+    },
+  );
+
   it("two retries at once send one request for the session", async () => {
     const stores = await signedInStores();
     const held: { release?: () => void; up: boolean } = { up: false };

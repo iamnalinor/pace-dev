@@ -36,7 +36,7 @@ describe("TextLink: an address inside a run of text (feedback 5 item 8)", () => 
     );
     const link = screen.getByRole("link", { name: "example.com/a" });
     expect(link.props["href"]).toBe("https://example.com/a");
-    expect(link.props["hrefAttrs"]).toEqual({ rel: "noopener", target: "_blank" });
+    expect(link.props["hrefAttrs"]).toEqual({ rel: "noopener noreferrer", target: "_blank" });
     const stopPropagation = jest.fn();
     await fireEvent.press(link, { stopPropagation });
     expect(stopPropagation).toHaveBeenCalled();

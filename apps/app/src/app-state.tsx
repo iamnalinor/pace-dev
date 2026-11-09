@@ -86,6 +86,21 @@ const forgetTyped = (): void => {
   forgetDrafts();
 };
 
+/**
+The first status followed. Signed out at start (a token that expired while away), the fields'
+drafts go too: no draft outlives its account (security review L5); a sign-out later forgets them
+on its transition.
+*/
+const followFromStart = (
+  follow: (status: AuthState["status"]) => void,
+  status: AuthState["status"],
+): void => {
+  follow(status);
+  if (status === "signed-out") {
+    forgetDrafts();
+  }
+};
+
 /** Starts/stops the sync loop with the auth status; a foreground return syncs at once. */
 const runSyncLoop = (runtime: PaceRuntime, onSynced: OnSynced): (() => void) => {
   const { actions, auth, sync } = runtime;
@@ -109,7 +124,7 @@ const runSyncLoop = (runtime: PaceRuntime, onSynced: OnSynced): (() => void) => 
       runtime.live.stop();
     }
   };
-  follow(auth.store.getState().status);
+  followFromStart(follow, auth.store.getState().status);
   const unsubscribe = auth.store.subscribe((current, previous) => {
     if (current.status === previous.status) {
       return;
