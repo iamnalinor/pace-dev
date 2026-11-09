@@ -866,6 +866,18 @@ describe("Composer", () => {
     expect(await screen.findByText(en("composer.toInboxDone"))).toBeOnTheScreen();
   });
 
+  it("offers Undo on the to-Inbox toast: the note leaves the Inbox and the line comes back (design review M10)", async () => {
+    const runtime = await createTestRuntime();
+    await renderComposer(runtime, "think about the trip");
+    await fireEvent.press(screen.getByRole("button", { name: en("composer.toInbox") }));
+    await fireEvent.press(await screen.findByRole("button", { name: en("common.undo") }));
+    await waitFor(() => {
+      const titles = Object.values(runtime.state.store.getState().tasks.byId).map((t) => t.title);
+      expect(titles).not.toContain("think about the trip");
+    });
+    expect(screen.getByDisplayValue("think about the trip")).toBeOnTheScreen();
+  });
+
   it("parses a pasted homework at once and writes nothing until Approve", async () => {
     const homework =
       "№№ 290, 292, 293 — решить методом выделения линейных множителей. № 365 (определитель)";
