@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { View } from "react-native";
 
 import type { Drawn, Fold } from "@pace/client";
@@ -11,6 +12,7 @@ import { Pressable } from "#app/ui/pressable.tsx";
 import { Text } from "#app/ui/text.tsx";
 import { Tooltip } from "#app/ui/tooltip.tsx";
 
+import { boxLabelFit } from "./box-label.ts";
 import { laneStyle } from "./week-lanes.ts";
 import { type Picked, pickedKey, type Single } from "./week-picked.ts";
 
@@ -25,6 +27,12 @@ const dayFull = (at: string, zone: string, language: Language): string =>
 
 /** A block or an event is at least this tall: a two-minute one is still something to tap. */
 export const MIN_TARGET_PX = 24;
+
+/**
+On the web a word never breaks inside itself (react-native-web's text breaks a word that does not
+fit, «Музы|ка»; design review H6): `boxLabelFit` cuts the name to one line instead.
+*/
+const KEEP_WORDS = { overflowWrap: "normal", wordBreak: "normal" } as const;
 
 /** A label line's height: a box shows as many lines of its name as fit whole (F-TYP-05). */
 const LABEL_LINE_PX = 16;
@@ -82,6 +90,8 @@ export const ItemBox = ({
   const look = itemLook(item, isSelected);
   const { label, named, tip } = useBoxName(item, place);
   const lines = Math.max(1, Math.floor(entry.height / LABEL_LINE_PX));
+  const [width, setWidth] = useState(0);
+  const fit = boxLabelFit(label, width, lines);
   return (
     <View
       className="absolute"
@@ -96,12 +106,21 @@ export const ItemBox = ({
           // The box is as tall as the time it spans (at least 24): the target is what is drawn.
           hitArea="drawn"
           label={named}
+          onLayout={(event) => {
+            setWidth(event.nativeEvent.layout.width);
+          }}
           onPress={() => {
             onPick(picked);
           }}
           role="button"
         >
-          <Text className={look.text} lines={lines} policy="clamp" role="caption">
+          <Text
+            className={look.text}
+            role="caption"
+            {...fit}
+            // react-native-web's styles React Native's types do not know.
+            {...({ style: KEEP_WORDS } as object)}
+          >
             {label}
           </Text>
         </Pressable>
