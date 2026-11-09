@@ -1,6 +1,22 @@
+import type { Page } from "@playwright/test";
+
 import { approve, nowTasks } from "./support/composer.ts";
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { loginViaApi } from "./support/login.ts";
+
+/**
+Approves, and waits until the assistant log has heard what became of the conversation. That answer
+is sent after the approval, best effort and not awaited (`assistant.resolve`): a reload right after
+the press cancelled it, and the log then said «Suggested…» instead of «Created…» (bug class 198).
+*/
+const approveAndLog = async (page: Page): Promise<void> => {
+  const logged = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/decisions/resolve") && response.request().method() === "POST",
+  );
+  await approve(page);
+  expect((await logged).ok()).toBe(true);
+};
 
 // The Worker runs with LLM_PROVIDER=fake: the "assistant" reads every line as one task titled
 // with the line itself, so the journey is deterministic and never leaves the machine.
@@ -14,7 +30,7 @@ test("the assistant reads a line, the task is added, the decision is logged", as
   await expect(page.getByText("The assistant will create “разобрать почту”")).toBeVisible();
   await expect(nowTasks(page).getByText("разобрать почту")).toHaveCount(0);
   await expectNoA11yViolations(page);
-  await approve(page);
+  await approveAndLog(page);
   await expect(line).toHaveValue("");
   await page.goto("/");
   await expect(nowTasks(page).getByText("разобрать почту")).toBeVisible();
@@ -69,7 +85,7 @@ test("an assistant question is answered with one click, by keyboard too", async 
   await correct.fill("urgent");
   await correct.press("Enter");
   await expect(page.getByText("The assistant will create “Съездить в банк”")).toBeVisible();
-  await approve(page);
+  await approveAndLog(page);
   await expect(line).toHaveValue("");
   await page.goto("/decisions");
   const row = page.getByRole("button", { name: /Created task “Съездить в банк”/u });
