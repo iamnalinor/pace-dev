@@ -210,6 +210,35 @@ describe("Tooltip on the web (spec §4.2.31, §6 tooltip)", () => {
     expect(isShown(LABEL)).toBe(false);
   });
 
+  it("a press on the trigger right after an immediate one showed takes it away, before its page listeners are in (bug class 196)", async () => {
+    // The Calendar tile's «nothing on» shows on the enter; a click's press follows in the same
+    // moment, before React ran the effect that listens for presses on the window. The tooltip
+    // stayed under the sheet the press opened and took the Escape meant to close it.
+    await renderTriggers(<Trigger isImmediate label={LABEL} name="Calendar" />);
+    const { parent } = button("Calendar");
+    if (parent === null) {
+      throw new Error("the trigger has no tooltip around it");
+    }
+    const handlers = parent.props as Partial<
+      Record<"onPointerDown" | "onPointerEnter", (event: unknown) => void>
+    >;
+    await act(() => {
+      handlers.onPointerEnter?.(pointer("mouse"));
+      handlers.onPointerDown?.(pointer("mouse"));
+      page.dispatchEvent(new Event("pointerdown"));
+    });
+    expect(isShown(LABEL)).toBe(false);
+  });
+
+  it("a press on the trigger calls off a show still waiting for its delay", async () => {
+    await renderTriggers(<Trigger label={LABEL} name="Send" />);
+    await fireEvent(button("Send"), "pointerEnter", pointer("mouse"));
+    await pass(100);
+    await fireEvent(button("Send"), "pointerDown", pointer("mouse"));
+    await pass(HOVER_DELAY_MS * 2);
+    expect(isShown(LABEL)).toBe(false);
+  });
+
   it("a pointer moving elsewhere leaves a keyboard-focus tooltip up", async () => {
     await renderTriggers(<Trigger label={LABEL} name="Send" />);
     await fireEvent(sendWrapper(), "focus", {});
