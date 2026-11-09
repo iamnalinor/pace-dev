@@ -106,7 +106,7 @@ const startBoth = async (runtime: PaceRuntime): Promise<void> => {
   );
 };
 
-/** The bar measured at a height: the window is 1334 high in jest, so 40 % is 533. */
+/** The bar measured at a height: the window is 844 high in jest, so 40 % is 338 with the nav bar in it. */
 const layOut = async (height: number): Promise<void> => {
   await fireEvent(screen.getByLabelText(en("time.bar")), "layout", {
     nativeEvent: { layout: { height, width: 390 } },
