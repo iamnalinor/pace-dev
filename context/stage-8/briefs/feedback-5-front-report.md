@@ -96,13 +96,19 @@ Not given drafts, on purpose:
 
 ## Deviations
 
-- **Back/forward inside one screen.** The pane, the day, the filter replace the history entry
-  instead of pushing one: expo-router's tab navigator turns a param change on the focused tab
-  into a replace (`TabRouter` NAVIGATE / SET_PARAMS keep the history length; `useLinking` then
-  calls `history.replace`), and pushing a new screen for each would remount Now. Back and forward
-  between screens restore each screen as its address says (the state is read from the address,
-  not kept beside it), and a reload or a shared link opens the same state. Making each pane
-  change a history step needs a push-params action expo-router 57 does not have; left open.
+- ~~**Back/forward inside one screen.**~~ **Closed 2026-11-09 (QA round 24 R24-02).** It was a
+  deviation: the pane, the day, the filter replaced the history entry (expo-router's tab navigator
+  keeps its history length on a param change, so `useLinking` replaced). Now every change
+  `useSearchParam` writes is a step on the web: `platform/push-entry.web.ts` dispatches
+  `PUSH_ENTRY` just before the param change, and the tabs' router override
+  (`ui/tab-history.ts`, `UNSTABLE_router`) grows the tab history by one entry, so `useLinking`
+  pushes the address with the whole navigation state; Back resets to the state recorded for the
+  entry before, without remounting a screen (the keys are the same). On the web the tabs keep
+  every visit (`backBehavior: "fullHistory"`, so a tab switch does not drop the steps); a phone
+  keeps its tab Back as before. Writing the value already shown is no step; a pick that clears
+  another param in the same action (a week and its block) is one step. Guards:
+  `tab-history.test.ts`, `use-search-param.test.tsx`, `reload-state.e2e.ts` (a task: Back closes,
+  Forward reopens; Day two days back, Back twice; Week in More's stack).
 - **Narrow windows ignore `?task=`.** On a phone the task opens on its own route
   (`/task/<id>`), as before; a wide address opened in a narrow window shows the list.
 - **Day's open editor** (the block being edited) is not in the address; only the date is.

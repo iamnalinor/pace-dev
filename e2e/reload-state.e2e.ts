@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 
-import { addTask, settledLine } from "./support/composer.ts";
+import { addTask, nowTasks, settledLine } from "./support/composer.ts";
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { loginViaApi } from "./support/login.ts";
 import { repeatsAfterSettle, settle, watchScreen } from "./support/screen-checks.ts";
@@ -135,4 +135,77 @@ test("a link in a task's description opens in a new tab without starting to edit
   await expect(page.getByRole("textbox", { name: "Description" })).toHaveCount(0);
   await page.getByText(/and more$/u).click({ position: { x: 4, y: 4 } });
   await expect(page.getByRole("textbox", { name: "Description" })).toBeVisible();
+});
+
+test.describe("Back and forward follow the screen (feedback 5 item 6, QA round 24 R24-02)", () => {
+  test("a task opened beside the list: Back closes it, Forward opens it again, a second task is a step of its own", async ({
+    page,
+  }) => {
+    await page.setViewportSize(DESKTOP);
+    await loginViaApi(page);
+    await page.goto("/");
+    await addTask(page, "First of two");
+    await addTask(page, "Second of two");
+    await page.getByRole("button", { exact: true, name: "Close" }).first().click();
+    await expect(taskHeader(page, "Second of two")).toHaveCount(0);
+    const list = page.url();
+
+    await nowTasks(page)
+      .getByRole("link", { name: /^First of two/u })
+      .click();
+    await expect(taskHeader(page, "First of two")).toBeVisible();
+    await nowTasks(page)
+      .getByRole("link", { name: /^Second of two/u })
+      .click();
+    await expect(taskHeader(page, "Second of two")).toBeVisible();
+
+    await page.goBack();
+    await expect(taskHeader(page, "First of two")).toBeVisible();
+    await page.goBack();
+    await expect(taskHeader(page, "First of two")).toHaveCount(0);
+    await expect(page).toHaveURL(list);
+    await expect(await settledLine(page)).toBeVisible();
+    await page.goForward();
+    await expect(taskHeader(page, "First of two")).toBeVisible();
+    await expect(page).toHaveURL(/[?&]task=/u);
+  });
+
+  test("Day: two days back, then Back twice returns to today", async ({ page }) => {
+    await page.setViewportSize(DESKTOP);
+    await loginViaApi(page);
+    await page.goto("/day");
+    const today = page.getByRole("button", { name: "Today" });
+    const previous = page.getByRole("button", { name: "Previous day" });
+    await expect(previous).toBeVisible();
+    await expect(today).toHaveCount(0);
+    await previous.click();
+    await expect(page).toHaveURL(/[?&]date=\d{4}-\d{2}-\d{2}/u);
+    const yesterday = page.url();
+    await previous.click();
+    await expect(page).not.toHaveURL(yesterday);
+    await page.goBack();
+    await expect(page).toHaveURL(yesterday);
+    await expect(today).toBeVisible();
+    await page.goBack();
+    await expect(page).not.toHaveURL(/[?&]date=/u);
+    await expect(today).toHaveCount(0);
+    await expect(page).toHaveURL(/\/day$/u);
+  });
+
+  test("Week (in More's stack): another week is a step; Back and Forward move between them", async ({
+    page,
+  }) => {
+    await page.setViewportSize(DESKTOP);
+    await loginViaApi(page);
+    await page.goto("/week");
+    const previous = page.getByRole("button", { name: "Previous week" });
+    await previous.click();
+    await expect(page).toHaveURL(/[?&]week=\d{4}-\d{2}-\d{2}/u);
+    const earlier = page.url();
+    await page.goBack();
+    await expect(page).toHaveURL(/\/week$/u);
+    await expect(previous).toBeVisible();
+    await page.goForward();
+    await expect(page).toHaveURL(earlier);
+  });
 });

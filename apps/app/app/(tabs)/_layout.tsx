@@ -1,8 +1,10 @@
 import { Tabs, useIsFocused } from "expo-router";
 
 import { useT } from "#app/app-state.tsx";
+import { TAB_BACK_BEHAVIOR } from "#app/platform/push-entry.ts";
 import { ScreenScene } from "#app/ui/screen-scene.tsx";
 import { TabBar } from "#app/ui/tab-bar.tsx";
+import { tabHistoryRouter } from "#app/ui/tab-history.ts";
 import { useBreakpoint } from "#app/ui/use-breakpoint.ts";
 
 /**
@@ -16,9 +18,13 @@ export default function TabsLayout() {
   const isFront = useIsFocused();
   return (
     <Tabs
+      // On the web Back and forward follow every screen shown, a change inside one included
+      // (feedback 5 item 6, QA round 24 R24-02); a phone keeps the default.
+      backBehavior={TAB_BACK_BEHAVIOR}
       screenLayout={({ children }) => <ScreenScene>{children}</ScreenScene>}
       screenOptions={{ headerShown: false, tabBarPosition: isCompact ? "bottom" : "left" }}
       tabBar={(props) => <TabBar {...props} isFront={isFront} />}
+      UNSTABLE_router={(original) => tabHistoryRouter(original) as Partial<typeof original>}
     >
       <Tabs.Screen name="index" options={{ title: t("nav.now") }} />
       <Tabs.Screen name="day" options={{ title: t("nav.day") }} />

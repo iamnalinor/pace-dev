@@ -3,6 +3,7 @@ import { useCallback } from "react";
 
 import { usePace, useSettings } from "#app/app-state.tsx";
 import { fromWallClock } from "#app/format/time.ts";
+import { usePushEntry } from "#app/platform/push-entry.ts";
 import { formatInZone } from "@pace/core";
 
 /**
@@ -12,19 +13,29 @@ lives in the address, not in React state, so a reload, a shared link and the bro
 show the same screen. A param that is missing, repeated or empty reads as `null`; the screen checks
 the rest (an unknown id, a malformed date) and falls back to its default without writing anything,
 so the address never starts a loop of its own (bug-lessons 1). Setting `null` takes it off.
+
+Every change written is a person's step (a task opened or closed, another day, week or period, a
+filter picked): on the web it takes a step in the browser's history first, so Back shows what was
+there before and Forward comes back (QA round 24 R24-02). Writing the value already shown does
+nothing at all.
 */
 export const useSearchParam = (
   name: string,
 ): readonly [value: null | string, set: (next: null | string) => void] => {
   const params: Readonly<Record<string, string | string[] | undefined>> = useLocalSearchParams();
   const router = useRouter();
+  const pushEntry = usePushEntry();
   const raw = params[name];
   const value = typeof raw === "string" && raw !== "" ? raw : null;
   const set = useCallback(
     (next: null | string): void => {
+      if (next === value) {
+        return;
+      }
+      pushEntry();
       router.setParams({ [name]: next ?? undefined });
     },
-    [name, router],
+    [name, pushEntry, router, value],
   );
   return [value, set];
 };
