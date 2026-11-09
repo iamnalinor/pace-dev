@@ -372,8 +372,10 @@ test("narrow side-by-side blocks say their whole name on hover, and a 0-minute b
   // name in its own text and title too.
   expect(
     await email.evaluate((box) => {
-      const label = box.querySelector<HTMLElement>('[data-text-policy="truncate"]');
-      return label !== null && label.scrollWidth > label.clientWidth;
+      // Any line of its text drawn narrower than it is long: cut with an ellipsis.
+      return [...box.querySelectorAll<HTMLElement>('[dir="auto"]')].some(
+        (label) => label.scrollWidth > label.clientWidth,
+      );
     }),
   ).toBe(true);
   await email.hover();
