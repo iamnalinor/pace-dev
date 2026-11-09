@@ -33,6 +33,17 @@ const gapAbove = async (above: Locator, below: Locator): Promise<number> => {
   return bottom.y - (top.y + top.height);
 };
 
+/** The air between two boxes that do not overlap, on whichever side they meet (0 if touching). */
+const gapBeside = async (one: Locator, other: Locator): Promise<number> => {
+  const [a, b] = await Promise.all([one.boundingBox(), other.boundingBox()]);
+  if (a === null || b === null) {
+    throw new Error("both boxes must be on the screen");
+  }
+  const across = Math.max(b.x - (a.x + a.width), a.x - (b.x + b.width), 0);
+  const along = Math.max(b.y - (a.y + a.height), a.y - (b.y + b.height), 0);
+  return Math.max(across, along);
+};
+
 const timeBar = (page: Page) => page.getByRole("region", { name: "Time" });
 
 for (const size of SIZES) {
@@ -239,12 +250,12 @@ test("the greyed Calendar button says why the moment the pointer is over it", as
   await expect(calendar).toHaveAttribute("aria-describedby", /.+/u);
   await calendar.hover();
   const tooltip = page.getByRole("tooltip");
-  // No toast and no delay: the bubble is there at once, right above the button.
+  // No toast and no delay: the bubble is there at once, right beside the button, on the first
+  // side where it covers no other control (the typed field above the bar: bug class 6).
   await expect(tooltip).toBeVisible({ timeout: 300 });
   await expect(page.getByTestId("toast-card")).toHaveCount(0);
-  const gap = await gapAbove(tooltip, calendar);
-  expect(gap).toBeGreaterThanOrEqual(0);
-  expect(gap).toBeLessThan(16);
+  expect(await gapBeside(tooltip, calendar)).toBeLessThan(16);
+  expect(await controlsUnder(page, '[role="tooltip"]', ["Calendar"])).toEqual([]);
   await expectNoA11yViolations(page);
   await page.mouse.move(0, 0);
   await expect(tooltip).toBeHidden();
