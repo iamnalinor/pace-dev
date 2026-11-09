@@ -9,6 +9,7 @@ import type { TooltipProps } from "./tooltip-props.ts";
 import { paletteVars } from "../platform/theme.ts";
 import { Text } from "./text.tsx";
 import { useTheme } from "./theme-provider.tsx";
+import { controlsNear, forgetControls, type ScanRoot } from "./tooltip-controls.ts";
 import {
   type Box,
   HOVER_DELAY_MS,
@@ -44,35 +45,22 @@ const boxOf = (element: unknown): Box | null => {
 /** The trigger's box and the controls around it, read when the tooltip shows. */
 type Anchor = { readonly box: Box; readonly others: readonly Box[] };
 
-/** The controls a bubble must not lie over (bug class 6: an overlay over a control takes its press). */
-const CONTROLS =
-  'button, input, textarea, select, a[href], [role="button"], [role="link"], [role="tab"], [role="switch"], [role="radio"], [role="checkbox"]';
-
-/** How far from its trigger a control can be and still be in a bubble's way. */
-const NEAR_PX = 320;
-
-/** The boxes of the page's other controls near the trigger, read when the tooltip shows. */
+/**
+The controls around the trigger, read when the tooltip shows: in the trigger's dialog when it is in
+one, else the page; a warm hover reuses the last read (`controlsNear`, UI review I3).
+*/
 const othersNear = (element: unknown, anchor: Box | null): readonly Box[] => {
-  const trigger = element as null | Partial<Pick<Element, "contains">>;
+  const trigger = element as null | Partial<Pick<Element, "closest">>;
   if (
     anchor === null ||
     typeof document === "undefined" ||
-    typeof trigger?.contains !== "function"
+    typeof trigger?.closest !== "function"
   ) {
     return [];
   }
-  return [...document.querySelectorAll(CONTROLS)].flatMap((control) => {
-    if (trigger.contains?.(control) === true || control.closest('[aria-hidden="true"]') !== null) {
-      return [];
-    }
-    const box = boxOf(control);
-    const isNear =
-      box !== null &&
-      box.width > 0 &&
-      Math.abs(box.x + box.width / 2 - (anchor.x + anchor.width / 2)) < NEAR_PX + box.width / 2 &&
-      Math.abs(box.y + box.height / 2 - (anchor.y + anchor.height / 2)) < NEAR_PX;
-    return isNear ? [box] : [];
-  });
+  const dialog = trigger.closest('[role="dialog"], [aria-modal="true"]');
+  const root = (dialog ?? document) as unknown as ScanRoot;
+  return controlsNear(anchor, { now: Date.now(), reuseMs: WARM_MS, root });
 };
 
 /** Keyboard focus, not the focus a click leaves behind. */
@@ -129,18 +117,26 @@ const useDismiss = (isShown: boolean, hide: () => void): void => {
       return;
     }
     const dismiss = (): void => {
+      // The page moved: the controls read around the trigger are where they were no more.
+      forgetControls();
       hideRef.current();
     };
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") {
-        dismiss();
+      if (event.key !== "Escape") {
+        return;
       }
+
+      // Only the tooltip goes: the sheet or dialog under it hears nothing of this Escape.
+      event.stopPropagation();
+      hideRef.current();
     };
     globalThis.addEventListener("keydown", onKey, { capture: true });
     globalThis.addEventListener("scroll", dismiss, { capture: true });
+    globalThis.addEventListener("resize", dismiss);
     return () => {
       globalThis.removeEventListener("keydown", onKey, { capture: true });
       globalThis.removeEventListener("scroll", dismiss, { capture: true });
+      globalThis.removeEventListener("resize", dismiss);
     };
   }, [isShown]);
 };
@@ -170,8 +166,8 @@ const useTimer = () => {
 };
 
 /**
-Fixed to the window over the page, at its place once both it and its trigger are measured. A
-hidden one is still laid out (and measured), only not seen and not in the pointer's way.
+Fixed to the window over the page, at its place once both it and its trigger are measured; until
+then (its first layout) it is laid out unseen.
 */
 const frameStyle = (anchor: Anchor | null, size: null | Size) => {
   const viewport = { height: globalThis.innerHeight, width: globalThis.innerWidth };
@@ -191,21 +187,18 @@ const frameStyle = (anchor: Anchor | null, size: null | Size) => {
 
 /**
 The bubble (spec §4.2.31): an elevated surface, `footnote` in `label.primary`, wrapping inside
-`size.tooltip.max`; in the page's body (no clipping card can cut it) in the theme's colours. It
-stays in the page while hidden, so the trigger's description can point at it. Shown, it takes the
-pointer: it can be hovered and its words selected (WCAG 1.4.13).
+`size.tooltip.max`; in the page's body (no clipping card can cut it) in the theme's colours. It is
+mounted only while shown (UI review I3: a Week of blocks no longer keeps a portal per block); the
+trigger's description is the hidden `Description` beside it. It takes the pointer: it can be
+hovered and its words selected (WCAG 1.4.13).
 */
 const Bubble = ({
   anchor,
-  id,
-  isVisible,
   label,
   onPointerEnter,
   onPointerLeave,
 }: {
   readonly anchor: Anchor | null;
-  readonly id: string;
-  readonly isVisible: boolean;
   readonly label: string;
   readonly onPointerEnter: () => void;
   readonly onPointerLeave: () => void;
@@ -214,19 +207,17 @@ const Bubble = ({
   const [size, setSize] = useState<null | Size>(null);
   const bubble = (
     <View
-      aria-hidden={!isVisible}
       onLayout={(event) => {
         setSize(event.nativeEvent.layout);
       }}
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
-      pointerEvents={isVisible ? "auto" : "none"}
-      style={[paletteVars(scheme), frameStyle(isVisible ? anchor : null, size)]}
+      pointerEvents="auto"
+      style={[paletteVars(scheme), frameStyle(anchor, size)]}
       testID="tooltip-bubble"
     >
       <View
         className="max-w-tooltip-max rounded-sm border border-separator bg-elevated px-3 py-2"
-        id={id}
         role="tooltip"
       >
         <Text role="footnote">{label}</Text>
@@ -235,6 +226,16 @@ const Bubble = ({
   );
   return typeof document === "undefined" ? bubble : createPortal(bubble, document.body);
 };
+
+/**
+What the trigger's `aria-describedby` points at: the label, never drawn and never laid out
+(`display: none`; a description may name a hidden element), there whether the bubble shows or not.
+*/
+const Description = ({ id, label }: { readonly id: string; readonly label: string }) => (
+  <View id={id} style={{ display: "none" }} testID="tooltip-description">
+    <Text role="footnote">{label}</Text>
+  </View>
+);
 
 /**
 What shows and why: shown by the pointer resting on the trigger (`hover`) or by the keyboard's
@@ -316,10 +317,14 @@ export const Tooltip = ({
   useDismiss(isShown, state.hide);
   // Events react-native-web passes to the DOM but React Native's types do not list.
   const keys = {
-    onKeyDown: (event: { readonly key?: string }) => {
-      if (event.key === "Escape") {
-        state.hide();
+    onKeyDown: (event: { readonly key?: string; readonly stopPropagation?: () => void }) => {
+      if (!isShown || event.key !== "Escape") {
+        return;
       }
+
+      // Only the tooltip goes first: the dialog around it stays for the next Escape.
+      event.stopPropagation?.();
+      state.hide();
     },
   };
   return (
@@ -349,16 +354,15 @@ export const Tooltip = ({
       {...(keys as object)}
     >
       {children}
-      {label === undefined ? null : (
+      {label === undefined ? null : <Description id={id} label={label} />}
+      {isShown ? (
         <Bubble
           anchor={state.shown?.anchor ?? null}
-          id={id}
-          isVisible={isShown}
           label={label}
           onPointerEnter={state.keep}
           onPointerLeave={state.leave}
         />
-      )}
+      ) : null}
     </View>
   );
 };
