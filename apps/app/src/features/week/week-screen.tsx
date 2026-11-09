@@ -22,7 +22,7 @@ import { Text } from "#app/ui/text.tsx";
 import { Tooltip } from "#app/ui/tooltip.tsx";
 import { fitHourPx, gridFromHour, type WeekModel } from "@pace/client";
 import { useCalendarRange, useUsage } from "@pace/client/react";
-import { addDaysIn, type Language } from "@pace/core";
+import { formatWeekRange } from "@pace/core";
 
 import { PickedPane, PickedSheet } from "./picked-details.tsx";
 import { BOTTOM_PX, LABELS_PX, WeekGrid } from "./week-grid.tsx";
@@ -33,12 +33,6 @@ const HOUR_FLOOR_PX = 18;
 
 /** On a phone a day column keeps this width at least, and the week scrolls sideways. */
 const PHONE_COLUMN_PX = 72;
-
-/** "5 Oct", "5 окт." */
-const monthDay = (date: string, zone: string, language: Language): string =>
-  new Intl.DateTimeFormat(language, { day: "numeric", month: "short", timeZone: zone }).format(
-    new Date(date),
-  );
 
 /**
 The moon: the night hours (00–07) on the grid, or not; the same switch as in Settings, so the same
@@ -178,7 +172,6 @@ const WeekPage = ({
     week.days.every((day) => day.blocks.length === 0) &&
     calendar.length === 0 &&
     usage.length === 0;
-  const lastDay = addDaysIn(week.weekStart, 6, week.zone);
   // A phone opens Week from More: the chevron goes back there; beside the sidebar there is none.
   const back = useBack();
   return (
@@ -191,7 +184,8 @@ const WeekPage = ({
           period={
             <WeekPeriod
               isAway={!week.isCurrent}
-              label={`${monthDay(week.weekStart, week.zone, language)} – ${monthDay(lastDay, week.zone, language)}`}
+              // Insights' form: one range, one format, and short enough for the pill in RU (N2).
+              label={formatWeekRange(week.weekStart, week.zone, language)}
               next={week.next}
               onWeek={onWeek}
               previous={week.previous}

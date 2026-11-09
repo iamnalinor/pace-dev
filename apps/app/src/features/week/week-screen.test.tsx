@@ -137,13 +137,28 @@ describe("WeekScreen", () => {
   it("offers This week only on another week, and it brings this week back", async () => {
     await renderScreen(<WeekScreen />, await world());
     const back = () => screen.queryByRole("button", { name: en("period.thisWeek") });
-    expect(screen.getByText("Oct 5 – Oct 11")).toBeOnTheScreen();
+    expect(screen.getByText("Oct 5 – 11")).toBeOnTheScreen();
     expect(back()).toBeNull();
     await fireEvent.press(screen.getByRole("button", { name: "Previous week" }));
     expect(await screen.findByText("Sep 28 – Oct 4")).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("button", { name: en("period.thisWeek") }));
-    expect(await screen.findByText("Oct 5 – Oct 11")).toBeOnTheScreen();
+    expect(await screen.findByText("Oct 5 – 11")).toBeOnTheScreen();
     expect(back()).toBeNull();
+  });
+
+  it("names the week as Insights does, on one line, within a month and across two (design review 2 N2)", async () => {
+    const language = jest.spyOn(globalThis.navigator, "language", "get").mockReturnValue("ru-RU");
+    try {
+      const page = await renderScreen(<WeekScreen />, await world());
+      // «5 окт. – 11 окт.» wrapped its month onto a second line inside the pill at 390.
+      expect(screen.getByText("5 – 11 окт.")).toHaveProp("numberOfLines", 1);
+      await page.unmount();
+      setSearchParams({ week: "2026-09-30" });
+      await renderScreen(<WeekScreen />, await world());
+      expect(screen.getByText("28 сент. – 4 окт.")).toHaveProp("numberOfLines", 1);
+    } finally {
+      language.mockRestore();
+    }
   });
 
   it("keeps the week and the picked block in the address, and a reload opens both (feedback 5 item 6)", async () => {
@@ -171,7 +186,7 @@ describe("WeekScreen", () => {
     await page.unmount();
     setSearchParams({ block: "no-such-block", week: "2026-13-01" });
     await renderScreen(<WeekScreen />, await world());
-    expect(screen.getByText("Oct 5 – Oct 11")).toBeOnTheScreen();
+    expect(screen.getByText("Oct 5 – 11")).toBeOnTheScreen();
     expect(screen.queryByText("Study · 1h")).toBeNull();
     expect(paramsSet).not.toHaveBeenCalled();
   });
