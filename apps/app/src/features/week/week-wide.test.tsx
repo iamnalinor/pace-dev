@@ -1,6 +1,7 @@
 import { act, fireEvent, screen } from "@testing-library/react-native";
 
 import { en, renderScreen } from "#app/test/render.tsx";
+import { setSearchParams } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { addMinutesIso } from "@pace/core";
 import { NOW } from "@pace/core/testing";
@@ -116,6 +117,37 @@ describe("WeekScreen on a wide window", () => {
     await fireEvent.press(screen.getByRole("button", { name: en("period.thisWeek") }));
     expect(pane()).toBeNull();
     expect(block()).not.toHaveProp("aria-current", "true");
+  });
+
+  it("lets go of a picked event when the address moves to another week, as browser Back does (review I1)", async () => {
+    const runtime = await createTestRuntime({
+      routes: {
+        "GET /api/calendar": () => ({
+          events: [
+            {
+              calendarName: "University",
+              endAt: addMinutesIso(NOW, -60),
+              id: "ev-1",
+              location: "Room 214",
+              series: null,
+              startAt: addMinutesIso(NOW, -150),
+              title: "Seminar",
+            },
+          ],
+        }),
+      },
+    });
+    await renderScreen(<WeekScreen />, runtime);
+    await fireEvent.press(
+      await screen.findByRole("button", { name: /, From the calendar: Seminar$/u }),
+    );
+    expect(await screen.findByText("Room 214")).toBeOnTheScreen();
+    await act(() => {
+      setSearchParams({ week: "2026-09-28" });
+    });
+    expect(screen.getByText("Sep 28 – Oct 4")).toBeOnTheScreen();
+    expect(pane()).toBeNull();
+    expect(screen.queryByText("Room 214")).toBeNull();
   });
 
   it("closes the pane on Escape (UI review I4)", async () => {

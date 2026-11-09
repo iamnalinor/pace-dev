@@ -221,14 +221,22 @@ nothing is written back.
 */
 const usePicked = (week: WeekModel): readonly [null | Picked, (next: null | Picked) => void] => {
   const [blockId, setBlockId] = useSearchParam("block");
-  const [other, setOther] = useState<null | Picked>(null);
+  // An event or a run belongs to the week it was picked on: browser Back or Forward changes the
+  // week in the address and keeps the screen mounted, so another week reads as no pick, derived
+  // and not written back (review of round 24, I1; bug-lessons 201).
+  const [kept, setKept] = useState<null | { readonly picked: Picked; readonly weekStart: string }>(
+    null,
+  );
+  const other = kept?.weekStart === week.weekStart ? kept.picked : null;
   const block =
     blockId === null
       ? undefined
       : week.days.flatMap((day) => day.blocks).find((item) => item.id === blockId);
   const picked: null | Picked = block === undefined ? other : { block, kind: "block" };
   const pick = (next: null | Picked): void => {
-    setOther(next?.kind === "block" ? null : next);
+    setKept(
+      next === null || next.kind === "block" ? null : { picked: next, weekStart: week.weekStart },
+    );
     const nextBlock = next?.kind === "block" ? next.block.id : null;
     if (nextBlock !== blockId) {
       setBlockId(nextBlock);

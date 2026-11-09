@@ -192,6 +192,26 @@ test.describe("Back and forward follow the screen (feedback 5 item 6, QA round 2
     await expect(page).toHaveURL(/\/day$/u);
   });
 
+  test("Day: a block open on yesterday is not left open over today after Back (review I1)", async ({
+    page,
+  }) => {
+    await page.setViewportSize(DESKTOP);
+    await loginViaApi(page);
+    await page.goto("/day");
+    await page.getByRole("button", { name: "Previous day" }).click();
+    await expect(page).toHaveURL(/[?&]date=/u);
+    await page.getByRole("button", { name: "Log past activity" }).click();
+    const details = page.getByRole("region", { name: "Details" });
+    await details.getByLabel("What", { exact: true }).fill("Yesterday's block");
+    await details.getByRole("button", { exact: true, name: "Save" }).click();
+    await page.getByRole("button", { name: /Yesterday's block/u }).click();
+    await expect(details.getByLabel("What", { exact: true })).toHaveValue("Yesterday's block");
+    await page.goBack();
+    await expect(page).not.toHaveURL(/[?&]date=/u);
+    await expect(page.getByRole("button", { name: "Today" })).toHaveCount(0);
+    await expect(details).toHaveCount(0);
+  });
+
   test("Week (in More's stack): another week is a step; Back and Forward move between them", async ({
     page,
   }) => {

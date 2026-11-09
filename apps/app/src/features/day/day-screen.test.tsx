@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 
 import { controlsInsideControls } from "#app/test/nested-controls.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
@@ -170,6 +170,27 @@ describe("DayScreen", () => {
     expect(searchParams()).toEqual({ date: "2026-10-05" });
     await fireEvent.press(screen.getByRole("button", { name: en("period.today") }));
     expect(searchParams()).toEqual({});
+  });
+
+  it("closes the open sheet when the address moves to another day, as browser Back does (review I1)", async () => {
+    const runtime = await createTestRuntime();
+    await runtime.actions.logPast({
+      category: "work",
+      endAt: addMinutesIso(NOW, -240),
+      label: "Team chat",
+      startAt: addMinutesIso(NOW, -270),
+    });
+    await renderScreen(<DayScreen />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: /Team chat/u }));
+    expect(await screen.findByLabelText("What")).toHaveDisplayValue("Team chat");
+    await act(() => {
+      setSearchParams({ date: "2026-10-05" });
+    });
+    expect(screen.getByText("Mon, Oct 5")).toBeOnTheScreen();
+    await waitFor(() => {
+      expect(screen.queryByLabelText("What")).toBeNull();
+    });
+    expect(paramsSet).not.toHaveBeenCalled();
   });
 
   it("opens the day the address names, and today for one it cannot read, writing nothing back", async () => {

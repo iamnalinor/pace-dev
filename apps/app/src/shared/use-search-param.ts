@@ -18,6 +18,10 @@ Every change written is a person's step (a task opened or closed, another day, w
 filter picked): on the web it takes a step in the browser's history first, so Back shows what was
 there before and Forward comes back (QA round 24 R24-02). Writing the value already shown does
 nothing at all.
+
+Back and Forward change the param without the screen's own setter and keep the screen mounted:
+React state that only means something for one value of the param (a block picked on a day) is
+stored with that value and reads as nothing for another one (bug-lessons 201).
 */
 export const useSearchParam = (
   name: string,

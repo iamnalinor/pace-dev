@@ -223,11 +223,21 @@ export const DayScreen = () => {
   const isWide = useIsWide();
   // The day is in the address (`?date=`, feedback 5 item 6): a reload shows the same day.
   const [date, setDate] = useZonedDateParam("date");
-  const [sheet, setSheet] = useState<null | SheetTarget>(null);
+  const day = hooks.useDay(date);
+  // The block picked belongs to the day it was picked on: browser Back or Forward changes the
+  // day in the address and keeps the screen mounted, so another day reads as no pick, derived and
+  // not written back (review of round 24, I1; bug-lessons 201).
+  const [picked, setPicked] = useState<null | {
+    readonly date: string;
+    readonly target: SheetTarget;
+  }>(null);
+  const sheet = picked?.date === day.date ? picked.target : null;
+  const setSheet = (target: null | SheetTarget): void => {
+    setPicked(target === null ? null : { date: day.date, target });
+  };
   const closeSheet = (): void => {
     setSheet(null);
   };
-  const day = hooks.useDay(date);
   const screen = (
     <Screen
       anchor="wide"
