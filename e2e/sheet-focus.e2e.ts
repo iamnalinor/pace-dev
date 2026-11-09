@@ -358,3 +358,24 @@ test.describe("keyboard only: a sheet opened from a list row (Review Focus 5)", 
     expect(await hasFocusRing(page)).toBe(true);
   });
 });
+
+test("each time-bar picker gives focus back to its tile on Escape, Task's with its search field included (QA round 24 R24-05)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 900, width: 1280 });
+  await loginViaApi(page);
+  await page.goto("/");
+  await expect(page.getByRole("textbox", { name: "New task" })).toBeVisible();
+  // The Task picker's search has the keyboard while it is open.
+  await page.getByRole("button", { exact: true, name: "Task" }).click();
+  await expect(page.getByRole("searchbox", { name: "Find a task" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  for (const name of ["Calendar", "Task", "Chores", "Misc"]) {
+    const tile = page.getByRole("button", { exact: true, name });
+    await tile.click();
+    await expect(page.getByTestId("popover-surface")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("popover-surface")).toHaveCount(0);
+    await expect(tile).toBeFocused();
+  }
+});

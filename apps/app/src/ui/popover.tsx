@@ -4,6 +4,7 @@ import Animated, { useAnimatedStyle } from "react-native-reanimated";
 
 import { layout, shadow } from "@pace/core";
 
+import { isFocusLost, moveFocus } from "../platform/move-focus.ts";
 import { paletteVars } from "../platform/theme.ts";
 import { FILL, OverlayLayer, useOverlayProgress } from "./overlay-frame.tsx";
 import { placePopover, POPOVER_SCALE } from "./overlay-motion.ts";
@@ -82,6 +83,29 @@ export type PopoverProps = {
 };
 
 /**
+Focus back on the anchor once the popover is gone, where nothing else took it. react-native-web's
+modal gives focus back to what held it when the modal's effect ran: a field inside that focused
+itself first (the Task picker's search) was that element, and focus fell to the page (QA round 24
+R24-05). A frame later, after the modal's own try.
+*/
+const useFocusBack = (anchor: RefObject<null | View>, isMounted: boolean): void => {
+  useEffect(() => {
+    if (!isMounted) {
+      return;
+    }
+    // The control it opened from, as it was then: the tile stays while its popover comes and goes.
+    const opener = anchor.current;
+    return () => {
+      requestAnimationFrame(() => {
+        if (isFocusLost()) {
+          moveFocus(opener);
+        }
+      });
+    };
+  }, [anchor, isMounted]);
+};
+
+/**
 A picker or a menu anchored to the control that opened it, on a wide window (spec §4.2.21, F-CMP-13:
 the desktop pickers were centred dialogs far from their buttons): `layout.popover` wide (360),
 `radius.lg`, at most 60 % of the window's height with its own scroll; under its trigger, or above it
@@ -104,6 +128,7 @@ export const Popover = ({
   const style = usePopoverMotion(phase.isOpen, phase.letGo);
   const box = useAnchorBox(anchor, phase.isOpen);
   const surfaceRef = useSheetFocusRef({ closeLabel: label });
+  useFocusBack(anchor, phase.isMounted);
   // Its height as drawn when the caller does not know it: a popover on the bottom edge (the time
   // bar's) must open above its trigger, whatever its list holds.
   const [measured, setMeasured] = useState(0);

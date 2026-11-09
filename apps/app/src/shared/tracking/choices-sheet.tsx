@@ -11,7 +11,6 @@ import { Popover } from "#app/ui/popover.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
 import { SwitchRow } from "#app/ui/switch-row.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
-import { IS_TOUCH_BROWSER } from "#app/ui/use-hotkey.tsx";
 import { type ActionResult, taskChoices, type TimeButtonView } from "@pace/client";
 import { formatDuration } from "@pace/core";
 
@@ -102,12 +101,11 @@ const TaskSearch = ({
   readonly onChange: (query: string) => void;
 }) => {
   const t = useT();
-  // On a phone, or any touch screen in a browser, the keyboard would cover the list it narrows:
-  // it opens on a tap in the field (fix round 5 V4: a wide touch browser is no computer).
-  const isTypedInAtOnce = useIsWide() && !IS_TOUCH_BROWSER;
+  // Not `autoFocus`: the picker puts the keyboard on its first field once it has opened (only where
+  // there is a keyboard, fix round 5 V4), after the modal noted the tile to give focus back to; a
+  // field that focused itself first was noted instead, and Escape left focus nowhere (R24-05).
   return (
     <TextField
-      autoFocus={isTypedInAtOnce}
       isLabelHidden
       label={t("time.taskSearch")}
       onChangeText={onChange}
