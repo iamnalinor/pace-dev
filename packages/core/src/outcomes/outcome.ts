@@ -2,7 +2,7 @@ import type { Event, EventInput } from "../events/event-schema.ts";
 import type { ResolvedPreset } from "../model/preset.ts";
 import type { PresetsState } from "../presets/preset-reducer.ts";
 
-import { autoOutcomeId } from "../ids.ts";
+import { autoOutcomeId, retiredId } from "../ids.ts";
 import { isOpen, type Subtask, type Task, type TasksState } from "../model/task.ts";
 import { taskPreset } from "../presets/resolve-preset.ts";
 import { addDaysIn, addMinutesIso } from "../time.ts";
@@ -189,7 +189,7 @@ const isRetiredAutoMiss = (event: Event): boolean =>
 The revocations of the automatic misses an older client just pushed: the server takes the event
 (an old client keeps a refused one in its outbox and sends it on every sync) and revokes it at
 once, so the task stays open on every device, that one included. Deterministic ids
-(`<miss id>:retired`) keep it idempotent. Misses already in a log are not touched (the owner kept
+(`retiredId`) keep it idempotent. Misses already in a log are not touched (the owner kept
 old automatic closes as they are).
 */
 export const retiredAutoMissRevokes = (
@@ -199,7 +199,7 @@ export const retiredAutoMissRevokes = (
   pushed
     .filter((event) => isRetiredAutoMiss(event))
     .map((event) => ({
-      id: `${event.id}:retired`,
+      id: retiredId(event.id),
       type: "event.revoked",
       occurredAt: now,
       precision: "exact",
