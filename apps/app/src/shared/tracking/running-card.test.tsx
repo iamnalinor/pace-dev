@@ -92,7 +92,12 @@ describe("RunningCard", () => {
     expect(screen.queryByText(/of ~20m/u)).toBeNull();
     const yes = screen.getByRole("button", { name: en("time.stillYes") });
     const stop = screen.getByRole("button", { name: "Stop: Walk" });
-    expect(yes.parent?.parent).toBe(stop.parent?.parent);
+    // Both stand in the main row, the name's column beside them.
+    const row = name.parent?.parent ?? null;
+    expect(row).not.toBeNull();
+    expect(row).toContainElement(yes);
+    expect(row).toContainElement(stop);
+    expect(screen.queryAllByTestId("running-alongside")).toHaveLength(0);
     // Stop keeps its filled square on fill.2 and yields its word to the answer.
     expect(within(stop).queryByText(en("time.stop"))).toBeNull();
   });
