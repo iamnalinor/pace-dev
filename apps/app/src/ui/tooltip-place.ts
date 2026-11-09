@@ -51,17 +51,28 @@ const isOverlapping = (one: Box, other: Box): boolean =>
   one.y < other.y + other.height - 1 &&
   other.y < one.y + one.height - 1;
 
-/** The bubble's box on one side of its trigger, slid to stay inside the window; null if it cannot fit. */
-const boxOn = (side: Side, anchor: Box, { bubble, viewport }: Fit): Box | null => {
+/**
+Where the bubble lines up with its trigger along the side: centred, or slid so that its start
+(left, top) or its end (right, bottom) is the trigger's.
+*/
+type Align = "centre" | "end" | "start";
+
+/**
+The bubble's box on one side of its trigger, lined up by `align` and slid to stay inside the
+window; null if it cannot fit.
+*/
+const boxOn = (
+  side: Side,
+  anchor: Box,
+  { align, bubble, viewport }: Fit & { readonly align: Align },
+): Box | null => {
   const clamp = (value: number, size: number, room: number): number =>
     Math.min(Math.max(value, EDGE), Math.max(EDGE, room - EDGE - size));
-  const centredX = clamp(
-    anchor.x + anchor.width / 2 - bubble.width / 2,
-    bubble.width,
-    viewport.width,
-  );
+  const along = (start: number, length: number, size: number): number =>
+    ({ centre: start + length / 2 - size / 2, end: start + length - size, start })[align];
+  const centredX = clamp(along(anchor.x, anchor.width, bubble.width), bubble.width, viewport.width);
   const centredY = clamp(
-    anchor.y + anchor.height / 2 - bubble.height / 2,
+    along(anchor.y, anchor.height, bubble.height),
     bubble.height,
     viewport.height,
   );
@@ -91,11 +102,17 @@ chevron, the period stepper, the header's actions): its bubble above lay over th
 */
 export const HEADER_BAND_PX = 120;
 
+/** Centred on every side first; only then slid to a side's start or end. */
+const ALIGNS: readonly Align[] = ["centre", "end", "start"];
+
 /**
 Where a tooltip's bubble goes: above its trigger, else below, else beside it (after, before) — below
-first for a trigger in the header band (`HEADER_BAND_PX`) — the first side that fits the window and lies over none of `others` (the page's other controls: a
-bubble over a control takes its press, bug class 6). Every side covering something, the first
-that fits; none fitting, below.
+first for a trigger in the header band (`HEADER_BAND_PX`) — the first side that fits the window and
+lies over none of `others` (the page's other controls: a bubble over a control takes its press, bug
+class 6). No side clear centred, the same sides with the bubble slid to line up with the trigger's
+end, then its start (bug class 195: a centred bubble wider than its trigger reached a neighbour
+every side had). Every place covering something, the first centred one that fits; none fitting,
+below.
 */
 export const placeTooltip = (
   anchor: Box,
@@ -103,12 +120,9 @@ export const placeTooltip = (
   { others = [], viewport }: { readonly viewport: Size; readonly others?: readonly Box[] },
 ): Placement => {
   const sides = anchor.y < HEADER_BAND_PX ? HEADER_SIDES : SIDES;
-  const fitting = sides
-    .map((side) => ({
-      box: boxOn(side, anchor, { bubble, viewport }),
-      side,
-    }))
-    .filter((place): place is { box: Box; side: Side } => place.box !== null);
+  const fitting = ALIGNS.flatMap((align) =>
+    sides.map((side) => ({ box: boxOn(side, anchor, { align, bubble, viewport }), side })),
+  ).filter((place): place is { box: Box; side: Side } => place.box !== null);
   const chosen = fitting.find(({ box }) => others.every((other) => !isOverlapping(box, other))) ??
     fitting[0] ?? {
       box: {
