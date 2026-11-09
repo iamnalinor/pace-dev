@@ -272,4 +272,43 @@ describe("DayScreen", () => {
     expect(await screen.findByLabelText("From")).toHaveProp("value", "11:00");
     expect(screen.getByLabelText("To")).toHaveProp("value", "13:00");
   });
+
+  it("stands each rail bar beside its row: the bar takes the row's measured top and height (owner 2026-11-09)", async () => {
+    const runtime = await createTestRuntime();
+    await runtime.actions.logPast({
+      category: "food",
+      endAt: addMinutesIso(NOW, -240),
+      label: "Breakfast",
+      startAt: addMinutesIso(NOW, -270),
+    });
+    await runtime.actions.startActivity(
+      { category: "study", label: "Lecture" },
+      { at: addMinutesIso(NOW, -60) },
+    );
+    await renderScreen(<DayScreen />, runtime);
+    const hidden = { includeHiddenElements: true } as const;
+    const rows = screen.getAllByTestId("day-entry");
+    // The gap from midnight, Breakfast, the gap after it, the running Lecture: rows of their own
+    // heights, a hairline between them.
+    expect(rows).toHaveLength(4);
+    const frames = [
+      { height: 52, y: 0 },
+      { height: 64, y: 53 },
+      { height: 52, y: 118 },
+      { height: 96, y: 171 },
+    ];
+    for (const [index, row] of rows.entries()) {
+      await fireEvent(row, "layout", {
+        nativeEvent: { layout: { width: 300, x: 0, ...frames[index] } },
+      });
+    }
+    const bars = screen.getAllByTestId("rail-bar", hidden);
+    expect(bars).toHaveLength(4);
+    for (const [index, bar] of bars.entries()) {
+      expect(bar).toHaveStyle({ height: frames[index]?.height, top: frames[index]?.y });
+    }
+    // The running block's bar ends on the red now line.
+    expect(screen.getByTestId("now-margin", hidden)).toHaveStyle({ top: 171 + 96 });
+    expect(screen.getByTestId("day-rail", hidden)).toHaveProp("accessibilityElementsHidden", true);
+  });
 });

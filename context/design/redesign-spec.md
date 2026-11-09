@@ -1436,6 +1436,16 @@ tokens that wraps between tokens (never inside one). Replaces the row of washed 
   for overdue and destructive only (§3.1).
 - Separators: none between rows; the rail and row spacing carry the rhythm (owner feedback-4).
 
+**Built note (Task 7.1, owner 2026-11-09: the rail lines up with the rows).** The rows keep their
+natural heights (no proportional rows); the rail beside the list (direction A's notebook page, dot
+grid behind it) draws one bar per row at that row's measured top and height (`onLayout` on each row,
+keyed by the row's key: one source of geometry), a block in its category's tint with a 1 px pen line
+in its stroke, a gap dashed (`outline`), a parallel block narrower beside the main line. The red now
+margin line sits in the row whose time holds now, as far down it as now is into that time, so the
+running block's bar ends on it. No scale break and no hatching on the rail (a row-aligned bar has no
+time scale to break and no overlap to draw); the row text carries the times. Hidden from screen
+readers. Not drawn: the «+1» for a third parallel block, the overlap footnote.
+
 **States.** Empty past day: one 24-hour gap row (drawn at the cap with a break) plus `EmptyState`
 «Здесь появится ваш день: всё, что вы запускаете на «Сейчас» и записываете задним числом» →
 «Записать прошедшее». Today with nothing: the gap from 00:00 to now + the same action. Loading:

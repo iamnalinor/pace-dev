@@ -951,6 +951,8 @@ Only what spec §2 names for the chosen direction (A · Тетрадь).
 
 Deferred (2026-11-06): the rail is an index drawn beside the list and scaled to the list's own height (percent positions from `dayRail`), not row-aligned: the rows keep their natural heights, so a band and its row line up in order, not in y. The rail's geometry lives in `view-models/day-rail.ts` (exported from `@pace/client`), not in `day.ts`; `dayRail` takes `(blocks, gaps, now)` — no zone, the entries are already the day's. Dot grid on the rail only (the rows are opaque cells). The branch for a parallel block is a narrower band beside the main one; the "+1" for a third is not drawn. Overlap hatching is on the parallel band's overlapping stretch only.
 
+Built (2026-11-09, owner: align the rail with the rows): the rail is no longer an index. `dayRail(entries, now)` (`view-models/day-rail.ts`) gives one bar per row under the row's key (`block` / `gap` / `parallel`, the hue, running) and `now` as the row that holds the present and how far into it; the Day timeline measures each row (`onLayout`, frames in the list's coordinates, reset per date) and `DayRail` draws each bar at its row's top and height, `NowMargin` at `top + height × at`. A bar for a row not measured yet is not drawn; a bar of a row that slides in slides with it (`ROW_LAYOUT`). The proportional clock, the 3 h gap cap with its scale break and the overlap hatching are gone with the index.
+
 
 ### Task 7.2: The running activity's ink line and the Week day strip
 
