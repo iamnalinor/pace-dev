@@ -121,3 +121,27 @@ test("at 1440 the wheel over the gutter scrolls a long screen (F-WEB-05, the reg
   await page.mouse.wheel(0, 400);
   await expect.poll(scrolled).toBeGreaterThan(0);
 });
+
+test("a phone keeps the tab bar on More's destinations, More current, and Back leads to More (spec §4.2.27, F-AND-03)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 844, width: 390 });
+  await loginViaApi(page);
+  const bar = page.getByTestId("tab-bar");
+  const more = bar.getByRole("link", { exact: true, name: "More" });
+  for (const name of ["Week", "Projects", "Insights", "History", "Settings"]) {
+    await page.goto("/more");
+    await page.getByRole("link", { exact: true, name }).click();
+    await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
+    await expect(bar).toBeVisible();
+    await expect(more).toHaveAttribute("aria-current", "page");
+    await page.getByRole("button", { name: "Back" }).click();
+    await expect(page).toHaveURL(/\/more$/u);
+  }
+  // A destination opened straight by its address goes back to More as well.
+  await page.goto("/notifications");
+  await expect(bar).toBeVisible();
+  await expect(more).toHaveAttribute("aria-current", "page");
+  await page.getByRole("button", { name: "Back" }).click();
+  await expect(page).toHaveURL(/\/more$/u);
+});

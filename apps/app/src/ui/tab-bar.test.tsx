@@ -15,14 +15,15 @@ jest.mock("./space-press.ts", (): unknown => jest.requireActual("./space-press.w
 
 type Props = ComponentProps<typeof TabBar>;
 
-const ROUTES = ["index", "day", "inbox", "more", "add"] as const;
+// More is a stack of its own (its list and the destinations it opens): the tab is its group.
+const ROUTES = ["index", "day", "inbox", "(more)", "add"] as const;
 
 const TITLES: Readonly<Record<(typeof ROUTES)[number], string>> = {
   add: en("nav.add"),
   day: en("nav.day"),
   inbox: en("nav.inbox"),
   index: en("nav.now"),
-  more: en("nav.more"),
+  "(more)": en("nav.more"),
 };
 
 const propsAt = (current: (typeof ROUTES)[number], navigate: jest.Mock, isFront = true): Props =>
@@ -50,7 +51,7 @@ describe("TabBar", () => {
       en("nav.more"),
     ]);
     await fireEvent.press(screen.getByRole("tab", { name: en("nav.more") }));
-    expect(navigate).toHaveBeenCalledWith("more", undefined);
+    expect(navigate).toHaveBeenCalledWith("(more)", undefined);
   });
 
   it("opens a tab on Space as well as Enter (ARIA tabs; react-native-web ignores Space on role tab)", async () => {

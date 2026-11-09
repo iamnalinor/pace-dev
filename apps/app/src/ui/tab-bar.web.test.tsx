@@ -12,15 +12,19 @@ jest.mock("./tab-bar-item.tsx", (): unknown => jest.requireActual("./tab-bar-ite
 
 type Props = ComponentProps<typeof TabBar>;
 
-const ROUTES = ["index", "day", "inbox", "more"] as const;
+const ROUTES = ["index", "day", "inbox", "(more)"] as const;
+
+const TITLES = {
+  "(more)": "nav.more",
+  day: "nav.day",
+  inbox: "nav.inbox",
+  index: "nav.now",
+} as const;
 
 const propsAt = (current: (typeof ROUTES)[number]): Props =>
   ({
     descriptors: Object.fromEntries(
-      ROUTES.map((name) => [
-        name,
-        { options: { title: en(name === "index" ? "nav.now" : `nav.${name}`) } },
-      ]),
+      ROUTES.map((name) => [name, { options: { title: en(TITLES[name]) } }]),
     ),
     navigation: { emit: () => ({ defaultPrevented: false }), navigate: jest.fn() },
     state: {
