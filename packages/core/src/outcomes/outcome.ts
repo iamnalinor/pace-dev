@@ -61,17 +61,31 @@ export const subtaskOutcome = (subtask: Subtask, dueAt: null | string): SubtaskO
   subtask.doneAt === null ? "pending" : lateness(subtask.doneAt, dueAt);
 
 /**
-Done subtasks decide (each by when it was done), and the ones still open when the task was
-closed as done were simply not needed. A task without subtasks, or with none done, goes by the
-closing instant. The preset no longer has a say (its `submission` mode went, 2026-11-09).
+Whether a task closed as done at `closedAt` reads late (owner, 2026-11-09): its subtasks decide
+only when every one of them is done, by the latest done instant (problems solved before the
+deadline and the task closed after it is on time); while any is left open, or with no subtasks,
+the closing instant decides. `doneAts` holds each subtask's done instant or `null`. The close
+sheet's preview reads the same rule.
 */
-const doneOutcome = (task: Task, closedAt: string): "done" | "done_late" => {
-  if (task.subtasks.some((item) => item.doneAt !== null)) {
-    const isLate = task.subtasks.some((item) => subtaskOutcome(item, task.dueAt) === "done_late");
-    return isLate ? "done_late" : "done";
+export const doneLateness = (
+  doneAts: readonly (null | string)[],
+  closedAt: string,
+  dueAt: null | string,
+): "done" | "done_late" => {
+  const done = doneAts.filter((when) => when !== null);
+  if (doneAts.length === 0 || done.length < doneAts.length) {
+    return lateness(closedAt, dueAt);
   }
-  return lateness(closedAt, task.dueAt);
+  // The latest done instant is after the due exactly when any of them is.
+  return done.some((when) => lateness(when, dueAt) === "done_late") ? "done_late" : "done";
 };
+
+const doneOutcome = (task: Task, closedAt: string): "done" | "done_late" =>
+  doneLateness(
+    task.subtasks.map((item) => item.doneAt),
+    closedAt,
+    task.dueAt,
+  );
 
 /**
 `null` while the task is open. An automatic `cancelled_missed` (only in old logs) is beaten by a retro

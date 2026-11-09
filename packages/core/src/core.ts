@@ -171,6 +171,7 @@ export {
   type AutoOutcomeInput,
   type Deadline,
   deadlineOf,
+  doneLateness,
   finalDeadlineOf,
   NOT_ASSIGNED_REASON,
   type Outcome,

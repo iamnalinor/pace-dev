@@ -11,8 +11,10 @@ import {
   HW_CREATED,
   HW_DUE,
   HW_ID,
+  HW_PROBLEMS,
   hwCreated,
   solved,
+  submitted,
   subtask,
   taskFixture,
 } from "../materialize/task-fixture.fake.ts";
@@ -24,6 +26,7 @@ import { addMinutesIso } from "../time.ts";
 import {
   autoOutcomeEvents,
   deadlineOf,
+  doneLateness,
   finalDeadlineOf,
   subtaskOutcome,
   taskOutcome,
@@ -200,11 +203,45 @@ describe("taskOutcome: the spec table", () => {
     expect(taskOutcome(someLate)).toBe("done_late");
   });
 
-  it("ignores subtasks left open when the task was closed as done", () => {
-    const left = closedTask("done", AFTER, { subtasks: [sent("s1", BEFORE), sent("s2", null)] });
-    expect(taskOutcome(left)).toBe("done");
-    const leftLate = closedTask("done", AFTER, { subtasks: [sent("s1", AFTER), sent("s2", null)] });
-    expect(taskOutcome(leftLate)).toBe("done_late");
+  it("goes by the closing instant while any subtask is left open (owner, 2026-11-09)", () => {
+    const partLate = closedTask("done", AFTER, {
+      subtasks: [sent("s1", BEFORE), sent("s2", null)],
+    });
+    expect(taskOutcome(partLate)).toBe("done_late");
+    const partOnTime = closedTask("done", BEFORE, {
+      subtasks: [sent("s1", BEFORE), sent("s2", null)],
+    });
+    expect(taskOutcome(partOnTime)).toBe("done");
+  });
+
+  it("goes by the latest done subtask once every subtask is done, whenever it was closed", () => {
+    const allEarly = closedTask("done", AFTER, {
+      subtasks: [sent("s1", BEFORE), sent("s2", BEFORE)],
+    });
+    expect(taskOutcome(allEarly)).toBe("done");
+    expect(doneLateness([BEFORE, BEFORE], AFTER, HW_DUE)).toBe("done");
+    expect(doneLateness([BEFORE, null], AFTER, HW_DUE)).toBe("done_late");
+    expect(doneLateness([BEFORE, AFTER], BEFORE, HW_DUE)).toBe("done_late");
+    expect(doneLateness([], AFTER, HW_DUE)).toBe("done_late");
+  });
+
+  it("reads an old log: problems sent early per subtask, the task closed late", () => {
+    const allSent = [
+      hwCreated(1),
+      ...HW_PROBLEMS.map((problem, index) =>
+        submitted(index + 2, BEFORE, { subtaskIds: [problem.id] }),
+      ),
+      at(20, AFTER, { type: "task.closed", payload: { taskId: HW_ID, outcome: "done" } }),
+    ];
+    const done = fold(allSent).byId[HW_ID];
+    expect(done === undefined ? null : taskOutcome(done)).toBe("done");
+    const oneSent = [
+      hwCreated(1),
+      submitted(2, BEFORE, { subtaskIds: ["s1"] }),
+      at(20, AFTER, { type: "task.closed", payload: { taskId: HW_ID, outcome: "done" } }),
+    ];
+    const late = fold(oneSent).byId[HW_ID];
+    expect(late === undefined ? null : taskOutcome(late)).toBe("done_late");
   });
 
   it("falls back to the closing instant for a task without done subtasks", () => {
