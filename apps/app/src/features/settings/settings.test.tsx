@@ -516,6 +516,30 @@ describe("SettingsScreen", () => {
     expect(router.replace).not.toHaveBeenCalled();
   });
 
+  it("on a phone puts Wait over Sign out anyway, each the column's width, so neither label wraps (bug class 197)", async () => {
+    const runtime = await createTestRuntime({
+      routes: { "POST /api/sync/push": () => problem(503, "offline") },
+      world: "empty",
+    });
+    await runtime.actions.setNightHours(true);
+    await runtime.actions.setLanguage("en");
+    await renderScreen(<SettingsScreen />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.logout") }));
+    // Side by side at the text inset (design review 2 N6) each half was 159 px at 390, and
+    // «Sign out anyway» / «Всё равно выйти» ran two lines (60 px). Stacked as the danger zone's.
+    const anyway = await screen.findByRole("button", { name: en("settings.logout.anyway") });
+    let node: null | typeof anyway = anyway;
+    const rows: string[] = [];
+    while (node !== null && node.props["role"] !== "group") {
+      if (/\bflex-row\b/u.test(classesOf(node))) {
+        rows.push(classesOf(node));
+      }
+      node = node.parent;
+    }
+    expect(node).not.toBeNull();
+    expect(rows).toEqual([]);
+  });
+
   it("waits for Telegram before deleting and can poll after the session disappears", async () => {
     const id = "123e4567-e89b-42d3-a456-426614174000";
     const created = jest.fn(() => ({
