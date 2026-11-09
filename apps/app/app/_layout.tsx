@@ -29,6 +29,11 @@ import { ThemeProvider, useTheme } from "#app/ui/theme-provider.tsx";
 import { ToastProvider } from "#app/ui/toast.tsx";
 import { TooltipHost } from "#app/ui/tooltip.tsx";
 import { useBreakpoint } from "#app/ui/use-breakpoint.ts";
+import { seedReducedMotion } from "#app/ui/use-reduced-motion.ts";
+
+// Reduced motion is asked once, as the app starts, so the first overlay already plays the right
+// preset (UI review I1).
+void seedReducedMotion();
 
 /**
 Beside a tablet's or a computer's window the navigation (the rail, the sidebar) stays beside every

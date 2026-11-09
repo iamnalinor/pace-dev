@@ -72,7 +72,7 @@ const SubtaskItem = ({
       label={subtask.label}
       onPress={toggle}
       role="checkbox"
-      {...spacePress(toggle)}
+      {...spacePress(toggle, isClosed)}
     >
       <Mark state={subtask.state} />
       <View className="min-w-0 flex-1 flex-row items-start gap-2 py-3">
