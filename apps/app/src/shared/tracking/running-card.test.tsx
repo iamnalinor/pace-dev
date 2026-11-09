@@ -44,7 +44,7 @@ describe("RunningCard", () => {
     expect(screen.queryByTestId("tag")).toBeNull();
     const name = screen.getByText(long);
     expect(name).toHaveProp("numberOfLines", 1);
-    expect(classes(name)).toContain("flex-1");
+    expect(classes(name.parent ?? { props: {} })).toContain("flex-1");
     expect(screen.getByRole("button", { name: `Stop: ${long}` })).toBeOnTheScreen();
   });
 
@@ -77,6 +77,37 @@ describe("RunningCard", () => {
         .queryAllByText(/.*/u)
         .filter((node) => node.props["accessibilityLiveRegion"] !== undefined),
     ).toEqual([]);
+  });
+});
+
+describe("RunningCard with a long Russian name (QA of the B2 fix)", () => {
+  const LONG = "Пошёл в ЦСС на консультацию";
+
+  it("keeps the elapsed time off the name's line, so the name keeps the row", async () => {
+    await renderScreen(
+      <RunningCard running={{ ...VIEW, label: LONG, minutes: 122 }} />,
+      await createTestRuntime(),
+    );
+    const name = screen.getByText(LONG);
+    const elapsed = screen.getByText(/2h 2m|2:02|2 h/u);
+    // «Пош… 2 ч 02 мин [Стоп]»: the time beside the name left it three letters.
+    expect(elapsed.parent).not.toBe(name.parent);
+    expect(classes(name.parent ?? { props: {} })).toContain("flex-1");
+  });
+
+  it("names an alongside row in full: no «параллельно» word beside it, and Stop as an icon", async () => {
+    await renderScreen(
+      <RunningCard
+        alongside={[{ ...VIEW, activityId: "a2", isAlongside: true, label: LONG, minutes: 92 }]}
+        running={VIEW}
+      />,
+      await createTestRuntime(),
+    );
+    const row = screen.getByTestId("running-alongside");
+    expect(within(row).queryByText(en("time.alongsideTag"))).toBeNull();
+    const stop = within(row).getByRole("button", { name: `Stop: ${LONG}` });
+    expect(within(stop).queryByText(en("time.stop"))).toBeNull();
+    expect(classes(within(row).getByText(LONG))).toContain("flex-1");
   });
 });
 

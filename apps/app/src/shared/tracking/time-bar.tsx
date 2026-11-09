@@ -188,7 +188,7 @@ export const TimeBar = () => {
     <View
       accessibilityLabel={t("time.bar")}
       className={cx(
-        "gap-2 border-t border-separator bg-app px-3 pb-3 pt-3",
+        "gap-2 border-t border-separator bg-app px-3 pb-2 pt-2",
         isSideBySide && "flex-row items-start gap-3",
       )}
       onLayout={size.onLayout}

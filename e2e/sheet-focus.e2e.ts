@@ -7,6 +7,7 @@ import { ru } from "./support/catalog.ts";
 import { expect, test } from "./support/fixtures.ts";
 import { loginViaApi } from "./support/login.ts";
 import { type LivedIn, seedLivedIn } from "./support/seed.ts";
+import { typedField } from "./support/time-bar.ts";
 
 /**
 Every sheet of the app takes the keyboard to its first field (QA 18 M1), keeps Shift+Tab inside
@@ -92,12 +93,10 @@ const OPENERS: readonly Opener[] = [
   {
     open: async (page) => {
       await page.goto("/");
-      const bar = page.getByRole("region", { name: ru["time.bar"] });
-      const more = bar.getByRole("button", { name: ru["time.startOther"] });
-      if ((await more.count()) > 0 && (await more.getAttribute("aria-expanded")) === "false") {
-        await more.click();
-      }
-      const field = bar.getByRole("textbox", { name: ru["time.whatDoing"] });
+      const field = await typedField(page.getByRole("region", { name: ru["time.bar"] }), {
+        field: ru["time.whatDoing"],
+        unfold: ru["time.startOther"],
+      });
       await field.fill("Пошёл в ЦСС, 20 мин");
       await field.press("Enter");
     },

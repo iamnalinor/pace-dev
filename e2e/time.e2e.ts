@@ -4,6 +4,7 @@ import { addTask, approve, deleteOpenTask, nowTasks } from "./support/composer.t
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { controlsUnder } from "./support/geometry.ts";
 import { API_URL, loginViaApi } from "./support/login.ts";
+import { typedField } from "./support/time-bar.ts";
 
 const SIZES = [
   { height: 844, name: "phone", width: 390 },
@@ -45,14 +46,6 @@ const gapBeside = async (one: Locator, other: Locator): Promise<number> => {
 };
 
 const timeBar = (page: Page) => page.getByRole("region", { name: "Time" });
-
-/** Opens the typed field when the bar folded it under «Start something else» (a phone). */
-const unfoldField = async (bar: Locator): Promise<void> => {
-  const more = bar.getByRole("button", { name: "Start something else" });
-  if ((await more.count()) > 0 && (await more.getAttribute("aria-expanded")) === "false") {
-    await more.click();
-  }
-};
 
 for (const size of SIZES) {
   test.describe(`time tracking, ${size.name} (${String(size.width)}px)`, () => {
@@ -126,7 +119,8 @@ for (const size of SIZES) {
       await expect(bar.getByRole("button", { name: "Stop: Workout" })).toBeVisible();
       // Two running: the bar (and on a phone the nav bar) stay within 40 % of the window, the
       // second one a compact row in the same card, never a card cut under the tiles (spec §5.1,
-      // design review B2). The field folds once the bar is left alone over the budget.
+      // design review B2; docs/design.md 2026-11-10 says what the budget guarantees). The field folds
+      // once the bar is left alone over the budget.
       await expect(bar.getByTestId("running-card")).toHaveCount(1);
       await expect
         .poll(
@@ -137,7 +131,7 @@ for (const size of SIZES) {
           { timeout: 10_000 },
         )
         .toBeLessThanOrEqual(size.height * 0.4);
-      await unfoldField(bar);
+      await typedField(bar, { field: "What are you doing?", unfold: "Start something else" });
 
       // The running button's picker offers Stop first.
       await bar.getByRole("button", { name: "Chores, running" }).click();
