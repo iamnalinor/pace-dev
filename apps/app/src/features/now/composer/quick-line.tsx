@@ -268,7 +268,12 @@ export const QuickLine = ({
   const isWide = useIsWide();
   return (
     <View className="flex-row items-end">
-      {isWide && isEmpty ? null : (
+      {isWide && isEmpty ? (
+        // The + slot is kept while + is away, so the field does not jump 42 px sideways when text
+        // comes (design review 2 N5). Its width is the web target's (a tablet's 48 dp target is 4
+        // wider, a shift too small to read).
+        <View aria-hidden className="w-hit-web" testID="line-plus-slot" />
+      ) : (
         <View>
           <LineButton
             disabled={isLocked}
