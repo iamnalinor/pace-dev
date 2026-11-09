@@ -2352,3 +2352,9 @@ New bugs go here with their class; a new class gets its own section above.
 - **Missed because.** The header link predates clickable descriptions (feedback 5 item 8); when the description learnt to show its links, nothing re-read the surfaces that showed a link taken from it.
 - **Class.** A fallback that surfaces part of a field elsewhere, kept after the field started showing that part itself.
 - **Sweep and guard.** The header link is left out when the description shows that very address (`isInDescription`, by the same `splitLinks` the description draws with); an explicit link, or one from the source text only, still shows. The edit form's Link field keeps its fallback (a field, not a second display). Guard: `task-screen.test.tsx` (an address in the description is one link on the screen).
+
+### 200. One glyph for two meanings in one row
+- **Bug.** Each row of Settings → Presets drew three chevrons: › (open the preset) inside the row and ▲ ▼ (move it up or down) beside it, the same glyph family at the same size, so the row read as three of one control (QA round 24 R24-10).
+- **Missed because.** The reorder buttons were tested by name and state; nothing looked at which glyphs a row draws.
+- **Class.** A row whose separate actions share one icon family (the disclosure chevron), so the one that navigates is not told from the ones that act.
+- **Sweep and guard.** The move buttons draw `arrow-up` / `arrow-down` (ArrowDown added to the kit); the row keeps its one chevron. Other chevrons: Day's activity field and the task header's project use `chevron-down` as the one picker cue of their control; the composer form's fold is `chevron-up` alone in its header. Guard: `presets.test.tsx` (the move buttons draw no chevron; the row's link draws the one).

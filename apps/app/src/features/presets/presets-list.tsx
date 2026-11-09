@@ -25,7 +25,7 @@ import {
 /**
 One preset: its tile and name, «Default» or «Yours» (and «Deleted») under the name, so the name
 takes the row and the arrows beside it (which move it in the pickers) never cut it to «Домаш…»
-(design review H3).
+(design review H3). The arrows are arrows, so the row's one chevron is its own (QA round 24 R24-10).
 */
 const PresetRow = ({
   isFirst,
@@ -67,13 +67,14 @@ const PresetRow = ({
       </View>
       <IconButton
         disabled={isFirst}
-        icon={"chevron-up"}
+        // Arrows, not chevrons: the row's one chevron is the one that opens it (R24-10).
+        icon="arrow-up"
         label={t("presets.moveUp", { name })}
         onPress={() => void run(actions.movePreset(preset.id, -1))}
       />
       <IconButton
         disabled={isLast}
-        icon={"chevron-down"}
+        icon="arrow-down"
         label={t("presets.moveDown", { name })}
         onPress={() => void run(actions.movePreset(preset.id, 1))}
       />

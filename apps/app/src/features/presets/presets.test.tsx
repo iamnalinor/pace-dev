@@ -45,6 +45,24 @@ describe("PresetsList", () => {
     expect(kind).toBeDefined();
   });
 
+  it("draws one chevron per row, the one that opens it: the reorder buttons are arrows (QA round 24 R24-10)", async () => {
+    await renderScreen(<PresetsList />, await createTestRuntime({ world: "empty" }));
+    type Node = { readonly props: Record<string, unknown>; readonly children: readonly unknown[] };
+    const icons = (node: Node): readonly string[] => {
+      const own = node.props["className"];
+      const nested = node.children.flatMap((child) =>
+        typeof child === "object" && child !== null ? icons(child as Node) : [],
+      );
+      return typeof own === "string" && own.startsWith("lucide ") ? [own, ...nested] : nested;
+    };
+    const up = screen.getByRole("button", { name: en("presets.moveUp", { name: "Work" }) });
+    const down = screen.getByRole("button", { name: en("presets.moveDown", { name: "Work" }) });
+    expect(icons(up as unknown as Node).join(" ")).not.toMatch(/chevron/u);
+    expect(icons(down as unknown as Node).join(" ")).not.toMatch(/chevron/u);
+    const open = screen.getByRole("link", { name: /^Work/u }) as unknown as Node;
+    expect(icons(open).join(" ")).toMatch(/chevron-right/u);
+  });
+
   it("lists the defaults in picker order, opens one and moves one", async () => {
     const runtime = await createTestRuntime({ world: "empty" });
     await renderScreen(<PresetsList />, runtime);

@@ -1,5 +1,6 @@
 import {
   AlignLeft,
+  ArrowDown,
   ArrowUp,
   Ban,
   Bell,
@@ -58,6 +59,7 @@ every icon has the kit's sizes and stroke. A new icon is added here.
 */
 const ICONS = {
   "align-left": AlignLeft,
+  "arrow-down": ArrowDown,
   "arrow-up": ArrowUp,
   ban: Ban,
   bell: Bell,
