@@ -2242,3 +2242,9 @@ New bugs go here with their class; a new class gets its own section above.
 - **Missed because.** The meta tests read the line's words in a wide test window's order with nothing cut; the cut only shows at 390 with real dates, and the gallery's rows were not read for which piece the cut took.
 - **Class.** A truncation policy (cut at the end) applied to pieces in reading order without asking which piece should yield (class 173's sibling: the part that yields must be the least important one).
 - **Sweep and guard.** On a phone `MetaLine` puts the due date after the other pieces, so the date is what the cut takes; a wide line keeps the date first. Other cut lines with pieces: the running card's Expect (one piece), Day's meta (time range first, the name wraps). Guards: `task-row.test.tsx` (phone: countdown before the date; computer: date first), `now-screen.test.tsx`.
+
+### 182. A shortcut hint shown by the window's width in a header that lives in a narrow pane
+- **Bug.** The Day activity editor in the 400 px inspector put «Сохранить Ctrl+Enter» beside its title, and «Изменить занятие» wrapped to two lines (design review 2 N11). The task pane's footer had already dropped its hints for the same reason (class 159), but through its own context only.
+- **Missed because.** The hint follows `useIsWide()` (the window), and the region's room is opt-in (`KeyHintRoomContext`); the activity pane never opted in, and no test rendered a pane header with a keyboard.
+- **Class.** Class 159 again: a region-dependent choice made by the window's size, opted into per caller instead of by the region.
+- **Sweep and guard.** The activity pane's Save and the composer's form in the pane (`variant="pane"`, «Создать Ctrl+Enter» beside «Новая задача») say there is no room; the shortcuts still work. Other pane headers with a hinted button: none (the task pane's header has no hinted button). Guard: `activity-pane.test.tsx` (wide, with a keyboard: no «Enter» in the pane).
