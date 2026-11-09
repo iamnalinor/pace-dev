@@ -302,8 +302,8 @@ describe("DayScreen", () => {
         nativeEvent: { layout: { width: 300, x: 0, ...frames[index] } },
       });
     }
-    const bars = screen.getAllByTestId("rail-bar", hidden);
-    expect(bars).toHaveLength(4);
+    expect(screen.getAllByTestId("rail-bar", hidden)).toHaveLength(4);
+    const bars = screen.getAllByTestId("rail-slot", hidden);
     for (const [index, bar] of bars.entries()) {
       expect(bar).toHaveStyle({ height: frames[index]?.height, top: frames[index]?.y });
     }

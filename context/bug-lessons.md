@@ -2036,3 +2036,9 @@ New bugs go here with their class; a new class gets its own section above.
 - **Missed because.** The composer test pinned the height to the line's type metrics only; no visual check of the empty composer after the kit moved the padding onto the input.
 - **Class.** An explicit height or minimum computed from content metrics, set on an element whose padding is inside its box.
 - **Sweep and guard.** The composer is the only caller that sets a field's height (`isGrowing` and `contentSize` searched); its empty and eight-line heights now add the input's padding, and `composer.test.tsx` reads both from the field's own classes.
+
+### 148. Classes on a reanimated view, which the web drops
+- **Bug.** Day's new row-aligned rail drew nothing visible on the web: each bar was an `Animated.View` with `className="absolute … tint"`, the classes never reached the element, and the bars stacked in the flow without colour (e2e `week.e2e.ts`, rail bars against their rows). The same mistake sat in `Disclosure` (`overflow-hidden` on its animated content) and the composer's unfold frame (its clip while growing): neither clipped on the web.
+- **Missed because.** jest renders the className prop as given, so a test that reads classes passes; the skeleton had a comment about it, no rule did.
+- **Class.** A NativeWind className on a component NativeWind does not interop (reanimated's `Animated.*`) on the web.
+- **Sweep and guard.** Every `<Animated.* className>` in apps/app moved to style or a plain View inside (rail bars, Disclosure, composer unfold; the skeleton and update banner already did). An ESLint `no-restricted-syntax` rule now refuses `className` on any `Animated.*` element.

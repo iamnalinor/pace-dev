@@ -47,6 +47,12 @@ const UNTYPED_RULES = {
 /** Syntax banned everywhere; a block that adds its own entries must spread these (the option replaces). */
 const RESTRICTED_SYNTAX = [
   {
+    message:
+      "A reanimated view takes no className on the web (NativeWind does not reach it): put the classes on a plain View inside, or the value in its style (bug-lessons 148).",
+    selector:
+      "JSXOpeningElement[name.object.name='Animated'] > JSXAttribute[name.name='className']",
+  },
+  {
     message: "Use a union of string literals instead of enum.",
     selector: "TSEnumDeclaration",
   },

@@ -72,8 +72,9 @@ describe("DayRail and NowMargin (Task 7.1, owner 2026-11-09: the rail lines up w
   it("stands one bar beside each row, its top and height the row's own", async () => {
     const entries = [block("08:00", "09:00"), gap("09:00", "11:00"), block("11:00", "12:00")];
     await draw(entries, stacked(entries, [72, 52, 110]));
-    const bars = screen.getAllByTestId("rail-bar", HIDDEN);
-    expect(bars).toHaveLength(3);
+    expect(screen.getAllByTestId("rail-bar", HIDDEN)).toHaveLength(3);
+    // The frame each bar is drawn in (its look is a plain View inside: bug-lessons 148).
+    const bars = screen.getAllByTestId("rail-slot", HIDDEN);
     expect(bars[0]).toHaveStyle({ height: 72, top: 0 });
     expect(bars[1]).toHaveStyle({ height: 52, top: 72 });
     expect(bars[2]).toHaveStyle({ height: 110, top: 124 });

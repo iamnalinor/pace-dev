@@ -17,6 +17,9 @@ import { Pressable } from "./pressable.tsx";
 import { Text } from "./text.tsx";
 import { useIsMotionReduced } from "./use-reduced-motion.ts";
 
+/** The open content is clipped to its animated height. */
+const CLIP = { overflow: "hidden" } as const;
+
 /**
 Where the content is: `shown` (open and settled: its height is its own), `opening` (growing to
 its measured height), `closing` (shrinking away, still mounted, hidden from assistive tech) or
@@ -218,9 +221,9 @@ export const Disclosure = ({
       {content.phase === "gone" ? null : (
         <Animated.View
           aria-hidden={content.phase === "closing"}
-          className="overflow-hidden"
           pointerEvents={content.phase === "closing" ? "none" : "auto"}
-          style={content.style}
+          // The clip in the style: a reanimated view takes no className on the web (bug-lessons 148).
+          style={[content.style, CLIP]}
           {...(content.phase === "closing" && {
             importantForAccessibility: "no-hide-descendants" as const,
           })}

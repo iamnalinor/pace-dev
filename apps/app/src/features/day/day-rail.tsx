@@ -50,33 +50,32 @@ const Bar = ({
   readonly frame: RowFrame;
   readonly isStill: boolean;
 }) => {
-  const style = { height: frame.height, top: frame.top } as const;
+  // Position in the animated frame's own style, look on a plain View inside: on the web an
+  // Animated.View takes no className (NativeWind does not reach it), and the bars had neither
+  // their place nor their colour (bug-lessons 148).
+  const style = {
+    height: frame.height,
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: frame.top,
+  } as const;
   const motion = isStill ? {} : { layout: ROW_LAYOUT };
-  if (bar.kind === "gap" || bar.hue === null) {
-    return (
-      <Animated.View
-        {...motion}
-        className="absolute left-1 w-3 rounded-xs border border-dashed border-outline"
-        style={style}
-        testID="rail-bar"
-      />
-    );
-  }
+  const lane = bar.kind === "parallel" ? "left-5 w-2" : "left-1 w-3";
+  const look =
+    bar.kind === "gap" || bar.hue === null
+      ? "absolute inset-y-0 left-1 w-3 rounded-xs border border-dashed border-outline"
+      : cx("absolute inset-y-0 overflow-hidden rounded-xs", lane, tintClass(bar.hue));
   return (
-    <Animated.View
-      {...motion}
-      className={cx(
-        "absolute overflow-hidden rounded-xs",
-        bar.kind === "parallel" ? "left-5 w-2" : "left-1 w-3",
-        tintClass(bar.hue),
-      )}
-      style={style}
-      testID="rail-bar"
-    >
-      <View
-        className={cx("absolute inset-x-0 top-0 border-t", outlineClass(bar.hue))}
-        testID="rail-pen"
-      />
+    <Animated.View {...motion} pointerEvents="none" style={style} testID="rail-slot">
+      <View className={look} testID="rail-bar">
+        {bar.kind === "gap" || bar.hue === null ? null : (
+          <View
+            className={cx("absolute inset-x-0 top-0 border-t", outlineClass(bar.hue))}
+            testID="rail-pen"
+          />
+        )}
+      </View>
     </Animated.View>
   );
 };

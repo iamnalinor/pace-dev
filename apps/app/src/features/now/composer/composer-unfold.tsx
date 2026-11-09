@@ -15,12 +15,14 @@ import Animated, {
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 
-import { cx } from "#app/ui/cx.ts";
 import { EASING } from "#app/ui/motion-presets.ts";
 import { useIsMotionReduced } from "#app/ui/use-reduced-motion.ts";
 import { motion } from "@pace/core";
 
 export type ComposerShape = "form" | "line";
+
+/** Clips the content while the frame grows to it. */
+const CLIP = { overflow: "hidden" } as const;
 
 /**
 Where the unfold is: `idle` (the content is simply there), `out` (the form fades out before it
@@ -192,7 +194,8 @@ export const ComposerUnfold = ({
   readonly onLayout: (height: number) => void;
   readonly phase: Phase;
 }) => (
-  <Animated.View className={cx(phase === "grow" && "overflow-hidden")} style={frameStyle}>
+  // The clip in the style: a reanimated view takes no className on the web (bug-lessons 148).
+  <Animated.View style={[frameStyle, phase === "grow" && CLIP]}>
     <Animated.View
       // Keyed by the content: its layout is reported each time the shape changes.
       key={shape}
