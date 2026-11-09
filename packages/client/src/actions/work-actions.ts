@@ -28,7 +28,7 @@ export type CloseInput = When & {
 export type WorkActions = {
   /** Marks a subtask done at `when` (now by default): the one mark a subtask has (feedback 5). */
   readonly markDone: (taskId: string, subtaskId: string, when?: When) => ActionResult;
-  /** Revokes the latest done mark of the subtask. */
+  /** Revokes the subtask's done marks; refused (`retro/task-closed`) while the task is closed. */
   readonly unmarkDone: (taskId: string, subtaskId: string) => ActionResult;
   readonly addSubtasks: (taskId: string, items: readonly (string | SubtaskForm)[]) => ActionResult;
   /** Takes a subtask off the task (History brings it back). */
@@ -81,9 +81,21 @@ const undoneBy = (deps: ActionDeps, taskId: string, subtaskId: string): readonly
     ];
   });
 
+/**
+A closed task's marks stay as they are, like ticking one is refused there: an old per-subtask
+`task.submitted` often closed the task (`closes: true`), and revoking it would silently reopen it.
+Reopen the task first.
+*/
 const unmarkDone =
   (deps: ActionDeps): WorkActions["unmarkDone"] =>
   async (taskId, subtaskId) => {
+    const task = taskOf(deps, taskId);
+    if (!task.ok) {
+      return task;
+    }
+    if (task.value.closed !== null) {
+      return err("retro/task-closed");
+    }
     const corrections = undoneBy(deps, taskId, subtaskId);
     return corrections.length === 0 ? err("action/nothing-to-do") : await emit(deps, corrections);
   };

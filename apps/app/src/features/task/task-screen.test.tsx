@@ -127,6 +127,21 @@ describe("TaskScreen — homework", () => {
     expect(task?.subtasks.find((item) => item.id === "s5")?.doneAt).toBeNull();
   });
 
+  it("keeps a closed task's checklist read-only: no mark taken back, nothing reopened", async () => {
+    const runtime = await createTestRuntime({ now: HW_VIEW_NOW });
+    await runtime.actions.closeTask({ taskId: HW_ID, outcome: "done" });
+    await renderScreen(<TaskScreen id={HW_ID} />, runtime);
+    const done = screen.getByRole("checkbox", { name: "Matrix rank" });
+    expect(done).toBeChecked();
+    expect(done).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "Kronecker–Capelli" })).toBeDisabled();
+    await fireEvent.press(done);
+    await pressSpace(done);
+    const task = runtime.state.store.getState().tasks.byId[HW_ID];
+    expect(task?.closed).not.toBeNull();
+    expect(task?.subtasks.find((item) => item.id === "s1")?.doneAt).not.toBeNull();
+  });
+
   it("goes back, and moves the task to another project from the header chip", async () => {
     const runtime = await hwScreen();
     await fireEvent.press(screen.getByRole("button", { name: "Project: Algebra. Change" }));
