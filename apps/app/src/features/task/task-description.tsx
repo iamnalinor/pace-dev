@@ -4,6 +4,7 @@ import { View } from "react-native";
 import type { TaskViewModel } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
+import { escapeFieldProps } from "#app/platform/enter-key.ts";
 import { useIsInPane } from "#app/shared/task-opener.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button } from "#app/ui/button.tsx";
@@ -38,12 +39,19 @@ const DescriptionEditor = ({
   return (
     <View className="mx-gutter gap-3">
       <TextField
+        {...escapeFieldProps}
         autoFocus
         editable={!isSaving}
         label={t("edit.description")}
         maxLength={4000}
         multiline
         onChangeText={onChange}
+        onKeyPress={(event) => {
+          // The field owns Escape (R24-01): it cancels the edit; the pane stays for the next one.
+          if (!isSaving && event.nativeEvent.key === "Escape") {
+            onCancel();
+          }
+        }}
         value={draft}
       />
       <View className="flex-row justify-end gap-2">

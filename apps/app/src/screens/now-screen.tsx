@@ -86,6 +86,13 @@ const NowSplit = ({
         inspector={inspector}
         inspectorLabel={t("now.details")}
         inspectorOpen={inspector !== undefined}
+        // Escape closes the picked task (R24-01); the task form owns its own Escape (its close).
+        {...(flow.form === null &&
+          picked !== null && {
+            onInspectorClose: () => {
+              onPick(null);
+            },
+          })}
       />
     </TaskOpenerProvider>
   );

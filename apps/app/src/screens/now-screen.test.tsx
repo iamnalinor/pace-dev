@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 
 import type { PaceRuntime } from "#app/runtime.ts";
 
@@ -16,10 +16,29 @@ jest.mock("#app/ui/layout.ts", (): unknown => ({
   useIsWide: () => mockWindow.isWide,
 }));
 
+/** The shortcuts registered while mounted, by key: the web build's keyboard, as a test drives it. */
+const mockHotkeys = new Map<string, () => void>();
+jest.mock("#app/ui/use-hotkey.tsx", (): unknown => ({
+  ...jest.requireActual("#app/ui/use-hotkey.tsx"),
+  useHotkey: (hotkey: undefined | { readonly key: string }, onPress: () => void) => {
+    if (hotkey !== undefined) {
+      mockHotkeys.set(hotkey.key, onPress);
+    }
+  },
+}));
+
 beforeEach(() => {
   mockWindow.isWide = true;
   redirected.mockClear();
+  mockHotkeys.clear();
 });
+
+/** Escape, as the web build's keyboard hands it to the shortcut registered last. */
+const pressEscape = async (): Promise<void> => {
+  await act(() => {
+    mockHotkeys.get("Escape")?.();
+  });
+};
 
 const button = (key: Parameters<typeof en>[0]) => screen.getByRole("button", { name: en(key) });
 /** The line (its label, "New task", is the + button's name as well). */
@@ -157,6 +176,28 @@ describe("NowScreen: the open task is in the address (feedback 5 item 6)", () =>
     await fireEvent.press(screen.getByRole("button", { name: en("common.close") }));
     expect(searchParams()).toEqual({});
     expect(taskDetails()).toBeNull();
+  });
+
+  it("closes the pane on Escape (UI review I4, QA round 24 R24-01)", async () => {
+    await renderScreen(<NowScreen />, await createTestRuntime());
+    await fireEvent.press(screen.getByText("Algebra HW 6"));
+    expect(taskDetails()).toBeOnTheScreen();
+    await pressEscape();
+    await waitFor(() => {
+      expect(taskDetails()).toBeNull();
+    });
+    expect(searchParams()).toEqual({});
+  });
+
+  it("lets the description being edited take Escape: the edit goes, the pane stays (R24-01)", async () => {
+    await renderScreen(<NowScreen />, await createTestRuntime());
+    await fireEvent.press(screen.getByText("Algebra HW 6"));
+    await fireEvent.press(screen.getByRole("button", { name: en("task.addDescription") }));
+    const field = screen.getByLabelText(en("edit.description"));
+    await fireEvent(field, "keyPress", { nativeEvent: { key: "Escape" } });
+    expect(screen.queryByLabelText(en("edit.description"))).toBeNull();
+    expect(taskDetails()).toBeOnTheScreen();
+    expect(searchParams()).toEqual({ task: HW_ID });
   });
 
   it("reopens the task the address names after a reload", async () => {

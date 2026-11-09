@@ -30,6 +30,12 @@ cursor stays; Escape is the field's own (it closes it) rather than the page's (a
 export const entryFieldProps = webEntry as TextInputProps;
 
 /**
+A field edited in place inside a pane (the task's description, R24-01): Escape is the field's own
+(it cancels the edit) rather than the page's (the pane's close); the next Escape closes the pane.
+*/
+export const escapeFieldProps = { dataSet: { paceKeys: "escape" } } as TextInputProps;
+
+/**
 A single-line field of a sheet (QA round 21 M1): Enter presses the form's action and the cursor
 stays in the field, so focus never drops to the page behind the dim (react-native-web 0.21 reads
 `blurOnSubmit`).

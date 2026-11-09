@@ -1,5 +1,6 @@
 import type { Locator } from "@playwright/test";
 
+import { addTask, nowTasks } from "./support/composer.ts";
 import { expect, test } from "./support/fixtures.ts";
 import { loginViaApi } from "./support/login.ts";
 import { seedLivedIn } from "./support/seed.ts";
@@ -107,4 +108,38 @@ test("Enter opens a destination of the phone's bar, which then says it is the cu
   await expect(bar.getByRole("link", { exact: true, name: "Now" })).not.toHaveAttribute(
     "aria-current",
   );
+});
+
+test("Escape closes Now's task pane and gives the focus back to its row; an edit in the pane takes the first Escape (QA round 24 R24-01)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 800, width: 1280 });
+  await loginViaApi(page);
+  await page.goto("/");
+  await addTask(page, "Pack the cables");
+  const header = page.getByRole("heading", { exact: true, name: "Pack the cables" });
+  await page.getByRole("button", { exact: true, name: "Close" }).first().click();
+  await expect(header).toHaveCount(0);
+  const row = nowTasks(page).getByRole("link", { name: /^Pack the cables/u });
+
+  await row.click();
+  await expect(header).toBeVisible();
+  await expect(page).toHaveURL(/[?&]task=/u);
+  await page.keyboard.press("Escape");
+  await expect(header).toHaveCount(0);
+  await expect(page).not.toHaveURL(/[?&]task=/u);
+  await expect(row).toBeFocused();
+
+  // The description edited in place owns the first Escape: the edit goes, the pane stays.
+  await row.click();
+  await page.getByRole("button", { exact: true, name: "Add description" }).click();
+  const field = page.getByRole("textbox", { exact: true, name: "Description" });
+  await expect(field).toBeFocused();
+  await field.pressSequentially("draft");
+  await page.keyboard.press("Escape");
+  await expect(field).toHaveCount(0);
+  await expect(header).toBeVisible();
+  await expect(page).toHaveURL(/[?&]task=/u);
+  await page.keyboard.press("Escape");
+  await expect(header).toHaveCount(0);
 });
