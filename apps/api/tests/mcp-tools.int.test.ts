@@ -402,6 +402,30 @@ describe("progress and closing", () => {
   });
 });
 
+describe("get_task's text answer (session review minor 8)", () => {
+  it("does not repeat long fields: the text cuts them short, the structured content keeps them whole", async () => {
+    const token = await readWriteToken();
+    const description = `${"Long description. ".repeat(100)}END-OF-DESCRIPTION`;
+    const sourceText = `${"Pasted source. ".repeat(100)}END-OF-SOURCE`;
+    const taskId = await createTask(token, {
+      description,
+      presetId: "hw",
+      sourceText,
+      subtasks: ["Problem with a distinctive label"],
+      title: "Long",
+    });
+    const result = await callTool(token, "get_task", { id: taskId });
+    expect(result.structuredContent).toMatchObject({ description, sourceText });
+    const text = result.content[0]?.text ?? "";
+    expect(text).not.toContain("END-OF-DESCRIPTION");
+    expect(text).not.toContain("END-OF-SOURCE");
+    // The subtasks are listed once, as lines, not again inside the fields.
+    expect(text.split("Problem with a distinctive label")).toHaveLength(2);
+    expect(text.length).toBeLessThan(description.length);
+    expect(text).toContain("Long description.");
+  });
+});
+
 describe("at and precision", () => {
   const HOUR = 3_600_000;
   const hoursFromNow = (hours: number): string => new Date(Date.now() + hours * HOUR).toISOString();
