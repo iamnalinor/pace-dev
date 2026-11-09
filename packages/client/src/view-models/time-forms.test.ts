@@ -62,4 +62,16 @@ describe("typeTime", () => {
     expect(typeTime("9")).toEqual({ isComplete: false, text: "09" });
     expect(typeTime("2575")).toEqual({ isComplete: false, text: "25:75" });
   });
+
+  it("reads the hour before a separator as typed, whole or pasted (QA round 25 R25-04)", () => {
+    for (const raw of ["9:30", "09:30", "9.30", "9 30", "9h30", "9,30"]) {
+      expect(typeTime(raw)).toEqual({ isComplete: true, text: "09:30" });
+    }
+    // Typed key by key: "1", then the colon, then the minutes.
+    expect(typeTime("1:")).toEqual({ isComplete: false, text: "01:" });
+    expect(typeTime("01:3")).toEqual({ isComplete: false, text: "01:3" });
+    expect(typeTime("01:30")).toEqual({ isComplete: true, text: "01:30" });
+    expect(typeTime("14:0")).toEqual({ isComplete: false, text: "14:0" });
+    expect(typeTime("25:00")).toEqual({ isComplete: false, text: "25:00" });
+  });
 });
