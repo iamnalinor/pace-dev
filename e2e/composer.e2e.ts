@@ -209,6 +209,28 @@ test("a title typed into the empty form is added on Enter", async ({ page }) => 
   await expect(page.getByText("Type something first.")).toHaveCount(0);
 });
 
+test("an empty form asked to create says the title is missing, by the keys and by Create (QA round 24 R24-06)", async ({
+  page,
+}) => {
+  await loginViaApi(page);
+  await page.setViewportSize({ height: 900, width: 1440 });
+  await page.goto("/");
+  await expect(page.getByRole("textbox", { name: "New task" })).toBeVisible();
+  await page.keyboard.press("Alt+n");
+  const form = taskForm(page);
+  const title = form.getByRole("textbox", { exact: true, name: "Title" });
+  await expect(title).toBeFocused();
+  await expect(form.getByText("Give the task a title.")).toHaveCount(0);
+  await page.keyboard.press("ControlOrMeta+Enter");
+  await expect(form.getByRole("alert")).toHaveText("Give the task a title.");
+  await expect(title).toBeFocused();
+  await form.getByRole("button", { exact: true, name: /^Create/u }).click();
+  await expect(title).toBeFocused();
+  await expect(form.getByRole("alert")).toHaveText("Give the task a title.");
+  await title.fill("Pay the rent");
+  await expect(form.getByText("Give the task a title.")).toHaveCount(0);
+});
+
 test("the form's close drops its draft: New task opens an empty form again (QA 14 L6)", async ({
   page,
 }) => {

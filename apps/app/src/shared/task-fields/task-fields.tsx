@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 import { type TextInput, View } from "react-native";
 
 import type { RepeatChangeProblem } from "@pace/client";
@@ -173,12 +173,63 @@ type TaskFieldsProps = {
   readonly onSubmit?: () => void;
   /** The cursor lands in the title (the composer's line moved there). */
   readonly isTitleFocused?: boolean;
+  /**
+  How many times a create was tried: from the first, an empty title says it is missing and takes
+  the cursor (QA round 24 R24-06), as Projects' name does.
+  */
+  readonly submitTries?: number;
   readonly showDeadlineIssue?: boolean;
   /** Why the repeat choice could not be saved (the editor checks it before any write). */
   readonly repeatProblem?: null | RepeatChangeProblem;
   /** The start is the person's (the editor shows an automatic one too): only then is a
   deadline before it worth a note. */
   readonly isStartChosen?: boolean;
+};
+
+/**
+The title's field: where the cursor goes, and whether it asks for a title. A fresh form does not
+open blaming the title the person has not typed yet (QA round 14 L6); once typed and cleared, or
+once a create was tried without one (R24-06), it asks, and a try puts the cursor there.
+*/
+const useTitleField = ({
+  isTitleFocused,
+  ref,
+  submitTries,
+  title,
+}: {
+  readonly isTitleFocused: boolean;
+  readonly ref: RefObject<null | TextInput>;
+  readonly submitTries: number;
+  readonly title: string;
+}) => {
+  const [isTouched, setIsTouched] = useState(false);
+  // Not `autoFocus`: on the web that scrolls the box the composer's form is still growing in. A
+  // direct load of /add opens the form under a fresh browser's first-sync cover, where a hidden
+  // field takes no focus: the cursor comes once the cover lifts (QA21 M2, R23-12).
+  const isCovered = useIsFirstSync();
+  useEffect(() => {
+    if (isTitleFocused && !isCovered) {
+      focusField(ref.current);
+    }
+  }, [isCovered, isTitleFocused, ref]);
+  const isMissing = title.trim() === "";
+  const triesSeenRef = useRef(0);
+  useEffect(() => {
+    // Only a new try moves the cursor, not each keystroke.
+    if (submitTries === triesSeenRef.current) {
+      return;
+    }
+    triesSeenRef.current = submitTries;
+    if (isMissing) {
+      focusField(ref.current);
+    }
+  }, [isMissing, ref, submitTries]);
+  return {
+    isAsked: isMissing && (submitTries > 0 || isTouched),
+    touch: () => {
+      setIsTouched(true);
+    },
+  };
 };
 
 /**
@@ -194,6 +245,7 @@ export const TaskFields = ({
   isStartChosen,
   repeatProblem = null,
   showDeadlineIssue = false,
+  submitTries = 0,
   values,
 }: TaskFieldsProps) => {
   const t = useT();
@@ -201,20 +253,9 @@ export const TaskFields = ({
   // session succeeded, the built-in ones are not drawn as its own (/add during a first sync, class 62).
   const isUnknown = useIsAccountUnknown();
   const titleRef = useRef<TextInput>(null);
+  const title = useTitleField({ isTitleFocused, ref: titleRef, submitTries, title: values.title });
   const [panel, setPanel] = useState<Panel>(null);
   const [isFinalOpen, setIsFinalOpen] = useState(false);
-  // A fresh form does not open blaming the title the person has not typed yet (QA round 14 L6);
-  // once typed and cleared it asks for one.
-  const [isTitleTouched, setIsTitleTouched] = useState(false);
-  // Not `autoFocus`: on the web that scrolls the box the composer's form is still growing in. A
-  // direct load of /add opens the form under a fresh browser's first-sync cover, where a hidden
-  // field takes no focus: the cursor comes once the cover lifts (QA21 M2, R23-12).
-  const isCovered = useIsFirstSync();
-  useEffect(() => {
-    if (isTitleFocused && !isCovered) {
-      focusField(titleRef.current);
-    }
-  }, [isCovered, isTitleFocused]);
   return (
     <View
       className="gap-4"
@@ -225,11 +266,11 @@ export const TaskFields = ({
     >
       <TextField
         draftKey={fieldDraftKey(draftKey, "title")}
-        error={isTitleTouched && values.title.trim() === "" ? t("edit.titleRequired") : null}
+        error={title.isAsked ? t("edit.titleRequired") : null}
         label={t("edit.taskTitle")}
-        onChangeText={(title) => {
-          setIsTitleTouched(true);
-          onChange({ title });
+        onChangeText={(next) => {
+          title.touch();
+          onChange({ title: next });
         }}
         onSubmitEditing={onSubmit}
         ref={titleRef}

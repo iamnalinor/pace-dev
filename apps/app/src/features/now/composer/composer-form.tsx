@@ -1,4 +1,4 @@
-import { type ReactNode, useMemo } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { View } from "react-native";
 
 import { useAppState, useT } from "#app/app-state.tsx";
@@ -135,9 +135,11 @@ const FormFields = ({
   model,
   onAdd,
   onEdit,
+  submitTries,
   subtaskDraft,
 }: {
   readonly isTitleFocused: boolean;
+  readonly submitTries: number;
   readonly model: ComposerModel;
   readonly subtaskDraft: SubtaskDraft;
   readonly onEdit: (edits: ComposerEdits) => void;
@@ -171,6 +173,7 @@ const FormFields = ({
           options={options}
           repeatProblem={model.repeatProblem}
           showDeadlineIssue={model.isDeadlineOwn}
+          submitTries={submitTries}
           values={values}
         />
       )}
@@ -219,6 +222,16 @@ export const ComposerForm = ({
   readonly onClose: () => void;
 }) => {
   const t = useT();
+  const [submitTries, setSubmitTries] = useState(0);
+  const isTitleMissing = model.target.kind !== "instance" && model.title.trim() === "";
+  // With no title, Create (and its keys) says what is missing instead of doing nothing (R24-06).
+  const add = (): void => {
+    if (isTitleMissing) {
+      setSubmitTries((tries) => tries + 1);
+      return;
+    }
+    onAdd();
+  };
   return (
     <HotkeyLayer>
       <View
@@ -233,10 +246,10 @@ export const ComposerForm = ({
               : t("form.create")
           }
           canAdd={
-            model.canAdd &&
+            (model.canAdd || isTitleMissing) &&
             (!model.isDeadlineOwn || isDeadlineChoiceValid(model.deadlinePolicy, model.due))
           }
-          onAdd={onAdd}
+          onAdd={add}
           onClose={onClose}
           title={title}
           variant={variant}
@@ -245,8 +258,9 @@ export const ComposerForm = ({
         <FormFields
           isTitleFocused={isTitleFocused}
           model={model}
-          onAdd={onAdd}
+          onAdd={add}
           onEdit={onEdit}
+          submitTries={submitTries}
           subtaskDraft={subtaskDraft}
         />
       </View>

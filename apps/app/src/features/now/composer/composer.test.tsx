@@ -727,6 +727,22 @@ describe("Composer", () => {
     expect(screen.getByText(en("edit.titleRequired"))).toBeOnTheScreen();
   });
 
+  it("says what is missing when Create is pressed, or Enter given, with no title (QA round 24 R24-06)", async () => {
+    const runtime = await createTestRuntime();
+    await renderComposer(runtime);
+    const taskCount = Object.keys(runtime.state.store.getState().tasks.byId).length;
+    await fireEvent.press(screen.getByRole("button", { name: en("nav.newTask") }));
+    const create = screen.getByRole("button", { name: en("form.create") });
+    expect(create).toBeEnabled();
+    await fireEvent.press(create);
+    expect(await screen.findByRole("alert")).toHaveTextContent(en("edit.titleRequired"));
+    // The form stays, nothing is made.
+    expect(title()).toBeOnTheScreen();
+    expect(Object.keys(runtime.state.store.getState().tasks.byId)).toHaveLength(taskCount);
+    await fireEvent.changeText(title(), "Renew the passport");
+    expect(screen.queryByText(en("edit.titleRequired"))).toBeNull();
+  });
+
   it("expands to the form by hand: the line moves into the title, a category brings its importance", async () => {
     const runtime = await createTestRuntime();
     await renderComposer(runtime);
@@ -765,8 +781,9 @@ describe("Composer", () => {
     const runtime = await createTestRuntime();
     await renderComposer(runtime);
     await fireEvent.press(screen.getByRole("button", { name: en("nav.newTask") }));
-    // Nothing to create yet.
-    expect(screen.getByRole("button", { name: en("form.create") })).toBeDisabled();
+    // Nothing to create yet: Create asks for a title instead (R24-06), as Projects' does.
+    await fireEvent.press(screen.getByRole("button", { name: en("form.create") }));
+    expect(screen.getByText(en("edit.titleRequired"))).toBeOnTheScreen();
     await fireEvent.changeText(title(), "pay the rent");
     await fireEvent.press(screen.getByRole("button", { name: en("form.create") }));
     await waitFor(() => {
@@ -819,7 +836,8 @@ describe("Composer", () => {
       screen.getByRole("radio", { checked: true, name: en("form.repeat.none") }),
     ).toBeOnTheScreen();
     expect(screen.queryByDisplayValue("half typed")).toBeNull();
-    expect(button("form.create")).toBeDisabled();
+    // A fresh form again: it does not open blaming the empty title.
+    expect(screen.queryByText(en("edit.titleRequired"))).toBeNull();
   });
 
   it("keeps the line's own text on close but not the form's changes to it", async () => {
