@@ -92,6 +92,25 @@ describe("Tooltip on the web (spec §4.2.31, §6 tooltip)", () => {
     expect(isShown(LABEL)).toBe(true);
   });
 
+  it("goes after the grace when the pointer leaves before the shown bubble is drawn (a quick pass over an immediate one)", async () => {
+    await renderTriggers(<Trigger isImmediate label={LABEL} name="Calendar" />);
+    const { parent } = button("Calendar");
+    if (parent === null) {
+      throw new Error("the trigger has no tooltip around it");
+    }
+    // Both in one go: the leave comes before the render that the enter asked for.
+    const handlers = parent.props as Record<
+      "onPointerEnter" | "onPointerLeave",
+      (event: unknown) => void
+    >;
+    await act(() => {
+      handlers.onPointerEnter(pointer("mouse"));
+      handlers.onPointerLeave(pointer("mouse"));
+    });
+    await pass(HOVER_GRACE_MS);
+    expect(isShown(LABEL)).toBe(false);
+  });
+
   it("stays while the pointer moves onto the bubble, and goes once it leaves both (WCAG 1.4.13)", async () => {
     await renderTriggers(<Trigger label={LABEL} name="Send" />);
     await fireEvent(button("Send"), "pointerEnter", pointer("mouse"));

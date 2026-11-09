@@ -248,9 +248,13 @@ const useTooltipState = (wrapperRef: RefObject<null | View>) => {
     readonly mode: Mode;
     readonly anchor: Anchor | null;
   }>(null);
+  // What was last asked for, before React draws it: a leave right after an immediate show (a quick
+  // pass over the trigger) must see the tooltip as shown, or nothing would ever hide it.
+  const modeRef = useRef<Mode | null>(null);
   const timer = useTimer();
   const show = (mode: Mode): void => {
     timer.cancel();
+    modeRef.current = mode;
     const box = boxOf(wrapperRef.current);
     setShown({
       anchor: box === null ? null : { box, others: othersNear(wrapperRef.current, box) },
@@ -259,13 +263,14 @@ const useTooltipState = (wrapperRef: RefObject<null | View>) => {
   };
   const hide = (): void => {
     timer.cancel();
+    modeRef.current = null;
     setShown(null);
   };
   return {
     hide,
     /** The pointer is on the trigger: shown after the delay, at once when `isAtOnce`. */
     hover: (isAtOnce: boolean): void => {
-      if (shown !== null) {
+      if (modeRef.current !== null) {
         timer.cancel();
       } else if (isAtOnce || isWarm()) {
         show("hover");
@@ -277,15 +282,15 @@ const useTooltipState = (wrapperRef: RefObject<null | View>) => {
     },
     /** The pointer is back on the bubble: a pending hide is called off. */
     keep: (): void => {
-      if (shown !== null) {
+      if (modeRef.current !== null) {
         timer.cancel();
       }
     },
     /** The pointer left the trigger or the bubble: a hover tooltip goes after the grace. */
     leave: (): void => {
-      if (shown === null) {
+      if (modeRef.current === null) {
         timer.cancel();
-      } else if (shown.mode === "hover") {
+      } else if (modeRef.current === "hover") {
         timer.after(HOVER_GRACE_MS, hide);
       }
     },

@@ -323,6 +323,9 @@ const sweepTooltips = async (
       covered.push(...under.map((control) => `${url} "${name}": ${control}`));
     }
     await page.mouse.move(0, 0);
+    // The bubble lingers a moment after the pointer leaves (it can be reached, WCAG 1.4.13) and is
+    // unmounted then: the next hover must not find and mark the one going away.
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
   }
   return { covered, shown };
 };
