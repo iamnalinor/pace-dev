@@ -91,10 +91,10 @@ test("every icon-only button on a computer shows its name on hover", async ({ pa
 
 /**
 Done at another time, or the task cancelled or skipped, is reachable without a gesture nobody is
-told about (QA round 19 M2): Done says what it does on hover, and a button beside it, named in
+told about (QA round 19 M2): Done says what it does on hover, and a button under it, named in
 words on a computer, opens the same sheet with its outcomes in one choice (QA round 20 L3, L6).
 */
-test("Done tells of its other times on hover, and a button beside it opens them", async ({
+test("Done tells of its other times on hover, and a button under it opens them", async ({
   page,
 }) => {
   const { token } = await loginViaApi(page);
@@ -104,14 +104,14 @@ test("Done tells of its other times on hover, and a button beside it opens them"
   const done = page.getByRole("button", { name: /^Готово/u });
   await expect(done).toBeVisible();
   await done.hover();
-  // What Done does; the way to another time is the button beside it (QA 20 L3).
+  // What Done does; the way to another time is the button under it (QA 20 L3).
   await expect(
     page.getByRole("tooltip").filter({ hasText: "Закрывает задачу сейчас." }),
   ).toBeVisible();
   await page.mouse.move(0, 0);
   const other = page.getByRole("button", { name: "Другое время или итог…" });
-  // On a computer's window it says what it is in words.
-  await expect(other).toHaveText("Другое время…");
+  // It says what it is in words, under Focus and Done (design review B1).
+  await expect(other).toHaveText("Другое время или итог…");
   await other.click();
   await expect(page.locator('[data-pace-surface="sheet"]')).toBeVisible();
   // The outcome is one choice in sight (QA 20 L6).

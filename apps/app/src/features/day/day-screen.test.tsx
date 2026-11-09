@@ -150,7 +150,7 @@ describe("DayScreen", () => {
     expect(screen.queryByRole("button", { name: "Next day" })).toBeNull();
     await fireEvent.press(screen.getByRole("button", { name: "Previous day" }));
     await waitFor(() => {
-      expect(screen.getByText("Monday · Oct 5")).toBeOnTheScreen();
+      expect(screen.getByText("Mon, Oct 5")).toBeOnTheScreen();
     });
     expect(screen.getByRole("button", { name: "Next day" })).toBeEnabled();
     await fireEvent.press(screen.getByRole("button", { name: en("period.today") }));
@@ -159,14 +159,14 @@ describe("DayScreen", () => {
     // A day picked from the month view is another day too.
     await fireEvent.press(screen.getByRole("button", { name: /Pick a day/u }));
     await fireEvent.press(await screen.findByRole("button", { name: "Thursday, October 1" }));
-    expect(await screen.findByText("Thursday · Oct 1")).toBeOnTheScreen();
+    expect(await screen.findByText("Thu, Oct 1")).toBeOnTheScreen();
     expect(today()).toBeOnTheScreen();
   });
 
   it("keeps the day in the address: a reload shows it again, Today takes the param off (feedback 5 item 6)", async () => {
     await renderScreen(<DayScreen />, await createTestRuntime());
     await fireEvent.press(screen.getByRole("button", { name: "Previous day" }));
-    expect(await screen.findByText("Monday · Oct 5")).toBeOnTheScreen();
+    expect(await screen.findByText("Mon, Oct 5")).toBeOnTheScreen();
     expect(searchParams()).toEqual({ date: "2026-10-05" });
     await fireEvent.press(screen.getByRole("button", { name: en("period.today") }));
     expect(searchParams()).toEqual({});
@@ -175,7 +175,7 @@ describe("DayScreen", () => {
   it("opens the day the address names, and today for one it cannot read, writing nothing back", async () => {
     setSearchParams({ date: "2026-10-01" });
     const page = await renderScreen(<DayScreen />, await createTestRuntime());
-    expect(screen.getByText("Thursday · Oct 1")).toBeOnTheScreen();
+    expect(screen.getByText("Thu, Oct 1")).toBeOnTheScreen();
     await page.unmount();
     for (const date of ["2026-02-30", "yesterday", "2026-10-01T00:00"]) {
       setSearchParams({ date });
@@ -197,7 +197,7 @@ describe("DayScreen", () => {
     await renderScreen(<DayScreen />, runtime);
     await fireEvent.press(screen.getByRole("button", { name: "Previous day" }));
     await waitFor(() => {
-      expect(screen.getByText("Monday · Oct 5")).toBeOnTheScreen();
+      expect(screen.getByText("Mon, Oct 5")).toBeOnTheScreen();
     });
     const rows = screen.getAllByTestId("day-entry");
     expect(rows.length).toBeGreaterThan(0);
@@ -211,7 +211,7 @@ describe("DayScreen", () => {
     expect(screen.queryByLabelText("Time")).toBeNull();
     await fireEvent.press(screen.getByRole("button", { name: "Previous day" }));
     await waitFor(() => {
-      expect(screen.getByText("Monday · Oct 5")).toBeOnTheScreen();
+      expect(screen.getByText("Mon, Oct 5")).toBeOnTheScreen();
     });
     expect(screen.queryByLabelText("Time")).toBeNull();
   });

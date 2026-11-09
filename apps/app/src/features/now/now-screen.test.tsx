@@ -811,8 +811,10 @@ describe("NowBoard", () => {
     });
   });
 
-  it("shows the empty state on a fresh account", async () => {
+  it("shows the empty state on a fresh account: what will appear, and a way to add a task (spec §5.1, M6)", async () => {
     await renderScreen(<Board />, await createTestRuntime({ world: "empty" }));
     expect(screen.getByText(en("now.empty"))).toBeOnTheScreen();
+    expect(screen.getByText(en("now.emptyBody"))).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: en("now.emptyAdd") })).toBeOnTheScreen();
   });
 });

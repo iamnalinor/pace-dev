@@ -6,7 +6,9 @@ import type { TaskTag, TaskViewModel } from "@pace/client";
 
 import { useT } from "#app/app-state.tsx";
 import { zonedText } from "#app/format/time.ts";
+import { useIsInPane } from "#app/shared/task-opener.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
+import { cx } from "#app/ui/cx.ts";
 import { Group } from "#app/ui/group.tsx";
 import { STATUS_HUES, type TagColor } from "#app/ui/hue.ts";
 import { Icon } from "#app/ui/icon.tsx";
@@ -171,6 +173,9 @@ export const TaskSummary = ({
 }) => {
   const t = useT();
   const viewer = useViewer();
+  // On the full page the title keeps the header's gutter, so it starts where every screen's title
+  // does (x 280 at 1440; design review H1); the pane keeps its own 16.
+  const isInPane = useIsInPane();
   const { stats } = view;
   const due =
     stats.dueAt === null
@@ -182,7 +187,7 @@ export const TaskSummary = ({
   );
   return (
     <View className="gap-3">
-      <View className="gap-2 px-gutter">
+      <View className={cx("gap-2 px-gutter", !isInPane && "lg:px-gutter-lg")}>
         <Text level={1} role="title1">
           {view.title}
         </Text>

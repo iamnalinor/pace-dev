@@ -226,6 +226,7 @@
     "32": "128px",
     "0.5": "2px",
     "auth-card": "400px",
+    "bar-tile": "56px",
     "chip-max": "180px",
     "content": "720px",
     "content-wide": "960px",

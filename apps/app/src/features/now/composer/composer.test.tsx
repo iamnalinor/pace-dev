@@ -129,7 +129,10 @@ describe("Composer", () => {
     await fireEvent.press(button("nav.newTask"));
     await fireEvent.press(screen.getByRole("radio", { name: "Homework" }));
     await fireEvent.press(screen.getByRole("button", { name: /^Estimate: /u }));
-    expect(screen.getByRole("button", { name: "Estimate: Default (1h)" })).toBeExpanded();
+    const chip = screen.getByRole("button", { name: "Estimate: Default (1h)" });
+    expect(chip).toBeExpanded();
+    // The chip shows the value, never cut: «По умолчанию (3…» lost the number (design review H3).
+    expect(chip).toHaveTextContent("~1h");
     expect(screen.queryByRole("radio", { name: "Default (1h)" })).toBeNull();
     expect(screen.queryByRole("radio", { name: "1h" })).toBeNull();
     await fireEvent.press(screen.getByRole("radio", { name: "30m" }));
@@ -861,6 +864,18 @@ describe("Composer", () => {
     });
     // It says where the line went: only the badge moved before (QA round 14 L10).
     expect(await screen.findByText(en("composer.toInboxDone"))).toBeOnTheScreen();
+  });
+
+  it("offers Undo on the to-Inbox toast: the note leaves the Inbox and the line comes back (design review M10)", async () => {
+    const runtime = await createTestRuntime();
+    await renderComposer(runtime, "think about the trip");
+    await fireEvent.press(screen.getByRole("button", { name: en("composer.toInbox") }));
+    await fireEvent.press(await screen.findByRole("button", { name: en("common.undo") }));
+    await waitFor(() => {
+      const titles = Object.values(runtime.state.store.getState().tasks.byId).map((t) => t.title);
+      expect(titles).not.toContain("think about the trip");
+    });
+    expect(screen.getByDisplayValue("think about the trip")).toBeOnTheScreen();
   });
 
   it("parses a pasted homework at once and writes nothing until Approve", async () => {

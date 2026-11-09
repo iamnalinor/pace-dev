@@ -151,6 +151,18 @@ describe("Chip (spec §4.2.6)", () => {
     );
   });
 
+  it("lets a chip whose words must show (a date, an estimate) take its row, so a number is never cut (design review H3)", async () => {
+    await renderScreen(
+      <Chip expanded={false} isWhole onPress={NOTHING}>
+        Начало 5 нояб. 15:51
+      </Chip>,
+      await empty(),
+    );
+    const pill = pillOf("button", "Начало 5 нояб. 15:51");
+    expect(pill).toContain("max-w-full");
+    expect(pill).not.toContain("max-w-chip-max");
+  });
+
   it("truncates a long name at size.chip.max with its full value kept (F-DAT-02)", async () => {
     const long = "Междисциплинарная курсовая работа по истории ".repeat(2);
     await renderScreen(<Chip onPress={NOTHING}>{long}</Chip>, await empty());

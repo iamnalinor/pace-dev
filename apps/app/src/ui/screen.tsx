@@ -13,8 +13,10 @@ import { useIsScreenActive } from "./screen-active.ts";
 const COLUMN = "w-full max-w-content-wide self-center";
 
 /**
-A list screen's column on `expanded` (Now, Day): 720 anchored at the region's leading edge, so its
-content starts at the same x on every destination (sidebar 248 + the header's gutter 32 = 280).
+A screen's column on `expanded`: anchored at the region's leading edge, so its content starts at the
+same x on every screen (sidebar 248 + the header's gutter 32 = 280; spec §5.0.1). `content` is 720
+(Now's list), `wide` 960 (the default). Centring the 960 column put Week, Inbox, Settings and the
+rest 116 px right of Now and Day (design review H1).
 */
 const ANCHORED = {
   content: "w-full max-w-content self-start",
@@ -87,7 +89,7 @@ and the wheel scrolls over the gutters too (F-WEB-05).
 export const Screen = ({
   children,
   fills = false,
-  anchor,
+  anchor = "wide",
   footer,
   header,
   scroller,
@@ -108,11 +110,11 @@ export const Screen = ({
   readonly fills?: boolean;
   readonly footer?: ReactNode;
   readonly header?: ReactNode;
-  /** The column hugs the region's leading edge instead of centring in it (see `ANCHORED`). */
+  /** How wide the column is on a computer; it always hugs the region's leading edge (`ANCHORED`). */
   readonly anchor?: keyof typeof ANCHORED;
 }) => {
   const isWide = useIsWide();
-  const column = anchor === undefined || !isWide ? COLUMN : ANCHORED[anchor];
+  const column = isWide ? ANCHORED[anchor] : COLUMN;
   const insets = useSafeAreaInsets();
   // A toast floats above the footer (the time bar) instead of covering its buttons.
   const [footerHeight, setFooterHeight] = useState(0);
@@ -145,7 +147,9 @@ export const Screen = ({
           className={cx("border-b bg-app", isScrolled ? "border-separator" : "border-transparent")}
           testID="screen-header-edge"
         >
-          <View className={column}>{header}</View>
+          <View className={column} testID="screen-column">
+            {header}
+          </View>
         </View>
       )}
       <ScreenBody

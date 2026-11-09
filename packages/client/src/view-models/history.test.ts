@@ -27,7 +27,7 @@ describe("historyViewModel", () => {
     });
     expect(history.events.find((entry) => entry.id === started?.id)).toMatchObject({
       taskId: null,
-      taskTitle: "Downtime",
+      taskTitle: "Rest",
       type: "activity.started",
     });
   });

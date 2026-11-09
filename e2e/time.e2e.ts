@@ -46,6 +46,14 @@ const gapBeside = async (one: Locator, other: Locator): Promise<number> => {
 
 const timeBar = (page: Page) => page.getByRole("region", { name: "Time" });
 
+/** Opens the typed field when the bar folded it under «Start something else» (a phone). */
+const unfoldField = async (bar: Locator): Promise<void> => {
+  const more = bar.getByRole("button", { name: "Start something else" });
+  if ((await more.count()) > 0 && (await more.getAttribute("aria-expanded")) === "false") {
+    await more.click();
+  }
+};
+
 for (const size of SIZES) {
   test.describe(`time tracking, ${size.name} (${String(size.width)}px)`, () => {
     test.use({ viewport: { height: size.height, width: size.width } });
@@ -116,6 +124,20 @@ for (const size of SIZES) {
       await page.getByRole("button", { name: "Workout" }).click();
       await expect(bar.getByRole("button", { name: "Stop: Getting ready" })).toBeVisible();
       await expect(bar.getByRole("button", { name: "Stop: Workout" })).toBeVisible();
+      // Two running: the bar (and on a phone the nav bar) stay within 40 % of the window, the
+      // second one a compact row in the same card, never a card cut under the tiles (spec §5.1,
+      // design review B2). The field folds once the bar is left alone over the budget.
+      await expect(bar.getByTestId("running-card")).toHaveCount(1);
+      await expect
+        .poll(
+          async () => {
+            const box = await bar.boundingBox();
+            return box === null ? Infinity : size.height - box.y;
+          },
+          { timeout: 10_000 },
+        )
+        .toBeLessThanOrEqual(size.height * 0.4);
+      await unfoldField(bar);
 
       // The running button's picker offers Stop first.
       await bar.getByRole("button", { name: "Chores, running" }).click();
@@ -129,7 +151,11 @@ for (const size of SIZES) {
       const typed = bar.getByRole("textbox", { name: "What are you doing?" });
       await typed.fill("Пошел в ЦСС, 20мин");
       await typed.press("Enter");
-      await approve(bar);
+      // A phone opens the proposal as a sheet (it never scrolls under the tiles, design review
+      // B2); a computer shows it in the bar above the field.
+      await approve(
+        size.name === "phone" ? page.locator('[data-pace-sheet="time-proposal"]') : bar,
+      );
       await expect(bar.getByRole("button", { name: "Stop: Пошел в ЦСС" })).toBeVisible();
       await expect(bar.getByText(/of ~20m/u)).toBeVisible();
       await bar.getByRole("button", { name: "Stop: Пошел в ЦСС" }).click();
@@ -157,6 +183,17 @@ for (const size of SIZES) {
       await page.goto("/day");
       await expect(page.getByRole("heading", { level: 1, name: "Day" })).toBeVisible();
       await expect(timeBar(page)).toHaveCount(0);
+      // The red now line is there on every size and theme, its time inside the timeline's edge
+      // (design review H4: missing on the phone and in dark; the time ran past the card).
+      const margin = page.getByTestId("now-margin");
+      await expect(margin).toBeVisible();
+      const [line, timeline] = await Promise.all([
+        margin.getByText(/^\d{2}:\d{2}$/u).boundingBox(),
+        page.getByTestId("day-timeline").boundingBox(),
+      ]);
+      expect((line?.x ?? Infinity) + (line?.width ?? 0)).toBeLessThanOrEqual(
+        (timeline?.x ?? 0) + (timeline?.width ?? 0),
+      );
       await page.goto("/");
       await timeBar(page).getByRole("button", { name: "Stop: Walk" }).click();
       await expect(timeBar(page).getByRole("button", { name: "Stop: Walk" })).toHaveCount(0);

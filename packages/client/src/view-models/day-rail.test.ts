@@ -67,11 +67,17 @@ describe("dayRail (Task 7.1: one bar beside each row of the day)", () => {
     });
   });
 
-  it("prefers the main line's row to a parallel one for now", () => {
+  it("puts now at the last running row, so every running bar ends on the line (design review H4)", () => {
     const main = block("08:00", "10:00", { isRunning: true });
     const alongside = block("08:30", "10:00", { isAlongside: true, isRunning: true });
-    expect(dayRail([main, alongside], at("10:00")).now?.key).toBe(main.key);
-    expect(dayRail([alongside], at("10:00")).now?.key).toBe(alongside.key);
+    expect(dayRail([main, alongside], at("10:00")).now).toEqual({ at: 1, key: alongside.key });
+    expect(dayRail([main], at("10:00")).now?.key).toBe(main.key);
+  });
+
+  it("keeps now on a running row whose end was read a tick before the clock (design review H4)", () => {
+    // The day's model and the screen's clock tick apart: the running row's end may lag now.
+    const running = block("08:00", "09:30", { isRunning: true });
+    expect(dayRail([running], at("09:31")).now).toEqual({ at: 1, key: running.key });
   });
 
   it("has no now outside the rows, and nothing for an empty day", () => {

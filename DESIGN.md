@@ -263,8 +263,8 @@ components:
     padding: "0 12px"
     height: "32px"
   chip-selected:
-    backgroundColor: "{colors.light-accent-quiet}"
-    textColor: "{colors.light-accent-text}"
+    backgroundColor: "{colors.light-accent}"
+    textColor: "{colors.light-accent-on}"
   tag-project-violet:
     textColor: "{colors.light-hue-violet-ink}"
     typography: "{typography.caption}"
@@ -381,7 +381,7 @@ Cool paper neutrals carry the screen; one ink-blue accent and one red margin col
 Every role exists in a light (`light-…`) and a dark (`dark-…`) token; components reference the light token and switch to the `dark-` sibling of the same role in dark theme. The dark theme is ink-night, not a grey inversion.
 
 ### Primary
-- **Ballpoint Ink** (light #2E4AD6 / dark #97A9FF): the accent. The one filled primary button per view, the switch track when on, the selected calendar day, the current-nav leading bar, the selected-row bar, the check circle at the moment of checking. Its text form **Ink Text** (#2E4AD6 / #ACBAFF) is for links, plain text buttons (Undo, «Вернуть»), selected chip labels, and `status-success` (done is ink, as in a notebook). **Ink Pressed** (#2640BC / #8498F7) is the pressed primary button. **On-Ink** (#FFFFFF / #0B0D14) is text on an ink fill. **Ink Wash** (`accent-quiet`) is the selected-chip fill and the one-time highlight of a row an assistant proposal just created.
+- **Ballpoint Ink** (light #2E4AD6 / dark #97A9FF): the accent. The one filled primary button per view, the switch track when on, the selected calendar day, the current-nav leading bar, the selected-row bar, the check circle at the moment of checking. Its text form **Ink Text** (#2E4AD6 / #ACBAFF) is for links, plain text buttons (Undo, «Вернуть») and `status-success` (done is ink, as in a notebook). **Ink Pressed** (#2640BC / #8498F7) is the pressed primary button. **On-Ink** (#FFFFFF / #0B0D14) is text on an ink fill, a chosen chip's label included. **Ink Wash** (`accent-quiet`) is the one-time highlight of a row an assistant proposal just created.
 - **Focus Ink** (#2E4AD6 / #ACBAFF): the focus ring, 2 px with a 2 px offset, on every focusable element.
 - **Selection Ink** (`selection`): web text selection and the selected-row fill, always together with a non-colour marker (the leading 3 px bar or a checkmark).
 
@@ -511,8 +511,8 @@ Every component is built on one set of kit primitives (`Pressable`, `Text`, `Ico
 - **Width:** content-width on medium/expanded; fill on compact for the screen's main action and inside sheets; equal halves for a split pair (Focus and Done). A split button adds a trailing chevron segment for other outcomes.
 
 ### Chips
-- **Style:** neutral pill, `fill-2`, `label-secondary`, `subhead` label, 32 visual height, max width 180 (truncate). Project identity is an 8 px `stroke` dot before the name, never a filled chip. No coloured outlines.
-- **State:** selected = Ink Wash fill + Ink Text label + a leading check (non-colour carrier). Filter chips are checkboxes; choice chips (≤ 4 options) are radios in a named group. Compact: one scrolling row; expanded: the strip wraps, past two rows a «Ещё N» chip opens a popover.
+- **Style:** neutral pill, `fill-2`, `label-secondary`, `subhead` label, 32 visual height, max width 180 (truncate); a chip whose words must show whole (a date, an estimate, «Начать с …») takes its row instead. A project or category chip at rest is its hue's tint under its ink (owner 2026-11-08: colour is never a dot). No coloured outlines.
+- **State:** selected = the solid Ballpoint Ink fill + On-Ink label and icon (spec §4.2.6, decision V2-02: the Ink Wash measured 1.1:1 against the cell, so a chosen chip could not be told from the others; the ink is ≥ 3:1 on every ground). A leading check may be added as a non-colour carrier. Filter chips are checkboxes; choice chips (≤ 4 options) are radios in a named group. Compact: one scrolling row; expanded: the strip wraps, past two rows a «Ещё N» chip opens a popover.
 
 ### Tags
 - **Style:** a `sm` (8) rectangle, 20 high, 4 px side padding, `caption` label. Project tag = hue `tint` fill + hue `ink` text, no dot, no border. «В работе» uses the violet hue. Tags appear only in rows and cards; in a header, field or picker a project is a value (category-style mark + name), never a tag. Truncate at 50 % of the row's text width.

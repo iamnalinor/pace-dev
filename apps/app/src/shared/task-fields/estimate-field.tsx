@@ -9,13 +9,25 @@ import { formatDuration, typedActivity } from "@pace/core";
 /** The estimates offered at one tap; a typed one ("2.5h") stays as it was read. */
 const ESTIMATES: readonly number[] = [15, 30, 45, 60, 90, 120, 180, 240];
 
-/** "No estimate", or the category's value while this task has no override. */
-const useNoneText = (fallback: null | number): string => {
+/**
+"No estimate", or the category's value while this task has no override: in words for the name,
+and as the value with a tilde on the chip, whose 180 px cut «По умолчанию (30 мин)» before its
+number in Russian (design review H3: a value keeps its number, the words go to the name).
+*/
+const useNoneText = (
+  fallback: null | number,
+): { readonly label: string; readonly shown: string } => {
   const t = useT();
   const language = useLanguage();
-  return fallback === null
-    ? t("composer.noEstimate")
-    : t("form.estimateDefault", { duration: formatDuration(fallback, language) });
+  if (fallback === null) {
+    const none = t("composer.noEstimate");
+    return { label: none, shown: none };
+  }
+  const duration = formatDuration(fallback, language);
+  return {
+    label: t("form.estimateDefault", { duration }),
+    shown: t("form.estimateDefaultShort", { duration }),
+  };
 };
 
 export const EstimateChip = ({
@@ -32,15 +44,16 @@ export const EstimateChip = ({
   const t = useT();
   const language = useLanguage();
   const none = useNoneText(fallback);
-  const text = minutes === null ? none : formatDuration(minutes, language);
+  const value = minutes === null ? null : formatDuration(minutes, language);
   return (
     <Chip
       expanded={isOpen}
       icon="clock"
-      label={`${t("composer.estimate")}: ${text}`}
+      isWhole
+      label={`${t("composer.estimate")}: ${value ?? none.label}`}
       onPress={onToggle}
     >
-      {text}
+      {value ?? none.shown}
     </Chip>
   );
 };

@@ -104,7 +104,7 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "settings.language.en": "English",
   "settings.language.ru": "Русский",
   "settings.theme": "Тема",
-  "settings.theme.system": "Как в системе",
+  "settings.theme.system": "Системная",
   "settings.theme.light": "Светлая",
   "settings.theme.dark": "Тёмная",
   "settings.language": "Язык",
@@ -183,12 +183,12 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "settings.deleteAccount": "Удалить аккаунт",
   "settings.deleteAccount.warning":
     "Аккаунт удалится навсегда: задачи, время, пресеты, журнал решений и все подключённые приложения. Отменить это нельзя.",
-  "settings.deleteAccount.confirm": "Удалить — подтвердить в Telegram",
+  "settings.deleteAccount.confirm": "Удалить через Telegram",
   "settings.danger": "Опасные действия",
   "settings.wipe": "Очистить данные",
   "settings.wipe.warning":
     "Все задачи, проекты, пресеты, активности и уведомления будут удалены. Аккаунт, входы и связь с Telegram останутся.",
-  "settings.wipe.confirm": "Очистить — подтвердить в Telegram",
+  "settings.wipe.confirm": "Очистить через Telegram",
   "settings.wipe.done": "Все данные очищены",
   "settings.confirmation.waiting": "Ждём подтверждения в Telegram…",
   "settings.confirmation.cancelled": "Запрос отменён.",

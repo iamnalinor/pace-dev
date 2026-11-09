@@ -3,6 +3,8 @@ import type { enBoard } from "../en/board.ts";
 /** Now, the task page and the words that describe a task. */
 export const ruBoard: { readonly [K in keyof typeof enBoard]: string } = {
   "now.empty": "Сейчас дел нет.",
+  "now.emptyBody": "Здесь появятся ваши задачи, ближайший срок сверху.",
+  "now.emptyAdd": "Добавить задачу",
   "task.reopened": "Открыта снова",
   "task.menu.preset": "Сменить пресет",
   "task.menu.closeAs": "Закрыть как…",
@@ -96,7 +98,6 @@ export const ruBoard: { readonly [K in keyof typeof enBoard]: string } = {
   "task.done": "Готово",
   "task.doneHint": "Закрывает задачу сейчас.",
   "task.doneOther": "Другое время или итог…",
-  "task.doneOtherShort": "Другое время…",
   "task.estimate": "Оценка {duration}",
   "task.trackedLine": "Затрачено {duration}",
   "task.closedAs": "Закрыта · {outcome}",

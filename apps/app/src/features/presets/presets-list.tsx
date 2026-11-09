@@ -13,7 +13,6 @@ import { ListRow } from "#app/ui/list-row.tsx";
 import { SectionHeader } from "#app/ui/section-header.tsx";
 import { SwitchRow } from "#app/ui/switch-row.tsx";
 import { HueTile } from "#app/ui/tag.tsx";
-import { Text } from "#app/ui/text.tsx";
 import {
   byPresetOrder,
   EXAMPLE_PRESET_IDS,
@@ -23,7 +22,11 @@ import {
   resolvePreset,
 } from "@pace/core";
 
-/** One preset: its dot and name, «Default» or «Yours» (and «Deleted») trailing; the arrows beside it move it in the pickers. */
+/**
+One preset: its tile and name, «Default» or «Yours» (and «Deleted») under the name, so the name
+takes the row and the arrows beside it (which move it in the pickers) never cut it to «Домаш…»
+(design review H3).
+*/
 const PresetRow = ({
   isFirst,
   isLast,
@@ -56,16 +59,10 @@ const PresetRow = ({
             router.push({ params: { id: preset.id }, pathname: "/presets/[id]" });
           }}
           role="link"
+          subtitle={kind}
           title={name}
           titleLines={1}
-          trailing={
-            <View className="flex-row items-center gap-2">
-              <Text role="footnote" tone="secondary">
-                {kind}
-              </Text>
-              <Icon name="chevron-right" size="inline" tone="tertiary" />
-            </View>
-          }
+          trailing={<Icon name="chevron-right" size="inline" tone="tertiary" />}
         />
       </View>
       <IconButton
@@ -95,6 +92,7 @@ const NewPreset = ({ choices }: { readonly choices: readonly Preset[] }) => {
       <View className="mx-gutter flex-row flex-wrap gap-2 px-row-x">
         {choices.map((preset) => (
           <Chip
+            isWhole
             key={preset.id}
             onPress={() => {
               router.push({ params: { from: preset.id, id: "new" }, pathname: "/presets/[id]" });

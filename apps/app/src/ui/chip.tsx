@@ -22,6 +22,12 @@ type Look = {
   */
   readonly hue?: null | TagColor | undefined;
   readonly disabled?: boolean | undefined;
+  /**
+  Words that must show whole (a date, an estimate, «Начать с «Отложенное»»): the chip takes its
+  row's width instead of `size.chip.max`, so «Начало 5 нояб. 15:51» keeps its time (design review
+  H3). A bare name (a project, a category) keeps the cap.
+  */
+  readonly isWhole?: boolean | undefined;
   /** 40 instead of 32: the time pills of the close sheet. */
   readonly tall?: boolean | undefined;
   /** Hears the pressable itself, for focus to be moved onto it. */
@@ -78,9 +84,13 @@ const tonesOf = (isOn: boolean, isDisabled: boolean): Tones => {
 };
 
 /** The pill: [icon] · the label (one line, `size.chip.max` at most, "…" past it). */
-const visualOf = (isOn: boolean, { disabled = false, hue, tall = false }: Look): string =>
+const visualOf = (
+  isOn: boolean,
+  { disabled = false, hue, isWhole = false, tall = false }: Look,
+): string =>
   cx(
-    "min-w-8 max-w-chip-max flex-row items-center justify-center gap-2 px-3",
+    "min-w-8 flex-row items-center justify-center gap-2 px-3",
+    isWhole ? "max-w-full" : "max-w-chip-max",
     tall ? "h-10" : "h-8",
     hasHue(isOn, disabled, hue) ? tintClass(hue) : tonesOf(isOn, disabled).fill,
   );

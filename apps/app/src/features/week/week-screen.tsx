@@ -61,7 +61,7 @@ const NightHoursToggle = () => {
       <Pressable
         checked={nightHours}
         className={cx(
-          "h-hit-web w-hit-web items-center justify-center rounded-pill",
+          "h-hit-web flex-row items-center justify-center gap-1 rounded-pill px-3",
           nightHours && "bg-fill-3",
         )}
         label={label}
@@ -71,6 +71,10 @@ const NightHoursToggle = () => {
         role="switch"
       >
         <Icon name="moon" tone={nightHours ? "accent" : "secondary"} />
+        {/* In words: a bare moon read as a dark-mode switch (design review M13). */}
+        <Text role="footnote" tone={nightHours ? "primary" : "secondary"}>
+          {label}
+        </Text>
       </Pressable>
     </Tooltip>
   );

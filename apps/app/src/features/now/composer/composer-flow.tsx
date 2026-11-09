@@ -24,6 +24,8 @@ import { useAiRead } from "@pace/client/react";
 
 import type { FormOrigin } from "./form-title.ts";
 
+import { useToInbox } from "./to-inbox.ts";
+
 /** A bare number is a subtask number ("290"); anything else is a label. */
 export const subtaskOf = (label: string): ComposerModel["subtasks"][number] => {
   const number = /^\d+$/u.test(label) ? Number(label) : null;
@@ -91,32 +93,6 @@ const useReadLater = (ask: () => Promise<AiOutcome | null>, onSaved: () => void)
           : t("composer.aiQueued", { time: clockTime(outcome.retryAt, deviceTz) }),
     });
     onSaved();
-  };
-};
-
-/**
-To Inbox: the line is kept as a note and a toast says so; a preview of it goes, and the assistant
-log hears so.
-*/
-const useToInbox = (
-  text: string,
-  pending: Pick<ReturnType<typeof usePendingActions>, "keptInInbox">,
-  done: () => void,
-) => {
-  const { actions } = usePace();
-  const run = useRunAction();
-  const toast = useToast();
-  const t = useT();
-  return async (): Promise<void> => {
-    const capture = await run(actions.captureInbox(text));
-    if (!capture.ok) {
-      return;
-    }
-    // Where the line went, in words: only the Inbox badge moved before (QA round 14 L10).
-    toast.show({ message: t("composer.toInboxDone") });
-
-    pending.keptInInbox();
-    done();
   };
 };
 
@@ -295,7 +271,7 @@ const useFlowState = ({
     setSubtaskDraft: draft.setSubtaskDraft,
     subtaskDraft: draft.subtaskDraft,
     text,
-    toInbox: useToInbox(text, pending, done),
+    toInbox: useToInbox(text, pending, { done, onText }),
     /** A paste is read at once; typing never is. */
     type: (next: string): void => {
       // Against the line as it stands: after adding, the line is empty again.

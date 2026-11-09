@@ -152,6 +152,8 @@ export type TokensV2 = {
   readonly size: {
     /** The sign-in and consent cards' width (login, app link, OAuth). */
     readonly authCard: number;
+    /** The time bar's four tiles' height (spec §5.1: 56, never under 52). */
+    readonly barTile: number;
     readonly chip: { readonly max: number };
     readonly hit: number;
     readonly hitWeb: number;

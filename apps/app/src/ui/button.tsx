@@ -20,9 +20,11 @@ import { KEYBOARD, useHotkey } from "./use-hotkey.tsx";
 /**
 What a button does (spec §4.2.3): `primary` the one main action of a view (the accent),
 `secondary` a tonal `fill.2` button, `plain` a text action in the accent's ink (Undo, Cancel), and
-`destructive` a step that cannot be undone (Wipe data, Delete account) on the quiet danger fill.
+`destructive` a step that cannot be undone (Wipe data, Delete account) on the quiet danger fill,
+and `plainDanger` a text action that removes something History can bring back (Delete activity),
+in the danger colour rather than the ink (design review M1).
 */
-export type ButtonVariant = "destructive" | "plain" | "primary" | "secondary";
+export type ButtonVariant = "destructive" | "plain" | "plainDanger" | "primary" | "secondary";
 
 /** One geometry per size: `regular` 48 on a phone and 40 on a desktop, `small` 32 (spec §4.2.3). */
 export type ButtonSize = "regular" | "small";
@@ -45,6 +47,8 @@ const LOOK: Readonly<Record<ButtonVariant, Look>> = {
     text: "danger",
   },
   plain: { fill: "", icon: "accent", spinner: "accent.text", text: "accent" },
+  // A 600 label in `status.danger` on the page or a sheet: the `textSmall` pair in `pairs.ts`.
+  plainDanger: { fill: "", icon: "danger", spinner: "status.danger", text: "danger" },
   primary: { fill: "bg-accent", icon: "onAccent", spinner: "accent.on", text: "onAccent" },
   secondary: {
     fill: "bg-fill-2",
@@ -75,6 +79,7 @@ const HEIGHT: Readonly<Record<ButtonSize, string>> = {
 const HINT: Readonly<Record<ButtonVariant, string>> = {
   destructive: "text-danger",
   plain: "text-label-secondary",
+  plainDanger: "text-label-secondary",
   primary: "text-accent-on",
   secondary: "text-label-secondary",
 };
@@ -90,6 +95,14 @@ export type ButtonWidth = "auto" | "fill" | "hug";
 
 /** What a button inside takes when it names no width: a sheet makes its buttons fill. */
 export const ButtonWidthContext = createContext<ButtonWidth>("auto");
+
+/**
+Whether the region a button sits in has room for its shortcut after the label. A window can be wide
+while the region is not: the 400 px task pane squeezed «Готово Ctrl+Enter» into a letter a line
+(design review B1, bug-lessons class 159). A narrow region says `false`; the shortcut still works
+and its tooltip or hint still names it.
+*/
+export const KeyHintRoomContext = createContext(true);
 
 /** At its label's width. */
 const AT_TEXT_WIDTH = { alignSelf: "flex-start" } as const;
@@ -115,7 +128,8 @@ export const KeyHint = ({
   readonly variant: ButtonVariant;
 }) => {
   const isWide = useIsWide();
-  return hotkey === undefined || KEYBOARD === null || !isWide ? null : (
+  const hasRoom = use(KeyHintRoomContext);
+  return hotkey === undefined || KEYBOARD === null || !isWide || !hasRoom ? null : (
     <NativeText
       aria-hidden
       className={cx("font-sans text-footnote font-normal tabular-nums", HINT[variant])}

@@ -37,6 +37,14 @@ describe("PresetsList", () => {
     expect(screen.getByRole("link", { name: "Work, Default" })).toBeOnTheScreen();
   });
 
+  it("says «Default» under the name, not beside it, so the reorder arrows never cut the name (design review H3)", async () => {
+    await renderScreen(<PresetsList />, await createTestRuntime({ world: "empty" }));
+    // The kind sits in the title's own column (the row's subtitle), not in the trailing slot.
+    const work = screen.getByText("Work");
+    const kind = screen.getAllByText("Default").find((node) => node.parent === work.parent);
+    expect(kind).toBeDefined();
+  });
+
   it("lists the defaults in picker order, opens one and moves one", async () => {
     const runtime = await createTestRuntime({ world: "empty" });
     await renderScreen(<PresetsList />, runtime);
