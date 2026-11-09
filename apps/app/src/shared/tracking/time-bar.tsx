@@ -123,9 +123,16 @@ const FoldedField = ({
   readonly fold: ReturnType<typeof useFold>;
 }) => {
   const t = useT();
+  // On the bar's edge, with its own target's air as the gap above and below (design review 2 N3);
+  // open, the field keeps the bar's 8 px from the tiles.
   return fold.isFoldable ? (
-    <Disclosure label={t("time.startOther")} onToggle={fold.toggle} open={fold.isUnfolded}>
-      {children}
+    <Disclosure
+      inset="edge"
+      label={t("time.startOther")}
+      onToggle={fold.toggle}
+      open={fold.isUnfolded}
+    >
+      <View className="pb-2">{children}</View>
     </Disclosure>
   ) : (
     children
@@ -188,7 +195,9 @@ export const TimeBar = () => {
     <View
       accessibilityLabel={t("time.bar")}
       className={cx(
-        "gap-2 border-t border-separator bg-app px-3 pb-2 pt-2",
+        "border-t border-separator bg-app px-3 pb-2 pt-2",
+        // The fold row's own target is the air around it; without it the parts keep 8 px apart.
+        !fold.isFoldable && "gap-2",
         isSideBySide && "flex-row items-start gap-3",
       )}
       onLayout={size.onLayout}
@@ -199,7 +208,7 @@ export const TimeBar = () => {
           <RunningCard alongside={others} running={main} />
         </View>
       )}
-      <View className={cx("gap-2", isSideBySide && "flex-1")}>
+      <View className={cx(!fold.isFoldable && "gap-2", isSideBySide && "flex-1")}>
         <FoldedField fold={fold}>
           <TypedStart onUse={markUse} setText={setText} typed={typed} />
         </FoldedField>

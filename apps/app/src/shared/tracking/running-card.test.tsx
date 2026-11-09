@@ -79,6 +79,24 @@ describe("RunningCard", () => {
     expect(screen.queryByRole("button", { name: en("time.stillYes") })).toBeNull();
   });
 
+  it("asks past 2× on the line under the name, with Yes, still beside Stop: no row of its own (design review 2 N3)", async () => {
+    await renderScreen(
+      <RunningCard running={{ ...VIEW, minutes: 100, status: "long" }} />,
+      await createTestRuntime(),
+    );
+    const question = screen.getByText(en("time.long"));
+    const name = screen.getByText("Walk");
+    // The question's own row added ~40 px and put the bar over its 40 % budget at 390 × 844.
+    expect(question.parent).toBe(name.parent);
+    // While it asks, it stands in for the time and the Expect line.
+    expect(screen.queryByText(/of ~20m/u)).toBeNull();
+    const yes = screen.getByRole("button", { name: en("time.stillYes") });
+    const stop = screen.getByRole("button", { name: "Stop: Walk" });
+    expect(yes.parent?.parent).toBe(stop.parent?.parent);
+    // Stop keeps its filled square on fill.2 and yields its word to the answer.
+    expect(within(stop).queryByText(en("time.stop"))).toBeNull();
+  });
+
   it("is not a live region", async () => {
     await renderScreen(<RunningCard running={VIEW} />, await createTestRuntime());
     expect(screen.getByTestId("running-card").props["accessibilityLiveRegion"]).toBeUndefined();

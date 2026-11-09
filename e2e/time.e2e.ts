@@ -4,6 +4,7 @@ import { addTask, approve, deleteOpenTask, nowTasks } from "./support/composer.t
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { controlsUnder } from "./support/geometry.ts";
 import { API_URL, loginViaApi } from "./support/login.ts";
+import { pushAsClient, ulid } from "./support/seed.ts";
 import { typedField } from "./support/time-bar.ts";
 
 const SIZES = [
@@ -212,6 +213,64 @@ for (const size of SIZES) {
     });
   });
 }
+
+const MINUTE = 60_000;
+
+/** `activity.started` as a client pushes it, `minutesAgo` before now. */
+const started = (minutesAgo: number, payload: Readonly<Record<string, unknown>>) => {
+  const at = Date.now() - minutesAgo * MINUTE;
+  return {
+    deviceId: "e2e-time",
+    id: ulid(at),
+    occurredAt: new Date(at).toISOString(),
+    payload: { activityId: ulid(at), ...payload },
+    precision: "exact",
+    recordedAt: new Date().toISOString(),
+    source: "web",
+    type: "activity.started",
+  };
+};
+
+test.describe("the time bar's budget while it asks, phone (390px)", () => {
+  test.use({ viewport: { height: 844, width: 390 } });
+
+  test("two running, the first past twice its Expect: the question keeps the bar within 40 %", async ({
+    page,
+  }) => {
+    const { token } = await loginViaApi(page);
+    const response = await pushAsClient(token, [
+      started(122, { category: "other", expectMinutes: 20, label: "Went to the study centre" }),
+      started(92, { alongside: true, category: "rest", label: "Music" }),
+    ]);
+    expect(response.ok).toBe(true);
+    await page.goto("/");
+    const bar = timeBar(page);
+    // The state every lived-in shot is in (design review 2 N3): «Ещё занимаетесь?» on a row of its
+    // own took the bar and the nav bar to 377 of 844 px. It now sits on the name's second line,
+    // with "Yes, still" beside Stop, and the fold row has no gap of its own above or below.
+    await expect(bar.getByText("Still doing this?")).toBeVisible();
+    await expect(bar.getByRole("button", { name: "Yes, still" })).toBeVisible();
+    await expect(bar.getByRole("button", { name: "Stop: Music" })).toBeVisible();
+    await expect
+      .poll(
+        async () => {
+          const box = await bar.boundingBox();
+          return box === null ? Infinity : 844 - box.y;
+        },
+        { timeout: 10_000 },
+      )
+      .toBeLessThanOrEqual(844 * 0.4);
+    // «Start something else» starts on the card's edge, not at a list row's inset.
+    const [more, card] = await Promise.all([
+      bar.getByRole("button", { name: "Start something else" }).boundingBox(),
+      bar.getByTestId("running-card").boundingBox(),
+    ]);
+    expect(more?.x).toBe(card?.x);
+    await bar.getByRole("button", { name: "Yes, still" }).click();
+    await expect(bar.getByText("Still doing this?")).toHaveCount(0);
+    await expect(bar.getByText(/of ~20m/u)).toBeVisible();
+  });
+});
 
 /** The element's box; a missing one fails the test at once. */
 const boxOf = async (locator: Locator): Promise<{ left: number; right: number; width: number }> => {
