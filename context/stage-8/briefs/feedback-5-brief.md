@@ -39,6 +39,8 @@ separate PR" and "all in a separate PR").
    past its final deadline stays open and reads as overdue. Old automatic closures in the log stay
    as they are (they can be reopened as before).
    Alternative that lost: also reopen the tasks already auto-closed once.
+   Older clients still write the automatic miss until updated: a client push of one is taken and
+   revoked at once by the server (bug-lessons 150), so the task stays open everywhere.
 10. **A subtask has one mark, done, with its date and time.** The separate "solved" and "submitted"
     (`sent`) marks become one `done` mark. Old logs: a subtask with either mark reads as done, at
     the earlier of the two times. The «Сдать N» / "Submit N" actions go; marking done records the

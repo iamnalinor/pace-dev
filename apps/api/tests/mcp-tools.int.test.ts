@@ -91,22 +91,29 @@ const createTask = async (token: string, args: Record<string, unknown>): Promise
   return String(result["taskId"]);
 };
 
-/** The automatic miss an older version wrote at the deadline (none is made since feedback 5). */
+/**
+The automatic miss an older version wrote at the deadline (none is made since feedback 5), already
+in the log: written in-process, since one an older client pushes now is revoked at once.
+*/
 const pushOldMiss = async (taskId: string): Promise<void> => {
   // The deadline of the overdue tasks below.
   const at = "2026-09-10T10:00:00.000Z";
-  await pushEvents(await loginAsDev("1001"), [
-    {
-      deviceId: "server",
-      id: `auto:${taskId}:missed`,
-      occurredAt: at,
-      payload: { outcome: "cancelled_missed", taskId },
-      precision: "exact",
-      recordedAt: at,
-      source: "system",
-      type: "task.closed",
-    },
-  ]);
+  const me = await json<{ id: string }>("/api/me", { token: await loginAsDev("1001") });
+  await env.USER_STORE.get(env.USER_STORE.idFromName(me.id)).append(
+    [
+      {
+        deviceId: "server",
+        id: `auto:${taskId}:missed`,
+        occurredAt: at,
+        payload: { outcome: "cancelled_missed", taskId },
+        precision: "exact",
+        recordedAt: at,
+        source: "system",
+        type: "task.closed",
+      },
+    ],
+    { now: new Date().toISOString() },
+  );
 };
 
 describe("MCP tools catalogue", () => {

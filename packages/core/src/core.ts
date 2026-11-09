@@ -175,6 +175,7 @@ export {
   finalDeadlineOf,
   NOT_ASSIGNED_REASON,
   type Outcome,
+  retiredAutoMissRevokes,
   subtaskOutcome,
   type SubtaskOutcome,
   taskOutcome,

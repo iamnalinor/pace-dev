@@ -7,6 +7,7 @@ import {
   ok,
   parseEvent,
   type Result,
+  retiredAutoMissRevokes,
   STORE_CHANGED,
 } from "@pace/core";
 
@@ -117,6 +118,25 @@ export class UserStore extends CloudStore {
     return inserted;
   }
 
+  async #append(
+    raw: readonly unknown[],
+    options: eventLog.AppendOptions,
+    { isClientPush }: { readonly isClientPush: boolean },
+  ): Promise<eventLog.AppendResult> {
+    const { accepted, events, rejected } = eventLog.screenBatch(raw, {
+      now: options.now,
+      validateEvent: options.validateEvent ?? eventLog.coreValidator,
+    });
+    const inserted = await this.#insert(events);
+    if (isClientPush) {
+      // An older client's automatic miss is taken and revoked at once (feedback 5).
+      await this.#system(retiredAutoMissRevokes(inserted, options.now), options.now);
+    }
+    await this.derive(options.now);
+    await this.#pool.afterWrite(options.now);
+    return { accepted, rejected, seq: await log.latestSeq(this.db) };
+  }
+
   async #system(inputs: readonly EventInput[], now: string): Promise<readonly Event[]> {
     const events = inputs.flatMap((input) => {
       const parsed = parseEvent({ ...input, deviceId: SERVER_DEVICE_ID, recordedAt: now });
@@ -158,14 +178,7 @@ export class UserStore extends CloudStore {
     raw: readonly unknown[],
     options: eventLog.AppendOptions,
   ): Promise<eventLog.AppendResult> {
-    const { accepted, events, rejected } = eventLog.screenBatch(raw, {
-      now: options.now,
-      validateEvent: options.validateEvent ?? eventLog.coreValidator,
-    });
-    await this.#insert(events);
-    await this.derive(options.now);
-    await this.#pool.afterWrite(options.now);
-    return { accepted, rejected, seq: await log.latestSeq(this.db) };
+    return await this.#append(raw, options, { isClientPush: false });
   }
 
   /**
@@ -179,7 +192,7 @@ export class UserStore extends CloudStore {
     options: eventLog.AppendOptions,
   ): Promise<Result<eventLog.AppendResult, typeof STORE_CHANGED>> {
     return storeId === (await storeIdOf(this.ctx.storage))
-      ? ok(await this.append(raw, options))
+      ? ok(await this.#append(raw, options, { isClientPush: true }))
       : err(STORE_CHANGED);
   }
 

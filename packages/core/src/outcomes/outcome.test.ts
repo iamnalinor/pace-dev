@@ -28,6 +28,7 @@ import {
   deadlineOf,
   doneLateness,
   finalDeadlineOf,
+  retiredAutoMissRevokes,
   subtaskOutcome,
   taskOutcome,
 } from "./outcome.ts";
@@ -368,5 +369,36 @@ describe("autoOutcomeEvents", () => {
       autoOutcomeId("hw:hw.history:2026-W42", "skipped"),
     ]);
     expect(run(events.toReversed(), now)).toEqual(first);
+  });
+});
+
+describe("retiredAutoMissRevokes", () => {
+  it("revokes only an automatic miss, with a deterministic id", () => {
+    const miss = at(7, HW_DUE, {
+      type: "task.closed",
+      payload: { taskId: HW_ID, outcome: "cancelled_missed" },
+      id: autoOutcomeId(HW_ID, "missed"),
+      source: "system",
+    });
+    const byHand = at(8, AFTER, {
+      type: "task.closed",
+      payload: { taskId: HW_ID, outcome: "cancelled_missed" },
+    });
+    const skip = at(9, AFTER, {
+      type: "task.closed",
+      payload: { taskId: HW_ID, outcome: "skipped" },
+      id: autoOutcomeId(HW_ID, "skipped"),
+      source: "system",
+    });
+    expect(retiredAutoMissRevokes([hwCreated(1), miss, byHand, skip], AFTER)).toEqual([
+      {
+        id: `${miss.id}:retired`,
+        type: "event.revoked",
+        occurredAt: AFTER,
+        precision: "exact",
+        source: "system",
+        payload: { targetId: miss.id },
+      },
+    ]);
   });
 });
