@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 import { Linking, type StyleProp, StyleSheet, type TextStyle, type ViewStyle } from "react-native";
 
 import { classPx } from "#app/test/class-px.ts";
@@ -225,6 +225,12 @@ describe("WeekScreen", () => {
     await renderScreen(<WeekScreen />, await world());
     expect(screen.getByText("Swipe to see all days")).toBeOnTheScreen();
     expect(screen.getByTestId("week-days")).toHaveProp("tabIndex", 0);
+  });
+
+  it("names the night hours switch in words beside the moon, not as a bare dark-mode-like glyph (design review M13)", async () => {
+    await renderScreen(<WeekScreen />, await createTestRuntime());
+    const toggle = screen.getByRole("switch", { name: "Night hours" });
+    expect(within(toggle).getByText("Night hours")).toBeOnTheScreen();
   });
 
   it("says so and keeps the night hours off when the device refuses to save the header's switch", async () => {
