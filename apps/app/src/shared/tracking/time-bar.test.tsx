@@ -89,6 +89,30 @@ const CSS_READ = {
   status: "parsed",
 };
 
+const startBoth = async (runtime: PaceRuntime): Promise<void> => {
+  await runtime.actions.startActivity(
+    { buttonId: "chores:commute", category: "chores", expectMinutes: 30, label: "Commute" },
+    { at: addMinutesIso(NOW, -20) },
+  );
+  await runtime.actions.startActivity(
+    {
+      alongside: true,
+      buttonId: "rest:workout",
+      category: "sport",
+      expectMinutes: 180,
+      label: "Workout",
+    },
+    { at: addMinutesIso(NOW, -10) },
+  );
+};
+
+/** The bar measured at a height: the window is 1334 high in jest, so 40 % is 533. */
+const layOut = async (height: number): Promise<void> => {
+  await fireEvent(screen.getByLabelText(en("time.bar")), "layout", {
+    nativeEvent: { layout: { height, width: 390 } },
+  });
+};
+
 describe("TimeBar", () => {
   it("has Calendar, Task, Chores and Misc in this order, with no «⋯» and no switches", async () => {
     await renderScreen(<TimeBar />, await createTestRuntime());
@@ -164,6 +188,65 @@ describe("TimeBar", () => {
     expect(screen.queryByLabelText(en("time.whatDoing"))).toBeNull();
     await fireEvent.press(toggle);
     expect(screen.getByLabelText(en("time.whatDoing"))).toHaveDisplayValue("Reading");
+  });
+
+  describe("under the region budget (spec §5.1, design review B2)", () => {
+    it("keeps what runs alongside as a compact row inside the one card, never a second card", async () => {
+      const runtime = await createTestRuntime();
+      await startBoth(runtime);
+      await renderScreen(<TimeBar />, runtime);
+      expect(screen.getAllByTestId("running-card")).toHaveLength(1);
+      const row = screen.getByTestId("running-alongside");
+      expect(within(row).getByText("Workout")).toBeOnTheScreen();
+      expect(within(row).getByRole("button", { name: "Stop: Workout" })).toBeOnTheScreen();
+      expect(within(row).queryByTestId("ink-line")).toBeNull();
+    });
+
+    it("never scrolls inside the bar", async () => {
+      const runtime = await createTestRuntime();
+      await startBoth(runtime);
+      await renderScreen(<TimeBar />, runtime);
+      expect(screen.queryByTestId("time-bar-scroll")).toBeNull();
+    });
+
+    it("folds the field once the bar would pass 40 %, but not one the person unfolded", async () => {
+      const runtime = await createTestRuntime();
+      await renderScreen(<TimeBar />, runtime);
+      await fireEvent.press(screen.getByRole("button", { name: "Chores" }));
+      await fireEvent.press(await screen.findByRole("button", { name: "Commute" }));
+      await waitFor(() => {
+        expect(running(runtime)).toEqual(["Commute"]);
+      });
+      // Started from the bar: the field stays under the finger while it fits.
+      expect(screen.getByLabelText(en("time.whatDoing"))).toBeOnTheScreen();
+      jest.useFakeTimers();
+      try {
+        await layOut(500);
+        await act(async () => {
+          await jest.advanceTimersByTimeAsync(6000);
+        });
+        expect(screen.queryByLabelText(en("time.whatDoing"))).toBeNull();
+        // Opened by hand, it stays open over the budget: the person asked for it.
+        await fireEvent.press(screen.getByRole("button", { name: en("time.startOther") }));
+        await layOut(560);
+        await act(async () => {
+          await jest.advanceTimersByTimeAsync(6000);
+        });
+        expect(screen.getByLabelText(en("time.whatDoing"))).toBeOnTheScreen();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it("opens the typed line's proposal as a sheet on a phone, so the tiles never cover it", async () => {
+      const runtime = await createTestRuntime({ routes: { "POST /api/parse": () => CSS_READ } });
+      await renderScreen(<TimeBar />, runtime);
+      const field = screen.getByLabelText("What are you doing?");
+      await fireEvent.changeText(field, "Пошел в ЦСС, 20мин");
+      await fireEvent(field, "submitEditing");
+      const proposal = await screen.findByText("Start: ЦСС");
+      expect(within(screen.getByTestId("sheet-frame")).getByText("Start: ЦСС")).toBe(proposal);
+    });
   });
 
   it("opens Misc's picker on a tap: six ways to rest; a pick starts it, a tap again offers Stop", async () => {

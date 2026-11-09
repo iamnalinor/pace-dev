@@ -1,11 +1,15 @@
 import { useRef, useState } from "react";
-import { ScrollView, useWindowDimensions, View } from "react-native";
+import { useWindowDimensions, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { TimeButtonView } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
+import { cx } from "#app/ui/cx.ts";
 import { Disclosure } from "#app/ui/disclosure.tsx";
+import { useIsWide } from "#app/ui/layout.ts";
 import { OverlayPresence } from "#app/ui/overlay-presence.tsx";
+import { layout } from "@pace/core";
 
 import type { CalendarToday } from "./calendar-today.ts";
 
@@ -17,8 +21,11 @@ import { TypedStart, useTypedStart } from "./typed-start.tsx";
 import { useCalendarButton } from "./use-calendar-button.ts";
 import { useRunningAnnouncements } from "./use-running-announcements.ts";
 
-/** The share of the window the bar's cards and proposals may take before they scroll (spec 3.3). */
+/** The share of the window the time bar and the nav bar under it may take (spec §5.1). */
 const BUDGET = 0.4;
+
+/** From this width the bar lays what runs beside the field and the tiles (spec §5.1, desktop). */
+const SIDE_BY_SIDE = 680;
 
 /**
 Which picker is open. Calendar's opens once today's calendar is read; only the picker asked for
@@ -54,10 +61,34 @@ const useTileAnchors = () => ({
   task: useRef<null | View>(null),
 });
 
+/**
+The bar's measured size against the region budget (spec §5.1): on a phone the time bar and the nav
+bar under it take at most 40 % of the window, so the list keeps the rest. Measured, never guessed
+from a count of what runs (bug-lessons 142); a wide window has no nav bar and lays the bar out side
+by side once it is 680 wide.
+*/
+const useBarSize = () => {
+  const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const isWide = useIsWide();
+  const [size, setSize] = useState({ height: 0, width: 0 });
+  const nav = isWide ? 0 : layout.navBar + insets.bottom;
+  return {
+    isOverBudget: size.height + nav > height * BUDGET,
+    isSideBySide: size.width >= SIDE_BY_SIDE,
+    onLayout: (event: { readonly nativeEvent: { readonly layout: typeof size } }): void => {
+      const { height: barHeight, width } = event.nativeEvent.layout;
+      setSize((was) =>
+        was.height === barHeight && was.width === width ? was : { height: barHeight, width },
+      );
+    },
+  };
+};
+
 /** The fold of the typed field, and the mark a use of the bar leaves so a start it made never folds it. */
-const useBarFold = (runningId: null | string, isPicking: boolean) => {
+const useBarFold = (runningId: null | string, isPicking: boolean, isOverBudget: boolean) => {
   const lastUseRef = useRef(0);
-  const fold = useFold(runningId, { isPicking, lastUseRef });
+  const fold = useFold(runningId, { isOverBudget, isPicking, lastUseRef });
   return {
     fold,
     markUse: (): void => {
@@ -66,73 +97,112 @@ const useBarFold = (runningId: null | string, isPicking: boolean) => {
   };
 };
 
-/**
-The cards and the typed field under the region budget: what runs and the proposal being read
-scroll inside 40 % of the window less the tiles, so the list above keeps its half (spec 3.3).
-*/
-const Budgeted = ({
+/** The open picker's tile, read live (so Stop shows the moment it runs), and what it opened with. */
+const pickedOf = (
+  buttons: readonly TimeButtonView[],
+  opened: null | { readonly id: TimeButtonView["id"]; readonly calendar: CalendarToday | null },
+) => {
+  const button = buttons.find((each) => each.id === opened?.id);
+  return opened === null || button === undefined ? null : { button, opened };
+};
+
+/** What runs, as the bar shows it: the main activity's card, with the others alongside in it. */
+const useBarCards = () => {
+  const { alongside, running } = usePace().hooks.useTimeBar();
+  const [main, ...others] = running === null ? alongside : [running, ...alongside];
+  useRunningAnnouncements(main === undefined ? others : [main, ...others]);
+  return { main, others };
+};
+
+/** The typed field, folded under «Start something else» while the bar says so. */
+const FoldedField = ({
   children,
-  reserved,
+  fold,
 }: {
   readonly children: React.ReactNode;
-  readonly reserved: number;
+  readonly fold: ReturnType<typeof useFold>;
 }) => {
-  const { height } = useWindowDimensions();
-  return (
-    <ScrollView
-      keyboardShouldPersistTaps="handled"
-      style={{ flexGrow: 0, maxHeight: Math.max(0, height * BUDGET - reserved) }}
-      testID="time-bar-scroll"
-    >
-      <View className="gap-2">{children}</View>
-    </ScrollView>
+  const t = useT();
+  return fold.isFoldable ? (
+    <Disclosure label={t("time.startOther")} onToggle={fold.toggle} open={fold.isUnfolded}>
+      {children}
+    </Disclosure>
+  ) : (
+    children
   );
 };
 
+/** The picker a tile opened, kept through its exit: the sheet leaves with what it showed (F-MOT-05). */
+const OpenedPicker = ({
+  anchors,
+  isSomethingRunning,
+  onClose,
+  picked,
+}: {
+  readonly anchors: ReturnType<typeof useTileAnchors>;
+  readonly isSomethingRunning: boolean;
+  readonly onClose: () => void;
+  readonly picked: null | {
+    readonly button: TimeButtonView;
+    readonly opened: { readonly calendar: CalendarToday | null };
+  };
+}) => (
+  <OverlayPresence value={picked}>
+    {(kept) => (
+      <ChoicesSheet
+        anchor={anchors[kept.button.id]}
+        button={kept.button}
+        calendar={kept.opened.calendar}
+        canGoAlongside={isSomethingRunning && !kept.button.isRunning}
+        onClose={onClose}
+      />
+    )}
+  </OverlayPresence>
+);
+
 /**
-The time bar at the foot of Now: what runs (and what runs alongside), "What are you doing?", and
-four tiles that never move and never fold — Calendar, Task, Chores and Rest — each opening what
-it can start. On a phone, opened on something running, only the typed field folds, under «Start
-something else»; a tap unfolds it. The bar's cards scroll past 40 % of the window.
+The time bar at the foot of Now: what runs (what runs alongside as compact rows in the same card),
+"What are you doing?", and four tiles that never move and never fold — Calendar, Task, Chores and
+Rest — each opening what it can start. Nothing in it scrolls and nothing is covered (design review
+B2): on a phone the typed field folds under «Start something else» once the bar would pass the
+budget, and a proposal for the typed line opens as a sheet. On a computer's column of 680 and more,
+what runs sits on the left and the field and the tiles on the right.
 */
 export const TimeBar = () => {
   const t = useT();
-  const { hooks } = usePace();
-  const { alongside, buttons, running } = hooks.useTimeBar();
+  const { buttons, running } = usePace().hooks.useTimeBar();
   const calendar = useCalendarButton();
   const { close, open, opened } = usePicker(calendar.forPicker);
   const anchors = useTileAnchors();
-  const openedButton = buttons.find((button) => button.id === opened?.id) ?? null;
   const [text, setText] = useState("");
   const typed = useTypedStart(text, setText);
-  const [tilesHeight, setTilesHeight] = useState(0);
-  const cards = [...(running === null ? [] : [running]), ...alongside];
-  useRunningAnnouncements(cards);
-  const { fold, markUse } = useBarFold(running?.activityId ?? null, opened !== null);
-  const field = <TypedStart onUse={markUse} setText={setText} typed={typed} />;
+  const size = useBarSize();
+  const { main, others } = useBarCards();
+  const { fold, markUse } = useBarFold(
+    running?.activityId ?? null,
+    opened !== null,
+    size.isOverBudget,
+  );
+  const isSideBySide = size.isSideBySide && main !== undefined;
   return (
     <View
       accessibilityLabel={t("time.bar")}
-      className="gap-2 border-t border-separator bg-app px-3 pb-3 pt-3"
+      className={cx(
+        "gap-2 border-t border-separator bg-app px-3 pb-3 pt-3",
+        isSideBySide && "flex-row items-start gap-3",
+      )}
+      onLayout={size.onLayout}
       role="region"
     >
-      <Budgeted reserved={tilesHeight}>
-        {cards.map((item) => (
-          <RunningCard key={item.activityId} running={item} />
-        ))}
-        {fold.isFoldable ? (
-          <Disclosure label={t("time.startOther")} onToggle={fold.toggle} open={fold.isUnfolded}>
-            {field}
-          </Disclosure>
-        ) : (
-          field
-        )}
-      </Budgeted>
-      <View
-        onLayout={(event) => {
-          setTilesHeight(event.nativeEvent.layout.height + 48);
-        }}
-      >
+      {main === undefined ? null : (
+        <View className={cx(isSideBySide && "flex-1")}>
+          <RunningCard alongside={others} running={main} />
+        </View>
+      )}
+      <View className={cx("gap-2", isSideBySide && "flex-1")}>
+        <FoldedField fold={fold}>
+          <TypedStart onUse={markUse} setText={setText} typed={typed} />
+        </FoldedField>
         <BarTiles
           anchors={anchors}
           buttons={buttons}
@@ -143,24 +213,16 @@ export const TimeBar = () => {
           }}
         />
       </View>
-      {/* Kept through its exit: the sheet leaves with what it showed (F-MOT-05). */}
-      <OverlayPresence
-        value={opened === null || openedButton === null ? null : { button: openedButton, opened }}
-      >
-        {(kept) => (
-          <ChoicesSheet
-            anchor={anchors[kept.button.id]}
-            button={kept.button}
-            calendar={kept.opened.calendar}
-            canGoAlongside={running !== null && !kept.button.isRunning}
-            onClose={() => {
-              // A start picked here is the bar's own: closing must not fold it.
-              markUse();
-              close();
-            }}
-          />
-        )}
-      </OverlayPresence>
+      <OpenedPicker
+        anchors={anchors}
+        isSomethingRunning={running !== null}
+        onClose={() => {
+          // A start picked here is the bar's own: closing must not fold it.
+          markUse();
+          close();
+        }}
+        picked={pickedOf(buttons, opened)}
+      />
     </View>
   );
 };

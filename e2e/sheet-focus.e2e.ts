@@ -90,6 +90,23 @@ const OPENERS: readonly Opener[] = [
     via: `the time bar's ${key}`,
   })),
   {
+    open: async (page) => {
+      await page.goto("/");
+      const bar = page.getByRole("region", { name: ru["time.bar"] });
+      const more = bar.getByRole("button", { name: ru["time.startOther"] });
+      if ((await more.count()) > 0 && (await more.getAttribute("aria-expanded")) === "false") {
+        await more.click();
+      }
+      const field = bar.getByRole("textbox", { name: ru["time.whatDoing"] });
+      await field.fill("Пошёл в ЦСС, 20 мин");
+      await field.press("Enter");
+    },
+    // A computer shows the proposal in the bar, above the field (design review B2).
+    sheet: "time-proposal",
+    sizes: ["phone"],
+    via: "the time bar's typed line",
+  },
+  {
     field: ru["edit.taskTitle"],
     open: async (page, seeded) => {
       await page.goto(`/task/${seeded.openTaskId}`);
