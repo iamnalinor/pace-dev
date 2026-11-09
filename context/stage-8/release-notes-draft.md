@@ -5,11 +5,15 @@ edits the wording before the release.
 
 ## Before you use it
 
-- **Update the Android app before giving a preset recurrence a first number.** A preset whose
+- **Update every device before giving a preset recurrence a first number.** A preset whose
   recurrence carries `firstNumber` (the numbered title's first number, feedback 5 item 1) is
-  dropped by older Android builds: their stricter preset schema refuses it, so the preset and its
-  tasks disappear on that phone until it is updated. Accepted by the owner (2026-11-09); update
-  every device first, then set the number.
+  refused by the previous release's stricter preset schema, and an older app drops the whole
+  preset event that carries it: if the number was set when the preset was created, the preset is
+  missing on that device (and its tasks show without it); if it was set by an update, that whole
+  update (name, recurrence, deadline policy, everything changed with it) is lost on that device,
+  which keeps the older definition. Nothing else this build writes into a preset is refused (pinned
+  by `old-reader-compat.test.ts`). Accepted by the owner (2026-11-09): update the APK and every
+  web tab first, then set the number.
 
 ## Changes in behaviour
 
