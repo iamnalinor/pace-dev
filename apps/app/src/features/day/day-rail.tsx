@@ -1,11 +1,13 @@
 import { View } from "react-native";
-import Svg, { Circle, Defs, Line, Pattern, Rect } from "react-native-svg";
+import Animated from "react-native-reanimated";
+import Svg, { Circle, Defs, Pattern, Rect } from "react-native-svg";
 
-import type { DayRail as DayRailModel, RailItem } from "@pace/client";
+import type { DayRail as DayRailModel, RailBar } from "@pace/client";
 
 import { clockTime } from "#app/format/time.ts";
 import { cx } from "#app/ui/cx.ts";
 import { outlineClass, tintClass } from "#app/ui/hue.ts";
+import { ROW_LAYOUT } from "#app/ui/motion.ts";
 import { Text } from "#app/ui/text.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { space, z } from "@pace/core";
@@ -28,102 +30,75 @@ const DotGrid = () => {
   );
 };
 
-/** 45° hatching where two blocks overlap: drawn in the quiet label tone, never red. */
-const Hatch = () => {
-  const { palette } = useTheme();
-  return (
-    <Svg height="100%" width="100%">
-      <Defs>
-        <Pattern
-          height={space["1"]}
-          id="hatch"
-          patternTransform="rotate(45)"
-          patternUnits="userSpaceOnUse"
-          width={space["1"]}
-        >
-          <Line
-            stroke={palette["label.tertiary"]}
-            strokeWidth={1}
-            x1={0}
-            x2={0}
-            y1={0}
-            y2={space["1"]}
-          />
-        </Pattern>
-      </Defs>
-      <Rect fill="url(#hatch)" height="100%" width="100%" />
-    </Svg>
-  );
-};
+/** Where a row of the timeline was laid out, in the list's own coordinates. */
+export type RowFrame = { readonly top: number; readonly height: number };
 
-/** A position on the rail as a share of its length, so the rail needs no measuring. */
-const percent = (value: number, total: number): `${number}%` => `${(value / total) * 100}%`;
+/** The rows' frames by row key, as each row reports its layout. */
+export type RowFrames = Readonly<Record<string, RowFrame>>;
 
-const MIDDLE = { top: "50%" } as const;
-const TILT = { transform: [{ rotate: "45deg" }] } as const;
-
-/** Two short 45° ticks across a gap that is drawn shorter than it was. */
-const ScaleBreak = () => (
-  <View className="absolute inset-x-0 items-center" style={MIDDLE} testID="rail-scale-break">
-    <View className="w-3 border-t border-label-quaternary" style={TILT} />
-    <View className="mt-1 w-3 border-t border-label-quaternary" style={TILT} />
-  </View>
-);
-
-/** One band: a block's tint with its pen line at the start; a gap dashed; a parallel one narrower. */
-const Band = ({ item, total }: { readonly item: RailItem; readonly total: number }) => {
-  const frame = {
-    height: percent(item.to - item.from, total),
-    top: percent(item.from, total),
-  } as const;
-  if (item.kind === "gap" || item.hue === null) {
+/**
+One bar, at its row's own top and height: a block in its category's tint with a 1 px pen line in
+its stroke at the top; a gap dashed, with no hue; a parallel block narrower, beside the main line.
+A row that was not shown when the day opened slides like its row (`ROW_LAYOUT`).
+*/
+const Bar = ({
+  bar,
+  frame,
+  isStill,
+}: {
+  readonly bar: RailBar;
+  readonly frame: RowFrame;
+  readonly isStill: boolean;
+}) => {
+  const style = { height: frame.height, top: frame.top } as const;
+  const motion = isStill ? {} : { layout: ROW_LAYOUT };
+  if (bar.kind === "gap" || bar.hue === null) {
     return (
-      <View
+      <Animated.View
+        {...motion}
         className="absolute left-1 w-3 rounded-xs border border-dashed border-outline"
-        style={frame}
-        testID="rail-gap"
-      >
-        {item.scaleBreak ? <ScaleBreak /> : null}
-      </View>
+        style={style}
+        testID="rail-bar"
+      />
     );
   }
   return (
-    <View
+    <Animated.View
+      {...motion}
       className={cx(
         "absolute overflow-hidden rounded-xs",
-        item.kind === "parallel" ? "left-5 w-2" : "left-1 w-3",
-        tintClass(item.hue),
+        bar.kind === "parallel" ? "left-5 w-2" : "left-1 w-3",
+        tintClass(bar.hue),
       )}
-      style={frame}
-      testID={`rail-${item.kind}`}
+      style={style}
+      testID="rail-bar"
     >
-      {/* The pen line: 1 px in the category's stroke at the band's leading edge. */}
-      <View className={cx("absolute inset-x-0 top-0 border-t", outlineClass(item.hue))} />
-      {item.overlap === null ? null : (
-        <View
-          className="absolute inset-x-0"
-          style={{
-            height: percent(item.overlap.to - item.overlap.from, item.to - item.from),
-            top: percent(item.overlap.from - item.from, item.to - item.from),
-          }}
-          testID="rail-overlap"
-        >
-          <Hatch />
-        </View>
-      )}
-    </View>
+      <View
+        className={cx("absolute inset-x-0 top-0 border-t", outlineClass(bar.hue))}
+        testID="rail-pen"
+      />
+    </Animated.View>
   );
 };
 
 /**
-The notebook page's rail (spec §2 A, Task 7.1), beside the editable rows: a faint dot grid and, on
-it, a band per block in its category's tint with a 1 px pen line at its start, a dashed band per
-gap (with a break in the scale where a long gap was cut short), a narrower band beside the main
-one for a parallel block, and hatching where blocks overlap. It is an index: the rows carry the
-meaning, so the rail is hidden from screen readers and takes no touches.
+The notebook page's rail (spec §2 A, Task 7.1; owner 2026-11-09: it lines up with the rows): a faint
+dot grid and, on it, one bar beside each row at that row's measured top and height, so a bar and
+its row never part whatever the row's height. A row not measured yet has no bar rather than a
+guessed one. The rows carry the meaning (their text says the times), so the rail is hidden from
+screen readers and takes no touches.
 */
-export const DayRail = ({ rail }: { readonly rail: DayRailModel }) =>
-  rail.items.length === 0 ? null : (
+export const DayRail = ({
+  frames,
+  rail,
+  still,
+}: {
+  readonly frames: RowFrames;
+  readonly rail: DayRailModel;
+  /** The keys the day opened with: their bars do not slide. */
+  readonly still?: ReadonlySet<string>;
+}) =>
+  rail.bars.length === 0 ? null : (
     <View
       accessibilityElementsHidden
       className="absolute inset-y-0 left-0 w-8 overflow-hidden rounded-md"
@@ -134,33 +109,43 @@ export const DayRail = ({ rail }: { readonly rail: DayRailModel }) =>
       <View className="absolute inset-0">
         <DotGrid />
       </View>
-      {rail.items.map((item) => (
-        <Band item={item} key={`${item.kind}-${String(item.from)}`} total={rail.total} />
-      ))}
+      {rail.bars.map((bar) => {
+        const frame = frames[bar.key];
+        return frame === undefined ? null : (
+          <Bar bar={bar} frame={frame} isStill={still?.has(bar.key) ?? true} key={bar.key} />
+        );
+      })}
     </View>
   );
 
 /**
 Now on the page: the red margin line (`status.danger`, 1 px) across the timeline with a dot at the
-rail and the time in `caption` (spec §2 A). Static, no pulse; hidden from screen readers (the
+rail and the time in `caption` (spec §2 A), inside the row whose time holds now and as far down it
+as now is into that time: at the running row's bottom, where its bar ends. Static, no pulse; hidden from screen readers (the
 running row says what is now).
 */
 export const NowMargin = ({
+  frames,
   now,
   rail,
   zone,
 }: {
+  readonly frames: RowFrames;
   readonly now: string;
   readonly rail: DayRailModel;
   readonly zone: string;
-}) =>
-  rail.nowAt === null ? null : (
+}) => {
+  const frame = rail.now === null ? undefined : frames[rail.now.key];
+  if (frame === undefined || rail.now === null) {
+    return null;
+  }
+  return (
     <View
       accessibilityElementsHidden
       className="absolute inset-x-0 flex-row items-center"
       importantForAccessibility="no-hide-descendants"
       pointerEvents="none"
-      style={{ top: percent(rail.nowAt, rail.total), zIndex: z.sticky }}
+      style={{ top: frame.top + frame.height * rail.now.at, zIndex: z.sticky }}
       testID="now-margin"
     >
       <View className="ml-3 h-2 w-2 rounded-pill bg-danger" />
@@ -170,3 +155,4 @@ export const NowMargin = ({
       </Text>
     </View>
   );
+};

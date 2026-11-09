@@ -117,3 +117,5 @@ the now-line's end) stay. Spec §4.2.6, §4.2.7 and the P1 usage rule are supers
 2026-11-08 (owner): **no profile name in the chrome.** The sidebar's header is the mark, «Pace» and
 the bell; More has no owner row. Settings says «Вы вошли как {name}» above Log out, the one place
 that names the account.
+
+2026-11-09 (owner): **Day's rail lines up with the rows**: one bar beside each row at the row's measured top and height (category tint + stroke pen line, a gap dashed), the red now line inside the row that holds now so the running bar ends on it; decoration hidden from screen readers, no longer a proportional index.

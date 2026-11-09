@@ -16,32 +16,18 @@ import { OverlayPresence } from "#app/ui/overlay-presence.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
 import { Shell } from "#app/ui/shell.tsx";
-import { type DayEntry, type DayModel, dayRail, type RailBlock, type RailGap } from "@pace/client";
+import { type DayEntry, type DayModel, dayRail } from "@pace/client";
 import { useUsageRead } from "@pace/client/react";
 import { addDaysIn, formatEyebrow } from "@pace/core";
 
 import { ActivityPane } from "./activity-pane.tsx";
 import { ActivitySheet, type SheetTarget } from "./activity-sheet.tsx";
 import { DayNav } from "./day-nav.tsx";
-import { DayRail, NowMargin } from "./day-rail.tsx";
+import { DayRail, NowMargin, type RowFrame, type RowFrames } from "./day-rail.tsx";
 import { EntryRow, LogPastRow, type SatOf } from "./day-rows.tsx";
 import { Totals } from "./day-totals.tsx";
 import * as Phone from "./phone-section.tsx";
 import { type DayPhone, useDayPhone } from "./use-day-phone.ts";
-
-/** The rail's bands from the day's entries (blocks, parallel ones among them, and gaps). */
-const railOf = (entries: readonly DayEntry[], now: string) => {
-  const blocks: RailBlock[] = [];
-  const gaps: RailGap[] = [];
-  for (const entry of entries) {
-    if (entry.kind === "gap") {
-      gaps.push(entry.gap);
-    } else {
-      blocks.push(entry.row);
-    }
-  }
-  return dayRail(blocks, gaps, now);
-};
 
 /**
 The rows only animate for what changes within a day (a block logged, a gap closed): a new day
@@ -68,10 +54,21 @@ type RowsProps = {
   readonly sat: SatOf;
   readonly selected: null | SheetTarget;
   readonly onOpen: (target: SheetTarget) => void;
+  /** Each row says where it was laid out, for its rail bar to stand beside it. */
+  readonly onFrame: (key: string, frame: RowFrame) => void;
 };
 
 /** One keyed row per entry, for the `Group` to put its one divider rule between. */
-const entryRows = ({ entries, onOpen, openingKeys, phone, sat, selected, zone }: RowsProps) =>
+const entryRows = ({
+  entries,
+  onFrame,
+  onOpen,
+  openingKeys,
+  phone,
+  sat,
+  selected,
+  zone,
+}: RowsProps) =>
   entries.map((entry) => (
     <Animated.View
       key={entry.key}
@@ -80,6 +77,10 @@ const entryRows = ({ entries, onOpen, openingKeys, phone, sat, selected, zone }:
         exiting: ROW_EXIT,
         layout: ROW_LAYOUT,
       })}
+      onLayout={(event) => {
+        const { height, y } = event.nativeEvent.layout;
+        onFrame(entry.key, { height, top: y });
+      }}
       testID="day-entry"
     >
       <EntryRow
@@ -93,34 +94,49 @@ const entryRows = ({ entries, onOpen, openingKeys, phone, sat, selected, zone }:
     </Animated.View>
   ));
 
+/** The rows' measured frames by key: one source of geometry for the rail and the now line. */
+const useRowFrames = () => {
+  const [frames, setFrames] = useState<RowFrames>({});
+  const onFrame = (key: string, frame: RowFrame): void => {
+    setFrames((known) => {
+      const was = known[key];
+      return was?.top === frame.top && was.height === frame.height
+        ? known
+        : { ...known, [key]: frame };
+    });
+  };
+  return { frames, onFrame };
+};
+
 /**
 The timeline on the notebook page: the rail beside one list of rows (blocks, gaps and, last, "Log
-past activity"), and the red margin line across them where now is.
+past activity"), each bar at its own row's measured frame, and the red margin line across them
+where now is. Rows report their frames in the list's coordinates, which are the rail's: the list
+starts at the timeline's top.
 */
 const Timeline = ({
   logPast,
   now,
-  rail,
-  rows,
-  zone,
-}: {
+  ...rows
+}: Omit<RowsProps, "onFrame"> & {
   readonly logPast: () => void;
   readonly now: string;
-  readonly rail: ReturnType<typeof railOf>;
-  readonly rows: ReturnType<typeof entryRows>;
-  readonly zone: string;
-}) => (
-  <View className="relative mx-gutter" testID="day-timeline">
-    <DayRail rail={rail} />
-    <View className="ml-10">
-      <Group inset={false}>
-        {rows}
-        <LogPastRow key="log-past" onPress={logPast} />
-      </Group>
+}) => {
+  const { frames, onFrame } = useRowFrames();
+  const rail = dayRail(rows.entries, now);
+  return (
+    <View className="relative mx-gutter" testID="day-timeline">
+      <DayRail frames={frames} rail={rail} still={rows.openingKeys} />
+      <View className="ml-10">
+        <Group inset={false}>
+          {entryRows({ ...rows, onFrame })}
+          <LogPastRow key="log-past" onPress={logPast} />
+        </Group>
+      </View>
+      <NowMargin frames={frames} now={now} rail={rail} zone={rows.zone} />
     </View>
-    <NowMargin now={now} rail={rail} zone={zone} />
-  </View>
-);
+  );
+};
 
 /** The day's header: the title and the period control; another day clears the open editor. */
 const DayHeader = ({
@@ -169,20 +185,18 @@ const DayPage = ({
         <EmptyText className="px-row-x py-6">{t("day.empty")}</EmptyText>
       ) : null}
       <Timeline
+        entries={day.entries}
+        // A new day starts with no frames: a row's old place is never another day's.
+        key={`timeline-${day.date}`}
         logPast={() => {
           onOpen(day.logTarget);
         }}
         now={now}
-        rail={railOf(day.entries, now)}
-        rows={entryRows({
-          entries: day.entries,
-          onOpen,
-          openingKeys,
-          phone,
-          sat,
-          selected,
-          zone: day.zone,
-        })}
+        onOpen={onOpen}
+        openingKeys={openingKeys}
+        phone={phone}
+        sat={sat}
+        selected={selected}
         zone={day.zone}
       />
       {IS_PHONE ? (
