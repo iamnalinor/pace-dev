@@ -1,6 +1,7 @@
 import type { CoreState } from "../materialize/core-state.ts";
 import type { Importance } from "../model/preset.ts";
 
+import { sliceWhole } from "../format/initials.ts";
 import { extractLink } from "../links.ts";
 import { isHomeworkPreset, resolvePreset } from "../presets/resolve-preset.ts";
 import { accountTz, type QueryContext } from "../queries/context.ts";
@@ -62,7 +63,7 @@ const capTitle = (title: string): string => {
   if (title.length <= MAX_TITLE) {
     return title;
   }
-  const cut = title.slice(0, MAX_TITLE - 1);
+  const cut = sliceWhole(title, MAX_TITLE - 1);
   const lastSpace = cut.lastIndexOf(" ");
   return `${(lastSpace > MAX_TITLE / 2 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
 };

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { err, ok, type Task, type TaskView, taskView } from "@pace/core";
+import { clipText, err, ok, type Task, type TaskView, taskView } from "@pace/core";
 
 import { defineTool } from "../registry.ts";
 import { describeRow, type TaskRow, taskRow, TaskRowSchema } from "../rows.ts";
@@ -67,23 +67,29 @@ const doneNote = (doneAt: null | string): string => (doneAt === null ? "" : ` do
 const numberNote = (number: null | number): string =>
   number === null ? "" : `№${String(number)} `;
 
+/** How much of one text field the text answer shows; the structured content has it whole. */
+const TEXT_FIELD_CHARS = 200;
+
+/**
+A text cut to `TEXT_FIELD_CHARS` characters with an ellipsis, between two characters (never
+inside an emoji: `clipText` counts graphemes).
+*/
+const cutText = (text: string): string => clipText(text, TEXT_FIELD_CHARS + 1);
+
 /** The closure as a line, with what its JSON would have said: the event to revoke, the reason. */
 const closedLine = (closed: NonNullable<Task["closed"]>): string =>
   [
     `Closed: ${closed.outcome} at ${closed.at} by ${closed.source}`,
     closed.confirmed ? ", confirmed" : "",
     `; event ${closed.eventId}`,
-    closed.reason === null ? "" : `; reason: ${closed.reason}`,
+    closed.reason === null ? "" : `; reason: ${cutText(closed.reason)}`,
     ".",
   ].join("");
 
-/** How much of one text field the text answer shows; the structured content has it whole. */
-const TEXT_FIELD_CHARS = 200;
-
-/** A string cut to `TEXT_FIELD_CHARS` with an ellipsis; other values as they are, nested ones too. */
+/** Strings cut short (`cutText`); other values as they are, nested ones too. */
 const cut = (value: unknown): unknown => {
   if (typeof value === "string") {
-    return value.length > TEXT_FIELD_CHARS ? `${value.slice(0, TEXT_FIELD_CHARS)}…` : value;
+    return cutText(value);
   }
   if (Array.isArray(value)) {
     return value.map((item) => cut(item));

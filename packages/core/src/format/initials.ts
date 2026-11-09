@@ -49,6 +49,23 @@ export const splitGraphemes = (text: string): string[] => {
     : Array.from(text.matchAll(cluster), (found) => found[0]);
 };
 
+const fitGraphemes = (text: string, units: number): string =>
+  // eslint-disable-next-line unicorn/no-array-reduce -- one pass that stops adding at the first character that does not fit
+  splitGraphemes(text).reduce<{ readonly isFull: boolean; readonly kept: string }>(
+    (state, grapheme) =>
+      state.isFull || state.kept.length + grapheme.length > units
+        ? { isFull: true, kept: state.kept }
+        : { isFull: false, kept: state.kept + grapheme },
+    { isFull: false, kept: "" },
+  ).kept;
+
+/**
+The longest start of `text` that fits in `units` UTF-16 code units (what a stored field's length
+counts) and ends between two characters: a cut never leaves half of an emoji.
+*/
+export const sliceWhole = (text: string, units: number): string =>
+  text.length <= units ? text : fitGraphemes(text, units);
+
 /**
 A text cut to at most `max` graphemes, its end replaced by `…` when it was longer: a value from
 data quoted in a sentence (a task title in a toast) without the sentence ever being cut.

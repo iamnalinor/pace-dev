@@ -424,6 +424,22 @@ describe("get_task's text answer (session review minor 8)", () => {
     expect(text.length).toBeLessThan(description.length);
     expect(text).toContain("Long description.");
   });
+
+  it("cuts by characters, never inside one (an emoji at the cut), and cuts the closure's reason too", async () => {
+    const token = await readWriteToken();
+    // 199 letters, then emoji (two UTF-16 units each): character 200 is the first emoji.
+    const description = `${"a".repeat(199)}${"😀".repeat(50)}`;
+    const reason = `${"Long reason. ".repeat(40)}END-OF-REASON`;
+    const taskId = await createTask(token, { description, presetId: "work", title: "Emoji" });
+    await okTool(token, "close_task", { outcome: "cancelled", reason, taskId });
+    const result = await callTool(token, "get_task", { id: taskId });
+    const text = result.content[0]?.text ?? "";
+    expect(text).toContain(`${"a".repeat(199)}😀…`);
+    // No half of a surrogate pair is left anywhere in the answer.
+    expect(text.isWellFormed()).toBe(true);
+    expect(text).not.toContain("END-OF-REASON");
+    expect(text).toContain("reason: Long reason.");
+  });
 });
 
 describe("at and precision", () => {

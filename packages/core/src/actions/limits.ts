@@ -1,3 +1,5 @@
+import { sliceWhole } from "../format/initials.ts";
+
 /**
 The bounds of a action, read by its schema and by the code that makes one: what the server
 answers must always fit the contract the client parses it with.
@@ -21,6 +23,6 @@ export const fitMinutes = (minutes: null | number | undefined, max: number): nul
     ? null
     : Math.min(max, Math.round(minutes));
 
-/** Text cut to `max` characters, the cut marked with "…". */
+/** Text cut to `max` code units (a field's length), between two characters, the cut marked "…". */
 export const fitText = (text: string, max: number): string =>
-  text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
+  text.length <= max ? text : `${sliceWhole(text, max - 1).trimEnd()}…`;
