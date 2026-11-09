@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 
 import { expect, test } from "./support/fixtures.ts";
 import { loginViaApi } from "./support/login.ts";
+import { seedLivedIn } from "./support/seed.ts";
 
 /** The destinations whose large title must sit at one y (spec §5.0.2, F-LAY-02). */
 const DESTINATIONS = [
@@ -20,8 +21,8 @@ const VIEWPORTS = [
   { height: 844, width: 390 },
 ] as const;
 
-/** The top of the screen's level-1 title as drawn. */
-const titleTop = async (page: Page, path: string): Promise<number> => {
+/** Where the screen's level-1 title starts as drawn. */
+const titleAt = async (page: Page, path: string): Promise<{ x: number; y: number }> => {
   await page.goto(path);
   const title = page.getByRole("heading", { level: 1 }).first();
   await expect(title).toBeVisible();
@@ -29,7 +30,7 @@ const titleTop = async (page: Page, path: string): Promise<number> => {
   if (box === null) {
     throw new Error(`no box for the title of ${path}`);
   }
-  return box.y;
+  return { x: box.x, y: box.y };
 };
 
 for (const viewport of VIEWPORTS) {
@@ -40,7 +41,7 @@ for (const viewport of VIEWPORTS) {
     await loginViaApi(page);
     const tops: Record<string, number> = {};
     for (const path of DESTINATIONS) {
-      tops[path] = await titleTop(page, path);
+      tops[path] = (await titleAt(page, path)).y;
     }
     const first = tops["/"] ?? NaN;
     for (const path of DESTINATIONS) {
@@ -51,6 +52,22 @@ for (const viewport of VIEWPORTS) {
     }
   });
 }
+
+test("at 1440 every destination's title and the task page's start at one x (spec §5.0.1, design review H1)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 900, width: 1440 });
+  const { token } = await loginViaApi(page);
+  const seeded = await seedLivedIn(token);
+  const lefts: Record<string, number> = {};
+  for (const path of [...DESTINATIONS, `/task/${seeded.openTaskId}`]) {
+    lefts[path] = (await titleAt(page, path)).x;
+  }
+  const first = lefts["/"] ?? NaN;
+  for (const [path, x] of Object.entries(lefts)) {
+    expect(Math.abs(x - first), `${path} ${JSON.stringify(lefts)}`).toBeLessThanOrEqual(1);
+  }
+});
 
 test("a tablet's window (800) has the navigation rail and no tab bar (spec §5.0.1, F-LAY-04)", async ({
   page,
