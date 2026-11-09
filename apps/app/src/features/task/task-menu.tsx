@@ -170,8 +170,9 @@ export const TaskMenu = ({
           }}
         />
       </View>
-      {isWide && isOpen ? (
-        <Popover anchor={anchorRef} label={t("task.menu")} onClose={dismiss} open>
+      {isWide ? (
+        // Always there on a wide window, opened by `open`: it plays its exit as it closes.
+        <Popover anchor={anchorRef} label={t("task.menu")} onClose={dismiss} open={isOpen}>
           {items}
         </Popover>
       ) : null}

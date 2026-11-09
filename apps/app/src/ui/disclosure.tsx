@@ -74,13 +74,30 @@ const startGrow = ({ height, isReduced, measured, opacity }: Box, onDone: () => 
   );
 };
 
-/** Shrinks the box from the measured height while it fades out, then calls `onDone`. */
-const startShrink = ({ height, isReduced, measured, opacity }: Box, onDone: () => void): void => {
+/**
+Where a close starts: a settled box from the content's current height (it may have grown while
+open; a stale one clips the first frame, bug class 5), a box still growing from the height it has
+reached (from the full height it would jump open before it shrank).
+*/
+export const shrinkFrom = ({
+  current,
+  measured,
+  phase,
+}: {
+  readonly current: number;
+  readonly measured: number;
+  readonly phase: Phase;
+}): number => (phase === "opening" ? current : measured);
+
+/** Shrinks the box from `from` while it fades out, then calls `onDone`. */
+const startShrink = (
+  { from, height, isReduced, opacity }: Box & { readonly from: number },
+  onDone: () => void,
+): void => {
   const duration = isReduced ? motion.reduced.fade : motion.exit.md;
-  // From the content's current height (it may have grown while open), never a stale one: a
-  // clipped first frame is bug class 5. The value is set first, so the animation starts from it in
-  // the same frame (a 0 ms timing step would cost that frame: parked N2).
-  height.set(measured);
+  // The value is set first, so the animation starts from it in the same frame (a 0 ms timing step
+  // would cost that frame: parked N2).
+  height.set(from);
   if (!isReduced) {
     height.set(withTiming(0, { duration, easing: EASING.exit }));
   }
@@ -131,6 +148,7 @@ const useContentMotion = (isOpen: boolean, onShown: (() => void) | undefined) =>
     if (startedRef.current === phase) {
       return;
     }
+    const previous = startedRef.current;
     startedRef.current = phase;
     const box = { height, isReduced, measured: measuredRef.current, opacity };
     // Opened again while it closed: no new layout comes (its size is the same), so it grows
@@ -138,11 +156,13 @@ const useContentMotion = (isOpen: boolean, onShown: (() => void) | undefined) =>
     if (phase === "opening" && measuredRef.current > 0) {
       startGrow(box, settle);
     }
-    if (phase === "closing") {
-      startShrink(box, () => {
-        setPhase("gone");
-      });
+    if (phase !== "closing") {
+      return;
     }
+    const from = shrinkFrom({ current: height.get(), measured: box.measured, phase: previous });
+    startShrink({ ...box, from }, () => {
+      setPhase("gone");
+    });
   }, [height, isReduced, opacity, phase, setPhase, settle]);
   const isClamped = phase === "opening" || (phase === "closing" && !isReduced);
   const style = useAnimatedStyle(

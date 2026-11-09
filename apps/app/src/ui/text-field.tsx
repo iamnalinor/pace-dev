@@ -347,7 +347,8 @@ export const TextField = ({ draftKey, onBlur, onFocus, ...props }: TextFieldProp
             describedBy: hasMessage ? field.messageId : undefined,
             isGrowing,
             isMultiline,
-            isShown: shownError !== null,
+            // The border alone (`isInvalid`) says it too: a screen reader hears the same.
+            isShown: shownError !== null || isInvalid,
             onSubmitEditing,
             purpose,
             submit,

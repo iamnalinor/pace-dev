@@ -1,5 +1,9 @@
+import type { ReactNode } from "react";
+
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { Linking } from "react-native";
+
+import type { PopoverProps } from "#app/ui/popover.tsx";
 
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
@@ -11,6 +15,21 @@ import { TaskScreen } from "./task-screen.tsx";
 
 beforeEach(() => {
   jest.clearAllMocks();
+});
+
+/** Each `open` the kit popover is drawn with (the wide ⋯ menu's). */
+const mockPopoverOpen = jest.fn<undefined, [boolean]>();
+jest.mock("#app/ui/popover.tsx", (): unknown => {
+  const actual = jest.requireActual<{ readonly Popover: (props: PopoverProps) => ReactNode }>(
+    "#app/ui/popover.tsx",
+  );
+  return {
+    ...actual,
+    Popover: (props: PopoverProps) => {
+      mockPopoverOpen(props.open);
+      return actual.Popover(props);
+    },
+  };
 });
 
 // jest renders the phone, where Space is no key; the web's handler is the one under test here.
@@ -699,6 +718,15 @@ describe("TaskScreen — the ⋯ menu's roles (UI review I2: no nested menu, no 
 
     it("the popover is a dialog named by the menu's label, its rows buttons", async () => {
       await checkRoles();
+    });
+
+    it("keeps the popover mounted as it closes, so it plays its exit (UI review minor)", async () => {
+      await trkScreen();
+      await openMenu();
+      expect(mockPopoverOpen).toHaveBeenLastCalledWith(true);
+      await requestClose();
+      // Told to close, not taken away: it fades and scales out before it lets go.
+      expect(mockPopoverOpen).toHaveBeenLastCalledWith(false);
     });
   });
 });
