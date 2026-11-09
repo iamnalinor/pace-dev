@@ -1,5 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 
+import { ru } from "./support/catalog.ts";
 import { expect, test } from "./support/fixtures.ts";
 import { loginViaApi } from "./support/login.ts";
 import { type LivedIn, seedLivedIn } from "./support/seed.ts";
@@ -122,4 +123,58 @@ test("Done tells of its other times on hover, and a button beside it opens them"
         .getByRole("radio", { exact: true, name: outcome }),
     ).toBeVisible();
   }
+});
+
+/** Gives `control` the keyboard's focus (a tooltip shows for it at once, not for a click's). */
+const focusByKeyboard = async (page: Page, control: Locator): Promise<void> => {
+  await control.focus();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Tab");
+  await expect(control).toBeFocused();
+};
+
+/**
+Escape at a shown tooltip takes only the tooltip away (review of the fix wave 293b78c..9039ae6,
+I1): the pane's Escape shortcut and react-native-web's Modal (it closes on the keyup) heard the
+same Escape and closed the pane or the sheet with it. The next Escape closes the container.
+*/
+test.describe("Escape at a tooltip inside a container", () => {
+  test.use({ viewport: { height: 900, width: 1280 } });
+
+  test("a sheet's cross: the first Escape takes the tooltip, the second the sheet", async ({
+    page,
+  }) => {
+    const { token } = await loginViaApi(page);
+    const seeded = await seedLivedIn(token);
+    await page.goto(`/task/${seeded.openTaskId}`);
+    await page.getByRole("button", { name: ru["task.doneOther"] }).click();
+    const sheet = page.locator('[data-pace-surface="sheet"]');
+    await expect(sheet).toBeVisible();
+    await focusByKeyboard(page, sheet.getByRole("button", { name: ru["common.close"] }));
+    await expect(page.getByRole("tooltip")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
+    await expect(sheet).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(sheet).toHaveCount(0);
+  });
+
+  test("an inspector pane's cross: the first Escape takes the tooltip, the second the pane", async ({
+    page,
+  }) => {
+    // The lived-in account speaks Russian, as the names below.
+    const { token } = await loginViaApi(page);
+    await seedLivedIn(token);
+    await page.goto("/day");
+    await page.getByRole("button", { name: ru["day.logPast"] }).click();
+    const pane = page.getByRole("region", { name: ru["day.details"] });
+    await expect(pane).toBeVisible();
+    await focusByKeyboard(page, pane.getByRole("button", { name: ru["common.close"] }));
+    await expect(page.getByRole("tooltip")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
+    await expect(pane).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(pane).toHaveCount(0);
+  });
 });

@@ -61,6 +61,37 @@ const isShown = (label: string): boolean =>
     .queryAllByTestId("tooltip-bubble")
     .some((bubble) => within(bubble).queryByText(label) !== null);
 
+/** The window the tooltip listens on (the test runs without a browser: a bare event target). */
+const page = new EventTarget();
+
+/** A real Escape on the window: nothing about its propagation is mocked. */
+const pressOnWindow = async (type: "keydown" | "keyup"): Promise<void> => {
+  await act(() => {
+    page.dispatchEvent(
+      Object.assign(new Event(type, { cancelable: true }), {
+        altKey: false,
+        isComposing: false,
+        ctrlKey: false,
+        key: "Escape",
+        metaKey: false,
+        shiftKey: false,
+      }),
+    );
+  });
+};
+
+beforeAll(() => {
+  Object.assign(globalThis, {
+    addEventListener: page.addEventListener.bind(page),
+    removeEventListener: page.removeEventListener.bind(page),
+  });
+});
+
+afterAll(() => {
+  Reflect.deleteProperty(globalThis, "addEventListener");
+  Reflect.deleteProperty(globalThis, "removeEventListener");
+});
+
 describe("Tooltip on the web (spec §4.2.31, §6 tooltip)", () => {
   afterEach(async () => {
     // A tooltip left open would make the next test's trigger "warm".
@@ -148,7 +179,7 @@ describe("Tooltip on the web (spec §4.2.31, §6 tooltip)", () => {
     // The DOM's focus event bubbles from the button up to the tooltip around it.
     await fireEvent(sendWrapper(), "focus", {});
     expect(isShown(LABEL)).toBe(true);
-    await fireEvent(button("Send"), "keyDown", { key: "Escape" });
+    await pressOnWindow("keydown");
     expect(isShown(LABEL)).toBe(false);
   });
 
@@ -194,13 +225,23 @@ describe("Tooltip on the web (spec §4.2.31, §6 tooltip)", () => {
     );
   });
 
-  it("on Escape only the tooltip goes: the key stops there (the dialog under it stays)", async () => {
+  it("on Escape only the tooltip goes: no other listener hears the key or its keyup (the sheet under it stays)", async () => {
     await renderTriggers(<Trigger label={LABEL} name="Send" />);
     await fireEvent(sendWrapper(), "focus", {});
-    const stopPropagation = jest.fn();
-    await fireEvent(button("Send"), "keyDown", { key: "Escape", stopPropagation });
+    // A sheet's Escape (a shortcut, react-native-web's Modal): on the window after the tooltip's.
+    const onSheetKey = jest.fn();
+    page.addEventListener("keydown", onSheetKey, { capture: true });
+    page.addEventListener("keyup", onSheetKey, { capture: true });
+    await pressOnWindow("keydown");
+    await pressOnWindow("keyup");
     expect(isShown(LABEL)).toBe(false);
-    expect(stopPropagation).toHaveBeenCalled();
+    expect(onSheetKey).not.toHaveBeenCalled();
+    // The tooltip is gone: the next Escape is the sheet's.
+    await pressOnWindow("keydown");
+    await pressOnWindow("keyup");
+    expect(onSheetKey).toHaveBeenCalledTimes(2);
+    page.removeEventListener("keydown", onSheetKey, { capture: true });
+    page.removeEventListener("keyup", onSheetKey, { capture: true });
   });
 
   it("on a touch screen shows nothing: the tap runs the control", async () => {

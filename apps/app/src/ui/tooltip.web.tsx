@@ -7,6 +7,7 @@ import { z } from "@pace/core";
 import type { TooltipProps } from "./tooltip-props.ts";
 
 import { paletteVars } from "../platform/theme.ts";
+import { pushEscapeTaker } from "./escape-first.ts";
 import { Text } from "./text.tsx";
 import { useTheme } from "./theme-provider.tsx";
 import { controlsNear, forgetControls, type ScanRoot } from "./tooltip-controls.ts";
@@ -96,7 +97,10 @@ const useDescribedBy = (wrapperRef: RefObject<null | View>, id: string, isOn: bo
   }, [id, isOn, wrapperRef]);
 };
 
-/** While it shows: Escape anywhere and a scroll (it would be left behind) take it away. */
+/**
+While it shows: Escape anywhere (taken before any shortcut or dialog, `escape-first.ts`) and a
+scroll (it would be left behind) take it away.
+*/
 const useDismiss = (isShown: boolean, hide: () => void): void => {
   const hideRef = useRef(hide);
   useEffect(() => {
@@ -113,6 +117,16 @@ const useDismiss = (isShown: boolean, hide: () => void): void => {
     };
   }, [isShown]);
   useEffect(() => {
+    if (!isShown) {
+      return;
+    }
+
+    // Only the tooltip goes: the pane, sheet or dialog under it hears nothing of this Escape.
+    return pushEscapeTaker(() => {
+      hideRef.current();
+    });
+  }, [isShown]);
+  useEffect(() => {
     if (!isShown || typeof globalThis.addEventListener !== "function") {
       return;
     }
@@ -121,20 +135,9 @@ const useDismiss = (isShown: boolean, hide: () => void): void => {
       forgetControls();
       hideRef.current();
     };
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key !== "Escape") {
-        return;
-      }
-
-      // Only the tooltip goes: the sheet or dialog under it hears nothing of this Escape.
-      event.stopPropagation();
-      hideRef.current();
-    };
-    globalThis.addEventListener("keydown", onKey, { capture: true });
     globalThis.addEventListener("scroll", dismiss, { capture: true });
     globalThis.addEventListener("resize", dismiss);
     return () => {
-      globalThis.removeEventListener("keydown", onKey, { capture: true });
       globalThis.removeEventListener("scroll", dismiss, { capture: true });
       globalThis.removeEventListener("resize", dismiss);
     };
@@ -320,18 +323,6 @@ export const Tooltip = ({
   const isShown = label !== undefined && state.shown !== null;
   useDescribedBy(wrapperRef, id, label !== undefined);
   useDismiss(isShown, state.hide);
-  // Events react-native-web passes to the DOM but React Native's types do not list.
-  const keys = {
-    onKeyDown: (event: { readonly key?: string; readonly stopPropagation?: () => void }) => {
-      if (!isShown || event.key !== "Escape") {
-        return;
-      }
-
-      // Only the tooltip goes first: the dialog around it stays for the next Escape.
-      event.stopPropagation?.();
-      state.hide();
-    },
-  };
   return (
     <View
       {...(isFilling && { className: "flex-1" })}
@@ -356,7 +347,6 @@ export const Tooltip = ({
         }
       }}
       ref={wrapperRef}
-      {...(keys as object)}
     >
       {children}
       {label === undefined ? null : <Description id={id} label={label} />}
