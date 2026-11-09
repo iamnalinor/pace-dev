@@ -41,6 +41,40 @@ const boxOf = (element: unknown): Box | null => {
   return { height: rect.height, width: rect.width, x: rect.left, y: rect.top };
 };
 
+/** The trigger's box and the controls around it, read when the tooltip shows. */
+type Anchor = { readonly box: Box; readonly others: readonly Box[] };
+
+/** The controls a bubble must not lie over (bug class 6: an overlay over a control takes its press). */
+const CONTROLS =
+  'button, input, textarea, select, a[href], [role="button"], [role="link"], [role="tab"], [role="switch"], [role="radio"], [role="checkbox"]';
+
+/** How far from its trigger a control can be and still be in a bubble's way. */
+const NEAR_PX = 320;
+
+/** The boxes of the page's other controls near the trigger, read when the tooltip shows. */
+const othersNear = (element: unknown, anchor: Box | null): readonly Box[] => {
+  const trigger = element as null | Partial<Pick<Element, "contains">>;
+  if (
+    anchor === null ||
+    typeof document === "undefined" ||
+    typeof trigger?.contains !== "function"
+  ) {
+    return [];
+  }
+  return [...document.querySelectorAll(CONTROLS)].flatMap((control) => {
+    if (trigger.contains?.(control) === true || control.closest('[aria-hidden="true"]') !== null) {
+      return [];
+    }
+    const box = boxOf(control);
+    const isNear =
+      box !== null &&
+      box.width > 0 &&
+      Math.abs(box.x + box.width / 2 - (anchor.x + anchor.width / 2)) < NEAR_PX + box.width / 2 &&
+      Math.abs(box.y + box.height / 2 - (anchor.y + anchor.height / 2)) < NEAR_PX;
+    return isNear ? [box] : [];
+  });
+};
+
 /** Keyboard focus, not the focus a click leaves behind. */
 const isKeyboardFocus = (target: unknown): boolean => {
   const node = target as Partial<Pick<Element, "matches">> | undefined;
@@ -139,9 +173,12 @@ const useTimer = () => {
 Fixed to the window over the page, at its place once both it and its trigger are measured. A
 hidden one is still laid out (and measured), only not seen and not in the pointer's way.
 */
-const frameStyle = (anchor: Box | null, size: null | Size) => {
+const frameStyle = (anchor: Anchor | null, size: null | Size) => {
   const viewport = { height: globalThis.innerHeight, width: globalThis.innerWidth };
-  const place = anchor === null || size === null ? null : placeTooltip(anchor, size, viewport);
+  const place =
+    anchor === null || size === null
+      ? null
+      : placeTooltip(anchor.box, size, { others: anchor.others, viewport });
   return {
     left: place?.left ?? 0,
     opacity: place === null ? 0 : 1,
@@ -166,7 +203,7 @@ const Bubble = ({
   onPointerEnter,
   onPointerLeave,
 }: {
-  readonly anchor: Box | null;
+  readonly anchor: Anchor | null;
   readonly id: string;
   readonly isVisible: boolean;
   readonly label: string;
@@ -206,13 +243,18 @@ focus on it (`focus`), with the trigger's place; and the moves that show and hid
 const useTooltipState = (wrapperRef: RefObject<null | View>) => {
   /** How it came to show: the pointer resting on it, or the keyboard's focus on its trigger. */
   type Mode = "focus" | "hover";
-  const [shown, setShown] = useState<null | { readonly mode: Mode; readonly anchor: Box | null }>(
-    null,
-  );
+  const [shown, setShown] = useState<null | {
+    readonly mode: Mode;
+    readonly anchor: Anchor | null;
+  }>(null);
   const timer = useTimer();
   const show = (mode: Mode): void => {
     timer.cancel();
-    setShown({ anchor: boxOf(wrapperRef.current), mode });
+    const box = boxOf(wrapperRef.current);
+    setShown({
+      anchor: box === null ? null : { box, others: othersNear(wrapperRef.current, box) },
+      mode,
+    });
   };
   const hide = (): void => {
     timer.cancel();

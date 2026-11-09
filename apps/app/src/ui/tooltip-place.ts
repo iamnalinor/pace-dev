@@ -13,7 +13,7 @@ export type Size = { readonly width: number; readonly height: number };
 export type Placement = {
   readonly left: number;
   readonly top: number;
-  readonly side: "above" | "below";
+  readonly side: Side;
 };
 
 /** Air between the trigger and the bubble. */
@@ -39,18 +39,71 @@ icon buttons reads each name without waiting again.
 */
 export const WARM_MS = 600;
 
+type Side = "above" | "after" | "before" | "below";
+
+/** The bubble's size and the window it must fit in. */
+type Fit = { readonly bubble: Size; readonly viewport: Size };
+
+/** Whether two boxes share more than a pixel. */
+const isOverlapping = (one: Box, other: Box): boolean =>
+  one.x < other.x + other.width - 1 &&
+  other.x < one.x + one.width - 1 &&
+  one.y < other.y + other.height - 1 &&
+  other.y < one.y + one.height - 1;
+
+/** The bubble's box on one side of its trigger, slid to stay inside the window; null if it cannot fit. */
+const boxOn = (side: Side, anchor: Box, { bubble, viewport }: Fit): Box | null => {
+  const clamp = (value: number, size: number, room: number): number =>
+    Math.min(Math.max(value, EDGE), Math.max(EDGE, room - EDGE - size));
+  const centredX = clamp(
+    anchor.x + anchor.width / 2 - bubble.width / 2,
+    bubble.width,
+    viewport.width,
+  );
+  const centredY = clamp(
+    anchor.y + anchor.height / 2 - bubble.height / 2,
+    bubble.height,
+    viewport.height,
+  );
+  const at = {
+    above: { x: centredX, y: anchor.y - GAP - bubble.height },
+    after: { x: anchor.x + anchor.width + GAP, y: centredY },
+    before: { x: anchor.x - GAP - bubble.width, y: centredY },
+    below: { x: centredX, y: anchor.y + anchor.height + GAP },
+  }[side];
+  const isInside =
+    at.x >= EDGE &&
+    at.y >= EDGE &&
+    at.x + bubble.width <= viewport.width - EDGE &&
+    at.y + bubble.height <= viewport.height - EDGE;
+  return isInside ? { ...at, height: bubble.height, width: bubble.width } : null;
+};
+
+const SIDES: readonly Side[] = ["above", "below", "after", "before"];
+
 /**
-Where a tooltip's bubble goes: centred over its trigger, or under it when there is no room
-above, and slid sideways to stay inside the window.
+Where a tooltip's bubble goes: above its trigger, else below, else beside it (after, before), the
+first side that fits the window and lies over none of `others` (the page's other controls: a
+bubble over a control takes its press, bug class 6). Every side covering something, the first
+that fits; none fitting, below.
 */
-export const placeTooltip = (anchor: Box, bubble: Size, viewport: Size): Placement => {
-  const above = anchor.y - GAP - bubble.height;
-  const side = above >= EDGE ? "above" : "below";
-  const centred = anchor.x + anchor.width / 2 - bubble.width / 2;
-  const rightmost = Math.max(EDGE, viewport.width - EDGE - bubble.width);
-  return {
-    left: Math.min(Math.max(centred, EDGE), rightmost),
+export const placeTooltip = (
+  anchor: Box,
+  bubble: Size,
+  { others = [], viewport }: { readonly viewport: Size; readonly others?: readonly Box[] },
+): Placement => {
+  const fitting = SIDES.map((side) => ({
+    box: boxOn(side, anchor, { bubble, viewport }),
     side,
-    top: side === "above" ? above : anchor.y + anchor.height + GAP,
-  };
+  })).filter((place): place is { box: Box; side: Side } => place.box !== null);
+  const chosen = fitting.find(({ box }) => others.every((other) => !isOverlapping(box, other))) ??
+    fitting[0] ?? {
+      box: {
+        ...bubble,
+        x: Math.min(Math.max(anchor.x, EDGE), Math.max(EDGE, viewport.width - EDGE - bubble.width)),
+        y: anchor.y + anchor.height + GAP,
+      },
+      side: "below" as const,
+    };
+  return { left: chosen.box.x, side: chosen.side, top: chosen.box.y };
 };
