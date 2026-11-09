@@ -2,10 +2,12 @@ import type { NowRow } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { Composer } from "#app/features/now/composer/composer.tsx";
+import { requestNewTask } from "#app/shared/new-task-request.ts";
 import { FoldedSection, TaskRows } from "#app/shared/task-list.tsx";
 import { TimeBar } from "#app/shared/tracking/time-bar.tsx";
 import { useSearchParam } from "#app/shared/use-search-param.ts";
 import { ZoneBanner } from "#app/shared/zone-banner.tsx";
+import { Button } from "#app/ui/button.tsx";
 import { EmptyState } from "#app/ui/empty-state.tsx";
 import { Screen } from "#app/ui/screen.tsx";
 
@@ -43,7 +45,17 @@ export const NowBoard = ({
       <ZoneBanner />
       <CalendarPrompt />
       <ProjectChips chips={board.projects} onSelect={setProjectId} selected={selected} />
-      {isEmpty ? <EmptyState title={t("now.empty")} /> : null}
+      {isEmpty ? (
+        <EmptyState
+          action={
+            <Button onPress={requestNewTask} variant="secondary">
+              {t("now.emptyAdd")}
+            </Button>
+          }
+          body={t("now.emptyBody")}
+          title={t("now.empty")}
+        />
+      ) : null}
       <NowTaskGroups rows={rows} />
       <FoldedSection count={future.length} title={t("now.future")}>
         <TaskRows animateLayout={false} label={t("now.future")} rows={future} />

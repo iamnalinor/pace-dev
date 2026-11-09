@@ -1,6 +1,8 @@
 /** Now, the task page and the words that describe a task. */
 export const enBoard = {
   "now.empty": "Nothing to do right now.",
+  "now.emptyBody": "Your tasks show here, the nearest deadline first.",
+  "now.emptyAdd": "Add a task",
   "task.reopened": "Reopened",
   "task.menu.preset": "Change preset",
   "task.menu.closeAs": "Close as…",
