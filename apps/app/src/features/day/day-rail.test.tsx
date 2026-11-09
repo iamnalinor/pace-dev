@@ -80,13 +80,13 @@ describe("DayRail and NowMargin (Task 7.1, owner 2026-11-09: the rail lines up w
     expect(bars[2]).toHaveStyle({ height: 110, top: 124 });
   });
 
-  it("draws a block in its category's tint and stroke, a gap dashed with no hue", async () => {
+  it("draws a block in its category's tint with a stroke edge, a gap dashed with no hue", async () => {
     const entries = [block("08:00", "09:00", { color: "green" }), gap("09:00", "10:00")];
     await draw(entries, stacked(entries, [60, 60]));
     const [bar, gapBar] = screen.getAllByTestId("rail-bar", HIDDEN);
-    expect(classesOf(bar ?? { props: {} })).toContain("bg-hue-green-tint");
-    expect(String(screen.getByTestId("rail-pen", HIDDEN).props["className"])).toContain(
-      "border-hue-green-stroke",
+    // The tint alone measured 1.15:1 on the page; the stroke edge is the ≥ 3:1 mark (H4).
+    expect(classesOf(bar ?? { props: {} })).toEqual(
+      expect.arrayContaining(["bg-hue-green-tint", "border-stroke", "border-hue-green-stroke"]),
     );
     expect(classesOf(gapBar ?? { props: {} })).toEqual(
       expect.arrayContaining(["border-dashed", "border-outline"]),
@@ -113,6 +113,25 @@ describe("DayRail and NowMargin (Task 7.1, owner 2026-11-09: the rail lines up w
     await draw(entries, stacked(entries, [60, 80]), at("09:30"));
     expect(screen.getByTestId("now-margin", HIDDEN)).toHaveStyle({ top: 140 });
     expect(screen.getByText("09:30", HIDDEN)).toBeOnTheScreen();
+  });
+
+  it("ends every running bar on the now line: the main one runs on past its row to it (design review H4)", async () => {
+    const entries = [
+      block("09:00", "09:30", { isRunning: true }),
+      block("09:10", "09:30", { isAlongside: true, isRunning: true }),
+    ];
+    await draw(entries, stacked(entries, [60, 80]), at("09:30"));
+    expect(screen.getByTestId("now-margin", HIDDEN)).toHaveStyle({ top: 140 });
+    const [main, alongside] = screen.getAllByTestId("rail-slot", HIDDEN);
+    expect(main).toHaveStyle({ height: 140, top: 0 });
+    expect(alongside).toHaveStyle({ height: 80, top: 60 });
+  });
+
+  it("sets the time inside the timeline's edge, above the line, never past the card (design review H4)", async () => {
+    const entries = [block("09:00", "09:30", { isRunning: true })];
+    await draw(entries, stacked(entries, [60]), at("09:30"));
+    const time = screen.getByText("09:30", HIDDEN);
+    expect(classesOf(time)).toEqual(expect.arrayContaining(["absolute", "right-4", "bottom-2"]));
   });
 
   it("puts the now line inside a row in proportion to its time", async () => {

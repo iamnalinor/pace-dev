@@ -65,30 +65,41 @@ const barsOf = (entries: readonly RailEntry[]): readonly RailBar[] =>
     };
   });
 
+/** A running block holds now whatever its end says: the day and the clock tick apart. */
+const isRunningEntry = (entry: RailEntry): boolean =>
+  entry.kind === "activity" && entry.row.isRunning;
+
+/** How far into a row now is: 0 at its start, 1 at its end (always 1 for a running row). */
+const shareOf = (entry: RailEntry, instant: number): number => {
+  const span = spanOf(entry);
+  const length = Date.parse(span.endAt) - Date.parse(span.startAt);
+  return isRunningEntry(entry) || length <= 0
+    ? 1
+    : Math.min(1, (instant - Date.parse(span.startAt)) / length);
+};
+
 /**
 The notebook page's rail (spec §2 A, Task 7.1; owner 2026-11-09: aligned with the rows): one bar
 per row of the day, in the rows' order and under their keys, so each bar stands beside its own row
 in its category's colour (a gap dashed, a parallel block narrower). The rows' heights are their own,
 not time: the bar takes the row's measured frame. `now` names the row whose time holds the present
-(the main line's before a parallel one) and how far into it, for the red margin line.
+and how far into it, for the red margin line: the last row that holds it, so every running bar
+(the main line's and one alongside it, listed after) can end on the line. A running row holds now
+even when its end was read a tick before the clock: the day's model and the screen's clock tick
+apart, and the line vanished in between (design review H4).
 */
 export const dayRail = (entries: readonly RailEntry[], now: string): DayRail => {
   const bars = barsOf(entries);
   const instant = Date.parse(now);
   const holding = entries.filter((entry) => {
     const span = spanOf(entry);
-    return Date.parse(span.startAt) <= instant && instant <= Date.parse(span.endAt);
+    return (
+      Date.parse(span.startAt) <= instant &&
+      (isRunningEntry(entry) || instant <= Date.parse(span.endAt))
+    );
   });
-  const isMain = (entry: RailEntry): boolean =>
-    bars.find((bar) => bar.key === entry.key)?.kind !== "parallel";
-  const row = holding.find((entry) => isMain(entry)) ?? holding[0];
-  if (row === undefined) {
-    return { bars, now: null };
-  }
-  const span = spanOf(row);
-  const length = Date.parse(span.endAt) - Date.parse(span.startAt);
-  return {
-    bars,
-    now: { at: length <= 0 ? 1 : (instant - Date.parse(span.startAt)) / length, key: row.key },
-  };
+  const row = holding.at(-1);
+  return row === undefined
+    ? { bars, now: null }
+    : { bars, now: { at: shareOf(row, instant), key: row.key } };
 };

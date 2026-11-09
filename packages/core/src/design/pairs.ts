@@ -147,6 +147,9 @@ export const USED_PAIRS: readonly ContrastPair[] = [
   ...HUE_NAMES.flatMap((name): readonly ContrastPair[] => [
     { fg: `hue.${name}.ink`, bg: `hue.${name}.tint`, over: "bg.cell", target: "meta" },
     { fg: `hue.${name}.ink`, bg: `hue.${name}.tint`, over: "bg.app", target: "meta" },
+    // Also Day's rail bar (design review H4): its 2 px stroke edge on the page is the bar's 3:1
+    // mark; its tint alone measured 1.15:1 light and 1.32:1 dark (on its own tint the stroke
+    // measures 2.9:1 for green and teal, so the edge, not the fill, carries it).
     { fg: `hue.${name}.stroke`, bg: "bg.app", target: "ui" },
     // Also a running time-bar tile's bar: the tile is `bg.cell`, since the stroke on `fill.3`
     // (the spec's running fill) measures 2.7-2.97:1 and on `fill.2` 2.94:1 (design review H5).

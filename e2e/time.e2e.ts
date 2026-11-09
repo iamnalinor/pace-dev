@@ -183,6 +183,17 @@ for (const size of SIZES) {
       await page.goto("/day");
       await expect(page.getByRole("heading", { level: 1, name: "Day" })).toBeVisible();
       await expect(timeBar(page)).toHaveCount(0);
+      // The red now line is there on every size and theme, its time inside the timeline's edge
+      // (design review H4: missing on the phone and in dark; the time ran past the card).
+      const margin = page.getByTestId("now-margin");
+      await expect(margin).toBeVisible();
+      const [line, timeline] = await Promise.all([
+        margin.getByText(/^\d{2}:\d{2}$/u).boundingBox(),
+        page.getByTestId("day-timeline").boundingBox(),
+      ]);
+      expect((line?.x ?? Infinity) + (line?.width ?? 0)).toBeLessThanOrEqual(
+        (timeline?.x ?? 0) + (timeline?.width ?? 0),
+      );
       await page.goto("/");
       await timeBar(page).getByRole("button", { name: "Stop: Walk" }).click();
       await expect(timeBar(page).getByRole("button", { name: "Stop: Walk" })).toHaveCount(0);
