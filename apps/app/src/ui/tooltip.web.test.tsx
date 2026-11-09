@@ -55,6 +55,11 @@ const pass = async (ms: number): Promise<void> => {
   });
 };
 
+/** The bubble's first layout: it is measured, and placed. */
+const layOut = async (bubble: ReturnType<typeof screen.getByTestId>): Promise<void> => {
+  await fireEvent(bubble, "layout", { nativeEvent: { layout: { height: 32, width: 120 } } });
+};
+
 /** Whether the bubble that says `label` is shown (a hidden one is not in the page at all). */
 const isShown = (label: string): boolean =>
   screen
@@ -151,6 +156,7 @@ describe("Tooltip on the web (spec §4.2.31, §6 tooltip)", () => {
     if (bubble === undefined) {
       throw new Error("no bubble");
     }
+    await layOut(bubble);
     expect(bubble.props["pointerEvents"]).toBe("auto");
     await fireEvent(bubble, "pointerEnter", pointer("mouse"));
     await pass(HOVER_GRACE_MS * 3);
@@ -158,6 +164,50 @@ describe("Tooltip on the web (spec §4.2.31, §6 tooltip)", () => {
     await fireEvent(bubble, "pointerLeave", pointer("mouse"));
     await pass(HOVER_GRACE_MS);
     expect(isShown(LABEL)).toBe(false);
+  });
+
+  it("an unplaced bubble takes no pointer: one mounted under the leaving pointer does not keep itself up", async () => {
+    await renderTriggers(<Trigger isImmediate label={LABEL} name="Send" />);
+    await fireEvent(button("Send"), "pointerEnter", pointer("mouse"));
+    const bubble = screen.getAllByTestId("tooltip-bubble")[0];
+    if (bubble === undefined) {
+      throw new Error("no bubble");
+    }
+    // Not measured yet: it waits at the window's corner, unseen, where the pointer may be going.
+    expect(bubble.props["pointerEvents"]).toBe("none");
+    expect(bubble.props["style"]).toEqual(
+      expect.arrayContaining([expect.objectContaining({ visibility: "hidden" })]),
+    );
+    // Nothing on it calls off the hide (here the bubble is not in a portal, so an event fired on
+    // it would reach the trigger's wrapper: its own handlers are what is checked).
+    expect(bubble.props["onPointerEnter"]).toBeUndefined();
+    await fireEvent(button("Send"), "pointerLeave", pointer("mouse"));
+    await pass(HOVER_GRACE_MS);
+    expect(isShown(LABEL)).toBe(false);
+  });
+
+  it("a pointer moving off the trigger and the bubble takes a hover tooltip away, though no leave came", async () => {
+    await renderTriggers(<Trigger isImmediate label={LABEL} name="Send" />);
+    await fireEvent(button("Send"), "pointerEnter", pointer("mouse"));
+    expect(isShown(LABEL)).toBe(true);
+    // Moves elsewhere on the page, one after another: the grace runs from the first, not the last.
+    for (const _ of [1, 2, 3]) {
+      await act(() => {
+        page.dispatchEvent(new Event("pointermove"));
+        jest.advanceTimersByTime(HOVER_GRACE_MS / 2);
+      });
+    }
+    expect(isShown(LABEL)).toBe(false);
+  });
+
+  it("a pointer moving elsewhere leaves a keyboard-focus tooltip up", async () => {
+    await renderTriggers(<Trigger label={LABEL} name="Send" />);
+    await fireEvent(sendWrapper(), "focus", {});
+    await act(() => {
+      page.dispatchEvent(new Event("pointermove"));
+    });
+    await pass(HOVER_GRACE_MS * 2);
+    expect(isShown(LABEL)).toBe(true);
   });
 
   it("shows the next trigger's at once when the pointer moves on from one", async () => {
