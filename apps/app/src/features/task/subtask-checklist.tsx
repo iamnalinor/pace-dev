@@ -3,7 +3,7 @@ import { View } from "react-native";
 import type { SubtaskRow, TaskViewModel } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
-import { clockTime } from "#app/format/time.ts";
+import { zonedText } from "#app/format/time.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { cx } from "#app/ui/cx.ts";
@@ -13,9 +13,6 @@ import { Pressable } from "#app/ui/pressable.tsx";
 import { SectionHeader } from "#app/ui/section-header.tsx";
 import { spacePress } from "#app/ui/space-press.ts";
 import { Text } from "#app/ui/text.tsx";
-
-const weekday = (atIso: string, tz: string, language: string): string =>
-  new Intl.DateTimeFormat(language, { timeZone: tz, weekday: "short" }).format(new Date(atIso));
 
 /** The 24 circle in its 48 column, filled once done. */
 const Mark = ({ state }: { readonly state: SubtaskRow["state"] }) => (
@@ -42,15 +39,16 @@ const SubtaskItem = ({
   readonly taskId: string;
 }) => {
   const t = useT();
-  const { deviceTz, language } = useViewer();
+  const viewer = useViewer();
   const { actions } = usePace();
   const run = useRunAction();
-  // When it was done, on this device's clock: the one mark records its instant (feedback 5).
+  // When it was done, on this device's clock: the one mark records its instant (feedback 5). Its
+  // day is named as the task's fields name one ("today 22:08", R24-07).
   const note =
     subtask.doneAt === null
       ? ""
       : t("task.subtaskDoneAt", {
-          when: `${weekday(subtask.doneAt, deviceTz, language)} ${clockTime(subtask.doneAt, deviceTz)}`,
+          when: zonedText({ at: subtask.doneAt, mode: "due", tz: viewer.deviceTz }, viewer),
         });
   const toggle = (): void => {
     if (isClosed) {

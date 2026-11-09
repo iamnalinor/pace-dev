@@ -233,6 +233,8 @@ describe("NotificationsScreen", () => {
     ).toBeOnTheScreen();
     expect(screen.getByText(`${SIGN_IN_IP} · Germany`)).toBeOnTheScreen();
     expect(screen.getByText(en("notifications.digestTitle"))).toBeOnTheScreen();
+    // Its deadline's day named as the task names it: "tomorrow", not the weekday (R24-07's class).
+    expect(screen.getByText(/^tomorrow 18:00 · /u)).toBeOnTheScreen();
     await waitFor(() => {
       expect(read).toHaveBeenCalledTimes(1);
     });

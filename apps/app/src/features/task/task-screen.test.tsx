@@ -135,8 +135,9 @@ describe("TaskScreen — homework", () => {
     await waitFor(() => {
       expect(screen.getByRole("checkbox", { name: "Kronecker–Capelli" })).toBeChecked();
     });
-    // Marked now (the test clock): its day and time beside it, and no "Submit N" anywhere.
-    expect(screen.getByText(en("task.subtaskDoneAt", { when: "Wed 12:50" }))).toBeOnTheScreen();
+    // Marked now (the test clock): its day, named as the fields name it (R24-07), and time beside
+    // it, and no "Submit N" anywhere.
+    expect(screen.getByText(en("task.subtaskDoneAt", { when: "today 12:50" }))).toBeOnTheScreen();
     expect(screen.queryByText(/^Submit/u)).toBeNull();
     expect(screen.getByRole("button", { name: en("task.done") })).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("checkbox", { name: "Kronecker–Capelli" }));

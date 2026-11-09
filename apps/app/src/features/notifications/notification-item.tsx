@@ -11,6 +11,7 @@ import { type DeliveryEntry, type ListedSessions, signInState } from "@pace/clie
 import {
   countryName,
   formatLeft,
+  formatRelativeDay,
   type Language,
   minutesBetween,
   plural,
@@ -22,9 +23,9 @@ import { Answers, Line } from "./answers.tsx";
 
 export type Zoned = { readonly language: Language; readonly zone: string; readonly now: string };
 
-/** `Fri 18:00` in the zone and language. */
-const dayClock = (iso: string, { language, zone }: Zoned): string =>
-  `${new Intl.DateTimeFormat(language, { timeZone: zone, weekday: "short" }).format(new Date(iso))} ${clockTime(iso, zone)}`;
+/** `today 18:00`, `Oct 9 18:00` in the zone and language: the day named as a task names it (R24-07). */
+const dayClock = (iso: string, { language, now, zone }: Zoned): string =>
+  `${formatRelativeDay(iso, now, { language, tz: zone })} ${clockTime(iso, zone)}`;
 
 type SignInPayload = Extract<PoolNotification, { kind: "login" }>["payload"];
 
