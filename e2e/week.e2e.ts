@@ -370,14 +370,19 @@ test("narrow side-by-side blocks say their whole name on hover, and a 0-minute b
   // The narrow box cannot show the whole name (it is cut to one line with an ellipsis, design
   // review H6); the tooltip says it with the times. Scoped to the bubble: the box keeps the whole
   // name in its own text and title too.
-  expect(
-    await email.evaluate((box) => {
-      // Any line of its text drawn narrower than it is long: cut with an ellipsis.
-      return [...box.querySelectorAll<HTMLElement>('[dir="auto"]')].some(
-        (label) => label.scrollWidth > label.clientWidth,
-      );
-    }),
-  ).toBe(true);
+  // Polled: the box is drawn before the week's layout settles (its lane, the hours' share of the
+  // height, its measured width), and a one-shot read in the full run caught it before the cut.
+  await expect
+    .poll(
+      async () =>
+        await email.evaluate((box) =>
+          // Any line of its text drawn narrower than it is long: cut with an ellipsis.
+          [...box.querySelectorAll<HTMLElement>('[dir="auto"]')].some(
+            (label) => label.scrollWidth > label.clientWidth,
+          ),
+        ),
+    )
+    .toBe(true);
   await email.hover();
   await expect(
     page.getByRole("tooltip").filter({ hasText: /^Email the dean, \d\d:\d\d–\d\d:\d\d$/u }),
