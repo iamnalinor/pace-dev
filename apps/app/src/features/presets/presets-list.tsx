@@ -39,8 +39,6 @@ const PresetRow = ({
   const t = useT();
   const language = useLanguage();
   const router = useRouter();
-  const { actions } = usePace();
-  const run = useRunAction();
   const presets = useAppState((state) => state.presets);
   const resolved = resolvePreset(presets, preset.id);
   const name = presetLabel(preset, language);
@@ -65,20 +63,44 @@ const PresetRow = ({
           trailing={<Icon name="chevron-right" size="inline" tone="tertiary" />}
         />
       </View>
+      {preset.archived ? null : (
+        <MoveButtons isFirst={isFirst} isLast={isLast} name={name} presetId={preset.id} />
+      )}
+    </View>
+  );
+};
+
+/** ▲▼ move a preset in the pickers: a deleted one is in no picker, so it has none (R25-02). */
+const MoveButtons = ({
+  isFirst,
+  isLast,
+  name,
+  presetId,
+}: {
+  readonly isFirst: boolean;
+  readonly isLast: boolean;
+  readonly name: string;
+  readonly presetId: string;
+}) => {
+  const t = useT();
+  const { actions } = usePace();
+  const run = useRunAction();
+  return (
+    <>
       <IconButton
         disabled={isFirst}
         // Arrows, not chevrons: the row's one chevron is the one that opens it (R24-10).
         icon="arrow-up"
         label={t("presets.moveUp", { name })}
-        onPress={() => void run(actions.movePreset(preset.id, -1))}
+        onPress={() => void run(actions.movePreset(presetId, -1))}
       />
       <IconButton
         disabled={isLast}
         icon="arrow-down"
         label={t("presets.moveDown", { name })}
-        onPress={() => void run(actions.movePreset(preset.id, 1))}
+        onPress={() => void run(actions.movePreset(presetId, 1))}
       />
-    </View>
+    </>
   );
 };
 
@@ -117,7 +139,9 @@ export const PresetsList = () => {
   const all = Object.values(presets.byId)
     .filter((preset) => preset.id !== "inbox")
     .toSorted(byPresetOrder);
-  const shown = all.filter((preset) => isShowingArchived || !preset.archived);
+  // The ones in use in picker order; the deleted ones after them, once shown (R25-02).
+  const live = all.filter((preset) => !preset.archived);
+  const shown = isShowingArchived ? [...live, ...all.filter((preset) => preset.archived)] : live;
   const hasExamples = EXAMPLE_PRESET_IDS.some((id) => presetById(presets, id) !== undefined);
   return (
     <View className="pb-6">
@@ -125,13 +149,13 @@ export const PresetsList = () => {
         {shown.map((preset, index) => (
           <PresetRow
             isFirst={index === 0}
-            isLast={index === shown.length - 1}
+            isLast={index === live.length - 1}
             key={preset.id}
             preset={preset}
           />
         ))}
       </Group>
-      <NewPreset choices={all.filter((preset) => !preset.archived)} />
+      <NewPreset choices={live} />
       {hasExamples ? null : (
         <View className="mx-gutter mt-4 items-start px-row-x">
           <Button onPress={() => void run(actions.seedExamplePresets())} variant="secondary">

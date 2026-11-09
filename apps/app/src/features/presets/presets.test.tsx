@@ -63,6 +63,23 @@ describe("PresetsList", () => {
     expect(icons(open).join(" ")).toMatch(/chevron-right/u);
   });
 
+  it("lists deleted presets last, without reorder arrows, once they are shown (QA round 25 R25-02)", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    await runtime.actions.archivePreset("work");
+    await renderScreen(<PresetsList />, runtime);
+    expect(screen.queryByRole("link", { name: /^Work/u })).toBeNull();
+    await fireEvent.press(screen.getByRole("switch", { name: en("presets.showArchived") }));
+    expect(screen.getAllByRole("link").at(-1)).toHaveAccessibleName(
+      `Work, ${en("presets.archivedBadge")} · Default`,
+    );
+    expect(
+      screen.queryByRole("button", { name: en("presets.moveUp", { name: "Work" }) }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: en("presets.moveDown", { name: "Work" }) }),
+    ).toBeNull();
+  });
+
   it("lists the defaults in picker order, opens one and moves one", async () => {
     const runtime = await createTestRuntime({ world: "empty" });
     await renderScreen(<PresetsList />, runtime);
@@ -134,7 +151,7 @@ describe("PresetScreen", () => {
     expect(isControl(back, backControl)).toBe(true);
   });
 
-  it("deletes a preset after a confirmation", async () => {
+  it("deletes a preset after a confirmation, and the toast's Undo brings it back (QA round 25 R25-02)", async () => {
     const runtime = await createTestRuntime({ world: "empty" });
     await renderScreen(<PresetScreen from={undefined} id="deferred" />, runtime);
     await fireEvent.press(screen.getByRole("button", { name: en("presets.archive") }));
@@ -142,6 +159,27 @@ describe("PresetScreen", () => {
     await waitFor(() => {
       expect(presetOf(runtime, "deferred")?.archived).toBe(true);
     });
+    await fireEvent.press(await screen.findByRole("button", { name: en("common.undo") }));
+    await waitFor(() => {
+      expect(presetOf(runtime, "deferred")?.archived).toBe(false);
+    });
+  });
+
+  it("opens a deleted preset as deleted, read-only, with Restore (QA round 25 R25-02)", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    await runtime.actions.archivePreset("deferred");
+    await renderScreen(<PresetScreen from={undefined} id="deferred" />, runtime);
+    expect(screen.getByText(en("presets.archivedNote"))).toBeOnTheScreen();
+    // Nothing to edit or save on a deleted preset, and no second Delete.
+    expect(screen.queryByRole("button", { name: en("common.save") })).toBeNull();
+    expect(screen.queryByRole("button", { name: en("presets.archive") })).toBeNull();
+    expect(screen.queryByLabelText(en("presets.name"))).toBeNull();
+    await fireEvent.press(screen.getByRole("button", { name: en("presets.restore") }));
+    await waitFor(() => {
+      expect(presetOf(runtime, "deferred")?.archived).toBe(false);
+    });
+    // Restored, it is the ordinary form again.
+    expect(await screen.findByRole("button", { name: en("common.save") })).toBeOnTheScreen();
   });
 
   it("creates a preset under an id from its name, which nobody types (QA round 18 L4)", async () => {

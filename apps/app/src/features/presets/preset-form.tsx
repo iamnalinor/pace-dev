@@ -3,10 +3,12 @@ import { Text, type TextInput, View } from "react-native";
 
 import { useAppState, useLanguage, usePace, useT } from "#app/app-state.tsx";
 import { errorText } from "#app/format/action-error.ts";
+import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button } from "#app/ui/button.tsx";
 import { useConfirmFocus } from "#app/ui/confirm-focus.ts";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
+import { toastQuote, useToast } from "#app/ui/toast.tsx";
 import { useDiscardDraft } from "#app/ui/use-draft.ts";
 import { IS_TOUCH_BROWSER } from "#app/ui/use-hotkey.tsx";
 import { definitionIssues, inheritedOf, newPresetId, type PresetDraft } from "@pace/client";
@@ -93,8 +95,8 @@ const Identity = ({
 };
 
 /**
-Delete asks once more: the preset leaves the pickers (History brings it back). Focus goes to
-Cancel and back (bug class 5).
+Delete asks once more: the preset leaves the pickers (the toast's Undo, or Restore on the deleted
+preset, brings it back). Focus goes to Cancel and back (bug class 5).
 */
 const DeleteButton = ({
   name,
@@ -165,6 +167,8 @@ const usePresetWrites = ({
   const presets = useAppState((state) => state.presets);
   const [problem, setProblem] = useState<null | string>(null);
   const [issues, setIssues] = useState(NO_ISSUES);
+  const toast = useToast();
+  const run = useRunAction();
   const refuseName = (message: string): void => {
     setProblem(null);
     nameError.refuse(message);
@@ -179,7 +183,20 @@ const usePresetWrites = ({
     issues,
     problem,
     remove: async (): Promise<void> => {
-      finish(await actions.archivePreset(draft.id));
+      const result = await actions.archivePreset(draft.id);
+      finish(result);
+      if (!result.ok) {
+        return;
+      }
+      // As the app's other deletes: a toast with Undo, which revokes the archive (R25-02).
+      const [archive] = result.value;
+      const name = toastQuote(draft.name.trim());
+      toast.show({
+        message: t("presets.deleted", { name }),
+        ...(archive !== undefined && {
+          action: { label: t("common.undo"), onPress: () => void run(actions.revoke(archive.id)) },
+        }),
+      });
     },
     save: async (): Promise<void> => {
       if (draft.name.trim() === "") {

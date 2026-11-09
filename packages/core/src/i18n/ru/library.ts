@@ -112,7 +112,12 @@ export const ruLibrary: { readonly [K in keyof typeof enLibrary]: string } = {
   "presets.inheritedDefault": "Стандартное значение",
   "presets.moveUp": "Поднять «{name}»",
   "presets.moveDown": "Опустить «{name}»",
-  "presets.deleteConfirm": "Удалить «{name}»? Задачи его сохранят, а вернуть можно из Истории.",
+  "presets.deleteConfirm":
+    "Удалить «{name}»? Задачи его сохранят, а вернуть можно в «Показать удалённые».",
+  "presets.deleted": "Пресет удалён: {name}",
+  "presets.restore": "Восстановить пресет",
+  "presets.archivedNote":
+    "Этот пресет удалён: его не предлагают для новых задач, а задачи его сохраняют. Восстановите его, чтобы изменить.",
   "presets.checkValue": "Проверьте значение.",
   "presets.showField": "Показывать «{field}» в задаче",
   "presets.preview": "Предпросмотр",

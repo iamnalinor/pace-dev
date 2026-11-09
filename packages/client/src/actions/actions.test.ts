@@ -682,6 +682,22 @@ describe("presets", () => {
       error: "action/nothing-to-do",
       ok: false,
     });
+    // Restore revokes the archive (QA round 25 R25-02): a correction, the archive stays in the log.
+    const restored = unwrap(await world.actions.restorePreset("hw.physics"));
+    expect(restored.map((event) => event.type)).toEqual(["event.revoked"]);
+    expect(world.state.store.getState().presets.byId["hw.physics"]?.archived).toBe(false);
+    await expect(world.actions.restorePreset("hw.physics")).resolves.toEqual({
+      error: "action/nothing-to-do",
+      ok: false,
+    });
+    await expect(world.actions.restorePreset("nope")).resolves.toEqual({
+      error: "preset/unknown",
+      ok: false,
+    });
+    // Deleted again and restored again: the newest archive is the one revoked.
+    unwrap(await world.actions.archivePreset("hw.physics"));
+    unwrap(await world.actions.restorePreset("hw.physics"));
+    expect(world.state.store.getState().presets.byId["hw.physics"]?.archived).toBe(false);
   });
 
   it("returns the preset validation errors", async () => {

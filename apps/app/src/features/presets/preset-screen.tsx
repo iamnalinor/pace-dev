@@ -1,11 +1,36 @@
 import { useRouter } from "expo-router";
+import { View } from "react-native";
 
-import { useAppState, useLanguage, useT } from "#app/app-state.tsx";
+import { useAppState, useLanguage, usePace, useT } from "#app/app-state.tsx";
 import { PresetForm } from "#app/features/presets/preset-form.tsx";
 import { PushedScreen } from "#app/screens/pushed-screen.tsx";
+import { useRunAction } from "#app/shared/use-run-action.ts";
+import { Button } from "#app/ui/button.tsx";
 import { EmptyState } from "#app/ui/empty-state.tsx";
+import { Text } from "#app/ui/text.tsx";
 import { editorDraft, newDraft } from "@pace/client";
 import { presetById, presetLabel } from "@pace/core";
+
+/**
+A deleted preset reads as deleted (QA round 25 R25-02): nothing to edit or save, only Restore,
+which revokes the archive; restored, the screen shows the ordinary form.
+*/
+const DeletedPreset = ({ id }: { readonly id: string }) => {
+  const t = useT();
+  const { actions } = usePace();
+  const run = useRunAction();
+  return (
+    <View className="mx-gutter mt-4 items-start gap-4 px-row-x">
+      <Text role="headline">{t("presets.archivedBadge")}</Text>
+      <Text role="body" tone="secondary">
+        {t("presets.archivedNote")}
+      </Text>
+      <Button onPress={() => void run(actions.restorePreset(id))} variant="secondary">
+        {t("presets.restore")}
+      </Button>
+    </View>
+  );
+};
 
 /** `/presets/new?from=<parent>` creates a preset; `/presets/<id>` edits one, a default too. */
 export const PresetScreen = ({
@@ -48,10 +73,17 @@ export const PresetScreen = ({
       </PushedScreen>
     );
   }
+  if (preset.archived) {
+    return (
+      <PushedScreen title={presetLabel(preset, language)}>
+        <DeletedPreset id={preset.id} />
+      </PushedScreen>
+    );
+  }
   return (
     <PushedScreen title={presetLabel(preset, language)}>
       <PresetForm
-        canDelete={!preset.archived && preset.id !== "inbox"}
+        canDelete={preset.id !== "inbox"}
         initial={editorDraft(preset, language)}
         isNew={false}
         key={preset.id}

@@ -11,12 +11,14 @@ import {
   validatePresetInput,
 } from "@pace/core";
 
-import { type ActionDeps, type ActionResult, emit, stamp } from "./deps.ts";
+import { type ActionDeps, type ActionResult, emit, fromStore, stamp } from "./deps.ts";
 
 export type PresetActions = {
   readonly createPreset: (input: PresetInput) => ActionResult;
   readonly updatePreset: (input: PresetInput) => ActionResult;
   readonly archivePreset: (presetId: string) => ActionResult;
+  /** Brings a deleted preset back: the archive event is revoked (a correction, never an edit). */
+  readonly restorePreset: (presetId: string) => ActionResult;
   /** One place up (`-1`) or down (`1`) in the pickers. */
   readonly movePreset: (presetId: string, step: -1 | 1) => ActionResult;
   /** The one-click seed of the example course presets; ids already present are left alone. */
@@ -83,6 +85,25 @@ const archivePreset =
       : await emit(deps, [stamp(deps, { type: "preset.archived", payload: { id: presetId } })]);
   };
 
+const restorePreset =
+  (deps: ActionDeps): PresetActions["restorePreset"] =>
+  async (presetId) => {
+    const { events, presets } = deps.state.store.getState();
+    const preset = presetById(presets, presetId);
+    if (preset === undefined) {
+      return err("preset/unknown");
+    }
+    if (!preset.archived) {
+      return err("action/nothing-to-do");
+    }
+    const archive = events.findLast(
+      (event) => event.type === "preset.archived" && event.payload.id === presetId,
+    );
+    return archive === undefined
+      ? err("action/nothing-to-do")
+      : fromStore(await deps.state.revoke(archive.id));
+  };
+
 /**
 The pickers' order as positions 1…n: new presets share order 100 until one is moved, so
 the whole list is renumbered and only the presets whose number changes get an event.
@@ -116,6 +137,7 @@ const movePreset =
 
 export const presetActions = (deps: ActionDeps): PresetActions => ({
   archivePreset: archivePreset(deps),
+  restorePreset: restorePreset(deps),
   movePreset: movePreset(deps),
   createPreset: async (input) => await savePreset(deps, input, "create"),
   seedExamplePresets: async () => {

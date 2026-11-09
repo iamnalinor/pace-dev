@@ -110,7 +110,12 @@ export const enLibrary = {
   "presets.inheritedDefault": "The default value",
   "presets.moveUp": "Move {name} up",
   "presets.moveDown": "Move {name} down",
-  "presets.deleteConfirm": "Delete “{name}”? Its tasks keep it, and History can bring it back.",
+  "presets.deleteConfirm":
+    "Delete “{name}”? Its tasks keep it, and Show deleted can bring it back.",
+  "presets.deleted": "Preset deleted: {name}",
+  "presets.restore": "Restore preset",
+  "presets.archivedNote":
+    "This preset is deleted: it is not offered for new tasks, and its tasks keep it. Restore it to edit it.",
   "presets.checkValue": "Check this value.",
   "presets.showField": "Show “{field}” on the task",
   "presets.preview": "Preview",
