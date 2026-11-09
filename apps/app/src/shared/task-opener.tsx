@@ -50,11 +50,24 @@ export const useOpenTask = (): OpenTask => {
   return pane ?? push;
 };
 
-/** The task screen's back action: close the pane it sits in, or go back a screen. */
+/**
+The task screen's back action: close the pane it sits in, or go back a screen; with nothing to go
+back to (a link opened straight on it, or Now's `?task=` handed over at a phone's width, which
+replaces the entry) it goes to Now.
+*/
 export const useTaskBack = (): (() => void) => {
   const router = useRouter();
   const closePane = use(PaneContext);
-  return closePane ?? router.back;
+  return (
+    closePane ??
+    (() => {
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace("/");
+      }
+    })
+  );
 };
 
 /** Whether the task sits in the pane beside the list (its "back" closes the pane). */

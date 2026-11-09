@@ -7,7 +7,11 @@ const CONTROLS =
 /** How far from its trigger a control can be and still be in a bubble's way. */
 const NEAR_PX = 320;
 
-/** At most this many controls are measured for one scan (a Week of blocks has hundreds). */
+/**
+At most this many controls near the trigger are kept for the bubble to avoid, the nearest first
+(a Week of blocks has hundreds). The cap comes after the nearness filter: capped in DOM order, a
+trigger late in the page lost its neighbours and the bubble covered them (bug class 6).
+*/
 export const MAX_CONTROLS = 120;
 
 /** The part of the DOM a scan reads (a duck type, so it is testable without a browser). */
@@ -56,13 +60,13 @@ const isNear = (box: Box, anchor: Box): boolean =>
   Math.abs(box.x + box.width / 2 - (anchor.x + anchor.width / 2)) < NEAR_PX + box.width / 2 &&
   Math.abs(box.y + box.height / 2 - (anchor.y + anchor.height / 2)) < NEAR_PX;
 
-/** The visible controls' boxes in `root`, the first `MAX_CONTROLS` of them. */
+/**
+The visible controls' boxes in `root`: one layout, then a read per control (nothing is written in
+between), reused by warm hovers.
+*/
 const measure = (root: ScanRoot): readonly Box[] => {
   const boxes: Box[] = [];
   for (const control of root.querySelectorAll(CONTROLS)) {
-    if (boxes.length >= MAX_CONTROLS) {
-      break;
-    }
     if (control.closest('[aria-hidden="true"]') === null) {
       boxes.push(boxOf(control));
     }
@@ -70,10 +74,16 @@ const measure = (root: ScanRoot): readonly Box[] => {
   return boxes;
 };
 
+const centreDistance = (box: Box, anchor: Box): number =>
+  Math.hypot(
+    box.x + box.width / 2 - (anchor.x + anchor.width / 2),
+    box.y + box.height / 2 - (anchor.y + anchor.height / 2),
+  );
+
 /**
 The boxes of the controls near `anchor` (the trigger's own controls left out), read in `root` (the
 trigger's dialog, else the page). A scan of the same root within `reuseMs` is reused, so warm
-hovers do not measure the page again; at most `MAX_CONTROLS` are measured.
+hovers do not measure the page again; at most `MAX_CONTROLS` of them are kept, the nearest.
 */
 export const controlsNear = (
   anchor: Box,
@@ -83,10 +93,17 @@ export const controlsNear = (
     root,
   }: { readonly now: number; readonly reuseMs: number; readonly root: ScanRoot },
 ): readonly Box[] => {
+  // The scan's age counts from when it was read, not from its last reuse: a long warm chain
+  // must not keep boxes the page has long since moved away from.
   if (cache.root !== root || now - cache.at > reuseMs) {
     cache.boxes = measure(root);
     cache.root = root;
+    cache.at = now;
   }
-  cache.at = now;
-  return cache.boxes.filter((box) => !isInside(box, anchor) && isNear(box, anchor));
+  const near = cache.boxes.filter((box) => !isInside(box, anchor) && isNear(box, anchor));
+  return near.length <= MAX_CONTROLS
+    ? near
+    : near
+        .toSorted((a, b) => centreDistance(a, anchor) - centreDistance(b, anchor))
+        .slice(0, MAX_CONTROLS);
 };

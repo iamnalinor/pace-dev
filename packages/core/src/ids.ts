@@ -45,6 +45,12 @@ Automatic outcomes are system-generated once per task and kind. Only `skipped` i
 export const autoOutcomeId = (taskId: string, kind: AutoOutcomeKind): string =>
   `auto:${taskId}:${kind}`;
 
+/**
+The server's revoke of an automatic `cancelled_missed` an older client pushed (feedback 5: no task
+closes by itself any more): one per miss, so a miss pushed again revokes nothing twice.
+*/
+export const retiredId = (missId: string): string => `${missId}:retired`;
+
 /** Digits of a read-later event's place: a reading writes far fewer than a million events. */
 const READ_PART_DIGITS = 6;
 

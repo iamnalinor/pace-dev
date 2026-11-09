@@ -11,6 +11,7 @@ import {
   instanceId,
   isUlid,
   newId,
+  retiredId,
   sleepDiscardId,
   sleepReopenId,
   sleepStartId,
@@ -101,6 +102,10 @@ describe("deterministic ids", () => {
     expect(autoOutcomeId("task-1", "missed")).toBe("auto:task-1:missed");
     expect(autoOutcomeId("task-1", "skipped")).toBe("auto:task-1:skipped");
   });
+
+  it("builds the id of a retired automatic miss's revoke", () => {
+    expect(retiredId("auto:task-1:missed")).toBe("auto:task-1:missed:retired");
+  });
 });
 
 /** The sync carries the id (`SyncEventSchema` reads `EVENT_ID_MAX`). */
@@ -134,6 +139,8 @@ const idsOf = ({
   const retry = `:${String(MAX_ATTEMPTS - 1)}`;
   const outcomes = [task, instance, repeat].flatMap((id) => [
     autoOutcomeId(id, "missed"),
+    // An old client's automatic miss, revoked by the server as it arrives.
+    retiredId(autoOutcomeId(id, "missed")),
     autoOutcomeId(id, "skipped"),
   ]);
   return [
@@ -174,7 +181,7 @@ describe("every deterministic id fits what the sync carries (class 12)", () => {
     task: ulid,
   });
 
-  it("holds for homework, series, outcome, automatic sleep and read-later ids at their longest", () => {
+  it("holds for homework, series, outcome (and a retired miss's revoke), automatic sleep and read-later ids at their longest", () => {
     fc.assert(
       fc.property(world, (world) => {
         expect(idsOf(world).filter((id) => !isCarried(id))).toEqual([]);

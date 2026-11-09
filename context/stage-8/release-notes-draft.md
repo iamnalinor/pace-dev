@@ -17,7 +17,9 @@ edits the wording before the release.
   reads as overdue. Older app builds still try to close it automatically as missed; the server
   now takes such a close from a device and revokes it at once, so the task stays open everywhere,
   that device included after its next sync. Automatic closes already in the history stay as they
-  were and can be reopened.
+  were and can be reopened. Two edges on an older build: a missed close it confirmed while offline is undone
+  when it syncs (the task reopens), and an instance it made ahead when it closed the task stays
+  (it is the same instance this build would make, so nothing is doubled).
 - **Lateness by subtasks only when all are done.** A task closed as done is judged by its latest
   done subtask only when every subtask is done; otherwise by when it was closed. History and
   Insights recount older tasks the same way.

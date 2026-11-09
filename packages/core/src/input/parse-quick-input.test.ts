@@ -168,6 +168,13 @@ describe("parseQuickInput", () => {
     expect(parse("короткая\nвторая строка").description).toBe("вторая строка");
   });
 
+  it("cuts a long title of emoji between two characters, never inside one", () => {
+    // No space to cut at: the cut falls where character 199 would be split in two.
+    const { title } = parse(`${"a".repeat(198)}${"😀".repeat(20)}`);
+    expect(title.isWellFormed()).toBe(true);
+    expect(title).toBe(`${"a".repeat(198)}…`);
+  });
+
   it("keeps the source text verbatim", () => {
     const text = "  Синк  по дашборду завтра ";
     expect(parse(text).text).toBe(text);

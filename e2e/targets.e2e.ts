@@ -37,7 +37,8 @@ type Measured = {
 /**
 The named controls in sight whose press area is under `TARGET_PX`, by name, and how many were
 measured. The press area is found by pressing: the points 21 px either side of the control's centre
-must land on the control (or inside it), never on a neighbour that covers it.
+must land on the control (or inside it), never on a neighbour that covers it. An overlay (a toast,
+a tooltip) covering a control is guarded in `overlays.e2e.ts` (bug class 6), not here.
 */
 const measure = async (
   page: Page,

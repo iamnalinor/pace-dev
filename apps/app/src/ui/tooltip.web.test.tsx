@@ -55,11 +55,47 @@ const pass = async (ms: number): Promise<void> => {
   });
 };
 
+/** The bubble's first layout: it is measured, and placed. */
+const layOut = async (bubble: ReturnType<typeof screen.getByTestId>): Promise<void> => {
+  await fireEvent(bubble, "layout", { nativeEvent: { layout: { height: 32, width: 120 } } });
+};
+
 /** Whether the bubble that says `label` is shown (a hidden one is not in the page at all). */
 const isShown = (label: string): boolean =>
   screen
     .queryAllByTestId("tooltip-bubble")
     .some((bubble) => within(bubble).queryByText(label) !== null);
+
+/** The window the tooltip listens on (the test runs without a browser: a bare event target). */
+const page = new EventTarget();
+
+/** A real Escape on the window: nothing about its propagation is mocked. */
+const pressOnWindow = async (type: "keydown" | "keyup"): Promise<void> => {
+  await act(() => {
+    page.dispatchEvent(
+      Object.assign(new Event(type, { cancelable: true }), {
+        altKey: false,
+        isComposing: false,
+        ctrlKey: false,
+        key: "Escape",
+        metaKey: false,
+        shiftKey: false,
+      }),
+    );
+  });
+};
+
+beforeAll(() => {
+  Object.assign(globalThis, {
+    addEventListener: page.addEventListener.bind(page),
+    removeEventListener: page.removeEventListener.bind(page),
+  });
+});
+
+afterAll(() => {
+  Reflect.deleteProperty(globalThis, "addEventListener");
+  Reflect.deleteProperty(globalThis, "removeEventListener");
+});
 
 describe("Tooltip on the web (spec §4.2.31, §6 tooltip)", () => {
   afterEach(async () => {
@@ -120,6 +156,7 @@ describe("Tooltip on the web (spec §4.2.31, §6 tooltip)", () => {
     if (bubble === undefined) {
       throw new Error("no bubble");
     }
+    await layOut(bubble);
     expect(bubble.props["pointerEvents"]).toBe("auto");
     await fireEvent(bubble, "pointerEnter", pointer("mouse"));
     await pass(HOVER_GRACE_MS * 3);
@@ -127,6 +164,50 @@ describe("Tooltip on the web (spec §4.2.31, §6 tooltip)", () => {
     await fireEvent(bubble, "pointerLeave", pointer("mouse"));
     await pass(HOVER_GRACE_MS);
     expect(isShown(LABEL)).toBe(false);
+  });
+
+  it("an unplaced bubble takes no pointer: one mounted under the leaving pointer does not keep itself up", async () => {
+    await renderTriggers(<Trigger isImmediate label={LABEL} name="Send" />);
+    await fireEvent(button("Send"), "pointerEnter", pointer("mouse"));
+    const bubble = screen.getAllByTestId("tooltip-bubble")[0];
+    if (bubble === undefined) {
+      throw new Error("no bubble");
+    }
+    // Not measured yet: it waits at the window's corner, unseen, where the pointer may be going.
+    expect(bubble.props["pointerEvents"]).toBe("none");
+    expect(bubble.props["style"]).toEqual(
+      expect.arrayContaining([expect.objectContaining({ visibility: "hidden" })]),
+    );
+    // Nothing on it calls off the hide (here the bubble is not in a portal, so an event fired on
+    // it would reach the trigger's wrapper: its own handlers are what is checked).
+    expect(bubble.props["onPointerEnter"]).toBeUndefined();
+    await fireEvent(button("Send"), "pointerLeave", pointer("mouse"));
+    await pass(HOVER_GRACE_MS);
+    expect(isShown(LABEL)).toBe(false);
+  });
+
+  it("a pointer moving off the trigger and the bubble takes a hover tooltip away, though no leave came", async () => {
+    await renderTriggers(<Trigger isImmediate label={LABEL} name="Send" />);
+    await fireEvent(button("Send"), "pointerEnter", pointer("mouse"));
+    expect(isShown(LABEL)).toBe(true);
+    // Moves elsewhere on the page, one after another: the grace runs from the first, not the last.
+    for (const _ of [1, 2, 3]) {
+      await act(() => {
+        page.dispatchEvent(new Event("pointermove"));
+        jest.advanceTimersByTime(HOVER_GRACE_MS / 2);
+      });
+    }
+    expect(isShown(LABEL)).toBe(false);
+  });
+
+  it("a pointer moving elsewhere leaves a keyboard-focus tooltip up", async () => {
+    await renderTriggers(<Trigger label={LABEL} name="Send" />);
+    await fireEvent(sendWrapper(), "focus", {});
+    await act(() => {
+      page.dispatchEvent(new Event("pointermove"));
+    });
+    await pass(HOVER_GRACE_MS * 2);
+    expect(isShown(LABEL)).toBe(true);
   });
 
   it("shows the next trigger's at once when the pointer moves on from one", async () => {
@@ -148,7 +229,7 @@ describe("Tooltip on the web (spec §4.2.31, §6 tooltip)", () => {
     // The DOM's focus event bubbles from the button up to the tooltip around it.
     await fireEvent(sendWrapper(), "focus", {});
     expect(isShown(LABEL)).toBe(true);
-    await fireEvent(button("Send"), "keyDown", { key: "Escape" });
+    await pressOnWindow("keydown");
     expect(isShown(LABEL)).toBe(false);
   });
 
@@ -194,13 +275,23 @@ describe("Tooltip on the web (spec §4.2.31, §6 tooltip)", () => {
     );
   });
 
-  it("on Escape only the tooltip goes: the key stops there (the dialog under it stays)", async () => {
+  it("on Escape only the tooltip goes: no other listener hears the key or its keyup (the sheet under it stays)", async () => {
     await renderTriggers(<Trigger label={LABEL} name="Send" />);
     await fireEvent(sendWrapper(), "focus", {});
-    const stopPropagation = jest.fn();
-    await fireEvent(button("Send"), "keyDown", { key: "Escape", stopPropagation });
+    // A sheet's Escape (a shortcut, react-native-web's Modal): on the window after the tooltip's.
+    const onSheetKey = jest.fn();
+    page.addEventListener("keydown", onSheetKey, { capture: true });
+    page.addEventListener("keyup", onSheetKey, { capture: true });
+    await pressOnWindow("keydown");
+    await pressOnWindow("keyup");
     expect(isShown(LABEL)).toBe(false);
-    expect(stopPropagation).toHaveBeenCalled();
+    expect(onSheetKey).not.toHaveBeenCalled();
+    // The tooltip is gone: the next Escape is the sheet's.
+    await pressOnWindow("keydown");
+    await pressOnWindow("keyup");
+    expect(onSheetKey).toHaveBeenCalledTimes(2);
+    page.removeEventListener("keydown", onSheetKey, { capture: true });
+    page.removeEventListener("keyup", onSheetKey, { capture: true });
   });
 
   it("on a touch screen shows nothing: the tap runs the control", async () => {

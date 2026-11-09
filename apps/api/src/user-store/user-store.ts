@@ -1,15 +1,6 @@
 import { drizzle, type DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
 
-import {
-  err,
-  type Event,
-  type EventInput,
-  ok,
-  parseEvent,
-  type Result,
-  retiredAutoMissRevokes,
-  STORE_CHANGED,
-} from "@pace/core";
+import { err, type Event, type EventInput, ok, type Result, STORE_CHANGED } from "@pace/core";
 
 import type {
   ApplyError,
@@ -50,11 +41,9 @@ import { runSleepPass, sleepAtAlarm } from "./sleep-pass.ts";
 import { StateCache } from "./state-cache.ts";
 import { prepareBatch, toRpcState } from "./state.ts";
 import { openStore, resetStore, SCHEMA_TAG, storeIdOf } from "./store-identity.ts";
+import { SERVER_DEVICE_ID, stampSystem, withRetiredMisses } from "./system-events.ts";
 
 type Db = DrizzleSqliteDODatabase<typeof schema>;
-
-/** System events are the server's own: this is their device. */
-const SERVER_DEVICE_ID = "server";
 
 /** A parsed event is JSON by construction, so the stored view is the same object. */
 const toStored = (event: Event): StoredEvent => event;
@@ -127,22 +116,16 @@ export class UserStore extends CloudStore {
       now: options.now,
       validateEvent: options.validateEvent ?? eventLog.coreValidator,
     });
-    const inserted = await this.#insert(events);
-    if (isClientPush) {
-      // An older client's automatic miss is taken and revoked at once (feedback 5).
-      await this.#system(retiredAutoMissRevokes(inserted, options.now), options.now);
-    }
+    // An older client's automatic miss is taken and revoked at once, in the same write.
+    const { ids } = await this.#state.current();
+    await this.#insert(isClientPush ? withRetiredMisses(events, ids, options.now) : events);
     await this.derive(options.now);
     await this.#pool.afterWrite(options.now);
     return { accepted, rejected, seq: await log.latestSeq(this.db) };
   }
 
   async #system(inputs: readonly EventInput[], now: string): Promise<readonly Event[]> {
-    const events = inputs.flatMap((input) => {
-      const parsed = parseEvent({ ...input, deviceId: SERVER_DEVICE_ID, recordedAt: now });
-      return parsed.ok ? [parsed.value] : [];
-    });
-    return await this.#insert(events);
+    return await this.#insert(stampSystem(inputs, now));
   }
   protected override get pool(): NotificationPool {
     return this.#pool;

@@ -9,7 +9,8 @@ import type { TooltipProps } from "./tooltip-props.ts";
 import { paletteVars } from "../platform/theme.ts";
 import { Text } from "./text.tsx";
 import { useTheme } from "./theme-provider.tsx";
-import { controlsNear, forgetControls, type ScanRoot } from "./tooltip-controls.ts";
+import { controlsNear, type ScanRoot } from "./tooltip-controls.ts";
+import { isWarm, useDismiss, usePointerAway, useTimer } from "./tooltip-dismiss.ts";
 import {
   type Box,
   HOVER_DELAY_MS,
@@ -23,14 +24,6 @@ type PointerLike = { readonly nativeEvent?: { readonly pointerType?: string } };
 
 /** The web has no host to set up: the bubble goes straight into the page's body. */
 export const TooltipHost = ({ children }: { readonly children: ReactNode }) => children;
-
-/**
-When a tooltip last closed (or 0): a trigger hovered soon after shows its own at once, so moving
-along a row of icon buttons reads each name without the delay again. One page, one pointer.
-*/
-const warmth = { closedAt: 0, openCount: 0 };
-
-const isWarm = (): boolean => warmth.openCount > 0 || Date.now() - warmth.closedAt < WARM_MS;
 
 /** Where the trigger is in the window right now (nothing to measure under test). */
 const boxOf = (element: unknown): Box | null => {
@@ -96,78 +89,11 @@ const useDescribedBy = (wrapperRef: RefObject<null | View>, id: string, isOn: bo
   }, [id, isOn, wrapperRef]);
 };
 
-/** While it shows: Escape anywhere and a scroll (it would be left behind) take it away. */
-const useDismiss = (isShown: boolean, hide: () => void): void => {
-  const hideRef = useRef(hide);
-  useEffect(() => {
-    hideRef.current = hide;
-  });
-  useEffect(() => {
-    if (!isShown) {
-      return;
-    }
-    warmth.openCount += 1;
-    return () => {
-      warmth.openCount -= 1;
-      warmth.closedAt = Date.now();
-    };
-  }, [isShown]);
-  useEffect(() => {
-    if (!isShown || typeof globalThis.addEventListener !== "function") {
-      return;
-    }
-    const dismiss = (): void => {
-      // The page moved: the controls read around the trigger are where they were no more.
-      forgetControls();
-      hideRef.current();
-    };
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key !== "Escape") {
-        return;
-      }
-
-      // Only the tooltip goes: the sheet or dialog under it hears nothing of this Escape.
-      event.stopPropagation();
-      hideRef.current();
-    };
-    globalThis.addEventListener("keydown", onKey, { capture: true });
-    globalThis.addEventListener("scroll", dismiss, { capture: true });
-    globalThis.addEventListener("resize", dismiss);
-    return () => {
-      globalThis.removeEventListener("keydown", onKey, { capture: true });
-      globalThis.removeEventListener("scroll", dismiss, { capture: true });
-      globalThis.removeEventListener("resize", dismiss);
-    };
-  }, [isShown]);
-};
-
-/** One timer at a time: the pending show (the hover delay) or the pending hide (the grace). */
-const useTimer = () => {
-  const timerRef = useRef<null | ReturnType<typeof setTimeout>>(null);
-  const cancel = (): void => {
-    if (timerRef.current === null) {
-      return;
-    }
-
-    clearTimeout(timerRef.current);
-    timerRef.current = null;
-  };
-  useEffect(() => cancel, []);
-  return {
-    after: (ms: number, run: () => void): void => {
-      cancel();
-      timerRef.current = setTimeout(() => {
-        timerRef.current = null;
-        run();
-      }, ms);
-    },
-    cancel,
-  };
-};
-
 /**
 Fixed to the window over the page, at its place once both it and its trigger are measured; until
-then (its first layout) it is laid out unseen.
+then (its first layout) it is laid out unseen at the window's corner, and takes no pointer there:
+the leaving pointer may be on its way to that corner, and a bubble that took it would call off its
+own hide and stay up once it moved away from under the resting pointer.
 */
 const frameStyle = (anchor: Anchor | null, size: null | Size) => {
   const viewport = { height: globalThis.innerHeight, width: globalThis.innerWidth };
@@ -180,7 +106,7 @@ const frameStyle = (anchor: Anchor | null, size: null | Size) => {
     opacity: place === null ? 0 : 1,
     position: "fixed" as "absolute",
     top: place?.top ?? 0,
-    ...(anchor === null && { visibility: "hidden" }),
+    ...((anchor === null || size === null) && { visibility: "hidden" }),
     zIndex: z.tooltip,
   };
 };
@@ -189,16 +115,18 @@ const frameStyle = (anchor: Anchor | null, size: null | Size) => {
 The bubble (spec §4.2.31): an elevated surface, `footnote` in `label.primary`, wrapping inside
 `size.tooltip.max`; in the page's body (no clipping card can cut it) in the theme's colours. It is
 mounted only while shown (UI review I3: a Week of blocks no longer keeps a portal per block); the
-trigger's description is the hidden `Description` beside it. It takes the pointer: it can be
-hovered and its words selected (WCAG 1.4.13).
+trigger's description is the hidden `Description` beside it. Once placed it takes the pointer: it
+can be hovered and its words selected (WCAG 1.4.13).
 */
 const Bubble = ({
   anchor,
+  bubbleRef,
   label,
   onPointerEnter,
   onPointerLeave,
 }: {
   readonly anchor: Anchor | null;
+  readonly bubbleRef: RefObject<null | View>;
   readonly label: string;
   readonly onPointerEnter: () => void;
   readonly onPointerLeave: () => void;
@@ -210,9 +138,9 @@ const Bubble = ({
       onLayout={(event) => {
         setSize(event.nativeEvent.layout);
       }}
-      onPointerEnter={onPointerEnter}
-      onPointerLeave={onPointerLeave}
-      pointerEvents="auto"
+      {...(size !== null && { onPointerEnter, onPointerLeave })}
+      pointerEvents={size === null ? "none" : "auto"}
+      ref={bubbleRef}
       style={[paletteVars(scheme), frameStyle(anchor, size)]}
       testID="tooltip-bubble"
     >
@@ -251,9 +179,12 @@ const useTooltipState = (wrapperRef: RefObject<null | View>) => {
   // What was last asked for, before React draws it: a leave right after an immediate show (a quick
   // pass over the trigger) must see the tooltip as shown, or nothing would ever hide it.
   const modeRef = useRef<Mode | null>(null);
+  // A hide is pending (the grace after the pointer left): a later move away does not restart it.
+  const leavingRef = useRef(false);
   const timer = useTimer();
   const show = (mode: Mode): void => {
     timer.cancel();
+    leavingRef.current = false;
     modeRef.current = mode;
     const box = boxOf(wrapperRef.current);
     setShown({
@@ -263,13 +194,26 @@ const useTooltipState = (wrapperRef: RefObject<null | View>) => {
   };
   const hide = (): void => {
     timer.cancel();
+    leavingRef.current = false;
     modeRef.current = null;
     setShown(null);
   };
+  // The pointer moved somewhere off the trigger and the bubble: as a leave, unless one is pending.
+  const bubbleRef = useRef<View>(null);
+  usePointerAway(shown?.mode === "hover", { bubbleRef, wrapperRef }, () => {
+    if (modeRef.current !== "hover" || leavingRef.current) {
+      return;
+    }
+
+    leavingRef.current = true;
+    timer.after(HOVER_GRACE_MS, hide);
+  });
   return {
+    bubbleRef,
     hide,
     /** The pointer is on the trigger: shown after the delay, at once when `isAtOnce`. */
     hover: (isAtOnce: boolean): void => {
+      leavingRef.current = false;
       if (modeRef.current !== null) {
         timer.cancel();
       } else if (isAtOnce || isWarm()) {
@@ -282,15 +226,19 @@ const useTooltipState = (wrapperRef: RefObject<null | View>) => {
     },
     /** The pointer is back on the bubble: a pending hide is called off. */
     keep: (): void => {
-      if (modeRef.current !== null) {
-        timer.cancel();
+      if (modeRef.current === null) {
+        return;
       }
+
+      leavingRef.current = false;
+      timer.cancel();
     },
     /** The pointer left the trigger or the bubble: a hover tooltip goes after the grace. */
     leave: (): void => {
       if (modeRef.current === null) {
         timer.cancel();
       } else if (modeRef.current === "hover") {
+        leavingRef.current = true;
         timer.after(HOVER_GRACE_MS, hide);
       }
     },
@@ -320,18 +268,6 @@ export const Tooltip = ({
   const isShown = label !== undefined && state.shown !== null;
   useDescribedBy(wrapperRef, id, label !== undefined);
   useDismiss(isShown, state.hide);
-  // Events react-native-web passes to the DOM but React Native's types do not list.
-  const keys = {
-    onKeyDown: (event: { readonly key?: string; readonly stopPropagation?: () => void }) => {
-      if (!isShown || event.key !== "Escape") {
-        return;
-      }
-
-      // Only the tooltip goes first: the dialog around it stays for the next Escape.
-      event.stopPropagation?.();
-      state.hide();
-    },
-  };
   return (
     <View
       {...(isFilling && { className: "flex-1" })}
@@ -356,13 +292,13 @@ export const Tooltip = ({
         }
       }}
       ref={wrapperRef}
-      {...(keys as object)}
     >
       {children}
       {label === undefined ? null : <Description id={id} label={label} />}
       {isShown ? (
         <Bubble
           anchor={state.shown?.anchor ?? null}
+          bubbleRef={state.bubbleRef}
           label={label}
           onPointerEnter={state.keep}
           onPointerLeave={state.leave}

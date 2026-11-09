@@ -1,5 +1,6 @@
 import { createContext, type ReactNode, use, useEffect, useRef, useState } from "react";
 
+import { didTakeEscape, listenForEscape } from "./escape-first.ts";
 import {
   canFireWhileTyping,
   type Hotkey,
@@ -72,7 +73,15 @@ const hasOwnKeys = (event: KeyboardEvent): boolean =>
   (event.key === "Escape" && isWithin(event.target, OWNS_ESCAPE));
 
 const onKeyDown = (event: KeyboardEvent): void => {
-  if (KEYBOARD === null || event.defaultPrevented || event.isComposing || hasOwnKeys(event)) {
+  // A shown tooltip hears Escape before any shortcut (it goes, and the pane or sheet under it
+  // stays); on a touch screen its own listener (`escape-first.ts`) takes it.
+  if (
+    KEYBOARD === null ||
+    event.defaultPrevented ||
+    event.isComposing ||
+    didTakeEscape(event) ||
+    hasOwnKeys(event)
+  ) {
     return;
   }
   const top = layers.at(-1) ?? 0;
@@ -100,6 +109,8 @@ const listen = (): void => {
   registry.isListening = true;
   // The capture phase: react-native-web's fields stop a keydown from bubbling to the window.
   globalThis.addEventListener("keydown", onKeyDown, { capture: true });
+  // Escape's keyup, which react-native-web's Modal closes on, is held back where Escape was taken.
+  listenForEscape();
 };
 
 const LayerContext = createContext(0);
