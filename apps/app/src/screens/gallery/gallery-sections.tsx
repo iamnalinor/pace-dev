@@ -15,6 +15,7 @@ import { TaskFooter } from "#app/features/task/task-footer.tsx";
 import { TaskHeader } from "#app/features/task/task-header.tsx";
 import { WeekGrid } from "#app/features/week/week-grid.tsx";
 import { TaskRows } from "#app/shared/task-list.tsx";
+import { TaskPaneProvider } from "#app/shared/task-opener.tsx";
 import { RunningCard } from "#app/shared/tracking/running-card.tsx";
 import { CountBadge } from "#app/ui/count-badge.tsx";
 import { Group } from "#app/ui/group.tsx";
@@ -304,7 +305,12 @@ export const TaskSections = ({ data }: { readonly data: GalleryData }) => {
             {t("dev.gallery.nothing")}
           </Text>
         ) : (
-          <TaskFooter onClose={NOTHING} view={view} />
+          // The pane at its narrowest (360): the halves keep whole words (design review B1).
+          <View className="w-inspector-min">
+            <TaskPaneProvider onClose={NOTHING}>
+              <TaskFooter onClose={NOTHING} view={view} />
+            </TaskPaneProvider>
+          </View>
         )}
       </Section>
     </>

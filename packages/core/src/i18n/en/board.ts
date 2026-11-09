@@ -94,7 +94,6 @@ export const enBoard = {
   "task.done": "Done",
   "task.doneHint": "Finishes the task now.",
   "task.doneOther": "Other time or outcome…",
-  "task.doneOtherShort": "Other time…",
   "task.estimate": "Est. {duration}",
   "task.trackedLine": "Tracked {duration}",
   "task.closedAs": "Closed · {outcome}",

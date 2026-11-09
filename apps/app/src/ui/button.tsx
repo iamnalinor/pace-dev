@@ -91,6 +91,14 @@ export type ButtonWidth = "auto" | "fill" | "hug";
 /** What a button inside takes when it names no width: a sheet makes its buttons fill. */
 export const ButtonWidthContext = createContext<ButtonWidth>("auto");
 
+/**
+Whether the region a button sits in has room for its shortcut after the label. A window can be wide
+while the region is not: the 400 px task pane squeezed «Готово Ctrl+Enter» into a letter a line
+(design review B1, bug-lessons class 150). A narrow region says `false`; the shortcut still works
+and its tooltip or hint still names it.
+*/
+export const KeyHintRoomContext = createContext(true);
+
 /** At its label's width. */
 const AT_TEXT_WIDTH = { alignSelf: "flex-start" } as const;
 
@@ -115,7 +123,8 @@ export const KeyHint = ({
   readonly variant: ButtonVariant;
 }) => {
   const isWide = useIsWide();
-  return hotkey === undefined || KEYBOARD === null || !isWide ? null : (
+  const hasRoom = use(KeyHintRoomContext);
+  return hotkey === undefined || KEYBOARD === null || !isWide || !hasRoom ? null : (
     <NativeText
       aria-hidden
       className={cx("font-sans text-footnote font-normal tabular-nums", HINT[variant])}
