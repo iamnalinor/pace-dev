@@ -2,11 +2,16 @@ import { View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
 import { cx } from "#app/ui/cx.ts";
-import { fillClass } from "#app/ui/hue.ts";
 import { Pressable } from "#app/ui/pressable.tsx";
 import { RadioGroup, useRadio } from "#app/ui/radio-group.tsx";
+import { HueTile } from "#app/ui/tag.tsx";
 import { type ProjectColorName, ProjectColorSchema } from "@pace/core";
 
+/**
+One colour as the tile a project leads with (its tint, a folder in its ink), never a dot: a dot's
+colour cannot be told (owner 2026-11-08, design review L5). The chosen one is ringed in
+`label.primary` and shows a check in place of the folder, a cue that is not colour.
+*/
 const Swatch = ({ color }: { readonly color: ProjectColorName }) => {
   const t = useT();
   const { checked, onPress, setNode, tabIndex } = useRadio(color);
@@ -17,22 +22,25 @@ const Swatch = ({ color }: { readonly color: ProjectColorName }) => {
       onPress={onPress}
       ref={setNode}
       role="radio"
-      shape="pill"
+      shape="md"
       tabIndex={tabIndex}
-      visual={cx("size-8 items-center justify-center", checked && "bg-fill-3")}
+      visual={cx(
+        "size-10 items-center justify-center border-2",
+        checked ? "border-label-primary" : "border-transparent",
+      )}
     >
-      <View
-        className={cx(
-          "size-5 rounded-pill",
-          fillClass(color),
-          checked && "border-2 border-label-primary",
-        )}
-      />
+      {checked ? (
+        <View testID="swatch-chosen">
+          <HueTile hue={color} icon="check" />
+        </View>
+      ) : (
+        <HueTile hue={color} icon="folder" />
+      )}
     </Pressable>
   );
 };
 
-/** The project colors as round swatches: one radio group (one tab stop), each named after its color. */
+/** The project colours as tinted tiles: one radio group (one tab stop), each named after its color. */
 export const ColorSwatches = ({
   label,
   onChange,
