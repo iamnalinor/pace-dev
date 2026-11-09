@@ -51,6 +51,12 @@ describe("TaskRow", () => {
     ).toEqual([]);
   });
 
+  it("marks the row so the web hovers it whole, check and all (design review 2 N7)", async () => {
+    await renderRow(ROW.id);
+    const box = screen.getByTestId("list-row-control").parent;
+    expect(box?.props["dataSet"]).toEqual({ paceRow: "true" });
+  });
+
   it("keeps the check beside the press area, never inside it", async () => {
     await renderRow(null);
     const check = screen.getByRole("checkbox");

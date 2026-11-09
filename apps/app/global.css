@@ -170,6 +170,28 @@ for a pointer that hovers, so a phone's tap never leaves it stuck. React Native 
   [data-pace-inner]:not([aria-disabled="true"]):hover > [data-pace-visual]::after {
     background-color: var(--pace-fill-1);
   }
+
+  [data-pace-row] > [data-pace-press]:not([aria-disabled="true"]):hover::after {
+    background-color: transparent;
+  }
+
+  [data-pace-row]:has(> [data-pace-press]:not([aria-disabled="true"]):hover)::after {
+    background-color: var(--pace-fill-1);
+  }
+}
+
+/*
+A row whose control sits beside its press area (`ControlRow`: a task's check, then the title): a
+hover on the press area tints the whole row, the check's column too, as one object; the press area
+alone started at the title and left the check on the bare ground (design review 2 N7).
+*/
+[data-pace-row]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-color: transparent;
+  transition: background-color 100ms cubic-bezier(0.4, 0, 1, 1);
 }
 
 [data-pace-press]:not([aria-disabled="true"]):active::after {

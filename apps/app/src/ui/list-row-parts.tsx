@@ -63,6 +63,9 @@ export const SelectedBar = () => (
   />
 );
 
+/** `dataSet` is react-native-web's (React Native's types do not know it; native ignores it). */
+const ROW_MARK = { dataSet: { paceRow: "true" } } as object;
+
 /**
 A row whose control sits beside its press area (`ListRow control`): the control's 48 column at the
 leading edge, the selection fill under both, the press area after it.
@@ -76,7 +79,11 @@ export const ControlRow = ({
   readonly control: ReactNode;
   readonly isSelected: boolean;
 }) => (
-  <View className={cx("relative flex-row", isSelected && "bg-fill-1")}>
+  <View
+    className={cx("relative flex-row", isSelected && "bg-fill-1")}
+    // react-native-web writes `data-pace-row`: the web hovers the whole row (global.css, N7).
+    {...ROW_MARK}
+  >
     {isSelected ? <SelectedBar /> : null}
     <View className="pl-1" testID="list-row-control">
       {control}
