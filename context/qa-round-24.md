@@ -78,3 +78,21 @@ R23-03 still there (R24-03, medium). R23-05, R23-10, R23-15, R22-20 not checked.
 - Offline Log out is honest and keyboard-friendly; /add now focuses the title.
 - Subtask done marks update progress and remaining work at once; undo is clean; overdue is clearly worded.
 - Zero console errors and zero 4xx/5xx in every session I ran.
+
+## Fix wave notes (2026-11-09)
+
+Fixed with tests and a bug-lessons class each: R24-01 (class 194), R24-02 (195, the front report's deviation closed), R24-05 (198), R24-06 (197), R24-07 (196), R24-08 (199), R24-10 (200); plus the owner's keepalive item on bug-lessons 192.
+
+**R24-04 — kept as designed.** The phone row puts the deadline last on purpose (design review 2 N10, commit 7cd2b40, bug-lessons 181): the line is cut at its end, and the piece that must stay whole is the countdown («осталось 23 ч 59 мин»). In the shots (s/now-ru-390-light.png, s/mt-p1.png) every countdown is whole and only «Срок …» (or a progress count after it) yields; the full deadline is one tap away on the task. No change.
+
+**R24-09 — not a rounding difference.** Insights formats every figure with one `formatDuration(minutes, language)`, nothing depends on the width. The two shots were taken about a minute apart with «Музыка» running, so the open activity had grown from 3 ч to 3 ч 01 мин (and «Другое» from 2 ч to 2 ч 01 мин). No change.
+
+**R24-03 — measured, not fixed (time-boxed).** 390 px, touch, 4× CPU, production web build, lived-in RU account, CDP Profiler + Event Timing (script: scratchpad `qa24/prof.ts`):
+
+| Tap | Event duration | Click handler (processing) | React render, inclusive | `(program)` (style, layout, paint) |
+|---|---|---|---|---|
+| Day tab (first visit) | 400 ms | 255 ms | ~300 ms | ~1.0 s over the window |
+| Now tab (back, Now already mounted) | 216 ms | 167 ms | ~200 ms | ~0.35 s |
+| Open a row (task page) | 312 ms | 233 ms | ~235 ms | ~0.44 s |
+
+The work is synchronous React rendering in the click (a discrete event renders at once), spread across react-dom and react-native-web's element and style resolution (`createDOMProps`, style preprocessing), with timezone formatting (`@date-fns/tz` `tzOffset`, ~7 ms self) the only app-side function that shows up; no single hot spot. The telling line is the Now tab: Now is already mounted, yet going back to it renders ~200 ms of tree. The root layout's `Navigator` reads `usePathname()` (and `useHasNavigation`), so every navigation re-renders it, and with it `<Stack>` / `<Tabs>` and every mounted scene. Proposed fix (not contained enough for this wave): confirm with a React profiling build which scenes re-render on a tab switch; move the pathname reads at the root into leaf components (as `CrashContext` already does), memoize the scene content (`ScreenScene` / screen components) so an unfocused or unchanged scene skips, and consider wrapping tab and row navigations in `startTransition` so the tap paints before the new screen renders. Carry as R25 medium.
