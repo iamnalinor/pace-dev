@@ -304,6 +304,14 @@ const requestClose = async (): Promise<void> => {
   });
 };
 
+/** A node's horizontal margin and padding classes. */
+const inset = (node: null | { readonly props: Record<string, unknown> }): readonly string[] => {
+  const name = node?.props["className"];
+  return (typeof name === "string" ? name : "")
+    .split(" ")
+    .filter((each) => /^(?:lg:)?[mp]x-/u.test(each));
+};
+
 describe("TaskScreen — work", () => {
   it("shows its link and description, and no ranking card", async () => {
     await trkScreen();
@@ -315,6 +323,16 @@ describe("TaskScreen — work", () => {
     ).toBeOnTheScreen();
     expect(screen.queryByRole("button", { name: /^Why it's/u })).toBeNull();
     expect(screen.queryByRole("button", { name: "Waiting" })).toBeNull();
+  });
+
+  it("starts the description where the title starts, not a row inset short of it (design review 2 N6)", async () => {
+    await trkScreen();
+    const title = screen.getByRole("header", { name: /flaky/iu });
+    const words = screen.getByText("p99 check fails ~1 in 5 runs on the shared runner.");
+    // The description sat at x = 264 on a computer, the title at 280.
+    const block = screen.getByTestId("task-description");
+    expect(inset(block)).toEqual(inset(title.parent));
+    expect(block).toContainElement(words);
   });
 
   it("edits the description directly on the task page", async () => {

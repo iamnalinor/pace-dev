@@ -17,6 +17,12 @@ import { Tag } from "#app/ui/tag.tsx";
 import { Text } from "#app/ui/text.tsx";
 import { describeRepeatRule, formatDuration, presetLabel } from "@pace/core";
 
+/**
+The title block's horizontal inset: the gutter, a computer's wider one on the page (the pane keeps
+the narrow one). Bare text under the title (the description) starts here too (design review 2 N6).
+*/
+export const titleInset = (isInPane: boolean): string =>
+  cx("px-gutter", !isInPane && "lg:px-gutter-lg");
 /** A long address cut in its middle: the host stays at the start, the end of the path at the end. */
 const LINK_HEAD = 24;
 const LINK_TAIL = 10;
@@ -187,7 +193,7 @@ export const TaskSummary = ({
   );
   return (
     <View className="gap-3">
-      <View className={cx("gap-2 px-gutter", !isInPane && "lg:px-gutter-lg")}>
+      <View className={cx("gap-2", titleInset(isInPane))}>
         <Text level={1} role="title1">
           {view.title}
         </Text>
