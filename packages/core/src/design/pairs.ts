@@ -148,6 +148,8 @@ export const USED_PAIRS: readonly ContrastPair[] = [
     { fg: `hue.${name}.ink`, bg: `hue.${name}.tint`, over: "bg.cell", target: "meta" },
     { fg: `hue.${name}.ink`, bg: `hue.${name}.tint`, over: "bg.app", target: "meta" },
     { fg: `hue.${name}.stroke`, bg: "bg.app", target: "ui" },
+    // Also a running time-bar tile's bar: the tile is `bg.cell`, since the stroke on `fill.3`
+    // (the spec's running fill) measures 2.7-2.97:1 and on `fill.2` 2.94:1 (design review H5).
     { fg: `hue.${name}.stroke`, bg: "bg.cell", target: "ui" },
   ]),
 ];

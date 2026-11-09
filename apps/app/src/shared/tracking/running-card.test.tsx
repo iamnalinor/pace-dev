@@ -137,7 +137,7 @@ describe("the four tiles", () => {
     const bar = await screen.findByLabelText(t("ru", "time.bar"));
     const tiles = within(bar)
       .getAllByRole("button")
-      .filter((button) => classes(button).includes("flex-1") && classes(button).includes("h-16"));
+      .filter((button) => classes(button).includes("h-bar-tile"));
     expect(tiles).toHaveLength(4);
     expect(
       new Set(

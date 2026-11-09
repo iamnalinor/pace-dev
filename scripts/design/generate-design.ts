@@ -70,6 +70,7 @@ const CONTAINER_SIZES = [80, 96, 128];
 
 const SIZE_TOKENS: Readonly<Record<string, number>> = {
   "auth-card": size.authCard,
+  "bar-tile": size.barTile,
   "chip-max": size.chip.max,
   content: layout.contentMax,
   "content-wide": layout.contentMaxWide,

@@ -7,7 +7,7 @@ import type { TimeButtonView } from "@pace/client";
 
 import { useT } from "#app/app-state.tsx";
 import { cx } from "#app/ui/cx.ts";
-import { outlineClass } from "#app/ui/hue.ts";
+import { fillClass } from "#app/ui/hue.ts";
 import { Icon, type IconName, type IconTone } from "#app/ui/icon.tsx";
 import { Pressable } from "#app/ui/pressable.tsx";
 import { Text } from "#app/ui/text.tsx";
@@ -20,28 +20,25 @@ const ICONS: Readonly<Record<TimeButtonView["id"], IconName>> = {
   task: "timer",
 };
 
-/** Every tile's frame is the same 2 px border, so a state never changes its size. */
-const TILE = "h-16 min-w-0 flex-1 items-center justify-center gap-0.5 rounded-xl border-2 px-1";
+/**
+Every tile's box (spec §5.1): 56 high, the `md` corners, the width of its quarter. Never `flex-1`:
+inside the tooltip's column that made the basis 0, which beat the height, and the tile shrank to the
+44 of its target on the web (design review H5, bug-lessons class 150).
+*/
+const TILE = "h-bar-tile w-full items-center justify-center gap-0.5 rounded-md px-1";
 
 /**
-How a tile looks (spec 4.3.7): neutral at rest, dashed and quiet when it cannot start anything
-now (the Calendar tile), and while its activity runs its own category's stroke.
+How a tile looks (spec §5.1, F-COL-05, F-COL-12): neutral `fill.2` at rest, the Calendar tile with
+nothing near included (never dashed or "disabled": its tooltip and hint say why); while its activity
+runs, the `bg.cell` card (not the spec's `fill.3`: the stroke measures under 3:1 on it) with a bar
+in its category's stroke along the bottom and its label in 600.
 */
 const tileLook = (
   button: TimeButtonView,
-  isGreyed: boolean,
-): { readonly box: string; readonly icon: IconTone; readonly ink: TextTone } => {
-  if (button.isRunning) {
-    return {
-      box: cx("bg-cell", outlineClass(button.color)),
-      icon: "primary",
-      ink: "primary",
-    };
-  }
-  return isGreyed
-    ? { box: "border-dashed border-outline bg-cell", icon: "tertiary", ink: "tertiary" }
-    : { box: "border-transparent bg-cell", icon: "secondary", ink: "secondary" };
-};
+): { readonly box: string; readonly icon: IconTone; readonly ink: TextTone } =>
+  button.isRunning
+    ? { box: "bg-cell", icon: "primary", ink: "primary" }
+    : { box: "bg-fill-2", icon: "secondary", ink: "secondary" };
 
 /**
 One of the four fixed tiles: icon over the name on one line, the same size and place whatever the
@@ -61,7 +58,7 @@ export const BarTile = ({
 }) => {
   const t = useT();
   const label = t(button.labelKey);
-  const look = tileLook(button, unavailable !== undefined);
+  const look = tileLook(button);
   return (
     <Tooltip isFilling isImmediate label={unavailable}>
       <Pressable
@@ -75,12 +72,18 @@ export const BarTile = ({
         }}
         ref={anchor}
         role="button"
-        shape="xl"
+        shape="md"
       >
+        {button.isRunning ? (
+          <View
+            className={cx("absolute inset-x-3 bottom-1 h-1 rounded-pill", fillClass(button.color))}
+            testID="bar-tile-running"
+          />
+        ) : null}
         <Icon name={ICONS[button.id]} tone={look.icon} />
         <Text
           chrome
-          className={cx("text-center", button.isRunning && "font-medium")}
+          className={cx("text-center", button.isRunning && "font-semibold")}
           policy="truncate"
           role="caption"
           tone={look.ink}
