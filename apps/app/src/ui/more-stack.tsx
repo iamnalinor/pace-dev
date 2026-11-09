@@ -15,12 +15,13 @@ type StackState = Pick<StackNavigationState<ParamListBase>, "index" | "routes">;
 The stack with More's list put under its first screen, or null when it already starts there. A
 destination opened from elsewhere (Now's bell, a notification, a link, a sidebar on a wide window)
 starts the stack at itself; with More under it, Back leads to More, and the More tab shows More
-again afterwards instead of the destination left behind.
+again afterwards instead of the destination left behind. An empty stack is left alone.
 */
 export const anchoredAtMore = <State extends StackState>(
   state: State,
 ): null | (Omit<State, "routes"> & { readonly routes: readonly { readonly name: string }[] }) =>
-  state.routes[0]?.name === MORE_ROUTE
+  // An empty stack (still being built) has nothing in front to put More under.
+  state.routes.length === 0 || state.routes[0]?.name === MORE_ROUTE
     ? null
     : { ...state, index: state.index + 1, routes: [{ name: MORE_ROUTE }, ...state.routes] };
 
