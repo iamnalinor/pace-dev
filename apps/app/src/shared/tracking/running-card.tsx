@@ -88,7 +88,11 @@ const StopButton = ({ running }: { readonly running: RunningView }) => {
   );
 };
 
-/** An alongside row's Stop: the filled square alone, named «Стоп: …» (its tooltip says so). */
+/**
+An alongside row's Stop: the main Stop's filled square on the same `fill.2`, without the word, named
+«Стоп: …» (its tooltip says so). An outlined square alone at a row's end read as an unchecked
+checkbox (design review 2 N1).
+*/
 const StopIcon = ({ running }: { readonly running: RunningView }) => {
   const t = useT();
   const { actions } = usePace();
@@ -97,10 +101,12 @@ const StopIcon = ({ running }: { readonly running: RunningView }) => {
     <IconButton
       haptic="tick"
       icon="square"
+      isFilled
       label={`${t("time.stop")}: ${running.label}`}
       onPress={() => {
         void run(actions.stopActivity({ activityId: running.activityId }));
       }}
+      tonal
     />
   );
 };
@@ -136,7 +142,8 @@ const StillGoing = ({ running }: { readonly running: RunningView }) => {
 
 /**
 An activity running alongside the main one (spec §5.1 fold step 1): one compact row under the main
-card's line, its name (the row's width up to the time), the time so far and Stop as an icon; no
+card's line, led by its category's tile (owner 2026-11-08: a running activity in a row leads with a
+`HueTile`), its name (the row's width up to the time), the time so far and Stop as an icon; no
 line of its own, no second card (design review B2). «параллельно» is not drawn (it left the name one
 letter at 390): the row's place in the card says it, and its name says it to a screen reader.
 */
@@ -145,6 +152,7 @@ const AlongsideRow = ({ running }: { readonly running: RunningView }) => {
   const { language } = useViewer();
   return (
     <View className="flex-row items-center gap-3" testID="running-alongside">
+      <HueTile hue={running.color} icon="timer" />
       <Text
         accessibilityLabel={`${running.label}, ${t("time.alongsideTag")}`}
         className="flex-1"

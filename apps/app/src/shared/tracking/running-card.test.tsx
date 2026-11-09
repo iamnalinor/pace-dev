@@ -34,6 +34,16 @@ const classes = (node: { props: Record<string, unknown> }): readonly string[] =>
   return typeof name === "string" ? name.split(" ") : [];
 };
 
+type Node = { readonly children: readonly unknown[]; readonly props: Record<string, unknown> };
+
+const descendants = (root: unknown): readonly Node[] => {
+  if (typeof root !== "object" || root === null || !("props" in root)) {
+    return [];
+  }
+  const node = root as Node;
+  return [node, ...node.children.flatMap((child) => descendants(child))];
+};
+
 describe("RunningCard", () => {
   it("names the activity in plain text, not as a tag, and cuts a long name before Stop (F-DAT-02)", async () => {
     const long = "A".repeat(80);
@@ -108,6 +118,28 @@ describe("RunningCard with a long Russian name (QA of the B2 fix)", () => {
     const stop = within(row).getByRole("button", { name: `Stop: ${LONG}` });
     expect(within(stop).queryByText(en("time.stop"))).toBeNull();
     expect(classes(within(row).getByText(LONG))).toContain("flex-1");
+  });
+
+  it("stops an alongside row with the main Stop's filled square on a fill-2 disc, led by its tile (N1)", async () => {
+    await renderScreen(
+      <RunningCard
+        alongside={[{ ...VIEW, activityId: "a2", isAlongside: true, label: LONG, minutes: 92 }]}
+        running={VIEW}
+      />,
+      await createTestRuntime(),
+    );
+    const row = screen.getByTestId("running-alongside");
+    // An outlined square alone at a row's end reads as an unchecked checkbox (design review 2 N1).
+    expect(within(row).getByTestId("hue-tile")).toBeOnTheScreen();
+    const stop = within(row).getByRole("button", { name: `Stop: ${LONG}` });
+    const inside = descendants(stop);
+    expect(inside.some((node) => classes(node).includes("bg-fill-2"))).toBe(true);
+    // lucide draws `fill="none"` unless the glyph is filled.
+    expect(
+      inside.some(
+        (node) => typeof node.props["fill"] === "string" && node.props["fill"] !== "none",
+      ),
+    ).toBe(true);
   });
 });
 
