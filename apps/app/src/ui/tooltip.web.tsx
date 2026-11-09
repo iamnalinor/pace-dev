@@ -64,6 +64,19 @@ const isKeyboardFocus = (target: unknown): boolean => {
 
 const isTouch = (event: PointerLike): boolean => event.nativeEvent?.pointerType === "touch";
 
+/**
+The device hovers with a fine pointer (a mouse, a trackpad). A phone's browser can report a tap's
+compatibility events as a mouse's, and the bubble then stayed up over the screen's title with
+nothing to hover away from it (design review 2 N4). Read when the pointer comes, not at load: a
+window can gain or lose a mouse. With no media query to ask (a test), it is taken as true.
+*/
+const canHover = (): boolean => {
+  const { matchMedia } = globalThis as { matchMedia?: (query: string) => { matches: boolean } };
+  return (
+    typeof matchMedia !== "function" || matchMedia("(hover: hover) and (pointer: fine)").matches
+  );
+};
+
 /** What a tooltip explains: a control (a button, a switch, anything that takes focus). */
 const TRIGGER = '[role="button"], [role="switch"], button, [tabindex]';
 
@@ -254,7 +267,8 @@ A short explanation of its trigger, anchored to it (spec §4.2.31, §6 tooltip).
 the trigger shows it after 400 ms (at once for a reason a control is unavailable, `isImmediate`,
 and at once when moving on from another tooltip); the keyboard's focus shows it at once. It stays
 while the pointer is on the trigger or on the bubble, and goes a moment after the pointer leaves
-both, when focus moves on, or on Escape. A touch shows nothing: the tap runs the control.
+both, when focus moves on, or on Escape. A touch shows nothing: the tap runs the control; nor does a
+pointer on a device that cannot hover finely (`(hover: hover) and (pointer: fine)`).
 */
 export const Tooltip = ({
   children,
@@ -282,7 +296,7 @@ export const Tooltip = ({
         }
       }}
       onPointerEnter={(event) => {
-        if (label !== undefined && !isTouch(event)) {
+        if (label !== undefined && !isTouch(event) && canHover()) {
           state.hover(isImmediate);
         }
       }}

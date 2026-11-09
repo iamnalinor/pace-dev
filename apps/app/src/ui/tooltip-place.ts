@@ -81,9 +81,19 @@ const boxOn = (side: Side, anchor: Box, { bubble, viewport }: Fit): Box | null =
 
 const SIDES: readonly Side[] = ["above", "below", "after", "before"];
 
+/** The order for a trigger in the header band: below first, off the screen's title. */
+const HEADER_SIDES: readonly Side[] = ["below", "above", "after", "before"];
+
 /**
-Where a tooltip's bubble goes: above its trigger, else below, else beside it (after, before), the
-first side that fits the window and lies over none of `others` (the page's other controls: a
+A trigger whose top is within this far of the window's top sits in the header band (the back
+chevron, the period stepper, the header's actions): its bubble above lay over the large title
+(design review 2 N4).
+*/
+export const HEADER_BAND_PX = 120;
+
+/**
+Where a tooltip's bubble goes: above its trigger, else below, else beside it (after, before) — below
+first for a trigger in the header band (`HEADER_BAND_PX`) — the first side that fits the window and lies over none of `others` (the page's other controls: a
 bubble over a control takes its press, bug class 6). Every side covering something, the first
 that fits; none fitting, below.
 */
@@ -92,10 +102,13 @@ export const placeTooltip = (
   bubble: Size,
   { others = [], viewport }: { readonly viewport: Size; readonly others?: readonly Box[] },
 ): Placement => {
-  const fitting = SIDES.map((side) => ({
-    box: boxOn(side, anchor, { bubble, viewport }),
-    side,
-  })).filter((place): place is { box: Box; side: Side } => place.box !== null);
+  const sides = anchor.y < HEADER_BAND_PX ? HEADER_SIDES : SIDES;
+  const fitting = sides
+    .map((side) => ({
+      box: boxOn(side, anchor, { bubble, viewport }),
+      side,
+    }))
+    .filter((place): place is { box: Box; side: Side } => place.box !== null);
   const chosen = fitting.find(({ box }) => others.every((other) => !isOverlapping(box, other))) ??
     fitting[0] ?? {
       box: {

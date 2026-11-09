@@ -25,6 +25,19 @@ describe("placeTooltip", () => {
     });
   });
 
+  it("prefers below for a trigger in the window's top 120 px, so a header's bubble never covers the title (design review 2 N4)", () => {
+    // Day's ‹ at y = 64 had room above and its «Предыдущий день» lay over «День».
+    expect(
+      placeTooltip({ height: 44, width: 44, x: 500, y: 64 }, BUBBLE, { viewport: VIEWPORT }).side,
+    ).toBe("below");
+    expect(
+      placeTooltip({ height: 44, width: 44, x: 500, y: 64 }, BUBBLE, {
+        others: [{ height: 40, width: 200, x: 420, y: 112 }],
+        viewport: VIEWPORT,
+      }).side,
+    ).toBe("above");
+  });
+
   it("stays inside the window at either edge", () => {
     expect(
       placeTooltip({ height: 40, width: 40, x: 0, y: 600 }, BUBBLE, { viewport: VIEWPORT }).left,
