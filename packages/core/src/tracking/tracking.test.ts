@@ -125,7 +125,7 @@ describe("categories and buttons", () => {
       // The id Rest had as a single button: logs and the assistant's callers keep it.
       ["rest", "time.choice.rest", "rest", 30],
       ["rest:walk", "time.choice.walk", "rest", 30],
-      ["rest:workout", "time.choice.workout", "sport", 60],
+      ["rest:workout", "time.choice.workout", "sport", 180],
       ["rest:nap", "time.choice.nap", "sleep", 30],
       ["rest:sleep", "time.choice.sleep", "sleep", 480],
     ]);
@@ -134,7 +134,7 @@ describe("categories and buttons", () => {
   it("finds a choice and its button by the choice's id; a retired one is gone", () => {
     expect(choiceById("rest:workout")).toMatchObject({
       button: { id: "rest" },
-      choice: { category: "sport", expectMinutes: 60 },
+      choice: { category: "sport", expectMinutes: 180 },
     });
     expect(choiceById("sport:60")).toBeNull();
     expect(choiceById("chores:nap")).toBeNull();

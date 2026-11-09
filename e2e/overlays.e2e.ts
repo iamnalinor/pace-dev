@@ -237,7 +237,7 @@ test.describe("motion and overlays at one width", () => {
     await page.setViewportSize({ height: 844, width: 390 });
     await page.goto("/");
     const bar = page.getByRole("region", { name: "Time" });
-    await bar.getByRole("button", { exact: true, name: "Rest" }).click();
+    await bar.getByRole("button", { exact: true, name: "Misc" }).click();
     await page.getByRole("button", { exact: true, name: "Walk" }).click();
     await expect(bar.getByRole("button", { name: /^Stop: Walk/u })).toBeVisible();
     const box = await bar.boundingBox();

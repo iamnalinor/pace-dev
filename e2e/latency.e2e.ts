@@ -536,14 +536,14 @@ test.describe("the other frequent taps within 100 ms on a slow phone (p75 of 9)"
   test("Now: opening a time-bar picker", async ({ page }) => {
     // Nothing runs on the seeded account, so the bar's tiles are out (no "Start something else").
     const timeTap = await openNow(page);
-    const picker = page.getByRole("list", { name: "Rest" });
+    const picker = page.getByRole("list", { name: "Misc" });
     await expect(picker).toHaveCount(0);
     const durations = await timeOpens(timeTap, page, {
       close: async () => {
         await page.keyboard.press("Escape");
       },
       shown: picker,
-      target: page.getByRole("button", { exact: true, name: "Rest" }),
+      target: page.getByRole("button", { exact: true, name: "Misc" }),
     });
     expectWithinBudget("picker", durations);
   });

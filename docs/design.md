@@ -121,3 +121,7 @@ that names the account.
 2026-11-09 (owner): **Day's rail lines up with the rows**: one bar beside each row at the row's measured top and height (category tint + stroke pen line, a gap dashed), the red now line inside the row that holds now so the running bar ends on it; decoration hidden from screen readers, no longer a proportional index.
 
 2026-11-09 (owner): **no «Сдача по подзадачам» / submission setting.** The preset field `submission` (`whole` / `per_subtask`) is gone from the preset editor, the task page's tags, MCP and the seeds; a task's check always closes it (with Undo), subtasks are marked done one by one and show progress, and lateness goes by the done subtasks' instants (else the closing time) whatever the preset. Old presets and events that carry the key still parse and it is dropped.
+
+2026-11-09 (owner): **the fourth time-bar tile is «Прочее» / "Misc"**, and its picker holds «Отдых» / "Rest"
+among Short break, Walk, Workout, Nap and Sleep (no choice named after its picker, R22-22).
+EN says "Misc", not "Other", which is a category's name. A workout is expected to take 3 h.

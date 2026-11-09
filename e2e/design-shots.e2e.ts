@@ -537,7 +537,7 @@ const STATES: readonly State[] = [
     run: async (ctx) => {
       const { page, L } = ctx;
       await openTimeBar(ctx);
-      await first(page.getByRole("button", { exact: true, name: L("Rest") })).click();
+      await first(page.getByRole("button", { exact: true, name: L("Misc") })).click();
     },
   },
   {

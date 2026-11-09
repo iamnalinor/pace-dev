@@ -60,7 +60,7 @@ for (const size of SIZES) {
       await addTask(page, `Write the lab report ${size.name}`);
       const bar = timeBar(page);
       // Four buttons, nothing else: no «⋯», no switches.
-      await expect(bar.getByRole("button", { name: /^(Calendar|Task|Chores|Rest)$/u })).toHaveCount(
+      await expect(bar.getByRole("button", { name: /^(Calendar|Task|Chores|Misc)$/u })).toHaveCount(
         4,
       );
       await expect(page.getByRole("button", { name: /More about/u })).toHaveCount(0);
@@ -87,11 +87,11 @@ for (const size of SIZES) {
       await tasks.getByRole("button", { name: `Write the lab report ${size.name}` }).click();
       await expect(bar.getByRole("button", { name: "Task, running" })).toBeVisible();
 
-      await bar.getByRole("button", { name: "Rest", exact: true }).click();
-      const rest = page.getByRole("list", { name: "Rest" });
+      await bar.getByRole("button", { name: "Misc", exact: true }).click();
+      const rest = page.getByRole("list", { name: "Misc" });
       await expect(rest.getByRole("button")).toHaveText([
         /Short break/u,
-        /Downtime/u,
+        /Rest/u,
         /Walk/u,
         /Workout/u,
         /Nap/u,
@@ -100,7 +100,7 @@ for (const size of SIZES) {
       await shoot(page, `day-picker-rest-${size.name}`, (name) => info.outputPath(name));
       await expectNoA11yViolations(page);
       await rest.getByRole("button", { name: "Walk" }).click();
-      await expect(bar.getByRole("button", { name: "Rest, running" })).toBeVisible();
+      await expect(bar.getByRole("button", { name: "Misc, running" })).toBeVisible();
       await expect(bar.getByText(/of ~30m/u)).toBeVisible();
 
       // Chores: a pick switches over from what ran.
@@ -108,10 +108,10 @@ for (const size of SIZES) {
       await shoot(page, `day-picker-chores-${size.name}`, (name) => info.outputPath(name));
       await page.getByRole("button", { name: "Getting ready" }).click();
       await expect(bar.getByRole("button", { name: "Chores, running" })).toBeVisible();
-      await expect(bar.getByRole("button", { name: "Rest", exact: true })).toBeVisible();
+      await expect(bar.getByRole("button", { name: "Misc", exact: true })).toBeVisible();
 
       // A workout alongside, from the switch in the picker's header.
-      await bar.getByRole("button", { name: "Rest", exact: true }).click();
+      await bar.getByRole("button", { name: "Misc", exact: true }).click();
       await page.getByLabel("Alongside what is running").click();
       await page.getByRole("button", { name: "Workout" }).click();
       await expect(bar.getByRole("button", { name: "Stop: Getting ready" })).toBeVisible();
@@ -145,9 +145,9 @@ for (const size of SIZES) {
       await addTask(page, `Planes and lines ${size.name}`);
       await expect(timeBar(page)).toBeVisible();
       await expect(timeBar(page).getByText("Walk")).toHaveCount(0);
-      await timeBar(page).getByRole("button", { name: "Rest", exact: true }).click();
-      await page.getByRole("list", { name: "Rest" }).getByRole("button", { name: "Walk" }).click();
-      await expect(timeBar(page).getByRole("button", { name: "Rest, running" })).toBeVisible();
+      await timeBar(page).getByRole("button", { name: "Misc", exact: true }).click();
+      await page.getByRole("list", { name: "Misc" }).getByRole("button", { name: "Walk" }).click();
+      await expect(timeBar(page).getByRole("button", { name: "Misc, running" })).toBeVisible();
       const running = timeBar(page);
       await expect(running.getByText("Walk")).toBeVisible();
       const firstRow = nowTasks(page).getByRole("listitem").first();

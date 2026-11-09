@@ -793,10 +793,10 @@ describe("NowBoard", () => {
       await waitFor(() => {
         expect(within(bar()).getByRole("button", { name: "Chores, running" })).toBeOnTheScreen();
       });
-      await fireEvent.press(within(bar()).getByRole("button", { name: "Rest" }));
+      await fireEvent.press(within(bar()).getByRole("button", { name: "Misc" }));
       await fireEvent.press(await screen.findByRole("button", { name: "Short break" }));
       await waitFor(() => {
-        expect(within(bar()).getByRole("button", { name: "Rest, running" })).toBeOnTheScreen();
+        expect(within(bar()).getByRole("button", { name: "Misc, running" })).toBeOnTheScreen();
       });
       expect(within(bar()).getByText("Short break")).toBeOnTheScreen();
       expect(runtime.state.store.getState().time.activities).not.toEqual({});

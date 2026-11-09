@@ -119,8 +119,8 @@ describe("the running activity in the bar", () => {
   it("starts a pick with a tick", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(<TimeBar />, runtime);
-    await fireEvent.press(screen.getByRole("button", { name: "Rest" }));
-    const list = (await screen.findAllByLabelText("Rest")).find(
+    await fireEvent.press(screen.getByRole("button", { name: "Misc" }));
+    const list = (await screen.findAllByLabelText("Misc")).find(
       (element) => element.props["role"] === "list",
     );
     await fireEvent.press(

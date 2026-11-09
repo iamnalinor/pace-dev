@@ -128,14 +128,12 @@ if (SHOT_DIR !== undefined) {
       }
       // The full time bar is on Now.
       await desktop.goto("/");
-      await desktop.getByRole("button", { name: "Rest", exact: true }).click();
+      await desktop.getByRole("button", { name: "Misc", exact: true }).click();
       await desktop
-        .getByRole("list", { name: "Rest" })
-        .getByRole("button", { name: "Downtime" })
+        .getByRole("list", { name: "Misc" })
+        .getByRole("button", { name: "Rest" })
         .click();
-      await expect(
-        desktop.getByRole("region", { name: "Time" }).getByText("Downtime"),
-      ).toBeVisible();
+      await expect(desktop.getByRole("region", { name: "Time" }).getByText("Rest")).toBeVisible();
       await shoot(desktop, "now-desktop");
       await desktop.goto("/day");
       await shoot(desktop, "day-desktop");
