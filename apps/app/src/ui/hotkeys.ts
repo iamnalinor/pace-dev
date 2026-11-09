@@ -31,10 +31,10 @@ export const HOTKEYS = {
   enter: { key: "Enter" },
   /** The composer's line straight to the Inbox. */
   toInbox: { key: "Enter", alt: true },
-  /** Focus on the open task (not while typing). */
-  focus: { key: "f" },
-  /** New task: the empty task form (not while typing). */
-  newTask: { key: "n" },
+  /** Focus on the open task: Alt+F (⌥F), a modifier always (F-A11Y-03, WCAG 2.1.4). */
+  focus: { alt: true, key: "f" },
+  /** New task, the empty task form: Alt+N (⌥N). */
+  newTask: { alt: true, key: "n" },
   /** Closes an open form. */
   escape: { key: "Escape" },
 } as const satisfies Readonly<Record<string, Hotkey>>;

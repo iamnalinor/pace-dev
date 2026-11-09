@@ -197,8 +197,8 @@ test("a title typed into the empty form is added on Enter", async ({ page }) => 
   await page.goto("/");
   const line = page.getByRole("textbox", { name: "New task" });
   await expect(line).toBeVisible();
-  // N opens the empty form, the cursor in its title.
-  await page.keyboard.press("n");
+  // Alt+N opens the empty form, the cursor in its title (a modifier always: F-A11Y-03).
+  await page.keyboard.press("Alt+n");
   const form = taskForm(page);
   await expect(form).toHaveAccessibleName("New task");
   const title = form.getByRole("textbox", { exact: true, name: "Title" });

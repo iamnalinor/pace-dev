@@ -26,7 +26,8 @@ describe("formatHotkey", () => {
     expect(formatHotkey(HOTKEYS.toInbox, "mac")).toBe("⌥↵");
     expect(formatHotkey(HOTKEYS.toInbox, "other")).toBe("Alt+Enter");
     expect(formatHotkey(HOTKEYS.enter, "mac")).toBe("↵");
-    expect(formatHotkey(HOTKEYS.focus, "other")).toBe("F");
+    expect(formatHotkey(HOTKEYS.focus, "other")).toBe("Alt+F");
+    expect(formatHotkey(HOTKEYS.newTask, "mac")).toBe("⌥N");
     expect(ariaHotkey(HOTKEYS.primary, "mac")).toBe("Meta+Enter");
     expect(ariaHotkey(HOTKEYS.toInbox, "other")).toBe("Alt+Enter");
   });
@@ -38,15 +39,25 @@ describe("isHotkeyPress", () => {
     expect(isHotkeyPress(HOTKEYS.primary, press("Enter", { ctrl: true }), "mac")).toBe(false);
     expect(isHotkeyPress(HOTKEYS.primary, press("Enter", { ctrl: true }), "other")).toBe(true);
     expect(isHotkeyPress(HOTKEYS.primary, press("Enter"), "other")).toBe(false);
-    expect(isHotkeyPress(HOTKEYS.focus, press("F"), "other")).toBe(true);
+    // A modifier always (F-A11Y-03, WCAG 2.1.4): a bare F is a letter, not a shortcut.
+    expect(isHotkeyPress(HOTKEYS.focus, press("f", { alt: true }), "other")).toBe(true);
+    expect(isHotkeyPress(HOTKEYS.focus, press("F"), "other")).toBe(false);
+    // ⌥N on a Mac types «˜»: the physical key still answers.
+    expect(
+      isHotkeyPress(HOTKEYS.newTask, { ...press("˜", { alt: true }), code: "KeyN" }, "mac"),
+    ).toBe(true);
     expect(isHotkeyPress(HOTKEYS.focus, press("f", { ctrl: true }), "other")).toBe(false);
     // A Russian layout: the F key types «а», the shortcut still answers.
-    expect(isHotkeyPress(HOTKEYS.focus, { ...press("а"), code: "KeyF" }, "other")).toBe(true);
-    expect(isHotkeyPress(HOTKEYS.newTask, { ...press("а"), code: "KeyF" }, "other")).toBe(false);
+    expect(
+      isHotkeyPress(HOTKEYS.focus, { ...press("а", { alt: true }), code: "KeyF" }, "other"),
+    ).toBe(true);
+    expect(
+      isHotkeyPress(HOTKEYS.newTask, { ...press("а", { alt: true }), code: "KeyF" }, "other"),
+    ).toBe(false);
   });
 
-  it("leaves bare letters to the field being typed in", () => {
-    expect(canFireWhileTyping(HOTKEYS.focus)).toBe(false);
+  it("fires its chords even while typing", () => {
+    expect(canFireWhileTyping(HOTKEYS.focus)).toBe(true);
     expect(canFireWhileTyping(HOTKEYS.primary)).toBe(true);
     expect(canFireWhileTyping(HOTKEYS.escape)).toBe(true);
   });
@@ -56,7 +67,7 @@ describe("labelWithHotkey", () => {
   it("adds the shortcut the way this computer names it, and nothing without a keyboard", () => {
     expect(labelWithHotkey("To Inbox", HOTKEYS.toInbox, "mac")).toBe("To Inbox · ⌥↵");
     expect(labelWithHotkey("To Inbox", HOTKEYS.toInbox, "other")).toBe("To Inbox · Alt+Enter");
-    expect(labelWithHotkey("New task", HOTKEYS.newTask, "mac")).toBe("New task · N");
+    expect(labelWithHotkey("New task", HOTKEYS.newTask, "mac")).toBe("New task · ⌥N");
     expect(labelWithHotkey("New task", HOTKEYS.newTask, null)).toBe("New task");
   });
 });
