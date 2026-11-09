@@ -299,7 +299,7 @@ export const Tooltip = ({
       // for its delay is called off. The window's press listener (`useDismiss`) is put in by an
       // effect after the tooltip shows, so a click's press right after an immediate show came
       // before it; the bubble then stayed under the sheet the press opened and took the Escape
-      // meant to close it (bug class 196).
+      // meant to close it (bug class 190).
       onPointerDown={state.hide}
       onPointerEnter={(event) => {
         if (label !== undefined && !isTouch(event) && canHover()) {

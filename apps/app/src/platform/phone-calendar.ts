@@ -1,6 +1,6 @@
 import * as Calendar from "expo-calendar";
 
-import { CALENDAR_LIMITS, type CalendarEvent } from "@pace/core";
+import { CALENDAR_LIMITS, type CalendarEvent, sliceWhole } from "@pace/core";
 
 import { type CalendarAttendee, isTakenEvent } from "./calendar-filter.ts";
 
@@ -57,10 +57,13 @@ const isTaken = (
   people === null ||
   isTakenEvent({ attendees: people, organizerEmail: event.organizerEmail, ownerAccount });
 
-/** Trimmed and cut to `limit`; nothing when it is empty. */
+/**
+Trimmed and cut to `limit` UTF-16 units (what the server's `.max()` counts) between two characters;
+nothing when it is empty.
+*/
 const textOf = (value: null | string | undefined, limit: number): string | undefined => {
   const trimmed = (value ?? "").trim();
-  return trimmed === "" ? undefined : trimmed.slice(0, limit);
+  return trimmed === "" ? undefined : sliceWhole(trimmed, limit);
 };
 
 const isSameAddress = (a: string | undefined, b: string | undefined): boolean =>

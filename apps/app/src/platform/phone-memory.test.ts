@@ -5,6 +5,7 @@ import type { FakeSecureStore } from "#app/testing/secure-store.fake.ts";
 import {
   dismiss,
   dismissedKeys,
+  removeSeriesRule,
   seriesRules,
   setSeriesRule,
   setUsageCursor,
@@ -43,4 +44,18 @@ it("keeps the usage cursor with the lock state, and reads an older cursor as unl
     JSON.stringify({ session: "session-A", value: "2026-10-06T05:00:00.000Z" }),
   );
   expect(await usageCursor("session-A")).toEqual({ at: "2026-10-06T05:00:00.000Z", locked: false });
+});
+
+it("loses no dismissal or rule when two are written at once (bug-lessons 185)", async () => {
+  await Promise.all([dismiss("calendar@one"), dismiss("calendar@two")]);
+  expect(await dismissedKeys()).toEqual(new Set(["calendar@one", "calendar@two"]));
+  await Promise.all([
+    setSeriesRule({ rule: "skip", series: "one", title: "One" }),
+    setSeriesRule({ rule: "attended", series: "two", title: "Two" }),
+  ]);
+  expect(new Set((await seriesRules()).map((rule) => rule.series))).toEqual(
+    new Set(["one", "two"]),
+  );
+  await Promise.all([removeSeriesRule("one"), removeSeriesRule("two")]);
+  expect(await seriesRules()).toEqual([]);
 });

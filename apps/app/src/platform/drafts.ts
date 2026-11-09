@@ -1,8 +1,8 @@
 /**
 Text typed into a field and not yet sent, kept on this device so a reload or an app restart does
 not lose it (feedback 5 item 7). Local only: never synced, never sent to the server. One record
-holds one account's drafts; another account's first draft replaces it, and signing out forgets it
-(bug-lessons 103).
+holds one session's drafts (`ownerTag`); another session's first draft replaces it, and signing out
+forgets it (bug-lessons 103).
 */
 
 /** The device's one slot for the drafts' record (localStorage on the web, SQLite on a phone). */
@@ -136,8 +136,11 @@ export const createDraftBook = ({
 };
 
 /**
-The account a draft belongs to, by a digest of its session token (FNV-1a, 32 bits): a tag that
-tells two sessions apart without keeping the session itself next to the drafts. `null` signed out.
+The session a draft belongs to, by a digest of its token (FNV-1a, 32 bits): a tag that tells two
+sessions apart without keeping the token itself next to the drafts. `null` signed out. Drafts are
+per session, not per account, on purpose: every way a session ends here (a Log out, a token found
+expired at start) forgets every draft anyway (`app-state.tsx`), so an account key would keep
+nothing more today, and a new sign-in (maybe another person on a shared phone) starts empty.
 */
 export const ownerTag = (session: string | undefined): null | string => {
   if (session === undefined || session === "") {

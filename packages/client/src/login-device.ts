@@ -1,4 +1,4 @@
-import { clipText, DEVICE_FIELD_LIMITS, endpoints } from "@pace/core";
+import { DEVICE_FIELD_LIMITS, endpoints, sliceWhole } from "@pace/core";
 
 import { type ApiClient, ApiError } from "./api-client.ts";
 
@@ -17,8 +17,10 @@ const DEVICE_ID_MAX = 64;
 const OLD_SERVER_FIELDS = ["deviceId", "deviceName"] as const;
 
 /**
-What a login may carry about the phone: each text trimmed and cut to the schema's limit by
-grapheme (a long custom-ROM model must not take the sign-in away), blank ones left out.
+What a login may carry about the phone: each text trimmed and cut to the schema's limit (a long
+custom-ROM model must not lose its field), blank ones left out. The server's `.max()` counts UTF-16
+units, so the cut does too, between two characters (`sliceWhole`): a cut by grapheme left an emoji
+model over the limit, and the server drops a field that does not fit (bug-lessons 186).
 */
 export const cleanLoginDevice = (device: LoginDevice | undefined): LoginDevice | undefined => {
   if (device === undefined) {
@@ -28,7 +30,7 @@ export const cleanLoginDevice = (device: LoginDevice | undefined): LoginDevice |
   for (const key of DEVICE_TEXT_FIELDS) {
     const text = device[key]?.trim() ?? "";
     if (text !== "") {
-      clean[key] = clipText(text, DEVICE_FIELD_LIMITS[key]);
+      clean[key] = sliceWhole(text, DEVICE_FIELD_LIMITS[key]).trimEnd();
     }
   }
   const id = device.deviceId?.trim() ?? "";

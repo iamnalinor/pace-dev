@@ -3,8 +3,8 @@ import * as SecureStore from "expo-secure-store";
 import { createStore } from "zustand/vanilla";
 
 import { appFirebaseProject } from "#app/platform/firebase-project.ts";
+import { serially } from "#app/platform/serially.ts";
 import { sessionHashOf } from "#app/platform/session-fingerprint.ts";
-import { seriallyBySession } from "#app/platform/session-poll-queue.ts";
 import { readSessionValue, writeSessionValue } from "#app/platform/session-value.ts";
 import { secureSave, shownThenSaved } from "#app/platform/shown-then-saved.ts";
 import { type ApiClient, ApiError } from "@pace/client";
@@ -332,7 +332,7 @@ export const pollNow = async (api: ApiClient): Promise<number> => {
   const session = api.currentSessionToken();
   return session === undefined
     ? 0
-    : await seriallyBySession(session, async () => await pollForSession(api, session));
+    : await serially(session, async () => await pollForSession(api, session));
 };
 
 /** The phone's FCM token; `null` without Google Play services (or Firebase in the build). */

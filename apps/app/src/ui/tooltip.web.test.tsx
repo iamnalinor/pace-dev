@@ -210,7 +210,7 @@ describe("Tooltip on the web (spec §4.2.31, §6 tooltip)", () => {
     expect(isShown(LABEL)).toBe(false);
   });
 
-  it("a press on the trigger right after an immediate one showed takes it away, before its page listeners are in (bug class 196)", async () => {
+  it("a press on the trigger right after an immediate one showed takes it away, before its page listeners are in (bug class 190)", async () => {
     // The Calendar tile's «nothing on» shows on the enter; a click's press follows in the same
     // moment, before React ran the effect that listens for presses on the window. The tooltip
     // stayed under the sheet the press opened and took the Escape meant to close it.

@@ -6,7 +6,7 @@ import type { ApiClient } from "@pace/client";
 import { backgroundApi, endBackgroundSessions } from "./background-api.ts";
 import { pollNow, pushMethodOf } from "./notifications.ts";
 import { uploadPhoneData } from "./phone-upload.ts";
-import { seriallyBySession } from "./session-poll-queue.ts";
+import { serially } from "./serially.ts";
 
 /** The task Android's WorkManager runs about every quarter hour, with the app closed or open. */
 export const BACKGROUND_CHECK_TASK = "pace.background-check";
@@ -90,7 +90,7 @@ export const startBackgroundCheck = async (): Promise<void> => {
     return;
   }
   registration.isStarted = true;
-  await seriallyBySession(REGISTRATION_QUEUE, async () => {
+  await serially(REGISTRATION_QUEUE, async () => {
     try {
       if (!(await TaskManager.isTaskRegisteredAsync(BACKGROUND_CHECK_TASK))) {
         await BackgroundTask.registerTaskAsync(BACKGROUND_CHECK_TASK, {
@@ -111,7 +111,7 @@ session's token), so it neither shows nor sends anything for that session.
 export const stopBackgroundCheck = async (): Promise<void> => {
   registration.isStarted = false;
   endBackgroundSessions();
-  await seriallyBySession(REGISTRATION_QUEUE, async () => {
+  await serially(REGISTRATION_QUEUE, async () => {
     try {
       await BackgroundTask.unregisterTaskAsync(BACKGROUND_CHECK_TASK);
     } catch {

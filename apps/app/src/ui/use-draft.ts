@@ -25,7 +25,7 @@ export const forgetDrafts = (): void => {
   book.forget();
 };
 
-/** The draft's key for the current account, or null when nothing may be kept. */
+/** The drafts' owner for the current session (`ownerTag`), or null when nothing may be kept. */
 const useOwner = (): (() => null | string) => {
   const session = use(DraftOwnerContext);
   return useCallback(() => ownerTag(session()), [session]);

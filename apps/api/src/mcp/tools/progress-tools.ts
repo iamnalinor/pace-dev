@@ -103,7 +103,7 @@ export const markSubtasks = defineTool({
 export const closeTask = defineTool({
   annotations: { destructiveHint: true, idempotentHint: true, readOnlyHint: false },
   description:
-    "Closes a task with an outcome: done (done_late is derived when it is past the deadline), cancelled (not needed any more; reason recommended) or skipped (consciously not done). A closed task keeps its history and can be reopened. Subtasks are marked done with mark_subtasks.",
+    "Closes a task with an outcome: done (done_late is derived, never passed: when every subtask is done, by the latest done instant against the deadline, so problems solved in time and the task closed later stay on time; otherwise by the closing instant), cancelled (not needed any more; reason recommended) or skipped (consciously not done). A closed task keeps its history and can be reopened. Subtasks are marked done with mark_subtasks.",
   handler: async (args, ctx) =>
     await runWrite(ctx, args, {
       build: forTask(args.taskId, (_scope, when) =>

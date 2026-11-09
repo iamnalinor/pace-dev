@@ -7,7 +7,7 @@ import { loginViaApi } from "./support/login.ts";
 /**
 Approves, and waits until the assistant log has heard what became of the conversation. That answer
 is sent after the approval, best effort and not awaited (`assistant.resolve`): a reload right after
-the press cancelled it, and the log then said «Suggested…» instead of «Created…» (bug class 198).
+the press cancelled it, and the log then said «Suggested…» instead of «Created…» (bug class 192).
 */
 const approveAndLog = async (page: Page): Promise<void> => {
   const logged = page.waitForResponse(

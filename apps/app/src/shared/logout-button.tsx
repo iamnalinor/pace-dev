@@ -85,7 +85,7 @@ export const LogoutButton = () => {
   // Wipe data): beside Export its buttons sat 500 px from the question. On a phone no card (its
   // padding would narrow the buttons), and Wait over Sign out anyway, each the column's width, as
   // the danger zone's confirm: side by side at the text inset each half was 159 px at 390 and
-  // «Всё равно выйти» ran two lines (bug class 197).
+  // «Всё равно выйти» ran two lines (bug class 191).
   return (
     <View
       aria-label={question}

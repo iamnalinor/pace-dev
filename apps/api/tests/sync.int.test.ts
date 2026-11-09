@@ -2,13 +2,14 @@ import { evictDurableObject, runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
-import { err, newId } from "@pace/core";
+import { err, type EventInput, newId } from "@pace/core";
 
 import type { UserStore } from "../src/user-store/user-store.ts";
 
+import { DERIVE_STEPS } from "../src/user-store/derive-steps.ts";
 import { coreValidator } from "../src/user-store/event-log.ts";
 import { STORE_EPOCH } from "../src/user-store/store-identity.ts";
-import { call, json, loginAsDev, pushEvents, storeIdOf } from "./helpers.ts";
+import { call, json, loginAsDev, pushEvents, readJson, storeIdOf } from "./helpers.ts";
 
 type PushResult = { accepted: string[]; rejected: { id: string; reason: string }[]; seq: number };
 type PullResult = {
@@ -217,6 +218,40 @@ describe("an older client's automatic miss (no auto-close since feedback 5)", ()
       return await instance.list(0, 10);
     });
     expect(page.events.map((item) => item.id)).toEqual([created.id, miss.id]);
+  });
+});
+
+describe("a derived system event that does not parse (the server's bug)", () => {
+  it("skips that step: the person's push still lands, answers 2xx, and a retry writes nothing", async () => {
+    const token = await loginAsDev("1002");
+    const me = await json<{ id: string }>("/api/me", { token });
+    const stub = env.USER_STORE.get(env.USER_STORE.idFromName(me.id));
+    // A step that writes an event its own schema refuses (an instant that is not one).
+    const broken: EventInput = {
+      id: "auto:broken",
+      occurredAt: "not an instant",
+      payload: { taskId: "t" },
+      precision: "exact",
+      source: "system",
+      type: "task.reopened",
+    };
+    await runInDurableObject(stub, (instance: UserStore) => {
+      instance.useDeriveSteps([() => [broken], ...DERIVE_STEPS]);
+    });
+    const created = event();
+    const response = await call("/api/sync/push", {
+      body: { events: [created], storeId: await storeIdOf(token) },
+      token,
+    });
+    expect(response.status).toBe(200);
+    const pushed = await readJson<PushResult>(response);
+    expect(pushed).toMatchObject({ accepted: [created.id], rejected: [] });
+    const pulled = await pull(token);
+    expect(pulled.events.map((item) => item.id)).toContain(created.id);
+    expect(pulled.events.map((item) => item.id)).not.toContain("auto:broken");
+    // The client's retry: accepted again, nothing new written, the network goes quiet.
+    const again = await push(token, [created]);
+    expect(again).toEqual({ accepted: [created.id], rejected: [], seq: pushed.seq });
   });
 });
 

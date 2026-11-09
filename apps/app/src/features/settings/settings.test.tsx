@@ -516,7 +516,7 @@ describe("SettingsScreen", () => {
     expect(router.replace).not.toHaveBeenCalled();
   });
 
-  it("on a phone puts Wait over Sign out anyway, each the column's width, so neither label wraps (bug class 197)", async () => {
+  it("on a phone puts Wait over Sign out anyway, each the column's width, so neither label wraps (bug class 191)", async () => {
     const runtime = await createTestRuntime({
       routes: { "POST /api/sync/push": () => problem(503, "offline") },
       world: "empty",

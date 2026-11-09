@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { endpoints } from "@pace/core";
+
 import { createApiClient } from "./api-client.ts";
 import { type Auth, createAuth } from "./auth.ts";
 import { createFakeFetch, fakeMe, type FakeRoute, fakeUser, problem } from "./fake-fetch.fake.ts";
@@ -148,8 +150,6 @@ describe("createAuth login", () => {
   });
 });
 
-const graphemes = (text = ""): number => [...new Intl.Segmenter().segment(text)].length;
-
 const NONCE_CREATED = {
   deepLink: "https://t.me/PaceTaskTrackerBot?start=login_n1",
   nonce: "n1",
@@ -197,10 +197,21 @@ describe("createAuth bot login", () => {
     const body = calls[0]?.body as Record<string, string>;
     expect(body["deviceBrand"]).toBeUndefined();
     expect(body["deviceId"]).toBe("dev-1");
-    expect(graphemes(body["deviceModel"])).toBe(60);
-    expect(body["deviceModel"]?.endsWith("…")).toBe(true);
-    expect(graphemes(body["deviceName"])).toBe(80);
-    expect(graphemes(body["osVersion"])).toBe(20);
+    // The server's `.max()` counts UTF-16 units: the cut must fit that, between two characters.
+    expect(body["deviceModel"]?.length).toBeLessThanOrEqual(60);
+    expect(body["deviceModel"]).toBe("👨‍👩‍👧".repeat(7));
+    expect(body["deviceName"]).toBe("x".repeat(80));
+    expect(body["osVersion"]).toBe("1".repeat(20));
+    // What the server parses keeps every field (a field over its limit would be dropped).
+    expect(endpoints.auth.nonceCreate.body.parse(body)).toEqual(body);
+  });
+
+  it("keeps an emoji model the server can store: within its UTF-16 limit, no half character (bug-lessons 186)", async () => {
+    const { auth, calls } = await setup({ "POST /api/auth/nonce": () => NONCE_CREATED });
+    await auth.startBotLogin("app", { deviceModel: `Pixel ${"🚀".repeat(40)}` });
+    const body = calls[0]?.body as Record<string, string>;
+    expect(endpoints.auth.nonceCreate.body.parse(body)).toEqual(body);
+    expect(body["deviceModel"]).toBe(`Pixel ${"🚀".repeat(27)}`);
   });
 
   it("signs in against an older Worker that refuses the phone's newer fields: asks again with the old ones", async () => {

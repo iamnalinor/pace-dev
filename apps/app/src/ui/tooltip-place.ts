@@ -110,7 +110,7 @@ Where a tooltip's bubble goes: above its trigger, else below, else beside it (af
 first for a trigger in the header band (`HEADER_BAND_PX`) — the first side that fits the window and
 lies over none of `others` (the page's other controls: a bubble over a control takes its press, bug
 class 6). No side clear centred, the same sides with the bubble slid to line up with the trigger's
-end, then its start (bug class 195: a centred bubble wider than its trigger reached a neighbour
+end, then its start (bug class 189: a centred bubble wider than its trigger reached a neighbour
 every side had). Every place covering something, the first centred one that fits; none fitting,
 below.
 */

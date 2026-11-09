@@ -1,7 +1,7 @@
 import type { CoreState } from "../materialize/core-state.ts";
 import type { Importance } from "../model/preset.ts";
 
-import { sliceWhole } from "../format/initials.ts";
+import { sliceWhole } from "../format/cut-text.ts";
 import { extractLink } from "../links.ts";
 import { isHomeworkPreset, resolvePreset } from "../presets/resolve-preset.ts";
 import { accountTz, type QueryContext } from "../queries/context.ts";
