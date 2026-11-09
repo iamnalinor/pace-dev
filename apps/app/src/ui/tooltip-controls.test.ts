@@ -38,9 +38,15 @@ describe("controlsNear (UI review I3: bounded per show)", () => {
     const root = rootOf([control(160, 100)]);
     controlsNear(ANCHOR, { now: 0, reuseMs: 600, root });
     controlsNear({ ...ANCHOR, x: 160 }, { now: 300, reuseMs: 600, root });
-    controlsNear(ANCHOR, { now: 800, reuseMs: 600, root });
     expect(root.querySelectorAll).toHaveBeenCalledTimes(1);
-    controlsNear(ANCHOR, { now: 2000, reuseMs: 600, root });
+  });
+
+  it("measures again once the scan is older than reuseMs, however often it was reused meanwhile", () => {
+    const root = rootOf([control(160, 100)]);
+    // A long warm chain: each reuse comes soon after the last, but the scan itself grows old.
+    for (const now of [0, 400, 800, 1200]) {
+      controlsNear(ANCHOR, { now, reuseMs: 600, root });
+    }
     expect(root.querySelectorAll).toHaveBeenCalledTimes(2);
   });
 

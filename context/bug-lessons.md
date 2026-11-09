@@ -2114,3 +2114,9 @@ New bugs go here with their class; a new class gets its own section above.
 - **Missed because.** The cap test only counted measurements; no test put the trigger's neighbour past the cap.
 - **Class.** A bound on work (a cap, a page, a sample) taken over the whole input in an arbitrary order, before the filter that says which items matter: the bound drops the items it was meant to keep.
 - **Sweep and guard.** The scan now measures every visible control once (one layout, then reads; reused by warm hovers) and caps after the nearness filter, keeping the nearest. Other caps before a filter: `activity-task-field` (filters, then slices), `drafts.ts` and the usage lists (sorted, then sliced) are in the right order. Guard: `tooltip-controls.test.ts` (a neighbour after 240 far controls is found; the cap keeps the nearest).
+
+### 169. A cache's age refreshed on every reuse
+- **Bug.** The tooltip's control scan set its timestamp on every reuse, so a chain of warm hovers each within 600 ms of the last kept one scan alive indefinitely, though the page under it could have changed (a list re-rendered, a pane opened) without a scroll or a resize to forget it (code review of 293b78c..9039ae6, minor 7).
+- **Missed because.** The reuse test checked that a reuse measures nothing, with a reuse that happened to slide the window; nothing asked how old the reused data was.
+- **Class.** A freshness window measured from the last read instead of from when the data was taken (sliding expiry where a fixed one was meant).
+- **Sweep and guard.** The timestamp is set only when the scan is taken. Other in-app caches with a reuse window: none slide (the store's caches are invalidated by events, not by time). Guard: `tooltip-controls.test.ts` (a chain of reuses 400 ms apart measures again once the scan is older than the window).

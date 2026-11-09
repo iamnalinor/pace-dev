@@ -93,11 +93,13 @@ export const controlsNear = (
     root,
   }: { readonly now: number; readonly reuseMs: number; readonly root: ScanRoot },
 ): readonly Box[] => {
+  // The scan's age counts from when it was read, not from its last reuse: a long warm chain
+  // must not keep boxes the page has long since moved away from.
   if (cache.root !== root || now - cache.at > reuseMs) {
     cache.boxes = measure(root);
     cache.root = root;
+    cache.at = now;
   }
-  cache.at = now;
   const near = cache.boxes.filter((box) => !isInside(box, anchor) && isNear(box, anchor));
   return near.length <= MAX_CONTROLS
     ? near
