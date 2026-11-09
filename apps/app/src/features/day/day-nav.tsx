@@ -59,6 +59,7 @@ export const DayNav = ({
   readonly onDate: (date: null | string) => void;
 }) => {
   const t = useT();
+  const { language } = useViewer();
   const isWide = useIsWide();
   const [picking, setPicking] = useState<null | RefObject<null | View>>(null);
   const close = (): void => {
@@ -90,6 +91,12 @@ export const DayNav = ({
           onDate(null);
         }}
         previousLabel={t("day.previous")}
+        shortLabel={new Intl.DateTimeFormat(language, {
+          day: "numeric",
+          month: "short",
+          timeZone: day.zone,
+          weekday: "short",
+        }).format(new Date(day.date))}
         todayLabel={t("period.today")}
       />
       {isWide && picking !== null ? (

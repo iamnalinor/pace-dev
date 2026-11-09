@@ -10,7 +10,10 @@ import { Text } from "#app/ui/text.tsx";
 export type PeriodStepperProps = {
   /** The period in words ("Sunday, Nov 1"); a polite live region, said once as it changes. */
   readonly label: string;
-  /** The label on a 320 window, where the long form pushes › out of the pill (spec §4.3.4). */
+  /**
+  The label on a 320 window, where the long form pushes › out of the pill (spec §4.3.4), and on a
+  phone while the reset shows.
+  */
   readonly shortLabel?: string | undefined;
   /** Makes the label a button that opens a picker, handed the label's node to anchor to. */
   readonly onLabel?: ((anchor: React.RefObject<null | View>) => void) | undefined;
@@ -30,6 +33,23 @@ export type PeriodStepperProps = {
 
 /** Windows this narrow (a 320 phone) show the short label. */
 export const SHORT_LABEL_WIDTH = 340;
+
+/**
+A phone's window up to this wide shows the short label while «Сегодня» takes its slot: at 390 the
+long day pushed «Сегодня» off the screen's edge (design review H7).
+*/
+export const SHORT_LABEL_AWAY_WIDTH = 430;
+
+/** The long label, or the short one on a 320 window and on a phone while the reset shows. */
+const shownLabel = ({
+  isAway,
+  label,
+  shortLabel,
+  width,
+}: Pick<PeriodStepperProps, "isAway" | "label" | "shortLabel"> & { readonly width: number }) => {
+  const isNarrow = width <= SHORT_LABEL_WIDTH || (isAway && width <= SHORT_LABEL_AWAY_WIDTH);
+  return shortLabel !== undefined && isNarrow ? shortLabel : label;
+};
 
 /** The period's name, a button when it opens a picker. */
 const PeriodLabel = ({
@@ -83,11 +103,11 @@ export const PeriodStepper = ({
 }: PeriodStepperProps) => {
   const t = useT();
   const { width } = useWindowDimensions();
-  const shown = shortLabel !== undefined && width <= SHORT_LABEL_WIDTH ? shortLabel : label;
+  const shown = shownLabel({ isAway, label, shortLabel, width });
   return (
     <View
       aria-label={t("period.group")}
-      className="min-w-0 flex-row items-center gap-2"
+      className="min-w-0 shrink flex-row items-center gap-2"
       role="group"
     >
       <View className="min-w-0 shrink flex-row items-center rounded-pill bg-fill-2">

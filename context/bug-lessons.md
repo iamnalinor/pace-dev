@@ -2084,3 +2084,9 @@ New bugs go here with their class; a new class gets its own section above.
 - **Missed because.** jest has no line breaking; the worst-case gallery fed long names into wide boxes, where every word fits.
 - **Class.** Text in a box narrower than its longest word, left to the platform's break rules instead of a stated policy (wrap between words, or one cut line).
 - **Sweep and guard.** A Week box measures its width and, when its longest word cannot fit, shows one line cut with an ellipsis (`boxLabelFit`); otherwise it wraps between words over the lines its height holds, and on the web words never break inside themselves. The whole name stays in the tooltip, the box's accessible name and the details. Swept the other narrow clamped labels (Day's rail has none; Insights bars truncate on one line; task rows wrap at 390 where words fit). Guard: `box-label.test.ts`.
+
+### 157. A control that appears beside a label and pushes the row past the screen
+- **Bug.** On a past day at 390, Day's period row (‹ «воскресенье · 8 нояб.» › and «Сегодня») ran to x = 390 and cut «Сегодня» at the screen's edge (design review H7): the short label existed for 320 windows only, and the group did not shrink inside the header row.
+- **Missed because.** The stepper was tried on today (no reset shown) and at 320 (the short label); the away state at 390 in Russian was only in a shot.
+- **Class.** A slot kept for a control that shows in one state (the reset away from today), sized for the state without it. Class 154's kind, seen through a state rather than a language.
+- **Sweep and guard.** `PeriodStepper` shows the short label on a phone's window (≤ 430) while the reset shows, and the group shrinks within its row; Day now passes a short label («вс, 8 нояб.»), as History already did; Week's range label is short already. Guard: `period-stepper.test.tsx` (short on a 390 phone away, long on today and on a computer).
