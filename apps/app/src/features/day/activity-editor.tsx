@@ -215,7 +215,7 @@ const DeleteBlock = ({
           }
         })();
       }}
-      variant="plain"
+      variant="plainDanger"
     >
       {t(isArmed ? "day.deleteConfirm" : "day.delete")}
     </Button>

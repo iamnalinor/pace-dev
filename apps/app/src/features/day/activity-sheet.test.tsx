@@ -574,6 +574,8 @@ describe("deleting a block", () => {
       />,
       runtime,
     );
+    // A step that removes is said in the danger colour, never the ink of a plain action (M1).
+    expect(screen.getByText("Delete activity").props["className"]).toContain("text-danger");
     await fireEvent.press(screen.getByRole("button", { name: "Delete activity" }));
     await fireEvent.press(screen.getByRole("button", { name: "Delete activity? Tap again" }));
     await waitFor(() => {
