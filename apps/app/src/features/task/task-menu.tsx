@@ -4,7 +4,7 @@ import { View } from "react-native";
 import type { TaskViewModel } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
-import { useTaskBack } from "#app/shared/task-opener.tsx";
+import { useTaskGoneBack } from "#app/shared/task-opener.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button } from "#app/ui/button.tsx";
 import { useConfirmFocus } from "#app/ui/confirm-focus.ts";
@@ -21,7 +21,7 @@ import { toastQuote, useToast } from "#app/ui/toast.tsx";
 const useDeleteTask = (view: TaskViewModel): (() => Promise<void>) => {
   const t = useT();
   const { actions } = usePace();
-  const back = useTaskBack();
+  const back = useTaskGoneBack();
   const toast = useToast();
   const run = useRunAction();
   return async () => {

@@ -3,7 +3,7 @@ import { useCallback } from "react";
 
 import { usePace, useSettings } from "#app/app-state.tsx";
 import { fromWallClock } from "#app/format/time.ts";
-import { usePushEntry } from "#app/platform/push-entry.ts";
+import { usePushEntry, useStepBack } from "#app/platform/push-entry.ts";
 import { formatInZone } from "@pace/core";
 
 /**
@@ -17,7 +17,8 @@ so the address never starts a loop of its own (bug-lessons 1). Setting `null` ta
 Every change written is a person's step (a task opened or closed, another day, week or period, a
 filter picked): on the web it takes a step in the browser's history first, so Back shows what was
 there before and Forward comes back (QA round 24 R24-02). Writing the value already shown does
-nothing at all.
+nothing at all. `forget` is for an action that removed what the param names (a note accepted, a
+task deleted): it takes the param off without a step (review of round 24, I2).
 
 Back and Forward change the param without the screen's own setter and keep the screen mounted:
 React state that only means something for one value of the param (a block picked on a day) is
@@ -25,10 +26,11 @@ stored with that value and reads as nothing for another one (bug-lessons 201).
 */
 export const useSearchParam = (
   name: string,
-): readonly [value: null | string, set: (next: null | string) => void] => {
+): readonly [value: null | string, set: (next: null | string) => void, forget: () => void] => {
   const params: Readonly<Record<string, string | string[] | undefined>> = useLocalSearchParams();
   const router = useRouter();
   const pushEntry = usePushEntry();
+  const didStepBack = useStepBack();
   const raw = params[name];
   const value = typeof raw === "string" && raw !== "" ? raw : null;
   const set = useCallback(
@@ -41,7 +43,15 @@ export const useSearchParam = (
     },
     [name, pushEntry, router, value],
   );
-  return [value, set];
+  // An action removed what the param names: no step, so Back does not stop on an entry whose
+  // item is gone; the step that opened it is taken back where it is the one before.
+  const forget = useCallback((): void => {
+    if (value === null || didStepBack(name)) {
+      return;
+    }
+    router.setParams({ [name]: undefined });
+  }, [didStepBack, name, router, value]);
+  return [value, set, forget];
 };
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/u;

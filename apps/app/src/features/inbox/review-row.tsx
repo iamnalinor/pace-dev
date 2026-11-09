@@ -63,11 +63,14 @@ one-tap answers under it (they sit beside the row, which opens the details).
 export const ReviewRow = ({
   isSelected,
   onOpen,
+  onRemoved,
   row,
 }: {
   readonly row: Row;
   readonly isSelected: boolean;
   readonly onOpen: () => void;
+  /** After an answer went through (the decision leaves the list). */
+  readonly onRemoved: () => void;
 }) => {
   const line = useReviewLine(row);
   return (
@@ -80,7 +83,7 @@ export const ReviewRow = ({
         titleLines={3}
       />
       <View className="px-row-x pb-row-y">
-        <ReviewAnswers row={row} />
+        <ReviewAnswers onDone={onRemoved} row={row} />
       </View>
     </View>
   );

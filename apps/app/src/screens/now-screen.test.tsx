@@ -27,7 +27,22 @@ jest.mock("#app/ui/use-hotkey.tsx", (): unknown => ({
   },
 }));
 
+/** The browser's history steps the screen takes, and the steps it takes back (the web build's). */
+const mockHistory = { back: [] as string[], steps: 0 };
+jest.mock("#app/platform/push-entry.ts", (): unknown => ({
+  ...jest.requireActual("#app/platform/push-entry.ts"),
+  usePushEntry: () => () => {
+    mockHistory.steps += 1;
+  },
+  useStepBack: () => (name: string) => {
+    mockHistory.back.push(name);
+    return false;
+  },
+}));
+
 beforeEach(() => {
+  mockHistory.back.length = 0;
+  mockHistory.steps = 0;
   mockWindow.isWide = true;
   redirected.mockClear();
   mockHotkeys.clear();
@@ -198,6 +213,23 @@ describe("NowScreen: the open task is in the address (feedback 5 item 6)", () =>
     expect(screen.queryByLabelText(en("edit.description"))).toBeNull();
     expect(taskDetails()).toBeOnTheScreen();
     expect(searchParams()).toEqual({ task: HW_ID });
+  });
+
+  it("takes a deleted task off the address without a step, so Back does not stop on it (review I2)", async () => {
+    const runtime = await createTestRuntime();
+    await renderScreen(<NowScreen />, runtime);
+    await fireEvent.press(screen.getByText("Algebra HW 6"));
+    expect(searchParams()).toEqual({ task: HW_ID });
+    const steps = mockHistory.steps;
+    await fireEvent.press(button("task.menu"));
+    await fireEvent.press(await screen.findByRole("button", { name: en("task.delete") }));
+    await fireEvent.press(button("common.delete"));
+    await waitFor(() => {
+      expect(searchParams()).toEqual({});
+    });
+    expect(runtime.state.store.getState().tasks.byId[HW_ID]).toBeUndefined();
+    expect(mockHistory.steps).toBe(steps);
+    expect(mockHistory.back).toEqual(["task"]);
   });
 
   it("reopens the task the address names after a reload", async () => {

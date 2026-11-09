@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 
 import { en, renderScreen } from "#app/test/render.tsx";
 import { paramsSet, searchParams, setSearchParams } from "#app/test/router.ts";
@@ -14,6 +14,23 @@ jest.mock("#app/ui/layout.ts", (): unknown => ({
 }));
 
 const pane = () => screen.queryByLabelText(en("inbox.details"));
+
+/** The browser's history steps the screen takes, and the steps it takes back (the web build's). */
+const mockHistory = { back: [] as string[], steps: 0 };
+jest.mock("#app/platform/push-entry.ts", (): unknown => ({
+  usePushEntry: () => () => {
+    mockHistory.steps += 1;
+  },
+  useStepBack: () => (name: string) => {
+    mockHistory.back.push(name);
+    return false;
+  },
+}));
+
+beforeEach(() => {
+  mockHistory.back.length = 0;
+  mockHistory.steps = 0;
+});
 
 /** The shortcuts registered while mounted, by key: the web build's keyboard, as a test drives it. */
 const mockHotkeys = new Map<string, () => void>();
@@ -48,6 +65,34 @@ describe("InboxScreen on a wide window", () => {
       expect(screen.queryByRole("header", { name: en("inbox.details") })).toBeNull();
     });
     expect(screen.queryByText(INBOX_TEXTS[INBOX_CABLE_ID])).toBeNull();
+  });
+
+  it("takes the open note off the address without a step once it is accepted or deleted (review I2)", async () => {
+    const runtime = await createTestRuntime();
+    await renderScreen(<InboxScreen />, runtime);
+    for (const action of [en("common.accept"), en("common.delete")]) {
+      const [row] = screen.getAllByTestId("inbox-capture");
+      await fireEvent.press(row as never);
+      expect(searchParams()["open"]).toBeDefined();
+      const steps = mockHistory.steps;
+      await fireEvent.press(within(pane() as never).getByRole("button", { name: action }));
+      await waitFor(() => {
+        expect(searchParams()).toEqual({});
+      });
+      // No step of its own: the one that opened it is taken back where it can be.
+      expect(mockHistory.steps).toBe(steps);
+      expect(mockHistory.back.at(-1)).toBe("open");
+    }
+    // The row's own Accept, on the note open beside the list, does the same.
+    const [row] = screen.getAllByTestId("inbox-capture");
+    await fireEvent.press(row as never);
+    const steps = mockHistory.steps;
+    const [accept] = screen.getAllByRole("button", { name: /^Accept: /u });
+    await fireEvent.press(accept as never);
+    await waitFor(() => {
+      expect(searchParams()).toEqual({});
+    });
+    expect(mockHistory.steps).toBe(steps);
   });
 
   it("keeps what is open in the address: a reload opens it again (feedback 5 item 6)", async () => {

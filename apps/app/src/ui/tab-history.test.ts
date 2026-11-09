@@ -1,4 +1,9 @@
-import { PUSH_ENTRY, tabHistoryRouter, type withEntryPushed } from "./tab-history.ts";
+import {
+  isStepBackWithout,
+  PUSH_ENTRY,
+  tabHistoryRouter,
+  type withEntryPushed,
+} from "./tab-history.ts";
 
 type State = Parameters<typeof withEntryPushed>[0];
 
@@ -81,5 +86,31 @@ describe("a browser step for a change inside one screen (R24-02)", () => {
     const back = router.getStateForAction(state, { type: "GO_BACK" }, {}) as State;
     expect(back.index).toBe(1);
     expect(back.routes[1]?.state).toBe(MORE_STACK);
+  });
+});
+
+/** An Inbox entry opened: the entry before shows `before`, the screen shows `front`. */
+const opened = (before: object | undefined, front: object | undefined) => ({
+  history: [
+    { key: "inbox-1", type: "route" },
+    { key: "inbox-1", params: before, type: "route" },
+    { key: "inbox-1", type: "route" },
+  ],
+  index: 0,
+  routes: [{ key: "inbox-1", params: front }],
+});
+
+describe("taking back the step that opened what an action removed (review I2)", () => {
+  it("takes it back when the entry before is this screen without the param, the rest the same", () => {
+    expect(isStepBackWithout(opened(undefined, { open: "n1" }), "open")).toBe(true);
+    expect(isStepBackWithout(opened({ f: "a" }, { f: "a", open: "n1" }), "open")).toBe(true);
+    expect(isStepBackWithout(opened({ open: undefined }, { open: "n1" }), "open")).toBe(true);
+  });
+
+  it("does not when the entry before shows something else, or is another screen, or there is none", () => {
+    expect(isStepBackWithout(opened({ open: "n0" }, { open: "n1" }), "open")).toBe(false);
+    expect(isStepBackWithout(opened({ f: "b" }, { f: "a", open: "n1" }), "open")).toBe(false);
+    expect(isStepBackWithout(state, "task")).toBe(false);
+    expect(isStepBackWithout({ index: 0, routes: [{ key: "now-1" }] }, "task")).toBe(false);
   });
 });

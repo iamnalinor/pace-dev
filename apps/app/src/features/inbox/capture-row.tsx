@@ -13,6 +13,15 @@ import { toastQuote } from "#app/ui/toast.tsx";
 import { useCaptureActions } from "./use-capture-actions.ts";
 import { useGuess } from "./use-guess.ts";
 
+/** A press that runs an action and, once it went through, `then`. */
+const andThen = (didGoThrough: () => Promise<boolean>, then: () => void) => (): void => {
+  void (async () => {
+    if (await didGoThrough()) {
+      then();
+    }
+  })();
+};
+
 /** Lines of a capture before «Show all». */
 const CAPTURE_LINES = 4;
 /** Before the row is laid out (or where it never is): a text this long may run past them. */
@@ -29,10 +38,13 @@ export const CaptureRow = ({
   card,
   isSelected,
   onOpen,
+  onRemoved,
 }: {
   readonly card: InboxCard;
   readonly isSelected: boolean;
   readonly onOpen: () => void;
+  /** After Accept or Delete went through. */
+  readonly onRemoved: () => void;
 }) => {
   const t = useT();
   const guess = useGuess(card);
@@ -59,9 +71,7 @@ export const CaptureRow = ({
         <View className="items-end gap-1 py-row-y pr-row-x">
           <Button
             label={`${t("common.accept")}: ${quote}`}
-            onPress={() => {
-              void accept();
-            }}
+            onPress={andThen(accept, onRemoved)}
             size="small"
             variant="secondary"
           >
@@ -69,9 +79,7 @@ export const CaptureRow = ({
           </Button>
           <Button
             label={`${t("common.delete")}: ${quote}`}
-            onPress={() => {
-              void remove();
-            }}
+            onPress={andThen(remove, onRemoved)}
             size="small"
             variant="plain"
           >

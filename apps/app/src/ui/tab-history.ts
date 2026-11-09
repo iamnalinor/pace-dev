@@ -66,6 +66,43 @@ export const withEntryRestored = <State extends TabState>(
   };
 };
 
+/** A history entry (as `TabRouter` keeps it) of the route `key`. */
+const isEntryOf = (value: unknown, key: string): value is Entry =>
+  typeof value === "object" && value !== null && "key" in value && value.key === key;
+
+/** The params as an address writes them: a key with no value is not there. */
+const written = (params: object | undefined, without?: string): Readonly<Record<string, unknown>> =>
+  Object.fromEntries(
+    Object.entries(params ?? {}).filter(([key, value]) => value !== undefined && key !== without),
+  );
+
+/**
+Whether the entry before the screen in front is that same screen without `name` and otherwise
+as it is: the step its change took (`PUSH_ENTRY`). An action that removes what the param names
+(an Inbox note accepted, a task deleted) then takes that step back instead of writing a new one,
+so Back does not stop on an entry whose item is gone (review of round 24, I2). A navigator with
+no history (More's stack, a phone's tabs) has no such entry.
+*/
+export const isStepBackWithout = (
+  state: {
+    readonly history?: readonly unknown[] | undefined;
+    readonly index: number;
+    readonly routes: readonly Route[];
+  },
+  name: string,
+): boolean => {
+  const front = state.routes[state.index];
+  const last = state.history?.at(-1);
+  const before = state.history?.at(-2);
+  if (front === undefined || !isEntryOf(last, front.key) || !isEntryOf(before, front.key)) {
+    return false;
+  }
+  const expected = written(front.params, name);
+  const shown = written(before.params);
+  const keys = new Set([...Object.keys(expected), ...Object.keys(shown)]);
+  return [...keys].every((key) => expected[key] === shown[key]);
+};
+
 type Router<State, Action, Options> = {
   readonly getStateForAction: (state: State, action: Action, options: Options) => unknown;
 };

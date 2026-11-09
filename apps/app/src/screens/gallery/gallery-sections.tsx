@@ -47,6 +47,9 @@ const HOUR_PX = 24;
 const PHONE_COLUMN_PX = 72;
 
 const NOTHING = (): void => undefined;
+/** A capture row and a task pane as shown, with nothing behind their actions. */
+const STILL_ROW = { isSelected: false, onOpen: NOTHING, onRemoved: NOTHING } as const;
+const STILL_PANE = { onClose: NOTHING, onGone: NOTHING } as const;
 
 /** One section of the gallery: a heading and the components it shows. */
 const Section = ({
@@ -267,7 +270,7 @@ export const ChromeSections = ({ data }: { readonly data: GalleryData }) => {
         ) : (
           <Group>
             {cards.map((card) => (
-              <CaptureRow card={card} isSelected={false} key={card.id} onOpen={NOTHING} />
+              <CaptureRow card={card} key={card.id} {...STILL_ROW} />
             ))}
           </Group>
         )}
@@ -307,7 +310,7 @@ export const TaskSections = ({ data }: { readonly data: GalleryData }) => {
         ) : (
           // The pane at its narrowest (360, or the window under it): the halves keep whole words (B1).
           <View className="w-full max-w-inspector-min">
-            <TaskPaneProvider onClose={NOTHING}>
+            <TaskPaneProvider {...STILL_PANE}>
               <TaskFooter onClose={NOTHING} view={view} />
             </TaskPaneProvider>
           </View>

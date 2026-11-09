@@ -212,6 +212,57 @@ test.describe("Back and forward follow the screen (feedback 5 item 6, QA round 2
     await expect(details).toHaveCount(0);
   });
 
+  test("Inbox: a note opened and accepted leaves no entry behind; Back goes to where the Inbox was opened from (review I2)", async ({
+    page,
+  }) => {
+    await page.setViewportSize(DESKTOP);
+    await loginViaApi(page);
+    await page.goto("/");
+    const line = page.getByRole("textbox", { name: "New task" });
+    for (const text of ["ask about the invoice", "book the hall"]) {
+      await line.pressSequentially(text);
+      await page.getByRole("button", { name: "To Inbox" }).click();
+      await expect(line).toHaveValue("");
+    }
+    await page.getByRole("link", { name: /^Inbox/u }).click();
+    await expect(page).toHaveURL(/\/inbox$/u);
+    for (const action of ["Accept", "Delete"]) {
+      await page.getByTestId("inbox-capture").first().click();
+      await expect(page).toHaveURL(/[?&]open=/u);
+      const details = page.getByRole("region", { name: "Details" });
+      await details.getByRole("button", { exact: true, name: action }).click();
+      await expect(page).toHaveURL(/\/inbox$/u);
+    }
+    await expect(page.getByTestId("inbox-capture")).toHaveCount(0);
+    await page.goBack();
+    await expect(page).toHaveURL(/localhost:\d+\/$/u);
+  });
+
+  test("Now: a task deleted in the pane leaves no entry behind; Back goes to what was before it (review I2)", async ({
+    page,
+  }) => {
+    await page.setViewportSize(DESKTOP);
+    await loginViaApi(page);
+    await page.goto("/");
+    await addTask(page, "Doomed task");
+    await expect(taskHeader(page, "Doomed task")).toBeVisible();
+    await page.goto("/day");
+    await page.getByRole("link", { name: /^Now/u }).click();
+    await expect(page).toHaveURL(/localhost:\d+\/$/u);
+    await nowTasks(page)
+      .getByRole("link", { name: /^Doomed task/u })
+      .click();
+    await expect(page).toHaveURL(/[?&]task=/u);
+    await page.getByRole("button", { name: "More actions" }).click();
+    await page.getByRole("button", { exact: true, name: "Delete the task" }).click();
+    await page.getByRole("button", { exact: true, name: "Delete" }).click();
+    await expect(page).not.toHaveURL(/[?&]task=/u);
+    await expect(nowTasks(page).getByText("Doomed task")).toHaveCount(0);
+    // The open's step was taken back: Back from here is Day, where Now was opened from.
+    await page.goBack();
+    await expect(page).toHaveURL(/\/day$/u);
+  });
+
   test("Week (in More's stack): another week is a step; Back and Forward move between them", async ({
     page,
   }) => {

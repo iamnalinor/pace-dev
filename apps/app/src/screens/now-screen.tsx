@@ -21,23 +21,29 @@ link and the browser's history open the same one. An id the store does not know 
 a mistyped link, the log still loading) leaves the pane closed and the address as it is: nothing
 is written back, so nothing loops (bug-lessons 1).
 */
-const usePickedTask = (): readonly [null | string, (taskId: null | string) => void] => {
-  const [taskId, setTaskId] = useSearchParam("task");
+const usePickedTask = (): readonly [
+  picked: null | string,
+  pick: (taskId: null | string) => void,
+  forget: () => void,
+] => {
+  const [taskId, setTaskId, forget] = useSearchParam("task");
   const isKnown = useAppState(
     (state) => taskId !== null && Object.hasOwn(state.tasks.byId, taskId),
   );
-  return [taskId !== null && isKnown ? taskId : null, setTaskId];
+  return [taskId !== null && isKnown ? taskId : null, setTaskId, forget];
 };
 
 /** The inspector's task: the picked one, with its pane's close. */
 const PickedTask = ({
   onClose,
+  onGone,
   picked,
 }: {
   readonly picked: string;
   readonly onClose: () => void;
+  readonly onGone: () => void;
 }) => (
-  <TaskPaneProvider onClose={onClose}>
+  <TaskPaneProvider onClose={onClose} onGone={onGone}>
     <TaskScreen id={picked} key={picked} />
   </TaskPaneProvider>
 );
@@ -50,9 +56,12 @@ line keeps its text.
 */
 const NowSplit = ({
   isComposerFocused,
+  onGone,
   onPick,
   picked,
 }: {
+  /** The picked task was deleted: it leaves the address without a step. */
+  readonly onGone: () => void;
   readonly isComposerFocused: boolean;
   readonly picked: null | string;
   readonly onPick: (picked: null | string) => void;
@@ -69,6 +78,7 @@ const NowSplit = ({
         onClose={() => {
           onPick(null);
         }}
+        onGone={onGone}
         picked={picked}
       />
     );
@@ -127,7 +137,7 @@ export const NowScreen = ({
 }) => {
   const router = useRouter();
   const isWide = useIsWide();
-  const [picked, setPicked] = usePickedTask();
+  const [picked, setPicked, forgetPicked] = usePickedTask();
   // A `?task=` link copied on a computer and opened at a phone's width (or a window narrowed with
   // a task open) opens the task on its own page, as a phone opens one (session review minor 6).
   if (!isWide && picked !== null) {
@@ -151,7 +161,12 @@ export const NowScreen = ({
     >
       {notesLineDraft ? <LineDraftNote /> : null}
       {isWide ? (
-        <NowSplit isComposerFocused={isComposerFocused} onPick={setPicked} picked={picked} />
+        <NowSplit
+          isComposerFocused={isComposerFocused}
+          onGone={forgetPicked}
+          onPick={setPicked}
+          picked={picked}
+        />
       ) : (
         <NowBoard isComposerFocused={isComposerFocused} />
       )}

@@ -22,7 +22,7 @@ const NOTHING = (): void => undefined;
 
 const renderInPane = async (): Promise<void> => {
   await renderScreen(
-    <TaskPaneProvider onClose={NOTHING}>
+    <TaskPaneProvider onClose={NOTHING} onGone={NOTHING}>
       <TaskScreen id={HW_ID} />
     </TaskPaneProvider>,
     await createTestRuntime({ now: HW_VIEW_NOW }),

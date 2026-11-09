@@ -74,12 +74,14 @@ const sectionsOf = (
 
 const InboxPage = ({
   onPick,
+  onRemoved,
   picked,
   sections,
   waiting,
 }: {
   readonly picked: null | Picked;
   readonly onPick: (picked: Picked) => void;
+  readonly onRemoved: (entry: Entry) => void;
   readonly sections: readonly ListSection<Entry>[];
   readonly waiting: number;
 }) => {
@@ -115,12 +117,18 @@ const InboxPage = ({
                 onOpen={() => {
                   onPick(entry);
                 }}
+                onRemoved={() => {
+                  onRemoved(entry);
+                }}
               />
             ) : (
               <ReviewRow
                 isSelected={selected === entryKey(entry)}
                 onOpen={() => {
                   onPick(entry);
+                }}
+                onRemoved={() => {
+                  onRemoved(entry);
                 }}
                 row={entry.row}
               />
@@ -150,7 +158,7 @@ export const InboxScreen = () => {
   const decisions = reviewDecisions(review);
   const sections = sectionsOf(decisions, inbox.cards, t);
   // What is open is in the address (`?open=<key>`, feedback 5 item 6): a reload opens it again.
-  const [openKey, setOpenKey] = useSearchParam("open");
+  const [openKey, setOpenKey, forgetOpen] = useSearchParam("open");
   const picked =
     sections.flatMap((section) => section.rows).find((entry) => entryKey(entry) === openKey) ??
     null;
@@ -162,6 +170,12 @@ export const InboxScreen = () => {
       onPick={(entry) => {
         setOpenKey(entryKey(entry));
       }}
+      onRemoved={(entry) => {
+        // The note open beside the list, accepted or deleted from its row.
+        if (entryKey(entry) === openKey) {
+          forgetOpen();
+        }
+      }}
       picked={picked}
       sections={sections}
       waiting={waitingCount(inbox, review)}
@@ -171,7 +185,11 @@ export const InboxScreen = () => {
     return (
       <Shell
         content={page}
-        inspector={picked === null ? undefined : <InboxPane onClose={close} picked={picked} />}
+        inspector={
+          picked === null ? undefined : (
+            <InboxPane onClose={close} onDone={forgetOpen} picked={picked} />
+          )
+        }
         inspectorLabel={t("inbox.details")}
         inspectorOpen={picked !== null}
         onInspectorClose={close}
@@ -182,7 +200,7 @@ export const InboxScreen = () => {
     <>
       {page}
       <OverlayPresence value={picked}>
-        {(kept) => <InboxSheet onClose={close} picked={kept} />}
+        {(kept) => <InboxSheet onClose={close} onDone={forgetOpen} picked={kept} />}
       </OverlayPresence>
     </>
   );

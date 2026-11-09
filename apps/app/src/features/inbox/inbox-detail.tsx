@@ -110,10 +110,13 @@ const useHeading = (picked: Picked): string => {
 /** A phone's details: the bottom sheet over the list. */
 export const InboxSheet = ({
   onClose,
+  onDone,
   picked,
 }: {
   readonly picked: Picked;
   readonly onClose: () => void;
+  /** After an answer removed what is open (accepted, deleted, decided): it goes without a step. */
+  readonly onDone: () => void;
 }) => {
   const t = useT();
   return (
@@ -124,7 +127,7 @@ export const InboxSheet = ({
       open
       title={useHeading(picked)}
     >
-      <Facts onDone={onClose} picked={picked} />
+      <Facts onDone={onDone} picked={picked} />
     </Sheet>
   );
 };
@@ -132,10 +135,13 @@ export const InboxSheet = ({
 /** A wide window's details, in the shell's inspector while something is selected. */
 export const InboxPane = ({
   onClose,
+  onDone,
   picked,
 }: {
   readonly picked: Picked;
   readonly onClose: () => void;
+  /** After an answer removed what is open (accepted, deleted, decided): it goes without a step. */
+  readonly onDone: () => void;
 }) => {
   const t = useT();
   return (
@@ -150,7 +156,7 @@ export const InboxPane = ({
           <IconButton icon="x" label={t("common.close")} onPress={onClose} />
         </View>
       </View>
-      <Facts onDone={onClose} picked={picked} />
+      <Facts onDone={onDone} picked={picked} />
     </ScrollView>
   );
 };
