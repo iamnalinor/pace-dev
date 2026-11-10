@@ -31,9 +31,9 @@ import {
 import {
   type Faults,
   hasFault,
-  nextStartOf,
   notAhead,
-  notIntoNext,
+  notOverlapping,
+  overlapOf,
   readDraft,
 } from "./activity-draft.ts";
 import { ActivityTaskField } from "./activity-task-field.tsx";
@@ -66,9 +66,17 @@ const CategoryPicker = ({
 type ActivityFieldsProps = FormPartProps<Draft> & {
   readonly faults: Faults | null;
   readonly isEndEditable: boolean;
+  /** The live block a logged one takes its time from, said under the start. */
+  readonly yieldsFrom: null | string;
 };
 
-const ActivityTimeFields = ({ draft, faults, isEndEditable, patch }: ActivityFieldsProps) => {
+const ActivityTimeFields = ({
+  draft,
+  faults,
+  isEndEditable,
+  patch,
+  yieldsFrom,
+}: ActivityFieldsProps) => {
   const t = useT();
   const toFieldRef = useRef<TextInput>(null);
   const said = (key: MessageKey | null | undefined): null | string =>
@@ -78,6 +86,7 @@ const ActivityTimeFields = ({ draft, faults, isEndEditable, patch }: ActivityFie
       <View className="flex-1">
         <TextField
           error={said(faults?.from)}
+          {...(yieldsFrom !== null && { hint: t("day.yieldsFrom", { label: yieldsFrom }) })}
           keyboardType="number-pad"
           label={t("day.from")}
           maxLength={TIME_MAX_LENGTH}
@@ -115,7 +124,13 @@ const ActivityTimeFields = ({ draft, faults, isEndEditable, patch }: ActivityFie
 };
 
 /** What it was, its category and its boundaries (the end only once it has one). */
-const ActivityFields = ({ draft, faults, isEndEditable, patch }: ActivityFieldsProps) => {
+const ActivityFields = ({
+  draft,
+  faults,
+  isEndEditable,
+  patch,
+  yieldsFrom,
+}: ActivityFieldsProps) => {
   const t = useT();
   const said = (key: MessageKey | null | undefined): null | string =>
     key === null || key === undefined ? null : t(key);
@@ -157,6 +172,7 @@ const ActivityFields = ({ draft, faults, isEndEditable, patch }: ActivityFieldsP
         faults={faults}
         isEndEditable={isEndEditable}
         patch={patch}
+        yieldsFrom={yieldsFrom}
       />
     </>
   );
@@ -234,9 +250,9 @@ export const useActivityEditor = ({ onClose, target, zone }: ActivitySheetProps)
   const [hasTriedToSave, setHasTriedToSave] = useState(false);
   const { now } = useViewer();
   const read = notAhead(readDraft(draft, target, zone), now);
-  const startAt = read.range?.startAt ?? target.startAt;
-  const nextStart = useAppState((state) => nextStartOf(state.time, target, startAt));
-  const { faults, range } = notIntoNext(read, nextStart);
+  const time = useAppState((state) => state.time);
+  const overlap = read.range === null ? null : overlapOf(time, { now, range: read.range, target });
+  const { faults, range } = overlap === null ? read : notOverlapping(read, overlap, hasEnd(target));
   const save = async (): Promise<void> => {
     setHasTriedToSave(true);
     if (range === null || hasFault(faults)) {
@@ -261,6 +277,7 @@ export const useActivityEditor = ({ onClose, target, zone }: ActivitySheetProps)
     patch,
     range,
     save,
+    yieldsFrom: overlap?.yieldsFrom ?? null,
     // Only the times are typed, so the days they fall on are named here: both for a night, and
     // as typed once the times read right (a retyped end moves near where it was).
     subtitle: formatDaySpan(range ?? target, zone, language),
@@ -283,6 +300,7 @@ export const ActivityEditorBody = ({
       faults={editor.faults}
       isEndEditable={hasEnd(target)}
       patch={editor.patch}
+      yieldsFrom={editor.yieldsFrom}
     />
     <DayChoices
       draft={editor.draft}

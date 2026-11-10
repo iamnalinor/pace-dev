@@ -26,6 +26,10 @@ const overlapWorld = async () => {
   );
   return runtime;
 };
+const breakfast = (runtime: Awaited<ReturnType<typeof overlapWorld>>) =>
+  Object.values(runtime.state.store.getState().time.activities).find(
+    (activity) => activity.label === "Breakfast",
+  );
 const lectureStart = (runtime: Awaited<ReturnType<typeof overlapWorld>>) =>
   Object.values(runtime.state.store.getState().time.activities).find(
     (activity) => activity.label === "Lecture",
@@ -365,6 +369,102 @@ describe("DayScreen", () => {
       await fireEvent.changeText(await screen.findByLabelText("To"), "11:30");
       await fireEvent.press(screen.getByRole("button", { name: "Save" }));
       expect(await screen.findByText(overlap)).toBeOnTheScreen();
+    });
+  });
+
+  describe("a block is refused over an earlier one or one with the same start, from every way in (review I2, R26-03)", () => {
+    const before = "That runs into the activity before: move its end first.";
+
+    it("from a gap's Log, its start moved back into the logged block before", async () => {
+      const runtime = await overlapWorld();
+      await renderScreen(<DayScreen />, runtime);
+      await fireEvent.press(screen.getByRole("button", { name: /2h not logged/u }));
+      await fireEvent.changeText(await screen.findByLabelText("What"), "Reading");
+      await fireEvent.changeText(screen.getByLabelText("From"), "10:45");
+      await fireEvent.press(screen.getByRole("button", { name: "Save" }));
+      expect(await screen.findByText(before)).toBeOnTheScreen();
+      expect(breakfast(runtime)?.endAt).toBe(addMinutesIso(NOW, -240));
+      expect(screen.queryByText("Reading")).toBeNull();
+    });
+
+    it("from Log past, with the same start as a logged block (which would vanish)", async () => {
+      const runtime = await overlapWorld();
+      await renderScreen(<DayScreen />, runtime);
+      await fireEvent.press(screen.getByRole("button", { name: "Log past activity" }));
+      await fireEvent.changeText(await screen.findByLabelText("What"), "Reading");
+      await fireEvent.changeText(screen.getByLabelText("From"), "10:30");
+      await fireEvent.changeText(screen.getByLabelText("To"), "12:00");
+      await fireEvent.press(screen.getByRole("button", { name: "Save" }));
+      expect(
+        await screen.findByText("That runs into the next activity: move its start first."),
+      ).toBeOnTheScreen();
+      expect(screen.getByText("Breakfast")).toBeOnTheScreen();
+      expect(screen.queryByText("Reading")).toBeNull();
+    });
+
+    it("from a block's own form, its start moved back into the live block before", async () => {
+      const runtime = await createTestRuntime();
+      // Rest 10:00–11:00 and Walk 11:00–12:00, both tracked live.
+      await runtime.actions.startActivity(
+        { category: "rest", label: "Rest" },
+        { at: addMinutesIso(NOW, -300) },
+      );
+      await runtime.actions.startActivity(
+        { category: "rest", label: "Walk" },
+        { at: addMinutesIso(NOW, -240) },
+      );
+      await runtime.actions.stopActivity({ at: addMinutesIso(NOW, -180) });
+      await renderScreen(<DayScreen />, runtime);
+      await fireEvent.press(screen.getByRole("button", { name: /Walk/u }));
+      await fireEvent.changeText(await screen.findByLabelText("From"), "10:30");
+      await fireEvent.press(screen.getByRole("button", { name: "Save" }));
+      expect(await screen.findByText(before)).toBeOnTheScreen();
+      const rest = Object.values(runtime.state.store.getState().time.activities).find(
+        (activity) => activity.label === "Rest",
+      );
+      expect(rest?.endAt).toBe(addMinutesIso(NOW, -240));
+    });
+
+    it("lets Log past take time out of the live block it lands in, and says so (spec: as in a calendar)", async () => {
+      const runtime = await overlapWorld();
+      await renderScreen(<DayScreen />, runtime);
+      await fireEvent.press(screen.getByRole("button", { name: "Log past activity" }));
+      await fireEvent.changeText(await screen.findByLabelText("What"), "Call");
+      await fireEvent.changeText(screen.getByLabelText("From"), "13:30");
+      await fireEvent.changeText(screen.getByLabelText("To"), "14:00");
+      expect(screen.getByText("This time comes out of “Lecture”.")).toBeOnTheScreen();
+      await fireEvent.press(screen.getByRole("button", { name: "Save" }));
+      expect(await screen.findByText("Call")).toBeOnTheScreen();
+    });
+
+    it("renames a block run alongside across a switch of the main line (review I3)", async () => {
+      const runtime = await createTestRuntime();
+      await runtime.actions.startActivity(
+        { category: "study", label: "Study" },
+        { at: addMinutesIso(NOW, -300) },
+      );
+      await runtime.actions.startActivity(
+        { alongside: true, category: "rest", label: "Music" },
+        { at: addMinutesIso(NOW, -300) },
+      );
+      await runtime.actions.startActivity(
+        { category: "rest", label: "Rest" },
+        { at: addMinutesIso(NOW, -240) },
+      );
+      const music = Object.values(runtime.state.store.getState().time.activities).find(
+        (activity) => activity.label === "Music",
+      );
+      await runtime.actions.stopActivity({
+        activityId: music?.id,
+        at: addMinutesIso(NOW, -180),
+      });
+      await renderScreen(<DayScreen />, runtime);
+      await fireEvent.press(screen.getByRole("button", { name: /Music/u }));
+      await fireEvent.changeText(await screen.findByLabelText("What"), "Jazz");
+      await fireEvent.press(screen.getByRole("button", { name: "Save" }));
+      await waitFor(() => {
+        expect(runtime.state.store.getState().time.activities[music?.id ?? ""]?.label).toBe("Jazz");
+      });
     });
   });
 

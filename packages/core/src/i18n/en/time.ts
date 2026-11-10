@@ -96,6 +96,8 @@ export const enTime = {
   "day.badRange": "The end must be after the start.",
   "day.ahead": "That is still ahead: log what already happened.",
   "day.overlapsNext": "That runs into the next activity: move its start first.",
+  "day.overlapsPrevious": "That runs into the activity before: move its end first.",
+  "day.yieldsFrom": "This time comes out of “{label}”.",
   "day.delete": "Delete activity",
   "day.deleteConfirm": "Delete activity? Tap again",
   "day.appsDuring": "Apps during this",
