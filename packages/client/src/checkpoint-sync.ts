@@ -25,14 +25,33 @@ import { SYNC_SCHEMA_VERSION } from "./sync-version.ts";
 
 export type { CheckpointSync } from "./sync-types.ts";
 
-const isCheckpointCapable = async (context: CheckpointSyncContext): Promise<boolean> => {
-  const instance = await (context.instance?.latest() ?? context.api.call(endpoints.instance, {}));
+/**
+The first negotiation takes the answer the start's server check already has (one read at load,
+QA PR55-1-12); a renegotiation after a contract failure asks the server now, since the answer kept
+is the one that just proved stale (bug-lessons 362).
+*/
+const readInstance = async (context: CheckpointSyncContext, isStale: boolean) => {
+  const { instance: reader } = context;
+  if (reader === undefined) {
+    return await context.api.call(endpoints.instance, {});
+  }
+  return isStale ? await reader.read() : await reader.latest();
+};
+const isCheckpointCapable = async (
+  context: CheckpointSyncContext,
+  isStale: boolean,
+): Promise<boolean> => {
+  const instance = await readInstance(context, isStale);
   return instance.features.historyCheckpoint === CHECKPOINT_VERSION;
 };
 const isOffered = async (context: CheckpointSyncContext): Promise<boolean> => {
   assertLive(context);
   const { runtime } = context;
-  runtime.negotiated ??= (async () => await isCheckpointCapable(context))();
+  if (runtime.negotiated === undefined) {
+    const { isStale } = runtime;
+    runtime.isStale = false;
+    runtime.negotiated = (async () => await isCheckpointCapable(context, isStale))();
+  }
   try {
     return await runtime.negotiated;
   } catch (error) {
@@ -134,7 +153,13 @@ export const createCheckpointSync = (options: CheckpointSyncOptions): Checkpoint
     ...options,
     hash: options.hash ?? sha256Text,
     pullSource: options.pullSource ?? options.transport.pull,
-    runtime: { initialized: false, sourceStore: null, isClosed: false, negotiated: undefined },
+    runtime: {
+      initialized: false,
+      sourceStore: null,
+      isClosed: false,
+      isStale: false,
+      negotiated: undefined,
+    },
   };
   return {
     enabled: async () =>
@@ -147,6 +172,7 @@ export const createCheckpointSync = (options: CheckpointSyncOptions): Checkpoint
         // without a reload (bug-lessons 362).
         if (isContractError(error)) {
           context.runtime.negotiated = undefined;
+          context.runtime.isStale = true;
         }
         throw error;
       }

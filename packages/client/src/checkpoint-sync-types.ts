@@ -36,6 +36,8 @@ export type CheckpointSyncContext = CheckpointSyncOptions & {
     sourceStore: null | string;
     isClosed: boolean;
     negotiated: Promise<boolean> | undefined;
+    /** The kept instance answer failed the contract: the next negotiation asks the server. */
+    isStale: boolean;
   };
 };
 export const assertLive = (context: CheckpointSyncContext): void => {
