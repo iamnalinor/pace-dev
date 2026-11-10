@@ -5,6 +5,7 @@ import type { CopyMeta, LocalSnapshot } from "./checkpoint-store-types.ts";
 import type { Sha256Text } from "./checkpoint-validation.ts";
 import type { EventStore } from "./event-store.ts";
 import type { HistoryCoordinator } from "./history-types.ts";
+import type { InstanceReader } from "./instance.ts";
 import type { AppStateHandle } from "./state.ts";
 import type { SyncTransport } from "./sync-transport.ts";
 
@@ -18,6 +19,8 @@ import {
 
 export type CheckpointSyncOptions = {
   readonly api: ApiClient;
+  /** The server's instance (shared with the app's server check); the endpoint when absent. */
+  readonly instance?: InstanceReader;
   readonly state: AppStateHandle;
   readonly store: EventStore;
   readonly transport: SyncTransport;

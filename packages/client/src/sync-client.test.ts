@@ -83,6 +83,61 @@ const pushesOf = (calls: ReturnType<typeof createFakeFetch>["calls"]) =>
     .map((call) => call.body as { events: readonly Event[]; storeId: string })
     .map(({ events, storeId }) => ({ ids: events.map((event) => event.id), storeId }));
 
+describe("createSyncClient catching up to a connect's hello (QA PR55-1-12)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** A loop started on a copy that pulled the server's log up to seq 2; every pull answered. */
+  const caughtUp = async () => {
+    const { calls, state, store, sync } = await setup({
+      "GET /api/sync/pull": ({ url }) =>
+        url.searchParams.get("since") === "0"
+          ? { events: localEvents(2), more: false, seq: 2, storeId: STORE_ID }
+          : { events: [], more: false, seq: 2, storeId: STORE_ID },
+      "POST /api/sync/push": acceptAll,
+    });
+    await sync.syncNow();
+    vi.useFakeTimers();
+    sync.start({ intervalMs: 60_000 });
+    await vi.advanceTimersByTimeAsync(0);
+    const before = calls.length;
+    return { calls: () => calls.slice(before), state, store, sync };
+  };
+
+  it("asks nothing when the copy already stands where the server's log stood", async () => {
+    const { calls, sync } = await caughtUp();
+    await sync.catchUpTo({ seq: 2, storeId: STORE_ID });
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(calls()).toEqual([]);
+    sync.stop();
+  });
+
+  it.each([
+    ["behind the log", { seq: 3, storeId: STORE_ID }],
+    ["on another store", { seq: 2, storeId: "store-b" }],
+  ])("pulls once when the copy is %s", async (_name, head) => {
+    const { calls, sync } = await caughtUp();
+    await sync.catchUpTo(head);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(calls().map((call) => call.path)).toContain("/api/sync/pull");
+    sync.stop();
+  });
+
+  it("runs when the copy holds writes the server has not got", async () => {
+    const { calls, state, sync } = await caughtUp();
+    await state.dispatch({
+      occurredAt: at(10),
+      payload: { language: "en" },
+      type: "settings.updated",
+    });
+    await sync.catchUpTo({ seq: 2, storeId: STORE_ID });
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(calls().map((call) => call.path)).toContain("/api/sync/push");
+    sync.stop();
+  });
+});
+
 describe("createSyncClient push", () => {
   it("pushes pending events in batches of 200, marks accepted and keeps rejected", async () => {
     const pending = localEvents(250);

@@ -186,6 +186,11 @@ export class UserStore extends HistoryStore {
     };
   }
 
+  /** Where the log stands: the seq and store a pull that reached its end answers with. */
+  async logHead(): Promise<{ readonly seq: number; readonly storeId: string }> {
+    return { seq: await log.latestSeq(this.db), storeId: await storeIdOf(this.ctx.storage) };
+  }
+
   /** One event by id, corrections included; `undefined` when the log has no such id. */
   async find(id: string): Promise<StoredEvent | undefined> {
     return await log.findEvent(this.db, id);

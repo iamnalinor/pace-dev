@@ -3316,6 +3316,22 @@ New bugs go here with their class; a new class gets its own section above.
   code's sentence. The bot flow's `network` stays «Не удалось войти»: it stands for any throw there,
   not only an unreachable server.
 
+### 326. The same read made twice because each caller fetches for itself
+- **Bug.** Every load sent `/api/instance` twice (the app's server check and the checkpoint
+  negotiation), `/api/notifications` twice on the Notifications route (the screen's mount and the
+  start), and the log twice: the start's HTTP pull and the same pull over the socket the moment it
+  opened; back online the same again (QA PR55-1-12).
+- **Missed because.** The steady-state guards (class 1) count requests after a screen settled; the
+  duplicates were all inside the load, and jest's fake socket opens no real connection.
+- **Rule.** A read several parts need is owned once: shared and joined while it is out
+  (`createInstanceReader`; the feed's `refreshUnlessFresh`, which also skips a page a few seconds
+  old). A connect's catch-up pull is asked only when the copy is behind where the server's log
+  stood as the socket opened: the server names its head in the v2 `hello`, read in the same turn
+  it accepts the socket, so nothing it appended can slip between.
+- **Sweep and guard.** Instance, notifications, the socket's catch-up (load and reconnect). A
+  check that must be current (a return to the app, Retry) still asks. `load-requests.e2e.ts` loads
+  `/` and `/notifications` and goes offline and back, and fails on any read made twice.
+
 ### 360. A caller that reaches below the shared path and skips the step it adds
 - **Bug.** PR 55 follow-up review, item 1: the archive toast's Undo (`undoArchive`) staged its
   revocation with `state.stage(…)` to get an in-queue check, below `stageEmit`, which is where the

@@ -91,8 +91,16 @@ export const parseLiveClientMessage = (
 };
 
 const SyncMessages = [
-  /** The first message on a v2 socket: the server speaks it. */
-  z.object({ type: z.literal("hello"), protocol: z.string() }),
+  /**
+  The first message on a v2 socket: the server speaks it, and (from this build on) where its log
+  stands as the socket opened, so a copy already there pulls nothing on connect.
+  */
+  z.object({
+    type: z.literal("hello"),
+    protocol: z.string(),
+    seq: z.number().int().nonnegative().optional(),
+    storeId: StoreIdSchema.optional(),
+  }),
   /** A push's answer: the HTTP push answer under the request's id. */
   SyncPushOutputSchema.extend({ type: z.literal("pushed"), id: z.string() }),
   /**

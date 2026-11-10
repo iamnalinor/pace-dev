@@ -67,7 +67,7 @@ export { createPaceClient, type PaceClient, type PaceClientOptions } from "./cre
 export { REQUEST_DEADLINE_MS, withinDeadline } from "./deadline.ts";
 
 export { canClearCopy, type EventStore } from "./event-store.ts";
-export { checkInstance, type InstanceError } from "./instance.ts";
+export { checkInstance, checkInstanceWith, type InstanceError } from "./instance.ts";
 export { createLiveChannel, type LiveChannel, type LiveStatus, type SocketLike } from "./live.ts";
 export {
   createNotificationFeed,

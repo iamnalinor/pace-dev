@@ -1,6 +1,7 @@
 import type { ApiClient } from "./api-client.ts";
 import type { PaceClientOptions } from "./create-client-types.ts";
 import type { HistoryCoordinator } from "./history-types.ts";
+import type { InstanceReader } from "./instance.ts";
 
 import { createCheckpointSync } from "./checkpoint-sync.ts";
 import { createHistoryCoordinator } from "./history.ts";
@@ -12,6 +13,8 @@ import { httpTransport, type SyncTransport } from "./sync-transport.ts";
 type StateAndSyncDeps = {
   readonly now: () => string;
   readonly api: ApiClient;
+  /** The server's instance, shared with the app's server check. */
+  readonly instance: InstanceReader;
   /** See `SyncDeps.onCopyChanged`. */
   readonly onCopyChanged: () => void;
 };
@@ -60,6 +63,7 @@ export const stateAndSync = (
     store: options.store,
     transport,
     history,
+    instance: deps.instance,
     pullSource: httpTransport(api).pull,
     ...(options.sha256Text !== undefined && { hash: options.sha256Text }),
   });

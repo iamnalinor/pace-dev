@@ -2,9 +2,12 @@ import { type LiveServerMessage, LiveServerMessageSchema } from "@pace/core";
 
 import type { LiveEventsPage } from "./live-types.ts";
 
+/** Where the server's log stood as the socket opened (a v2 hello from this build on). */
+export type LogHead = { readonly seq: number; readonly storeId: string };
+
 export type LiveHandlers = {
   readonly open: () => void;
-  readonly hello: () => void;
+  readonly hello: (head: LogHead | null) => void;
   readonly changed: () => void;
   readonly answer: (message: LiveServerMessage) => boolean;
   readonly invalid: (id: string) => void;
@@ -28,7 +31,8 @@ const isSyncMessage = (message: LiveServerMessage): message is SyncMessage =>
 const onSyncMessage = (message: SyncMessage, on: LiveHandlers): void => {
   switch (message.type) {
     case "hello": {
-      on.hello();
+      const { seq, storeId } = message;
+      on.hello(seq === undefined || storeId === undefined ? null : { seq, storeId });
       return;
     }
     case "changed": {

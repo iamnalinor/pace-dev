@@ -1,7 +1,8 @@
-import type { EndpointShape, LiveNotice } from "@pace/core";
+import { endpoints, type EndpointShape, type LiveNotice } from "@pace/core";
 
 import type { PaceClientOptions } from "./create-client-types.ts";
 import type { HistoryCoordinator } from "./history-types.ts";
+import type { LogHead } from "./live-messages.ts";
 import type { AppStateHandle } from "./state.ts";
 import type { SyncClient } from "./sync-client.ts";
 
@@ -11,6 +12,7 @@ import { type Assistant, createAssistant } from "./assistant.ts";
 import { type Auth, createAuth } from "./auth.ts";
 import { stateAndSync } from "./client-state.ts";
 import { type Clock, systemClock } from "./clock.ts";
+import { createInstanceReader, type InstanceReader } from "./instance.ts";
 import { createLiveChannel, type LiveChannel, type LiveEventsPage } from "./live.ts";
 import { createNotificationFeed, type NotificationFeed, parseLiveNotice } from "./notifications.ts";
 import { type SessionChecks, sessionChecks } from "./session-checks.ts";
@@ -31,6 +33,11 @@ export type PaceClient = {
   readonly live: LiveChannel;
   /** The notification pool, kept current by the live line. */
   readonly notifications: NotificationFeed;
+  /**
+  What the server says about itself (`GET /api/instance`, sent with no session): one reading shared
+  by the app's server check and the checkpoint negotiation (`createInstanceReader`).
+  */
+  readonly instance: InstanceReader;
   /** Other live messages about the pool (a new notification to show, one to take back). */
   readonly onNotice: (listener: (notice: LiveNotice) => void) => () => void;
   /**
@@ -67,6 +74,7 @@ const liveChannelOf = (
   options: PaceClientOptions,
   wiring: {
     readonly onChange: () => void;
+    readonly onHello: (head: LogHead) => void;
     readonly onDropped: () => void;
     readonly onFailedToOpen: () => void;
     readonly onEvents: (page: LiveEventsPage) => void;
@@ -81,6 +89,7 @@ const liveChannelOf = (
     ...(options.createSocket !== undefined && { createSocket: options.createSocket }),
     deviceId: options.deviceId,
     onChange: wiring.onChange,
+    onHello: wiring.onHello,
     onDropped: wiring.onDropped,
     onEvents: wiring.onEvents,
     onFailedToOpen: wiring.onFailedToOpen,
@@ -156,6 +165,7 @@ const liveAndSync = (
     readonly checks: SessionChecks;
     readonly now: () => string;
     readonly onMessage: (message: unknown) => void;
+    readonly instance: InstanceReader;
   },
 ): {
   readonly closePeers: () => void;
@@ -165,10 +175,42 @@ const liveAndSync = (
   readonly sync: SyncClient;
 } => {
   const { api, auth } = deps;
-  const wired: { sync?: SyncClient } = {};
-  const live: LiveChannel = liveChannelOf(options, {
+  const wired: { sync?: SyncClient; live?: LiveChannel } = {};
+  const live: LiveChannel = liveChannelOf(options, liveWiring(wired, deps));
+  wired.live = live;
+  const transport = preferSocket(socketTransport(live), httpTransport(api));
+  const copyCheck = sessionCheckOnCopyChange(auth, deps.checks);
+  const { closePeers, state, sync, history } = stateAndSync(options, transport, {
+    now: deps.now,
+    api,
+    instance: deps.instance,
+    onCopyChanged: copyCheck.ask,
+  });
+  wired.sync = sync;
+  const close = (): void => {
+    copyCheck.close();
+    closePeers();
+  };
+  return { closePeers: close, live, state, sync, history };
+};
+
+/** What the live channel tells the sync (and the session check), once both exist (`wired`). */
+const liveWiring = (
+  wired: { readonly sync?: SyncClient; readonly live?: LiveChannel },
+  deps: {
+    readonly auth: Auth;
+    readonly checks: SessionChecks;
+    readonly onMessage: (message: unknown) => void;
+  },
+): Parameters<typeof liveChannelOf>[1] => {
+  const { auth } = deps;
+  return {
     onChange: () => {
       wired.sync?.soon();
+    },
+    // A connect: a pull only if the copy is behind where the server's log stood as it opened.
+    onHello: (head) => {
+      void wired.sync?.catchUpTo(head);
     },
     // The socket went: a run finds out at once whether the server is still there (the offline
     // line), instead of at the next safety poll; its failures keep the sync's own backoff.
@@ -196,26 +238,13 @@ const liveAndSync = (
         // The same check a call's 401 starts: what else would send the session waits for it.
         const checked = await deps.checks.check();
         if (checked.ok) {
-          live.start();
+          wired.live?.start();
         }
       })();
     },
     sessionCheck: (): Promise<unknown> | undefined => deps.checks.pending(),
     token: auth.token,
-  });
-  const transport = preferSocket(socketTransport(live), httpTransport(api));
-  const copyCheck = sessionCheckOnCopyChange(auth, deps.checks);
-  const { closePeers, state, sync, history } = stateAndSync(options, transport, {
-    now: deps.now,
-    api,
-    onCopyChanged: copyCheck.ask,
-  });
-  wired.sync = sync;
-  const close = (): void => {
-    copyCheck.close();
-    closePeers();
   };
-  return { closePeers: close, live, state, sync, history };
 };
 
 /**
@@ -257,6 +286,16 @@ const apiAndAuth = (
   return { api, auth, checks };
 };
 
+/** The server's instance, read with no session (the route is public and names no one). */
+const instanceReaderOf = (options: PaceClientOptions): InstanceReader => {
+  const publicApi = createApiClient({
+    baseUrl: options.baseUrl,
+    ...(options.fetch !== undefined && { fetch: options.fetch }),
+    token: () => undefined,
+  });
+  return createInstanceReader(async () => await publicApi.call(endpoints.instance, {}));
+};
+
 /**
 Wires API client → auth → app state → sync → actions on the platform adapters: the one
 way a shell builds the client. A device that starts with a stored token refreshes its
@@ -269,10 +308,12 @@ export const createPaceClient = (options: PaceClientOptions): PaceClient => {
   const { now } = clock;
   const { api, auth, checks } = apiAndAuth(options);
   const notices = noticeRouter(createNotificationFeed({ api, source: options.source }));
+  const instance = instanceReaderOf(options);
   const { closePeers, live, state, sync, history } = liveAndSync(options, {
     api,
     auth,
     checks,
+    instance,
     now,
     onMessage: notices.onMessage,
   });
@@ -297,6 +338,7 @@ export const createPaceClient = (options: PaceClientOptions): PaceClient => {
     clock,
     close: closePeers,
     history,
+    instance,
     live,
     notifications,
     onNotice,

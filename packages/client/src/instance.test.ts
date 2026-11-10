@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { InstanceSchema } from "@pace/core";
+import { endpoints, InstanceSchema } from "@pace/core";
 
+import { createApiClient } from "./api-client.ts";
 import { createFakeFetch, fakeInstance, problem } from "./fake-fetch.fake.ts";
-import { checkInstance } from "./instance.ts";
+import { checkInstance, checkInstanceWith, createInstanceReader } from "./instance.ts";
 
 const offline = async (): Promise<Response> => {
   throw new TypeError("Network request failed");
@@ -128,5 +129,49 @@ describe("checkInstance configuration failures", () => {
       ok: false,
       error: expected,
     });
+  });
+});
+
+/** A client's instance reader over a fake server. */
+const readerOn = (fetch: ReturnType<typeof serverAnswering>) => {
+  const api = createApiClient({
+    baseUrl: "https://pace.example.dev",
+    fetch,
+    token: () => undefined,
+  });
+  return createInstanceReader(async () => await api.call(endpoints.instance, {}));
+};
+
+describe("createInstanceReader (QA PR55-1-12)", () => {
+  it("makes one request for checks at once, and the negotiation after them reuses its answer", async () => {
+    const fake = createFakeFetch({ "GET /api/instance": () => fakeInstance });
+    const reader = readerOn(fake.fetch);
+    const [first, second] = await Promise.all([
+      checkInstanceWith(reader.read),
+      checkInstanceWith(reader.read),
+    ]);
+    expect([first.ok, second.ok]).toEqual([true, true]);
+    await reader.latest();
+    expect(fake.calls).toHaveLength(1);
+    // A check that must be current (a return to the app) asks again.
+    await reader.read();
+    expect(fake.calls).toHaveLength(2);
+  });
+
+  it("never keeps a failure: the next read and the negotiation ask again", async () => {
+    const network = { isDown: true };
+    const fake = createFakeFetch({
+      "GET /api/instance": () => {
+        if (network.isDown) {
+          throw new TypeError("Network request failed");
+        }
+        return fakeInstance;
+      },
+    });
+    const reader = readerOn(fake.fetch);
+    expect(await checkInstanceWith(reader.read)).toEqual({ error: "unreachable", ok: false });
+    network.isDown = false;
+    await reader.latest();
+    expect(fake.calls).toHaveLength(2);
   });
 });

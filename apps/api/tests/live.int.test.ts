@@ -170,7 +170,7 @@ const openV2 = async (token: string, device: string): Promise<Inbox> => {
     throw new Error("no socket");
   }
   const inbox = inboxOf(socket);
-  expect(await inbox.next()).toEqual({ protocol: "pace.v2", type: "hello" });
+  expect(await inbox.next()).toMatchObject({ protocol: "pace.v2", type: "hello" });
   return inbox;
 };
 
@@ -323,7 +323,26 @@ describe("live sync channel, pace.v2", () => {
     if (socket === null) {
       throw new Error("no socket");
     }
-    expect(await inboxOf(socket).next()).toEqual({ protocol: "pace.v2", type: "hello" });
+    expect(await inboxOf(socket).next()).toMatchObject({ protocol: "pace.v2", type: "hello" });
+    socket.close();
+  });
+
+  it("says in its hello where the log stands, as a pull would answer it (QA PR55-1-12)", async () => {
+    const token = await loginAsDev("1001");
+    await pushEvents(token, [event(), event()]);
+    const pulled = await json<{ seq: number; storeId: string }>("/api/sync/pull?since=0", {
+      token,
+    });
+    const { socket } = await open(token, "phone-1", "pace.v2, pace.v1");
+    if (socket === null) {
+      throw new Error("no socket");
+    }
+    expect(await inboxOf(socket).next()).toEqual({
+      protocol: "pace.v2",
+      seq: pulled.seq,
+      storeId: pulled.storeId,
+      type: "hello",
+    });
     socket.close();
   });
 
@@ -618,7 +637,7 @@ describe("live sockets end with their session", () => {
       }
       socket.accept();
       const inbox = inboxOf(socket);
-      expect(await inbox.next()).toEqual({ protocol: "pace.v2", type: "hello" });
+      expect(await inbox.next()).toMatchObject({ protocol: "pace.v2", type: "hello" });
       return inbox;
     };
     const puller = await openShort("laptop-1");
@@ -650,7 +669,7 @@ describe("live sockets end with their session", () => {
     }
     socket.accept();
     const inbox = inboxOf(socket);
-    expect(await inbox.next()).toEqual({ protocol: "pace.v2", type: "hello" });
+    expect(await inbox.next()).toMatchObject({ protocol: "pace.v2", type: "hello" });
     socket.send(JSON.stringify({ id: "p", since: 0, type: "pull" }));
     const [, page] = await inbox.until("events");
     expect(page.id).toBe("p");

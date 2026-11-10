@@ -92,7 +92,7 @@ const useNotificationFeed = () => {
     loadedAt: sessions.status === "ready" ? sessions.loadedAt : null,
   };
   useEffect(() => {
-    void feed.refresh();
+    void feed.refreshUnlessFresh();
   }, [feed]);
   const unread = model.unreadIds.join(",");
   useEffect(() => {

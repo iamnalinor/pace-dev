@@ -2,6 +2,7 @@ import { createStore, type StoreApi } from "zustand/vanilla";
 
 import { err, type Result } from "@pace/core";
 
+import type { LogHead } from "./live-messages.ts";
 import type { PullPage } from "./sync-transport.ts";
 
 import {
@@ -44,6 +45,12 @@ export type SyncClient = {
   page the log already holds (one that waited for a run to finish) changes nothing.
   */
   readonly ingestLive: (page: PullPage) => Promise<void>;
+  /**
+  A socket connected and its server said where its log stands: a run (`soon`) only when the copy
+  is not there yet (another store, a lower cursor) or holds writes to send; a copy the start's
+  pull just brought there asks nothing (QA PR55-1-12: the same pull twice at every load).
+  */
+  readonly catchUpTo: (head: LogHead) => Promise<void>;
   /**
   Lets the run in flight finish (waited for at most `HOLD_WAIT_MS`), then starts none (every call
   gets `stopped`, the loop waits without ticking) until the returned `release`, or `HOLD_MAX_MS`
@@ -321,6 +328,18 @@ export const createSyncClient = (deps: SyncDeps): SyncClient => {
     },
     setInterval: loop.setInterval,
     soon: loop.soon,
+    catchUpTo: async (head) => {
+      try {
+        const meta = await deps.store.readMeta();
+        const pending = await deps.store.listPending();
+        if (meta.storeId === head.storeId && meta.cursor >= head.seq && pending.length === 0) {
+          return;
+        }
+      } catch {
+        // The copy could not be read: a run finds out what is wrong.
+      }
+      loop.soon();
+    },
     start: (options) => {
       loop.start(options.intervalMs);
     },

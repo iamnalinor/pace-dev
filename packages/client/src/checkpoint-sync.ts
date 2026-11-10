@@ -26,7 +26,7 @@ import { SYNC_SCHEMA_VERSION } from "./sync-version.ts";
 export type { CheckpointSync } from "./sync-types.ts";
 
 const isCheckpointCapable = async (context: CheckpointSyncContext): Promise<boolean> => {
-  const instance = await context.api.call(endpoints.instance, {});
+  const instance = await (context.instance?.latest() ?? context.api.call(endpoints.instance, {}));
   return instance.features.historyCheckpoint === CHECKPOINT_VERSION;
 };
 const isOffered = async (context: CheckpointSyncContext): Promise<boolean> => {

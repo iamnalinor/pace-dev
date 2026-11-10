@@ -624,7 +624,7 @@ describe("PaceProvider", () => {
     background.registerTaskAsync.mockClear();
     const { runtime } = await setup();
     const refresh = jest
-      .spyOn(runtime.notifications, "refresh")
+      .spyOn(runtime.notifications, "refreshUnlessFresh")
       .mockRejectedValue(new Error("offline"));
     await render(
       <PaceProvider runtime={runtime}>

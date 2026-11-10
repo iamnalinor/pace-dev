@@ -30,7 +30,7 @@ it("awaits the watcher's discovery before push without a second discovery reques
   serverStore.setState({ origin: runtime.baseUrl });
   const watching = checkServer(runtime);
   const booting = bootstrap(runtime, {
-    pool: { refresh: async () => undefined, isFresh: () => false },
+    pool: { refresh: async () => undefined },
     session: undefined,
     zoneSettled: async () => undefined,
   });
@@ -58,7 +58,7 @@ it("loads persisted checkpoint ids before generating recurring instances", async
   const instances = jest.spyOn(runtime.actions, "ensureInstances").mockResolvedValue(0);
   jest.spyOn(runtime.sync, "syncNow").mockResolvedValue(ok({ pulled: 0, pushed: 0 }));
   const running = bootstrap(delayed, {
-    pool: { refresh: async () => undefined, isFresh: () => false },
+    pool: { refresh: async () => undefined },
     session: undefined,
     zoneSettled: async () => undefined,
   });
@@ -76,7 +76,7 @@ it("syncs and starts the senders though the recurring instances could not be wri
     .spyOn(runtime.sync, "syncNow")
     .mockResolvedValue(ok({ pulled: 0, pushed: 0 }));
   await bootstrap(runtime, {
-    pool: { refresh: async () => undefined, isFresh: () => false },
+    pool: { refresh: async () => undefined },
     session: undefined,
     zoneSettled: async () => undefined,
   });

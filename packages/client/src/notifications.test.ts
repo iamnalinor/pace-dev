@@ -4,7 +4,7 @@ import { DEFAULT_SETTINGS, type PoolNotification } from "@pace/core";
 
 import { createApiClient } from "./api-client.ts";
 import { createFakeFetch, problem } from "./fake-fetch.fake.ts";
-import { createNotificationFeed, parseLiveNotice } from "./notifications.ts";
+import { createNotificationFeed, FEED_FRESH_MS, parseLiveNotice } from "./notifications.ts";
 import { eventAnswers, feedModel } from "./view-models/notifications.ts";
 
 const MOSCOW = "Europe/Moscow";
@@ -102,6 +102,41 @@ const feedWith = (routes: Parameters<typeof createFakeFetch>[0]) => {
 };
 
 describe("createNotificationFeed", () => {
+  it("asks once when the start and the screen both want the page a moment apart (QA PR55-1-12)", async () => {
+    let clock = 0;
+    const fake = createFakeFetch({
+      "GET /api/notifications": () => ({ deliveries: {}, items: [], more: false }),
+    });
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      fetch: fake.fetch,
+      token: () => "t",
+    });
+    const feed = createNotificationFeed({ api, now: () => clock, source: "web" });
+    await Promise.all([feed.refreshUnlessFresh(), feed.refreshUnlessFresh()]);
+    clock += FEED_FRESH_MS - 1;
+    await feed.refreshUnlessFresh();
+    expect(fake.calls).toHaveLength(1);
+    // A live notice or a pull to refresh always asks; past the window, so does the start.
+    await feed.refresh();
+    clock += FEED_FRESH_MS;
+    await feed.refreshUnlessFresh();
+    expect(fake.calls).toHaveLength(3);
+  });
+
+  it("does not take a failed page for a fresh one", async () => {
+    const fake = createFakeFetch({ "GET /api/notifications": () => problem(503, "offline") });
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      fetch: fake.fetch,
+      token: () => "t",
+    });
+    const feed = createNotificationFeed({ api, now: () => 0, source: "web" });
+    await feed.refreshUnlessFresh();
+    await feed.refreshUnlessFresh();
+    expect(fake.calls).toHaveLength(2);
+  });
+
   it("loads, then takes a live notification in and a dismissal as resolved", async () => {
     const { feed } = feedWith({
       "GET /api/notifications": () => ({ deliveries: {}, items: [seminar(null)], more: false }),

@@ -32,6 +32,9 @@ const sendTo = (socket: LiveSocket, message: KnownLiveServerMessage): void => {
   }
 };
 
+/** Where the log stands: the seq and store a pull from it would answer with. */
+export type LogHead = { readonly seq: number; readonly storeId: string };
+
 /**
 Accepts a live client as a hibernating WebSocket (no duration billed while it is quiet), tagged
 with the subprotocol it speaks, the session that opened it (see `live-sessions.ts`) and the device
@@ -39,8 +42,17 @@ it serves, so that device is not told about its own writes. Tags are all a socke
 survive hibernation, memory does not. A v2 socket hears `hello` first. A request the Worker named
 no session for is refused: no socket outlives a session it cannot be tied to. Neither does one for
 a session that ended after the Worker checked it (`isEndedSession`).
+
+The hello names the log's head, read in the same turn the socket is accepted (nothing appends in
+between: the object runs one event at a time), so a client whose copy already stands there knows
+it missed nothing and pulls nothing on connect (QA PR55-1-12: the start's HTTP pull was followed
+by the same pull over the socket).
 */
-export const acceptLiveSocket = async (ctx: ActorContext, request: Request): Promise<Response> => {
+export const acceptLiveSocket = async (
+  ctx: ActorContext,
+  request: Request,
+  head: () => Promise<LogHead>,
+): Promise<Response> => {
   if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
     return new Response("Expected a WebSocket", { status: 426 });
   }
@@ -53,6 +65,10 @@ export const acceptLiveSocket = async (ctx: ActorContext, request: Request): Pro
   }
   const protocol = liveProtocolOf(request.headers.get("Sec-WebSocket-Protocol"));
   const device = new URL(request.url).searchParams.get("device")?.slice(0, MAX_TAG) ?? "";
+  const hello =
+    protocol === LIVE_V2
+      ? JSON.stringify({ protocol: LIVE_V2, type: "hello", ...(await head()) })
+      : undefined;
   return ctx.upgrade(
     protocol,
     [
@@ -60,7 +76,7 @@ export const acceptLiveSocket = async (ctx: ActorContext, request: Request): Pro
       ...sessionTags(session.sessionId, session.expiresAt),
       ...(device === "" ? [] : [`${DEVICE_TAG}${device}`]),
     ],
-    protocol === LIVE_V2 ? JSON.stringify({ protocol: LIVE_V2, type: "hello" }) : undefined,
+    hello,
   );
 };
 
@@ -169,8 +185,11 @@ export abstract class LiveStore implements LiveStoreCalls {
 
   abstract list(...args: Parameters<LiveStoreCalls["list"]>): ReturnType<LiveStoreCalls["list"]>;
 
+  /** Where the log stands (a v2 socket's hello names it). */
+  abstract logHead(): Promise<LogHead>;
+
   async fetch(request: Request): Promise<Response> {
-    return await acceptLiveSocket(this.ctx, request);
+    return await acceptLiveSocket(this.ctx, request, async () => await this.logHead());
   }
 
   /**

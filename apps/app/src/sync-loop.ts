@@ -216,7 +216,7 @@ export const runSyncLoop = (runtime: PaceRuntime, onSynced: OnSynced): (() => vo
   const stopFollowingLive = runtime.live.status.subscribe(({ isConnected }, previous) => {
     sync.setInterval(isConnected ? POLL_LIVE_MS : POLL_OFFLINE_MS);
     // Back on the line: what the pool got meanwhile, unless it was just fetched.
-    if (isConnected && !previous.isConnected && canStartSenders(runtime) && !pool.isFresh()) {
+    if (isConnected && !previous.isConnected && canStartSenders(runtime)) {
       void pool.refresh();
     }
   });

@@ -10,7 +10,7 @@ import {
 
 import type { LiveEventsPage } from "./live-types.ts";
 
-import { type LiveHandlers as Handlers, onLiveMessage } from "./live-messages.ts";
+import { type LiveHandlers as Handlers, type LogHead, onLiveMessage } from "./live-messages.ts";
 import { createRequests, LiveUnavailable } from "./live-requests.ts";
 import { createRun, type Run } from "./live-run.ts";
 import { createTimers, type LiveTimers, retryDelay } from "./live-timers.ts";
@@ -25,6 +25,8 @@ export type SocketLike = {
   ) => void;
   readonly send: (data: string) => void;
   readonly close: () => void;
+  /** The subprotocol the server chose, once open (a browser's and React Native's socket say it). */
+  readonly protocol?: string | undefined;
 };
 
 export type LiveStatus = { readonly isConnected: boolean };
@@ -49,8 +51,16 @@ export type LiveChannelOptions = {
   readonly baseUrl: string;
   readonly deviceId: string;
   readonly token: () => string | undefined;
-  /** Something may have changed on the server: pull. Called on every (re)connect too. */
+  /**
+  Something may have changed on the server: pull. Called on every (re)connect too, unless the
+  server's hello names where its log stands (`onHello` then decides).
+  */
   readonly onChange: () => void;
+  /**
+  A v2 socket's hello named where the server's log stood as it opened: the copy pulls only if it
+  is not there yet (QA PR55-1-12). Without it, every connect asks for a pull (`onChange`).
+  */
+  readonly onHello?: (head: LogHead) => void;
   /** Any other message the server sends (the notification pool's), parsed from JSON. */
   readonly onMessage?: (message: unknown) => void;
   /** New events a v2 socket brings unasked (or a pull's answer that came too late). */
@@ -114,6 +124,13 @@ const parseMessage = (data: unknown): null | { readonly type?: unknown } => {
   }
 };
 
+/**
+Whether a socket's catch-up waits for the server's hello: it opened speaking v2, whose first
+message is the hello. One that does not say its protocol (a test's fake) or speaks v1 catches up
+on open.
+*/
+const isCaughtUpOnHello = (socket: SocketLike): boolean => socket.protocol === LIVE_V2;
+
 /** Wires one socket: open, its messages (a keep-alive's pong among them), close. */
 const follow = (socket: SocketLike, on: Handlers): void => {
   socket.addEventListener("open", on.open);
@@ -163,10 +180,11 @@ const createLine = (onQuiet: () => void) => {
       requests.failAll();
     },
     // A socket already replaced saying hello late says nothing about the current one.
-    hello: (from: SocketLike): void => {
+    hello: (from: SocketLike): boolean => {
       if (socket === from) {
         isV2 = true;
       }
+      return socket === from;
     },
     isV2: (): boolean => isV2,
     request: async (message: LiveClientMessage): Promise<LiveServerMessage> => {
@@ -210,8 +228,16 @@ const handlersFor = (
     }
   },
   events: on.options.onEvents,
-  hello: () => {
-    line.hello(socket);
+  hello: (head) => {
+    if (!line.hello(socket) || !isCaughtUpOnHello(socket)) {
+      return;
+    }
+    const { onChange, onHello } = on.options;
+    if (head === null || onHello === undefined) {
+      onChange();
+    } else {
+      onHello(head);
+    }
   },
   message: on.options.onMessage,
   open: on.open,
@@ -303,11 +329,9 @@ export const createLiveChannel = (options: LiveChannelOptions): LiveChannel => {
       }
       // The backoff is reset only once the socket has lived: a link that cuts it at once backs off.
       timers.stableIn(() => {
-        if (line.current() !== socket) {
-          return;
+        if (line.current() === socket) {
+          run.lived();
         }
-
-        run.lived();
       });
       timers.keepAlive(socket, (streak) => {
         // Each fresh socket that goes quiet again waits longer (`createTimers`).
@@ -317,7 +341,10 @@ export const createLiveChannel = (options: LiveChannelOptions): LiveChannel => {
         line.goneQuiet(socket);
       });
       status.setState({ isConnected: true });
-      options.onChange();
+      // A v2 socket's hello says whether anything was missed; any other catches up now.
+      if (!isCaughtUpOnHello(socket)) {
+        options.onChange();
+      }
     };
     const on = { close: closed, open: opened, options, pong: timers.ponged };
     follow(socket, handlersFor(socket, line, on));

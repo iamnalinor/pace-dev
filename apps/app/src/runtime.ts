@@ -1,6 +1,6 @@
 import { sha256Text } from "#app/platform/sha256-text.ts";
 import {
-  checkInstance,
+  checkInstanceWith,
   type Clock,
   createPaceClient,
   type EventStore,
@@ -155,7 +155,7 @@ export const createRuntime = async (options: RuntimeOptions = {}): Promise<PaceR
   return {
     ...client,
     baseUrl,
-    checkInstance: async () => await checkInstance(baseUrl, watched),
+    checkInstance: async () => await checkInstanceWith(client.instance.read),
     deviceId,
     hooks: createAppHooks(client.state, client.clock, client.history),
     resetLocalData: async () => {
