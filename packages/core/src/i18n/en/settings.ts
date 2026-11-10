@@ -5,6 +5,7 @@ export const enSettings = {
   "settings.appearance": "Appearance",
   "settings.keyboard": "Keyboard",
   "settings.keyboard.newTask": "New task",
+  "settings.keyboard.primary": "Done or save",
   "settings.keyboard.focus": "Focus",
   "settings.server": "Server",
   "settings.server.hint": "You can change the server on the sign-in screen.",

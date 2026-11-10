@@ -53,4 +53,10 @@ describe("the task footer in the pane beside the list (design review B1)", () =>
     const row = screen.getByTestId("task-footer-main");
     expect(within(row).queryByRole("button", { name: en("task.doneOther") })).toBeNull();
   });
+
+  it("names Ctrl+Enter in Done's tooltip and hint, as the hint has no room (QA round 27 R27-08)", async () => {
+    await renderInPane();
+    const done = screen.getByRole("button", { name: en("task.done") });
+    expect(done.props["accessibilityHint"]).toBe(`${en("task.doneHint")} · Ctrl+Enter`);
+  });
 });

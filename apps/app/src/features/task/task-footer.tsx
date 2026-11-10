@@ -7,8 +7,9 @@ import { usePace, useT } from "#app/app-state.tsx";
 import { useIsInPane } from "#app/shared/task-opener.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button, KeyHintRoomContext } from "#app/ui/button.tsx";
-import { HOTKEYS } from "#app/ui/hotkeys.ts";
+import { HOTKEYS, labelWithHotkey } from "#app/ui/hotkeys.ts";
 import { Tooltip } from "#app/ui/tooltip.tsx";
+import { KEYBOARD } from "#app/ui/use-hotkey.tsx";
 
 import { useFinishTask } from "./use-finish-task.ts";
 
@@ -55,6 +56,8 @@ export const TaskFooter = ({
   const run = useRunAction();
   const insets = useSafeAreaInsets();
   const isInPane = useIsInPane();
+  // The pane has no room for the key on the button: its tooltip and hint name it (R27-08).
+  const doneHint = labelWithHotkey(t("task.doneHint"), HOTKEYS.primary, KEYBOARD);
   const finish = useFinishTask(view);
   const padding = { paddingBottom: Math.max(insets.bottom, 12) + 8 };
   if (view.closed !== null) {
@@ -85,9 +88,9 @@ export const TaskFooter = ({
               focus and describes Done by it (react-native-web drops `hint`); the phone's tooltip
               does not show on a tap here, so its screen reader gets the hint. It says what Done
               does; the long press is a shortcut to the button under it, never taught (QA 20 L3). */}
-              <Tooltip label={t("task.doneHint")}>
+              <Tooltip label={doneHint}>
                 <Button
-                  hint={t("task.doneHint")}
+                  hint={doneHint}
                   onLongPress={onClose}
                   onPress={finish}
                   shortcut={HOTKEYS.primary}

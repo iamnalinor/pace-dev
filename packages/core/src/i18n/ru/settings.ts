@@ -7,6 +7,7 @@ export const ruSettings: { readonly [K in keyof typeof enSettings]: string } = {
   "settings.appearance": "Внешний вид",
   "settings.keyboard": "Клавиши",
   "settings.keyboard.newTask": "Новая задача",
+  "settings.keyboard.primary": "Готово или сохранить",
   "settings.keyboard.focus": "Фокус",
   "settings.server": "Сервер",
   "settings.server.hint": "Сменить сервер можно на экране входа.",

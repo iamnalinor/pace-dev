@@ -13,6 +13,8 @@ export const KeyboardRow = () => {
   const line = [
     [HOTKEYS.newTask, t("settings.keyboard.newTask")],
     [HOTKEYS.focus, t("settings.keyboard.focus")],
+    // The task's Done and a form's Save or Create (QA round 27 R27-08).
+    [HOTKEYS.primary, t("settings.keyboard.primary")],
   ] as const;
   return (
     <ListRow

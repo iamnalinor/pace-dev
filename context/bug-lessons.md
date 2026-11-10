@@ -2550,3 +2550,9 @@ New bugs go here with their class; a new class gets its own section above.
 - **Missed because.** History's tests undid the newest row; none undid an event that later rows depend on.
 - **Class.** A derived row that names and acts on its subject through the current state, with no case for a subject that a correction removed.
 - **Sweep and guard.** A row of a task that is gone is named as the log last wrote the task's title, and a task event of a gone task offers no Undo (an activity spent on it still does: it stands on its own). The other subjects History names: presets and activities fall back to the name the event wrote already (R23-07). Guard: `history.test.ts` (creation undone: the later row keeps the title and has no Undo).
+
+### 233. A shortcut whose name was taken off the button for room, and not said anywhere else
+- **Bug.** In the task pane «Готово» showed no Ctrl/⌘+Enter (design review B1 took the hint off for room) and its tooltip did not name it either, while the edit sheet, the close sheet and the Inbox show it on their buttons; Settings' «Клавиши» listed Alt+N and Alt+F only (QA round 27 R27-08).
+- **Missed because.** B1's test checked the hint was gone from the narrow button; `KeyHintRoomContext`'s own rule ("its tooltip or hint still names it") had no test on the button that uses it.
+- **Class.** A display rule with a stated fallback that the call site did not implement.
+- **Sweep and guard.** The pane's Done names the key in its tooltip and hint (`labelWithHotkey`); Settings lists Ctrl/⌘+Enter («Готово или сохранить») with the others. The other narrow regions (`KeyHintRoomContext` false): the pane's footer only. Guards: `task-footer-pane.test.tsx` (Done's hint names Ctrl+Enter), `keyboard-row.test.tsx` (the list names it).
