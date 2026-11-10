@@ -36,7 +36,7 @@ describe("History source loading", () => {
     await renderScreen(<HistoryScreen />, runtime);
     expect(screen.getByRole("progressbar", { name: en("history.loading") })).toBeOnTheScreen();
     expect(screen.queryByText(en("history.emptyAt"))).toBeNull();
-    await fireEvent.press(screen.getByRole("button", { name: en("history.dayBack") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("day.previous") }));
     await act(async () => {
       held.resolve(source);
     });

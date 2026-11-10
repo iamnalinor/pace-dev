@@ -152,7 +152,7 @@ export const NotificationsScreen = () => {
           }
           {...(!isWide && back !== undefined && { backLabel: t("common.back"), onBack: back })}
           title={t("notifications.title")}
-          variant={isWide ? "top" : "pushed"}
+          variant="top"
         />
       }
       scroller={(scroll) => (

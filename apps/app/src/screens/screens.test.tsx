@@ -126,7 +126,7 @@ describe("HistoryScreen", () => {
     expect(screen.getAllByRole("button", { name: /^Undo: /u }).length).toBeGreaterThan(0);
     // Today is offered only away from now (F-CPY-06).
     expect(screen.queryByRole("button", { name: en("period.today") })).toBeNull();
-    await fireEvent.press(screen.getByRole("button", { name: en("history.dayBack") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("day.previous") }));
     // The day viewed is in the label, and the events stop there.
     expect(screen.getByText(/^Tasks at .*Oct 5/u)).toBeOnTheScreen();
     expect(screen.getByText(/^Events up to/u)).toBeOnTheScreen();

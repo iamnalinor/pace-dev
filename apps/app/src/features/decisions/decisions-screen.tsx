@@ -3,6 +3,7 @@ import { View } from "react-native";
 
 import { useAppState, useLanguage, usePace, useT } from "#app/app-state.tsx";
 import { zonedText } from "#app/format/time.ts";
+import { useListVariant } from "#app/screens/pushed-screen.tsx";
 import { useOpenTask } from "#app/shared/task-opener.tsx";
 import { useBack } from "#app/shared/use-back.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
@@ -184,6 +185,7 @@ export const DecisionsScreen = () => {
   const { api } = usePace();
   // Reached from Notifications: a pasted link goes back there, not to Now (R26-08).
   const back = useBack("/notifications");
+  const variant = useListVariant();
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
   // It searches while typing, once the typing pauses; Enter searches at once.
@@ -205,7 +207,7 @@ export const DecisionsScreen = () => {
             backLabel={t("common.back")}
             onBack={back}
             title={t("decisions.title")}
-            variant="pushed"
+            variant={variant}
           />
           <View className="px-gutter pb-3 pt-1">
             <TextField

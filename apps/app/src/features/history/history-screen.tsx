@@ -151,7 +151,7 @@ const MomentStepper = ({
     <PeriodStepper
       isAway={at !== null}
       label={when}
-      nextLabel={t("history.dayForward")}
+      nextLabel={t("day.next")}
       onNext={
         at === null
           ? null
@@ -165,7 +165,7 @@ const MomentStepper = ({
       onToday={() => {
         onAt(null);
       }}
-      previousLabel={t("history.dayBack")}
+      previousLabel={t("day.previous")}
       shortLabel={shortWhen}
       todayLabel={t("period.today")}
     />

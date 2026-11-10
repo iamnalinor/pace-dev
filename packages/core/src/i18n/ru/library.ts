@@ -22,8 +22,6 @@ export const ruLibrary: { readonly [K in keyof typeof enLibrary]: string } = {
   "project.statsLine": "{open} открыто · {onTime} в срок · {late} просрочено",
   "project.done": "Закрытые",
   "project.empty": "Здесь пока нет задач.",
-  "history.dayBack": "На день раньше",
-  "history.dayForward": "На день позже",
   "history.title": "История",
   "history.loading": "Загрузка истории…",
   "history.events": "События",
