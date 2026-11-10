@@ -139,6 +139,8 @@ test("Escape closes Now's task pane and gives the focus back to its row; an edit
   await page.keyboard.press("Escape");
   await expect(field).toHaveCount(0);
   await expect(header).toBeVisible();
+  // Focus stays at the description's place, not on the page (QA round 25 R25-09).
+  await expect(page.getByRole("button", { exact: true, name: "Add description" })).toBeFocused();
   await expect(page).toHaveURL(/[?&]task=/u);
   await page.keyboard.press("Escape");
   await expect(header).toHaveCount(0);

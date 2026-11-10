@@ -1,10 +1,11 @@
-import { Fragment, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import { View } from "react-native";
 
 import type { TaskViewModel } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { escapeFieldProps } from "#app/platform/enter-key.ts";
+import { focusPlace } from "#app/platform/focus-place.ts";
 import { useIsInPane } from "#app/shared/task-opener.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button } from "#app/ui/button.tsx";
@@ -204,31 +205,35 @@ export const TaskDescription = ({
     setIsEditing(true);
   });
   const discardDraft = useDiscardDraft();
+  // Where the description stands: focus comes back here when the editor closes (R25-09).
+  const placeRef = useRef<View>(null);
   const close = (): void => {
     discardDraft(draftKey);
     setIsEditing(false);
+    focusPlace(placeRef);
   };
   const { isSaving, save } = useSaveDescription(view, close);
-  if (isEditing) {
-    return (
-      <DescriptionEditor
-        draft={draft}
-        isSaving={isSaving}
-        onCancel={close}
-        onChange={setDraft}
-        onSave={() => {
-          void save(draft);
-        }}
-      />
-    );
-  }
   return (
-    <DescriptionText
-      onEdit={() => {
-        setDraft(view.description ?? "");
-        setIsEditing(true);
-      }}
-      view={view}
-    />
+    <View ref={placeRef}>
+      {isEditing ? (
+        <DescriptionEditor
+          draft={draft}
+          isSaving={isSaving}
+          onCancel={close}
+          onChange={setDraft}
+          onSave={() => {
+            void save(draft);
+          }}
+        />
+      ) : (
+        <DescriptionText
+          onEdit={() => {
+            setDraft(view.description ?? "");
+            setIsEditing(true);
+          }}
+          view={view}
+        />
+      )}
+    </View>
   );
 };
