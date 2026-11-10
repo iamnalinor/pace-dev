@@ -117,4 +117,15 @@ describe("InboxScreen", () => {
     await fireEvent.press(screen.getByRole("button", { name: en("common.undo") }));
     expect(await screen.findByText(INBOX_TEXTS[INBOX_CABLE_ID])).toBeOnTheScreen();
   });
+
+  it("accepts a capture with a toast that names the task and undoes it (QA round 25 R25-06)", async () => {
+    const runtime = await createTestRuntime();
+    await renderScreen(<InboxScreen />, runtime);
+    const text = INBOX_TEXTS[INBOX_CABLE_ID];
+    await fireEvent.press(screen.getByRole("button", { name: `${en("common.accept")}: ${text}` }));
+    expect(await screen.findByText(/^Task created: /u)).toBeOnTheScreen();
+    expect(screen.queryByText(text)).toBeNull();
+    await fireEvent.press(screen.getByRole("button", { name: en("common.undo") }));
+    expect(await screen.findByText(text)).toBeOnTheScreen();
+  });
 });

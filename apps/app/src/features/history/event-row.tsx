@@ -109,7 +109,14 @@ export const EventRow = ({
   } else if (isLatest) {
     // Undo stays while the dialog asks, so the dialog gives focus back to it (bug class 5).
     trailing = (
-      <Button onPress={ask} size="small" variant="plain">
+      <Button
+        // One verb with the question it asks («Вернуть как было»; Undo is «Вернуть» everywhere,
+        // QA round 14 M2), and the row it undoes in its name (QA round 25 R25-05).
+        label={t("history.undoRow", { event: sentence })}
+        onPress={ask}
+        size="small"
+        variant="plain"
+      >
         {t("common.undo")}
       </Button>
     );

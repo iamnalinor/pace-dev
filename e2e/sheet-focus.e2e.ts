@@ -71,6 +71,13 @@ type Opener = {
 };
 
 /** One of the time bar's four fixed tiles on Now (they never fold; only the typed field does). */
+/** History's one visible Undo (its name is «Вернуть: <the row>», QA round 25 R25-05). */
+const historyUndo = (page: Page) =>
+  page
+    .getByRole("button", { name: /^Вернуть: / })
+    .filter({ hasText: ru["common.undo"] })
+    .first();
+
 const timeBarButton = async (page: Page, key: keyof typeof ru): Promise<void> => {
   await page.goto("/");
   const bar = page.getByRole("region", { name: ru["time.bar"] });
@@ -193,7 +200,7 @@ const OPENERS: readonly Opener[] = [
   {
     open: async (page) => {
       await page.goto("/history");
-      await page.getByRole("button", { exact: true, name: ru["common.undo"] }).first().click();
+      await historyUndo(page).click();
     },
     sheet: "history-undo",
     via: "History's Undo",
@@ -337,7 +344,7 @@ test.describe("keyboard only: a sheet opened from a list row (Review Focus 5)", 
     const { token } = await loginViaApi(page);
     await seedLivedIn(token);
     await page.goto("/history");
-    const undo = page.getByRole("button", { exact: true, name: ru["common.undo"] }).first();
+    const undo = historyUndo(page);
     await expect(undo).toBeVisible();
     // From the keyboard: onto the row's control (a Shift+Tab and a Tab come back onto it, so the
     // browser knows the keyboard moved it), then Enter opens the sheet.

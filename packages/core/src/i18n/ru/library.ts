@@ -14,6 +14,7 @@ export const ruLibrary: { readonly [K in keyof typeof enLibrary]: string } = {
   "inbox.openLine": "Открыть строку ввода",
   "inbox.details": "Заметка",
   "inbox.deleted": "Заметка удалена",
+  "inbox.accepted": "Задача создана: {title}",
   "inbox.review.details": "Решение",
   "inbox.noDeadline": "Без срока",
   "inbox.empty": "Нечего разбирать.",
@@ -28,8 +29,8 @@ export const ruLibrary: { readonly [K in keyof typeof enLibrary]: string } = {
   "history.eventsUntil": "События до {when}",
   "history.revoked": "Отменено",
   "history.undoConfirmQuestion":
-    "Отменить это событие? Всё, что оно изменило, пересчитается без него.",
-  "history.undoConfirm": "Отменить событие",
+    "Вернуть всё, как было до этого события? Всё, что оно изменило, пересчитается без него.",
+  "history.undoConfirm": "Вернуть как было",
   "history.snapshot": "Задачи на {when}",
   "history.emptyAccount": "Здесь появится всё, что вы делаете: каждое действие можно вернуть.",
   "history.undoRow": "Вернуть: {event}",

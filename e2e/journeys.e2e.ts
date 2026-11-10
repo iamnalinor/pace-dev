@@ -29,7 +29,10 @@ for (const size of SIZES) {
       // The newest change is the close; the undo is stored once its correction is listed, and
       // navigating sooner can reload the page before the write.
       await expect(page.getByText(`Task closed · ${title}`)).toBeVisible();
-      await page.getByRole("button", { exact: true, name: "Undo" }).first().click();
+      await page
+        .getByRole("button", { name: `Undo: Task closed · ${title}` })
+        .first()
+        .click();
       await expect(page.getByText("Correction: revoked")).toHaveCount(0);
       await page.getByRole("dialog").getByRole("button", { name: "Undo event" }).click();
       await expect(page.getByText("Correction: revoked")).toBeVisible();

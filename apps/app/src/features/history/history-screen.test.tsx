@@ -40,9 +40,11 @@ describe("HistoryScreen", () => {
     const taskId = created.value[0]?.type === "task.created" ? created.value[0].payload.taskId : "";
     await runtime.actions.setImportance(taskId, "asap");
     await renderScreen(<HistoryScreen />, runtime);
-    expect(await screen.findAllByRole("button", { name: en("common.undo") })).toHaveLength(1);
+    // One visible Undo, and every way in names the row it undoes (QA round 25 R25-05).
+    expect(await screen.findAllByText(en("common.undo"))).toHaveLength(1);
     const earlier = screen.getAllByRole("button", { name: /^Undo: / });
-    expect(earlier.length).toBeGreaterThan(0);
+    expect(earlier.length).toBeGreaterThan(1);
+    expect(screen.queryByRole("button", { name: en("common.undo") })).toBeNull();
     // Pressing it asks the same question, and nothing is undone before the answer.
     const revoke = jest.spyOn(runtime.actions, "revoke");
     await fireEvent.press(earlier[0] as never);

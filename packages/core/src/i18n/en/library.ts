@@ -12,6 +12,7 @@ export const enLibrary = {
   "inbox.openLine": "Open the line",
   "inbox.details": "Note details",
   "inbox.deleted": "Note deleted",
+  "inbox.accepted": "Task created: {title}",
   "inbox.review.details": "Decision details",
   "inbox.noDeadline": "No deadline",
   "inbox.empty": "Nothing to sort.",
