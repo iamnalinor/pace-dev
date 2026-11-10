@@ -704,6 +704,11 @@ describe("Settings → Devices and sessions", () => {
     const picker = await screen.findByLabelText("The computer's system");
     expect(within(picker).getByRole("radio", { name: "Windows" })).toBeChecked();
     expect(screen.getByText(/open PowerShell/u)).toBeOnTheScreen();
+    // The shown-once warning comes first, where the sheet opens, not under its scroll edge (R25-11).
+    const order = screen.getAllByText(/.+/u).map((node) => String(node.props["children"]));
+    const warning = order.findIndex((text) => text.startsWith("The token is shown only now"));
+    expect(warning).toBeGreaterThanOrEqual(0);
+    expect(warning).toBeLessThan(order.findIndex((text) => text.includes("open PowerShell")));
     const windowsLine = screen.getByText(/winget install -e --id Python\.Python\.3\.12/u);
     expect(windowsLine).toHaveTextContent(
       `Invoke-WebRequest -UseBasicParsing ${serverWeb}/pace_agent.py`,

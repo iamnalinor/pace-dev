@@ -61,6 +61,9 @@ export const ComputerSteps = ({ device }: { readonly device: NewAgent }) => {
   const command = agentCommand({ apiBase: apiOrigin, device, os, webOrigin });
   return (
     <View className="gap-3">
+      {/* First, where the sheet opens on the steps: lower down it fell under the sheet's own
+          scroll edge, cut mid-sentence above Done (QA round 25 R25-11). */}
+      <TokenOnce />
       <OsPicker
         chosenRef={(node) => {
           if (node === null || hasFocusedRef.current) {
@@ -110,7 +113,6 @@ export const ComputerSteps = ({ device }: { readonly device: NewAgent }) => {
       >
         {t(tokenShareLabel(isTokenShared))}
       </Button>
-      <TokenOnce />
       <Text className={STEP}>{t("devices.step3")}</Text>
       <Text className={STEP}>{t("devices.step4")}</Text>
       <CodeText>{agentLogsCommand(os)}</CodeText>
