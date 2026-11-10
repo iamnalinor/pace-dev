@@ -46,7 +46,7 @@ describe("TimeInput (spec §4.2.29)", () => {
     const onTime = jest.fn();
     await renderTime(onTime);
     const field = screen.getByLabelText("Starts at");
-    for (const raw of ["7:", "12:5", "24:00", "9:30 PM"]) {
+    for (const raw of ["12:5", "24:00", "9:30 PM", "25"]) {
       await fireEvent.changeText(field, raw);
       await fireEvent(field, "blur");
       expect(screen.getByRole("alert")).toHaveTextContent(en("day.badTime"));
@@ -58,6 +58,16 @@ describe("TimeInput (spec §4.2.29)", () => {
     await fireEvent(field, "blur");
     expect(onTime).toHaveBeenCalledWith("09:30");
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("reads an hour typed alone as that hour sharp when left (QA round 27 R27-04)", async () => {
+    const onTime = jest.fn();
+    await renderTime(onTime);
+    const field = screen.getByLabelText("Starts at");
+    await fireEvent.changeText(field, "7");
+    await fireEvent(field, "blur");
+    expect(onTime).toHaveBeenCalledWith("07:00");
+    expect(screen.getByLabelText("Starts at").props["value"]).toBe("07:00");
   });
 
   it("left untouched, shows the stored time and saves nothing", async () => {

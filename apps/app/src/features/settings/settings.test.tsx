@@ -122,7 +122,7 @@ describe("SettingsScreen", () => {
     await renderScreen(<SettingsScreen />, runtime);
     const settings = () => runtime.state.store.getState().settings;
     const first = screen.getByLabelText(en("settings.digestWindows.time", { index: 1 }));
-    await fireEvent.changeText(first, "8");
+    await fireEvent.changeText(first, "08:3");
     await fireEvent(first, "blur");
     // Half a time is never stored: the field says so instead.
     expect(settings().digestWindows[0]).toBe("09:00");

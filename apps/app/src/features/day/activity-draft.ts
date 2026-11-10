@@ -1,6 +1,11 @@
-import type { ActivityForm, ActivityRange, ActivityTarget } from "@pace/client";
-
 import { clockTime, fromWallClock, wallClock } from "#app/format/time.ts";
+import {
+  type ActivityForm,
+  type ActivityRange,
+  type ActivityTarget,
+  readTime,
+  typeTime,
+} from "@pace/client";
 import { type Activity, addDaysIn, type MessageKey, type TimeState } from "@pace/core";
 
 /** What the Day sheet checks before a block is saved, each fault under its own field. */
@@ -169,12 +174,20 @@ type Times = {
   readonly endAt: null | string | undefined;
 };
 
+/** «7» or «14» alone as 07:00 or 14:00; any other text as it is. */
+const sharp = (text: string): string => {
+  const read = readTime(text);
+  return read.isComplete && !typeTime(text).isComplete ? read.text : text;
+};
+
 /**
 The sheet's typed times as instants. A field left as it opened gives back the very instant it
 showed (its seconds, a repeated summer-time hour, a day or more of length); a retyped start is
 read on the day chosen for it, else the block's own day, a retyped end as `endFrom` says.
 */
-const typedTimes = (draft: Draft, target: SheetTarget, zone: string): Times => {
+const typedTimes = (typedDraft: Draft, target: SheetTarget, zone: string): Times => {
+  // An hour typed alone is that hour sharp, as when the field is left (R27-04).
+  const draft = { ...typedDraft, from: sharp(typedDraft.from), to: sharp(typedDraft.to) };
   const date = draft.fromDay ?? wallClock(target.startAt, zone).date;
   const startAt =
     keptOn({ atIso: target.startAt, day: date }, draft.from, zone) ??

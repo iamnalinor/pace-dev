@@ -1,7 +1,7 @@
 import { type Ref, type RefObject, useCallback, useEffect, useId, useRef, useState } from "react";
 import { TextInput, View } from "react-native";
 
-import { typeTime } from "@pace/client";
+import { readTime, typeTime } from "@pace/client";
 
 import { useT } from "../app-state.tsx";
 import { submitFieldProps } from "../platform/enter-key.ts";
@@ -25,22 +25,34 @@ draft holds either: «0:30» on the way to retyping the hour) refuses it, and th
 */
 const useUnreadableCheck = (
   pendingRef: RefObject<null | string>,
-  latestRef: RefObject<{ readonly isDraft: boolean }>,
-  setIsWrong: (isWrong: boolean) => void,
+  latestRef: RefObject<{ readonly isDraft: boolean; readonly onTime: (time: string) => void }>,
+  setters: {
+    readonly setIsWrong: (isWrong: boolean) => void;
+    /** Shows a text as the one typed, still to be saved. */
+    readonly adopt: (text: string) => void;
+  },
 ): void => {
+  const { adopt, setIsWrong } = setters;
   useTimeCheck(
     useCallback(() => {
       const typed = pendingRef.current;
       if (typed === null) {
         return false;
       }
-      const read = typeTime(typed);
-      const isUnreadable = !read.isComplete || (latestRef.current.isDraft && read.text !== typed);
-      if (isUnreadable) {
+      const read = readTime(typed);
+      if (!read.isComplete) {
         setIsWrong(true);
+        return true;
       }
-      return isUnreadable;
-    }, [latestRef, pendingRef, setIsWrong]),
+      if (latestRef.current.isDraft && read.text !== typed) {
+        // Read whole it is a time the draft does not hold yet («7» is 07:00): handed over and
+        // shown, and this press waits for the next one, which saves what the field now shows.
+        adopt(read.text);
+        latestRef.current.onTime(read.text);
+        return true;
+      }
+      return false;
+    }, [adopt, latestRef, pendingRef, setIsWrong]),
   );
 };
 
@@ -92,21 +104,25 @@ const useTypedTime = ({
       if (pendingRef.current === null || latestRef.current.isDraft) {
         return;
       }
-      const read = typeTime(pendingRef.current);
+      const read = readTime(pendingRef.current);
       if (read.isComplete && read.text !== latestRef.current.value) {
         latestRef.current.onTime(read.text);
       }
     },
     [],
   );
-  useUnreadableCheck(pendingRef, latestRef, setIsWrong);
+  const adopt = useCallback((typed: string) => {
+    pendingRef.current = typed;
+    setText(typed);
+  }, []);
+  useUnreadableCheck(pendingRef, latestRef, { adopt, setIsWrong });
   /** Saves what is typed; `true` when the stored time already is what the field shows. */
   const isCommitted = (): boolean => {
     if (!isEdited) {
       setText(value);
       return true;
     }
-    const read = typeTime(text);
+    const read = readTime(text);
     if (!read.isComplete) {
       setIsWrong(true);
       return false;
