@@ -10,6 +10,7 @@ import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
+import { TimeCheckScope, useTimeChecks } from "#app/ui/time-check.tsx";
 import { useDiscardDraft, useDraft } from "#app/ui/use-draft.ts";
 import {
   type AppState,
@@ -301,6 +302,7 @@ export const EditTaskSheet = ({
   const repeatProblem = useRepeatProblem(view.id, before, values);
   const toAdd = withDraft(added, subtaskDraft);
   const save = useSave({ added: toAdd, before, removed, seriesId, values, view }, onClose);
+  const times = useTimeChecks();
   return (
     <Sheet
       closeLabel={t("common.close")}
@@ -308,7 +310,10 @@ export const EditTaskSheet = ({
         <SheetActions
           isDisabled={values.title.trim() === "" || !deadline.valid || repeatProblem !== null}
           onPrimary={() => {
-            void save();
+            // A time typed and not readable refuses Save, said under its field (R27-02).
+            if (times.isAllRead()) {
+              void save();
+            }
           }}
           primaryLabel={t("common.save")}
         />
@@ -318,17 +323,19 @@ export const EditTaskSheet = ({
       open
       title={t("edit.title")}
     >
-      <TaskFields
-        draftKey={draftKey}
-        isStartChosen={isStartChosen(state, { before, taskId: view.id, values })}
-        onChange={(patch) => {
-          setValues((current) => ({ ...current, ...patch }));
-        }}
-        options={options}
-        repeatProblem={repeatProblem}
-        showDeadlineIssue={deadline.changed}
-        values={values}
-      />
+      <TimeCheckScope checks={times}>
+        <TaskFields
+          draftKey={draftKey}
+          isStartChosen={isStartChosen(state, { before, taskId: view.id, values })}
+          onChange={(patch) => {
+            setValues((current) => ({ ...current, ...patch }));
+          }}
+          options={options}
+          repeatProblem={repeatProblem}
+          showDeadlineIssue={deadline.changed}
+          values={values}
+        />
+      </TimeCheckScope>
       <SubtaskList
         draft={subtaskDraft}
         items={added}

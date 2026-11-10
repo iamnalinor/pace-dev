@@ -604,6 +604,30 @@ describe("TaskScreen — work", () => {
     });
   });
 
+  it("refuses Done and Save while the typed due time cannot be read, and says so (R27-02)", async () => {
+    const runtime = await createTestRuntime({ deviceTz: "UTC", now: TRK_NOW });
+    const result = await runtime.actions.createTask({
+      dueAt: "2026-10-16T18:00:00.000Z",
+      presetId: "personal",
+      title: "Unreadable due time",
+    });
+    const created = result.ok ? result.value[0] : undefined;
+    const taskId = created?.type === "task.created" ? created.payload.taskId : "";
+    await renderScreen(<TaskScreen id={taskId} />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
+    await fireEvent.press(screen.getByRole("button", { name: /^Due: /u }));
+    await fireEvent.changeText(screen.getByLabelText(en("composer.dueTime")), "2500");
+    await fireEvent.press(screen.getByRole("button", { name: en("common.done") }));
+    // The panel stays open on it, and says why.
+    expect(screen.getByLabelText(en("composer.dueTime"))).toBeOnTheScreen();
+    expect(screen.getByRole("alert")).toHaveTextContent(en("day.badTime"));
+    await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
+    expect(screen.getByText(en("edit.title"))).toBeOnTheScreen();
+    expect(runtime.state.store.getState().tasks.byId[taskId]?.dueAt).toBe(
+      "2026-10-16T18:00:00.000Z",
+    );
+  });
+
   it("opens the final date's calendar under its label, and keeps quiet while it is open (QA 13 L8)", async () => {
     await trkScreen();
     await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));

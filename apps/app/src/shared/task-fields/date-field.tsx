@@ -6,6 +6,7 @@ import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
 import { Calendar } from "#app/ui/calendar.tsx";
 import { Chip } from "#app/ui/chip.tsx";
+import { TimeCheckScope, useTimeChecks } from "#app/ui/time-check.tsx";
 import { TimeInput } from "#app/ui/time-input.tsx";
 
 /** A time a person sets, with the zone it was set in; `null` when not set. */
@@ -70,6 +71,29 @@ export const DateChip = ({
   );
 };
 
+/** Clear (for a date that is set) and Done. */
+const PanelButtons = ({
+  onClear,
+  onDone,
+}: {
+  readonly onClear: (() => void) | null;
+  readonly onDone: () => void;
+}) => {
+  const t = useT();
+  return (
+    <View className="flex-row justify-end gap-2">
+      {onClear === null ? null : (
+        <Button onPress={onClear} variant="plain">
+          {t("composer.clear")}
+        </Button>
+      )}
+      <Button onPress={onDone} variant="secondary">
+        {t("common.done")}
+      </Button>
+    </View>
+  );
+};
+
 /**
 A date panel: a month calendar and the time, both read on the value's own zone (the
 account's for a new one). The zone is named only when it is not the device's.
@@ -92,6 +116,7 @@ export const DatePanel = ({
   const today = wallClock(viewer.now, tz).date;
   const shown = due === null ? { date: null, time: DEFAULT_TIME[kind] } : wallClock(due.at, tz);
   const { time } = shown;
+  const times = useTimeChecks();
   const set = (date: string, at: string): void => {
     const instant = fromWallClock({ date, time: at, tz });
     if (instant !== null) {
@@ -114,36 +139,38 @@ export const DatePanel = ({
         <Text className="font-sans text-footnote text-label-secondary">
           {t(kind === "final" ? "form.finalTime" : "composer.dueTime")}
         </Text>
-        <TimeInput
-          className="w-24"
-          isDraft
-          label={t(kind === "final" ? "form.finalTime" : "composer.dueTime")}
-          onTime={(next) => {
-            set(shown.date ?? today, next);
-          }}
-          value={time}
-        />
+        <TimeCheckScope checks={times}>
+          <TimeInput
+            className="w-24"
+            isDraft
+            label={t(kind === "final" ? "form.finalTime" : "composer.dueTime")}
+            onTime={(next) => {
+              set(shown.date ?? today, next);
+            }}
+            value={time}
+          />
+        </TimeCheckScope>
         {tz === viewer.deviceTz ? null : (
           <Text className="font-sans text-caption font-normal tabular-nums text-label-tertiary">
             {t("add.dueZone", { tz })}
           </Text>
         )}
       </View>
-      <View className="flex-row justify-end gap-2">
-        {due === null ? null : (
-          <Button
-            onPress={() => {
-              onChange(null);
-            }}
-            variant="plain"
-          >
-            {t("composer.clear")}
-          </Button>
-        )}
-        <Button onPress={onClose} variant="secondary">
-          {t("common.done")}
-        </Button>
-      </View>
+      <PanelButtons
+        onClear={
+          due === null
+            ? null
+            : () => {
+                onChange(null);
+              }
+        }
+        onDone={() => {
+          // Done keeps the panel open on a time it cannot read, and says so (R27-02).
+          if (times.isAllRead()) {
+            onClose();
+          }
+        }}
+      />
     </View>
   );
 };

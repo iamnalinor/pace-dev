@@ -1,4 +1,4 @@
-import { type Ref, useEffect, useId, useRef, useState } from "react";
+import { type Ref, type RefObject, useCallback, useEffect, useId, useRef, useState } from "react";
 import { TextInput, View } from "react-native";
 
 import { typeTime } from "@pace/client";
@@ -8,12 +8,56 @@ import { cx } from "./cx.ts";
 import { ErrorMessage } from "./field-error.tsx";
 import { boxClass, FocusRing } from "./text-field.tsx";
 import { useTheme } from "./theme-provider.tsx";
+import { useTimeCheck } from "./time-check.tsx";
 
 /**
 How long a typed time may get: room for a paste the parser reads whole («9:30 PM», «12:345» are
 refused as typed rather than cut to a wrong time by the browser).
 */
 export const TIME_MAX_LENGTH = 8;
+
+/**
+A Save around the field asks first: typed text that is not a time (in a draft, not the time the
+draft holds either: «0:30» on the way to retyping the hour) refuses it, and the field says why
+(QA round 27 R27-02).
+*/
+const useUnreadableCheck = (
+  pendingRef: RefObject<null | string>,
+  latestRef: RefObject<{ readonly isDraft: boolean }>,
+  setIsWrong: (isWrong: boolean) => void,
+): void => {
+  useTimeCheck(
+    useCallback(() => {
+      const typed = pendingRef.current;
+      if (typed === null) {
+        return false;
+      }
+      const read = typeTime(typed);
+      const isUnreadable = !read.isComplete || (latestRef.current.isDraft && read.text !== typed);
+      if (isUnreadable) {
+        setIsWrong(true);
+      }
+      return isUnreadable;
+    }, [latestRef, pendingRef, setIsWrong]),
+  );
+};
+
+/** While untouched, the field shows the stored value as it changes (synced, a row above removed; I5). */
+const useStoredValue = (
+  value: string,
+  isEdited: boolean,
+  setText: (text: string) => void,
+): void => {
+  const [shown, setShown] = useState(value);
+  if (shown === value) {
+    return;
+  }
+
+  setShown(value);
+  if (!isEdited) {
+    setText(value);
+  }
+};
 
 /**
 The typed text of a `TimeInput` and when it is saved: on leave or Enter (`commit`), as it is typed
@@ -33,13 +77,7 @@ const useTypedTime = ({
   // Only what the person typed is saved: a field left untouched shows the stored time again,
   // so a time changed elsewhere meanwhile is never written back over.
   const [isEdited, setIsEdited] = useState(false);
-  const [shown, setShown] = useState(value);
-  if (shown !== value) {
-    setShown(value);
-    if (!isEdited) {
-      setText(value);
-    }
-  }
+  useStoredValue(value, isEdited, setText);
   // What an unmount must still save: the text typed and not yet saved, and who hears it.
   const pendingRef = useRef<null | string>(null);
   const latestRef = useRef({ isDraft, onTime, value });
@@ -59,6 +97,7 @@ const useTypedTime = ({
     },
     [],
   );
+  useUnreadableCheck(pendingRef, latestRef, setIsWrong);
   const commit = (): void => {
     if (!isEdited) {
       setText(value);

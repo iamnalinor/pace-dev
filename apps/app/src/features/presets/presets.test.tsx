@@ -152,6 +152,20 @@ describe("PresetScreen", () => {
     });
   });
 
+  it("refuses Save while a typed time cannot be read, and says so under the field (R27-02)", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    const before = presetOf(runtime, "work")?.definition;
+    await renderScreen(<PresetScreen from={undefined} id="work" />, runtime);
+    const field = en("presets.field.recurrence");
+    await fireEvent.press(screen.getByRole("switch", { name: en("presets.override", { field }) }));
+    await fireEvent.press(screen.getByRole("switch", { name: en("presets.repeats") }));
+    await fireEvent.changeText(screen.getByLabelText(en("presets.issuedAt")), "2500");
+    await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
+    expect(screen.getByRole("alert")).toHaveTextContent(en("day.badTime"));
+    expect(router.back).not.toHaveBeenCalled();
+    expect(presetOf(runtime, "work")?.definition).toEqual(before);
+  });
+
   it("keeps focus through the delete confirmation: onto Cancel, saying the question, and back (bug class 5)", async () => {
     await renderScreen(
       <PresetScreen from={undefined} id="deferred" />,

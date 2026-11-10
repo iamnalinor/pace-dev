@@ -4,10 +4,8 @@ import { Text, type TextInput, View } from "react-native";
 import { useAppState, useLanguage, usePace, useT } from "#app/app-state.tsx";
 import { errorText } from "#app/format/action-error.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
-import { Button } from "#app/ui/button.tsx";
-import { useConfirmFocus } from "#app/ui/confirm-focus.ts";
-import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
+import { type TimeChecks, TimeCheckScope, useTimeChecks } from "#app/ui/time-check.tsx";
 import { toastQuote, useToast } from "#app/ui/toast.tsx";
 import { useDiscardDraft } from "#app/ui/use-draft.ts";
 import { IS_TOUCH_BROWSER } from "#app/ui/use-hotkey.tsx";
@@ -15,6 +13,7 @@ import { definitionIssues, inheritedOf, newPresetId, type PresetDraft } from "@p
 import { byPresetOrder, newId, presetById, presetLabel, resolvePreset } from "@pace/core";
 
 import { ChoiceChips } from "./choice-chips.tsx";
+import { PresetActions } from "./preset-actions.tsx";
 import { PresetPreview } from "./preset-preview.tsx";
 import { PresetSections } from "./preset-sections.tsx";
 
@@ -94,73 +93,19 @@ const Identity = ({
   );
 };
 
-/**
-Delete asks once more: the preset leaves the pickers (the toast's Undo, or Restore on the deleted
-preset, brings it back). Focus goes to Cancel and back (bug class 5).
-*/
-const DeleteButton = ({
-  name,
-  onDelete,
-}: {
-  readonly name: string;
-  readonly onDelete: () => void;
-}) => {
-  const t = useT();
-  const [isConfirming, setIsConfirming] = useState(false);
-  const focus = useConfirmFocus();
-  const question = t("presets.deleteConfirm", { name });
-  if (!isConfirming) {
-    return (
-      <Button
-        onPress={() => {
-          focus.toCancel();
-          setIsConfirming(true);
-        }}
-        ref={focus.openerRef()}
-        variant="plain"
-      >
-        {t("presets.archive")}
-      </Button>
-    );
-  }
-  return (
-    <View
-      aria-label={question}
-      className="mx-4 mt-4 gap-2 rounded-xl border border-separator bg-cell p-4"
-      role="group"
-    >
-      <Text
-        accessibilityLiveRegion="polite"
-        className="font-sans text-subhead font-normal text-label-primary"
-        role="status"
-      >
-        {question}
-      </Text>
-      <SheetActions
-        cancelLabel={t("common.cancel")}
-        cancelRef={focus.cancelRef(question)}
-        onCancel={() => {
-          focus.toOpener();
-          setIsConfirming(false);
-        }}
-        onPrimary={onDelete}
-        primaryLabel={t("common.delete")}
-      />
-    </View>
-  );
-};
-
 /** Saving and deleting a draft: what each refuses and says (the name's refusals on the Name field). */
 const usePresetWrites = ({
   draft,
   isNew,
   nameError,
   onDone,
+  times,
 }: {
   readonly draft: PresetDraft;
   readonly isNew: boolean;
   readonly nameError: ReturnType<typeof useNameError>;
   readonly onDone: () => void;
+  readonly times: TimeChecks;
 }) => {
   const t = useT();
   const { actions } = usePace();
@@ -203,6 +148,10 @@ const usePresetWrites = ({
       });
     },
     save: async (): Promise<void> => {
+      // A time typed and not readable refuses Save, said under its field (R27-02).
+      if (!times.isAllRead()) {
+        return;
+      }
       if (draft.name.trim() === "") {
         refuseName(t("presets.nameRequired"));
         return;
@@ -262,10 +211,12 @@ export const PresetForm = ({
   // The name typed and not saved survives a reload (feedback 5 item 7); saved or deleted, it goes.
   const nameDraftKey = `preset.${isNew ? "new" : initial.id}.name`;
   const discardDraft = useDiscardDraft();
+  const times = useTimeChecks();
   const { issues, problem, remove, save } = usePresetWrites({
     draft,
     isNew,
     nameError,
+    times,
     onDone: () => {
       discardDraft(nameDraftKey);
       onDone();
@@ -295,15 +246,17 @@ export const PresetForm = ({
         }}
       />
       <PresetPreview draft={draft} />
-      <PresetSections
-        definition={draft.definition}
-        inherited={inheritedOf(presets, draft)}
-        inheritedHint={inheritedHint}
-        issues={issues}
-        onChange={(definition) => {
-          setDraft({ ...draft, definition });
-        }}
-      />
+      <TimeCheckScope checks={times}>
+        <PresetSections
+          definition={draft.definition}
+          inherited={inheritedOf(presets, draft)}
+          inheritedHint={inheritedHint}
+          issues={issues}
+          onChange={(definition) => {
+            setDraft({ ...draft, definition });
+          }}
+        />
+      </TimeCheckScope>
       {problem === null ? null : (
         <Text
           accessibilityRole="alert"
@@ -312,10 +265,11 @@ export const PresetForm = ({
           {problem}
         </Text>
       )}
-      <View className="gap-2 px-4 pt-4">
-        <Button onPress={() => void save()}>{t("common.save")}</Button>
-        {canDelete ? <DeleteButton name={draft.name} onDelete={() => void remove()} /> : null}
-      </View>
+      <PresetActions
+        name={canDelete ? draft.name : null}
+        onDelete={() => void remove()}
+        onSave={() => void save()}
+      />
     </View>
   );
 };
