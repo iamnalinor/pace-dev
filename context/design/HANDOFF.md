@@ -6,6 +6,19 @@ full decision log is [`overhaul-ledger.md`](overhaul-ledger.md) (a copy of the p
 working ledger; its last lines are the most recent rulings).
 
 
+## 000. Session 2026-11-09/10: finish of PR #54, then a freeze
+
+- **What was done.** Feedback round 5 was implemented. QA rounds 24–28 ran, each with a code review alongside, and every round's mediums and highs were fixed. There was no blocker or high from round 24 onwards. Bug lessons run up to 249; 250+ belongs to PR #55.
+- **Freeze (owner, 2026-11-10).** After round 28 the owner stopped further QA rounds so that #54 can merge. Round 28's findings and its code review were fixed (TDD) and checked locally:
+  - unit, app and api tests pass;
+  - lint is clean;
+  - the full e2e listed all 257 tests. One latency sample was over its ceiling under suite load; the single-file re-run was clean.
+- **What no QA round has verified yet.** The fixes of rounds 27–28 and both code reviews, the split rule and the screenshot design review of the late changes. All of it is listed in [`../stage-8/recheck-after-freeze.md`](../stage-8/recheck-after-freeze.md), with severity for what was left unfixed. Run that checklist as the first QA pass after the merge.
+- **Owner decisions in this session:**
+  - tap latency (R23-03/R25-03/R26) is a separate task after #54 merges;
+  - a past activity logged over occupied time always cuts or splits its neighbour (R27-05; see `../stage-8/briefs/feedback-5-brief.md`);
+  - the freeze itself.
+
 ## 00. Session 2026-11-05/06 (opencode; controller Opus, implementers Sonnet)
 
 **Owner's rules for this run:** PR B only (do not start PR C), never merge without the owner; no QA round;
@@ -231,7 +244,7 @@ landscape (the rail scrolls to Settings at ~844×390, the cutout and gesture are
 nor the content, a compact ListRow stays ≥ 48 dp); reduced motion.
 
 ## 7. Open items for the owner
-- Tap latency 120–300 ms at 4× CPU (Task 5.6).
+- Tap latency 120–300 ms at 4× CPU (Task 5.6): deferred by the owner to a separate task after #54 merges.
 - Visual choices to confirm: Week blocks as a light tint with dark ink; icon tile `#0D0F15`.
 
 ## 8. How to resume
