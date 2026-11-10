@@ -1,6 +1,9 @@
 import { render } from "@testing-library/react-native";
 
+import { DatePanel } from "#app/shared/task-fields/date-field.tsx";
 import { FormAlert } from "#app/shared/task-fields/form-alert.tsx";
+import { renderScreen } from "#app/test/render.tsx";
+import { createTestRuntime } from "#app/test/runtime.ts";
 
 import { firstOfTick, RevealContext, revealIn } from "./overlay-reveal.ts";
 import { TextField } from "./text-field.tsx";
@@ -89,5 +92,19 @@ describe("several messages at once, and a message that changes (review M1, M2)",
     const { rerender } = await render(ui("Type a time like 09:30."));
     await rerender(ui("This runs into the next activity."));
     expect(reveal).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("a panel that unfolds in a sheet (QA round 27 R27-06)", () => {
+  it("asks to be revealed whole as it opens", async () => {
+    const reveal = jest.fn<undefined, [unknown]>();
+    await renderScreen(
+      <RevealContext value={reveal}>
+        <DatePanel kind="due" onChange={jest.fn()} onClose={jest.fn()} value={null} />
+      </RevealContext>,
+      await createTestRuntime({ world: "empty" }),
+    );
+    expect(reveal).toHaveBeenCalledTimes(1);
+    expect(reveal.mock.calls[0]?.[0]).not.toBeNull();
   });
 });

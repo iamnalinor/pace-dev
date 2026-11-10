@@ -6,6 +6,7 @@ import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
 import { Calendar } from "#app/ui/calendar.tsx";
 import { Chip } from "#app/ui/chip.tsx";
+import { useRevealOnShow } from "#app/ui/overlay-reveal.ts";
 import { TimeCheckScope, useTimeChecks } from "#app/ui/time-check.tsx";
 import { TimeInput } from "#app/ui/time-input.tsx";
 
@@ -117,6 +118,8 @@ export const DatePanel = ({
   const shown = due === null ? { date: null, time: DEFAULT_TIME[kind] } : wallClock(due.at, tz);
   const { time } = shown;
   const times = useTimeChecks();
+  // Unfolded in a sheet, the panel scrolls whole into view above the pinned Save (R27-06).
+  const panelRef = useRevealOnShow("date-panel");
   const set = (date: string, at: string): void => {
     const instant = fromWallClock({ date, time: at, tz });
     if (instant !== null) {
@@ -124,7 +127,7 @@ export const DatePanel = ({
     }
   };
   return (
-    <View className="gap-3 rounded-xl border border-separator bg-app p-3">
+    <View className="gap-3 rounded-xl border border-separator bg-app p-3" ref={panelRef}>
       <Calendar
         labels={{ next: t("calendar.nextMonth"), previous: t("calendar.previousMonth") }}
         language={viewer.language}
