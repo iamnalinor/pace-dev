@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
   type Checkpoint,
+  CHECKPOINT_VERSION,
   checkpointCutoff,
   createCheckpoint,
   err,
@@ -168,7 +169,7 @@ export class HistorySync {
     if (!hasValidBounds(input, latest)) {
       return err("sync/invalid-cursor");
     }
-    if (input.checkpointVersion !== 1 && input.through === undefined) {
+    if (input.checkpointVersion !== CHECKPOINT_VERSION && input.through === undefined) {
       return ok({ ...(await listPage(this.#options.db, input.since, input.limit)), storeId });
     }
     if (input.since > latest) {

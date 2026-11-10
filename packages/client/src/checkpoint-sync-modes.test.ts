@@ -139,6 +139,82 @@ describe("the outbox of a checkpoint copy", () => {
   });
 });
 
+describe("a long-lived tab on a server that rolls back under it (bug-lessons 362)", () => {
+  it("asks the server what it offers again after a run fails on the contract, then syncs the legacy way", async () => {
+    const server = await checkpointServer();
+    const disk = await ownedDisk();
+    const rollback = { isDone: false };
+    const pull = server.routes["GET /api/sync/pull"];
+    const { client, fake } = await startClient(server, disk, {
+      routes: {
+        // An older deploy: it knows no `checkpointVersion` and answers a plain legacy page.
+        "GET /api/sync/pull": (request) => {
+          const answer = pull?.(request) as Record<string, unknown>;
+          if (!rollback.isDone || answer instanceof Response) {
+            return answer;
+          }
+          const { records: _records, ...legacy } = answer;
+          return legacy;
+        },
+      },
+    });
+    await client.sync.syncNow();
+    expect((await disk.readMeta()).coverage).toBe("checkpoint");
+    rollback.isDone = true;
+    delete server.options.historyCheckpoint;
+    const written = await client.state.dispatch(languageChange);
+
+    // The run that meets the older contract fails; the next one asks the server again.
+    expect(await client.sync.syncNow()).toMatchObject({ ok: false });
+    expect(await client.sync.syncNow()).toMatchObject({ ok: true, value: { pushed: 1 } });
+    expect(fake.pathsCalled("/api/instance")).toHaveLength(2);
+    expect(await disk.readMeta()).toMatchObject({ coverage: "full", cursor: 2 });
+    expect(server.log().map((event) => event.id)).toEqual([
+      old.id,
+      written.ok ? written.value.id : "",
+    ]);
+    // Settled: the next run is one pull, no new negotiation.
+    const calls = fake.calls.length;
+    expect(await client.sync.syncNow()).toEqual({ ok: true, value: { pulled: 0, pushed: 0 } });
+    expect(fake.calls.slice(calls).map((call) => call.path)).toEqual(["/api/sync/pull"]);
+    client.close();
+  });
+});
+
+describe("a full copy whose schema upgrade was cut off (bug-lessons 363)", () => {
+  it("keeps the legacy run and its whole log: a rewound cursor is not a copy that never pulled", async () => {
+    const server = await checkpointServer();
+    server.append([newer]);
+    const disk = await ownedDisk();
+    const first = await startClient(server, disk);
+    await first.client.sync.syncNow();
+    expect(await first.client.history.ensureComplete()).toEqual({ ok: true, value: undefined });
+    first.client.close();
+    // What `upgradeCursor` leaves when the app stops between its rewind and the pull after it.
+    const guard = await disk.readMeta();
+    const rewound = await disk.applyLegacyPage({
+      guard,
+      storeId: "one",
+      since: 0,
+      seq: 0,
+      events: [],
+      syncVersion: guard.syncVersion + 1,
+    });
+    expect(rewound).toMatchObject({ ok: true });
+    expect(await disk.readMeta()).toMatchObject({ coverage: "full", cursor: 0, storeId: "one" });
+
+    const second = await startClient(server, disk);
+    expect(await second.client.sync.syncNow()).toMatchObject({ ok: true });
+    expect(second.fake.pathsCalled("/api/sync/bootstrap")).toEqual([]);
+    expect(await disk.readMeta()).toMatchObject({ coverage: "full", cursor: 2 });
+    expect(second.client.state.store.getState()).toMatchObject({
+      historyCoverage: "full",
+      log: [old, newer],
+    });
+    second.client.close();
+  });
+});
+
 /** A device with a checkpoint copy and one action written offline, as its last run left it. */
 const stale = async () => {
   const server = await checkpointServer();

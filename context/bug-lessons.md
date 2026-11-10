@@ -1917,6 +1917,8 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-10 | PR 55 follow-up review, item 1: on a checkpoint copy the archive toast's Undo (`undoArchive`) never loaded the history: it staged with `state.stage` below `stageEmit` and answered a refusal, the copy stayed a checkpoint | 360 (new) | yes: every action that writes `event.revoked` / `event.amended` (revoke, revokeAll, undoLast, deleteTask, discardInbox, unmarkDone, deleteActivity, confirm/undo an automatic outcome, startSeriesForTask, restorePreset, undoArchive); only `undoArchive` called below the shared path | `corrections-checkpoint.test.ts` (each action: one load, success, the same event types as a full copy); ESLint `state.stage(` ban in `actions/` (`eslint-scoped-bans.test.ts`) |
 | 2026-11-10 | PR 55 follow-up review, item 2: `restorePreset` read `state.events` before the history was loaded, so on a checkpoint copy (the archive in the base) it answered `action/nothing-to-do` | 118, 360 | yes: the actions that read the log for a target (deleteTask, discardInbox, deleteActivity, unmarkDone, startSeriesForTask) read it after the wait; `confirmAutoOutcome` checked "confirmed already" only before it and now asks again in the queue | `corrections-checkpoint.test.ts` (restorePreset case; two confirms at once write one amendment) |
 | 2026-11-10 | PR 55 follow-up review, item 3: one event this build cannot read in a checkpoint copy's tail, then any correction, stopped the copy's sync for good: the strict source read failed the run before its push, the outbox never left and every run repeated the same requests | 361 (new), 300 | yes: every place the checkpoint run asks for the complete source (`retryPage`, `sourceBootstrap`, `acceptSource`); the History screen and export keep the strict read | `checkpoint-sync-tail.test.ts` (HTTP and socket: the copy turns full, the outbox is sent, the next run is one pull) |
+| 2026-11-10 | PR 55 follow-up review, item 5: a long-lived tab kept the checkpoint run after a deploy rollback or a version bump and failed every run until a reload; the server's pull compared with a literal `1` | 362 (new), 270 | yes: the one cached negotiation on the client (`isOffered`); the other version comparisons on the server already use `CHECKPOINT_VERSION` | `checkpoint-sync-modes.test.ts` (rollback under a running tab: one failed run, then the legacy run settles) |
+| 2026-11-10 | PR 55 follow-up review, item 6: a full copy whose `upgradeCursor` rewind was cut off before its pull was read as never pulled and cut down to a checkpoint | 363 (new), 300 | yes: `isCheckpointRun` and `requiresBootstrap` were the two readers of "has pulled" | `checkpoint-sync-modes.test.ts` (rewound full copy: no bootstrap, whole log kept) |
 
 ### 125. A live region around a ticking value
 - **Bug.** PR B 4.2 (F-A11Y-10): the running row sat in `accessibilityLiveRegion="polite"` around the
@@ -3337,3 +3339,30 @@ New bugs go here with their class; a new class gets its own section above.
   with a pull). The History screen and export still read strictly. `checkpoint-sync-tail.test.ts`
   "becomes a full copy the tolerant way…" (HTTP and socket): after the run the copy is full and the
   outbox sent, and the next run makes exactly one request, a pull.
+
+### 362. A negotiated capability cached for as long as the runtime lives
+- **Bug.** PR 55 follow-up review, item 5: whether the server offers checkpoints was asked once per
+  runtime (`isOffered`). A deploy rollback or a `CHECKPOINT_VERSION` bump left a long-lived tab on
+  the checkpoint run, failing every run on a contract the server no longer spoke, until a reload.
+  On the server, `pull` compared the asked version with a literal `1`, not with `CHECKPOINT_VERSION`.
+- **Missed because.** The mode tests restart the client between server answers (class 300), so
+  each start negotiated afresh; none changed the server under a running tab.
+- **Rule.** A capability learned from the server is a guess that a failure on its contract
+  invalidates: the cache is dropped when a run fails that way, and the next run asks again. A
+  version compared on both sides is the shared constant on both sides.
+- **Sweep and guard.** `checkpoint-sync.ts` clears `runtime.negotiated` on a contract error (a page
+  or checkpoint out of shape, an unknown route or parameter); `history-sync.ts` compares with
+  `CHECKPOINT_VERSION`. `checkpoint-sync-modes.test.ts` "a long-lived tab on a server that rolls
+  back under it": one failed run, then the legacy run sends the outbox and the copy settles.
+
+### 363. Progress judged by a field an interrupted step rewinds
+- **Bug.** PR 55 follow-up review, item 6: "has this copy pulled?" was read as `cursor !== 0`. The
+  legacy run's schema upgrade (`upgradeCursor`) rewinds a full copy's cursor to 0 in its own
+  transaction before pulling again; cut off between the two (the app closed), the next run read the
+  full copy as one that never pulled, bootstrapped it and cut it down to a checkpoint.
+- **Missed because.** Upgrade tests ran the rewind and the pull in one run; no test restarted in
+  between.
+- **Rule.** A decision about a copy's history reads a field only its first pull sets and nothing
+  rewinds (`storeId`), not one a resumable step moves back and forth.
+- **Sweep and guard.** `isCheckpointRun` and `requiresBootstrap` read `storeId`.
+  `checkpoint-sync-modes.test.ts` "a full copy whose schema upgrade was cut off".

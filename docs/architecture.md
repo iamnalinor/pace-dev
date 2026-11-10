@@ -395,7 +395,9 @@ that has pulled nothing yet starts from a checkpoint instead of the whole log:
   (`installHistory`); the copy is `coverage: "full"` from then on.
 - Which run a copy takes is decided per run from its meta (`CheckpointSync.enabled`): the
   checkpoint run when the server offers checkpoints and the copy is built on one or has pulled
-  nothing; the legacy run otherwise. A full copy that has pulled is never bootstrapped again or
+  nothing (no `storeId` yet: the cursor alone is not proof, a schema upgrade rewinds it); the
+  legacy run otherwise. What the server offers is asked once per runtime and asked again after a
+  run fails on the checkpoint contract (a rollback or a version bump under a long-lived tab). A full copy that has pulled is never bootstrapped again or
   cut down to a checkpoint. A checkpoint copy on a server that stopped offering them (the flag
   rolled back, or a version this build reads as none) is turned into a full one by the legacy
   run: a pull from 0 whose first page replaces the base and keeps the outbox. Both runs push
