@@ -5,7 +5,8 @@ import { typeTime } from "@pace/client";
 
 import { useT } from "../app-state.tsx";
 import { cx } from "./cx.ts";
-import { boxClass, ErrorMessage, FocusRing } from "./text-field.tsx";
+import { ErrorMessage } from "./field-error.tsx";
+import { boxClass, FocusRing } from "./text-field.tsx";
 import { useTheme } from "./theme-provider.tsx";
 
 /**

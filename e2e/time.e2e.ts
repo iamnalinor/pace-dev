@@ -429,3 +429,35 @@ test("the phone's activity sheet keeps Save in view without a scroll, Delete bel
   await expect(save).toBeInViewport({ ratio: 1 });
   await expect(page.getByRole("button", { name: "Delete activity" })).toBeAttached();
 });
+
+test("the phone's activity sheet scrolls an error under To into view above the pinned Save (QA round 26 R26-01)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 844, width: 390 });
+  // Yesterday noon on the page's clock: Log past offers 11:30–12:00.
+  const noon = new Date();
+  noon.setDate(noon.getDate() - 1);
+  noon.setHours(12, 0, 0, 0);
+  await page.clock.setFixedTime(noon);
+  await loginViaApi(page);
+  await page.goto("/day");
+  const save = page.getByRole("button", { exact: true, name: "Save" });
+  await page.getByRole("button", { name: "Log past activity" }).click();
+  await page.getByLabel("What", { exact: true }).fill("Commute");
+  await save.click();
+  await expect(page.getByRole("button", { name: /Commute/u })).toBeVisible();
+  // 10:00 to noon runs into Commute: said under To, four lines in its half of the row.
+  await page.getByRole("button", { name: "Log past activity" }).click();
+  await page.getByLabel("What", { exact: true }).fill("Nap");
+  await page.getByLabel("From", { exact: true }).fill("10:00");
+  const body = page.getByTestId("overlay-body");
+  expect(await body.evaluate((element) => element.scrollTop)).toBe(0);
+  await save.click();
+  const error = page
+    .getByRole("alert")
+    .filter({ hasText: "That runs into the next activity: move its start first." });
+  await expect(error).toBeInViewport({ ratio: 1 });
+  // Whole above the footer's Save, not under it: the body moved to show it.
+  await expect.poll(async () => await gapAbove(error, save)).toBeGreaterThanOrEqual(0);
+  expect(await body.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+});

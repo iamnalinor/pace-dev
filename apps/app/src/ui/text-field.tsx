@@ -5,6 +5,7 @@ import { typeRole } from "@pace/core";
 
 import { submitFieldProps } from "../platform/enter-key.ts";
 import { cx } from "./cx.ts";
+import { ErrorMessage } from "./field-error.tsx";
 import { FieldLabel } from "./field-label.tsx";
 import { Icon } from "./icon.tsx";
 import { useSheetSubmit } from "./sheet-submit.tsx";
@@ -113,20 +114,6 @@ export const FocusRing = () => (
     pointerEvents="none"
     testID="text-field-ring"
   />
-);
-
-/** The error under the field, with its glyph, announced once (polite). */
-export const ErrorMessage = ({ error, id }: { readonly error: string; readonly id: string }) => (
-  <View className="flex-row items-start gap-1" nativeID={id} testID="text-field-message">
-    <Icon name="triangle-alert" size="inline" tone="danger" />
-    <Text
-      accessibilityLiveRegion="polite"
-      className="shrink font-sans text-footnote text-danger"
-      role="alert"
-    >
-      {error}
-    </Text>
-  </View>
 );
 
 /** The hint under the field. */
