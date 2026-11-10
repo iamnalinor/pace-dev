@@ -93,7 +93,7 @@ describe("HistoryScreen", () => {
     const revoke = jest.spyOn(runtime.actions, "revoke");
     await renderScreen(<HistoryScreen />, runtime);
 
-    const [firstUndo] = screen.getAllByRole("button", { name: en("common.undo") });
+    const [firstUndo] = screen.getAllByRole("button", { name: /^Undo: /u });
     if (firstUndo === undefined) {
       throw new Error("no History Undo button");
     }
@@ -107,7 +107,7 @@ describe("HistoryScreen", () => {
     expect(revoke).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: en("history.undoConfirm") })).toBeNull();
 
-    const [secondUndo] = screen.getAllByRole("button", { name: en("common.undo") });
+    const [secondUndo] = screen.getAllByRole("button", { name: /^Undo: /u });
     if (secondUndo === undefined) {
       throw new Error("no History Undo button after Cancel");
     }
@@ -123,7 +123,7 @@ describe("HistoryScreen", () => {
   it("shows the board and the events, each undoable", async () => {
     await renderScreen(<HistoryScreen />, await createTestRuntime());
     expect(screen.getByRole("header", { name: en("history.title") })).toBeOnTheScreen();
-    expect(screen.getAllByRole("button", { name: en("common.undo") }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: /^Undo: /u }).length).toBeGreaterThan(0);
     // Today is offered only away from now (F-CPY-06).
     expect(screen.queryByRole("button", { name: en("period.today") })).toBeNull();
     await fireEvent.press(screen.getByRole("button", { name: en("history.dayBack") }));

@@ -99,7 +99,7 @@ const ProjectTitle = ({ project }: { readonly project: ProjectViewModel }) => (
 /** A project: its name and figures, then its tasks as on Now: open, in future, done (each one opens). */
 export const ProjectScreen = ({ id }: { readonly id: string }) => {
   const t = useT();
-  const back = useBack();
+  const back = useBack("/projects");
   const view = usePace().hooks.useProjectView(id);
   const [isEditing, setIsEditing] = useState(false);
   const backProps = { backLabel: t("common.back"), onBack: back };

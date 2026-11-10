@@ -1,9 +1,9 @@
-import { useRouter } from "expo-router";
 import { View } from "react-native";
 
 import { useAppState, useLanguage, usePace, useT } from "#app/app-state.tsx";
 import { PresetForm } from "#app/features/presets/preset-form.tsx";
 import { PushedScreen } from "#app/screens/pushed-screen.tsx";
+import { useLeave } from "#app/shared/use-back.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button } from "#app/ui/button.tsx";
 import { EmptyState } from "#app/ui/empty-state.tsx";
@@ -42,19 +42,13 @@ export const PresetScreen = ({
 }) => {
   const t = useT();
   const language = useLanguage();
-  const router = useRouter();
   const presets = useAppState((state) => state.presets);
-  const done = (): void => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace("/presets");
-    }
-  };
+  // Save, Delete and Back go to the list it was opened from, a pasted link too (R25-12).
+  const done = useLeave("/presets");
   if (id === "new") {
     const parent = from === undefined ? undefined : presetById(presets, from);
     return (
-      <PushedScreen title={t("presets.new")}>
+      <PushedScreen parent="/presets" title={t("presets.new")}>
         <PresetForm
           canDelete={false}
           initial={newDraft(parent?.id ?? "hw")}
@@ -68,20 +62,20 @@ export const PresetScreen = ({
   const preset = presetById(presets, id);
   if (preset === undefined) {
     return (
-      <PushedScreen title={t("presets.title")}>
+      <PushedScreen parent="/presets" title={t("presets.title")}>
         <EmptyState title={t("presets.notFound")} />
       </PushedScreen>
     );
   }
   if (preset.archived) {
     return (
-      <PushedScreen title={presetLabel(preset, language)}>
+      <PushedScreen parent="/presets" title={presetLabel(preset, language)}>
         <DeletedPreset id={preset.id} />
       </PushedScreen>
     );
   }
   return (
-    <PushedScreen title={presetLabel(preset, language)}>
+    <PushedScreen parent="/presets" title={presetLabel(preset, language)}>
       <PresetForm
         canDelete={preset.id !== "inbox"}
         initial={editorDraft(preset, language)}

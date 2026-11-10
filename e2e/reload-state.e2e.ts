@@ -343,3 +343,15 @@ test.describe("Back and forward follow the screen (feedback 5 item 6, QA round 2
     await expect(page).toHaveURL(earlier);
   });
 });
+
+test("a pasted link to a new preset saves back to the presets, not to Now (QA round 25 R25-12)", async ({
+  page,
+}) => {
+  await page.setViewportSize(DESKTOP);
+  await loginViaApi(page);
+  await page.goto("/presets/new?from=work");
+  await page.getByLabel("Name", { exact: true }).fill("Course work");
+  await page.getByRole("button", { exact: true, name: "Save" }).click();
+  await expect(page).toHaveURL(/\/presets$/u);
+  await expect(page.getByRole("link", { name: /^Course work/u })).toBeVisible();
+});

@@ -67,6 +67,13 @@ export const router = {
   setParams,
 };
 
+/** The navigator the screen sits in, as `useNavigation().getState()` reads it (none by default). */
+export const navigatorState: {
+  current:
+    | undefined
+    | { readonly index: number; readonly routes: readonly { readonly name: string }[] };
+} = { current: undefined };
+
 /** The hrefs a `<Redirect>` was rendered with, for assertions. */
 export const redirected = jest.fn<undefined, [string]>();
 
@@ -97,4 +104,6 @@ export const routerModule = () => ({
   useIsFocused: () => true,
   // eslint-disable-next-line @eslint-react/no-unnecessary-use-prefix -- stands in for expo-router's hook of this name
   useRouter: () => router,
+  // eslint-disable-next-line @eslint-react/no-unnecessary-use-prefix -- stands in for expo-router's hook of this name
+  useNavigation: () => ({ getState: () => navigatorState.current }),
 });

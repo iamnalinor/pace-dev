@@ -73,6 +73,7 @@ beforeEach(() => {
   const fake = jest.requireActual<typeof RouterFake>("./src/test/router.ts");
   fake.setSearchParams({});
   fake.paramsSet.mockClear();
+  fake.navigatorState.current = undefined;
 });
 
 // A phone's window (390 × 844, the design's phone) unless a test says otherwise: React Native's

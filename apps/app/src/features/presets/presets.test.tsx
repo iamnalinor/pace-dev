@@ -5,7 +5,7 @@ import type { PaceRuntime } from "#app/runtime.ts";
 import { PresetScreen } from "#app/features/presets/preset-screen.tsx";
 import { isControl } from "#app/test/focus-target.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
-import { router } from "#app/test/router.ts";
+import { navigatorState, router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 
 import { PresetsList } from "./presets-list.tsx";
@@ -180,6 +180,34 @@ describe("PresetScreen", () => {
     });
     // Restored, it is the ordinary form again.
     expect(await screen.findByRole("button", { name: en("common.save") })).toBeOnTheScreen();
+  });
+
+  it("goes to the list on Save when opened from a pasted link, not to Now (QA round 25 R25-12)", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    // A link straight on /presets/new: More's list is the only screen under it.
+    navigatorState.current = { index: 1, routes: [{ name: "more" }, { name: "presets/[id]" }] };
+    await renderScreen(<PresetScreen from="work" id="new" />, runtime);
+    await fireEvent.changeText(screen.getByLabelText(en("presets.name")), "Course work");
+    await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
+    await waitFor(() => {
+      expect(router.replace).toHaveBeenCalledWith("/presets");
+    });
+    expect(router.back).not.toHaveBeenCalled();
+  });
+
+  it("goes back to where it was opened from on Save when that is in the app", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    navigatorState.current = {
+      index: 2,
+      routes: [{ name: "more" }, { name: "presets/index" }, { name: "presets/[id]" }],
+    };
+    await renderScreen(<PresetScreen from="work" id="new" />, runtime);
+    await fireEvent.changeText(screen.getByLabelText(en("presets.name")), "Course work");
+    await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
+    await waitFor(() => {
+      expect(router.back).toHaveBeenCalled();
+    });
+    expect(router.replace).not.toHaveBeenCalled();
   });
 
   it("creates a preset under an id from its name, which nobody types (QA round 18 L4)", async () => {
