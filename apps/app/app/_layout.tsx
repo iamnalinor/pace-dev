@@ -3,7 +3,6 @@ import "../global.css";
 import { type ErrorBoundaryProps, Stack, usePathname } from "expo-router";
 import { ShareIntentProvider } from "expo-share-intent";
 import { StatusBar } from "expo-status-bar";
-import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -21,25 +20,32 @@ import { UpdateBanner } from "#app/platform/update-banner.tsx";
 import "#app/platform/push-task.ts";
 import { useCrashContext } from "#app/platform/use-crash-context.ts";
 import { CrashScreen } from "#app/screens/crash-screen.tsx";
-import { useIsWide } from "#app/ui/layout.ts";
+import { Navigation } from "#app/ui/navigation.tsx";
 import { ScreenScene } from "#app/ui/screen-scene.tsx";
 import { useIsScrimUp } from "#app/ui/scrim.ts";
-import { Sidebar } from "#app/ui/sidebar.tsx";
+import { Shell } from "#app/ui/shell.tsx";
 import { SyncFrame } from "#app/ui/sync-frame.tsx";
 import { ThemeProvider, useTheme } from "#app/ui/theme-provider.tsx";
 import { ToastProvider } from "#app/ui/toast.tsx";
 import { TooltipHost } from "#app/ui/tooltip.tsx";
+import { useBreakpoint } from "#app/ui/use-breakpoint.ts";
+import { seedReducedMotion } from "#app/ui/use-reduced-motion.ts";
+
+// Reduced motion is asked once, as the app starts, so the first overlay already plays the right
+// preset (UI review I1).
+void seedReducedMotion();
 
 /**
-On a wide window the sidebar stays beside every signed-in screen, pushed ones included; not
-beside the versions screen, which leaves only Log out.
+Beside a tablet's or a computer's window the navigation (the rail, the sidebar) stays beside every
+signed-in screen, pushed ones included; not beside the versions screen, which leaves only Log out.
+A phone navigates by the tabs' bar instead.
 */
-const useHasSidebar = (): boolean => {
-  const isWide = useIsWide();
+const useHasNavigation = (): boolean => {
+  const breakpoint = useBreakpoint();
   const path = usePathname();
   const { status } = useAuth();
   const isBlocked = useIsServerBlocked();
-  return isWide && status === "signed-in" && !isBlocked && !isBarePath(path);
+  return breakpoint !== "compact" && status === "signed-in" && !isBlocked && !isBarePath(path);
 };
 
 /** Keeps what a crash file says about the app current; apart, so syncs do not redraw the Stack. */
@@ -56,19 +62,18 @@ const AppDocumentTheme = () => {
 
 const Navigator = () => {
   const { palette, scheme } = useTheme();
-  const hasSidebar = useHasSidebar();
+  const hasNavigation = useHasNavigation();
   const path = usePathname();
   useCrashNotice();
   return (
     <UpdateBanner>
       <SyncFrame isBare={isBarePath(path)}>
-        <View className="flex-1 flex-row bg-app">
-          <CrashContext />
-          <DocumentLanguage />
-          <DocumentHead />
-          <AppDocumentTheme />
-          {hasSidebar ? <Sidebar /> : null}
-          <View className="flex-1">
+        <CrashContext />
+        <DocumentLanguage />
+        <DocumentHead />
+        <AppDocumentTheme />
+        <Shell
+          content={
             <NavigatorHold>
               <Stack
                 // A signed-in app its server does not fit sees the versions screen instead of any
@@ -92,24 +97,18 @@ const Navigator = () => {
                 <Stack.Screen name="login" options={{ animation: "fade" }} />
                 <Stack.Screen name="auth/index" options={{ animation: "fade" }} />
                 <Stack.Screen name="task/[id]" />
-                <Stack.Screen name="project/[id]" />
-                <Stack.Screen name="projects" />
-                <Stack.Screen name="week" />
-                <Stack.Screen name="insights" />
-                <Stack.Screen name="settings" />
                 <Stack.Screen name="review" />
-                <Stack.Screen name="history" />
                 <Stack.Screen name="permissions" />
-                <Stack.Screen name="notifications" />
                 <Stack.Screen
                   name="onboarding"
                   options={{ animation: "fade", gestureEnabled: false }}
                 />
               </Stack>
             </NavigatorHold>
-          </View>
-          <StatusBar style={scheme === "dark" ? "light" : "dark"} />
-        </View>
+          }
+          {...(hasNavigation && { navigation: <Navigation /> })}
+        />
+        <StatusBar style={scheme === "dark" ? "light" : "dark"} />
       </SyncFrame>
     </UpdateBanner>
   );

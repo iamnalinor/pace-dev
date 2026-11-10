@@ -102,3 +102,32 @@ title, Important/ASAP keep their marks; no Pause in the header; delete is an inl
 Undo in the row; Alt+N / Alt+F shortcuts; haptics on; tablet gets the rail and rotation; no
 Material You (our colours on Android too); the time bar's tiles stay visible and only the field
 folds. Sources: spec §12, `context/design/findings.md`.
+
+2026-11-06 (owner): Now's task list is one plain list — tasks with a deadline, one edge-to-edge hairline (a labelled `separator` for screen readers), then tasks without one; no group headers, no preview or «Show all». «In future» stays a fold.
+
+2026-11-06 (owner): Settings sessions show the real device. The server parses the stored User-Agent (`userAgentDetails`: browser + major version, OS + version where the UA carries it, Android model, form factor; unknown parts absent) and the phone app sends brand, model and Android version at login (`expo-device`; optional fields, D1 migration `0009`, old rows null). `GET /api/sessions` returns `device`, with `name` kept for old clients. The row title is the device ("Samsung Galaxy S23", "Chrome 131 on macOS"), the parts the title does not say go under it, and old rows fall back to their name. Left: no tablet icon in the kit (a phone browser gets the smartphone icon), no PWA/standalone detection (the UA does not differ), UA reduction hides macOS/Android model on some Chromes.
+
+2026-11-08 (owner): **colour is never shown as a dot** («по точкам цвет определить невозможно»). A
+coloured chip at rest is its hue's tint under its ink (chosen, the accent like any chip); a
+project, category or running activity in a row leads with a 32 `HueTile` (the hue's tint, an icon in
+its ink); the task page's category is a `Tag`. Status dots that carry no colour meaning (unread,
+the now-line's end) stay. Spec §4.2.6, §4.2.7 and the P1 usage rule are superseded where they say
+"dot".
+
+2026-11-08 (owner): **no profile name in the chrome.** The sidebar's header is the mark, «Pace» and
+the bell; More has no owner row. Settings says «Вы вошли как {name}» above Log out, the one place
+that names the account.
+
+2026-11-09 (owner): **Day's rail lines up with the rows**: one bar beside each row at the row's measured top and height (category tint + stroke pen line, a gap dashed), the red now line inside the row that holds now so the running bar ends on it; decoration hidden from screen readers, no longer a proportional index.
+
+2026-11-09 (owner): **no «Сдача по подзадачам» / submission setting.** The preset field `submission` (`whole` / `per_subtask`) is gone from the preset editor, the task page's tags, MCP and the seeds; a task's check always closes it (with Undo), subtasks are marked done one by one and show progress, and lateness goes by the done subtasks' instants (else the closing time) whatever the preset. Old presets and events that carry the key still parse and it is dropped.
+
+2026-11-09 (owner): **the fourth time-bar tile is «Прочее» / "Misc"**, and its picker holds «Отдых» / "Rest"
+among Short break, Walk, Workout, Nap and Sleep (no choice named after its picker, R22-22).
+EN says "Misc", not "Other", which is a category's name. A workout is expected to take 3 h.
+
+2026-11-09 (owner): **lateness by subtasks only once all are done.** A task closed as done is as late as its latest done subtask only when every subtask is done; while any is left open (or with none) the closing time decides. Core's `doneLateness` is the one rule, read by the outcome and the close sheet's preview.
+
+2026-11-10 (design fixes, B2 follow-up): **the time bar's budget is kept by a compact running card, not by scrolling.** At 390 × 844 with two activities running, the folded field and the four tiles, the bar and the nav bar take at most 40 % of the window (`e2e/time.e2e.ts`). To fit, the running card puts the time so far under the name (beside it the name was cut to three letters in Russian), the Expect beside the time, and an activity alongside is one row: its name, its time and Stop as an icon named «Стоп: …», without the word «параллельно». The large `numeric.live` time gave way to `numeric.value` under the name: the name is the hierarchy's first item and must stay readable. At larger font scales or on smaller windows the spec's later fold steps apply. (The «Ещё занимаетесь?» exemption this note first made is withdrawn: see 2026-11-09, design fixes 2.)
+
+2026-11-09 (design fixes 2, N3): **the budget holds while «Ещё занимаетесь?» asks.** That state is the common one (an activity past twice a ~20 min Expect), and its own row took the bar and the nav bar to 377 of 844 px (44.7 %). While it asks, the question takes the time's line under the name, «Да, ещё» stands before Stop, and Stop yields its word (the alongside rows' filled square on `fill.2`, named «Стоп: …»); answered, the time and Expect come back. «Начать другое» sits on the bar's edge in line with the card and the tiles, and its own target is the air around it (no bar gap above or below). `e2e/time.e2e.ts` asserts the 40 % in this state too.

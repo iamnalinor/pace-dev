@@ -2,7 +2,7 @@
 
 A task in Pace is always the same thing: a title, optional subtasks, a deadline, an
 estimate, a status. A **preset** is the profile that says how a kind of task behaves:
-what happens when the deadline passes, whether it is submitted as a
+what happens when the deadline passes, whether lateness is judged on the
 whole or subtask by subtask, how progress is tracked, whether a new instance appears every
 week, which extra fields the form shows, and when notifications fire.
 
@@ -51,8 +51,12 @@ Rules the editor enforces:
 - Pickers list presets by `order` (then by name): the defaults come as Homework, Work,
   Personal, Deferred; new presets go after them (order 100) unless given another place.
 - A task's progress follows its content, not only the preset: with subtasks it is the share
-  solved (and per-subtask submission applies only then); without subtasks it is the 0–10
-  bar and the task is submitted whole. A preset with `progressMode: none` stays without.
+  done; without subtasks it is the 0–10 bar. A preset with `progressMode: none` stays without.
+- Whether a done task was on time does not depend on the preset: a task with subtasks marked
+  done is judged by those instants (each subtask is marked *done* with its instant; old logs'
+  *solved* and *submitted* both read as done, at the earlier of the two), and the ones left
+  open when the task was closed were not needed; a task without done subtasks is judged by
+  when it was closed. The task's check always closes it (History undoes it).
 
 ## Fields
 
@@ -63,10 +67,9 @@ others differ.
 | Field | Values | Meaning | Default (`hw`) |
 |---|---|---|---|
 | `defaultImportance` | `asap`, `prioritized`, `normal`, `nice_to_have` | Importance a new task starts with: a label shown after the project on every row. Lists are ordered by deadline only, whatever the importance. | `normal` |
-| `deadlinePolicy` | `{ kind: "hard" }` or `{ kind: "resubmission", softDays, finalAt, finalTz }` | **Hard**: when the deadline passes the task is closed as *cancelled (missed)* and you are asked to confirm. **Resubmission**: late work is still welcome; the soft target is `softDays` after the deadline, and `finalAt` (an instant in the zone `finalTz`, or `null` for none) is the hard end. | `hard` |
-| `submission` | `whole`, `per_subtask` | **Whole**: one Done/Submit for the task. **Per subtask**: each subtask is *solved* and then *submitted*; "Submit" sends every solved, unsent subtask at once, and the submission time decides whether it was on time. | `per_subtask` |
-| `progressMode` | `subtasks`, `slider`, `none` | What progress means: the share of subtasks solved, a 0–10 slider, or nothing. | `subtasks` |
-| `recurrence` | `{ issued: { weekday, time }, due: { weekday, time }, tz }` or `null` | Weekly homework rhythm. `weekday` is ISO (1 = Monday … 7 = Sunday), `time` is `HH:MM` on the wall clock of `tz` (an IANA zone such as `Europe/Moscow`). One instance belongs to every ISO week; its deadline is the due slot in the same week when that slot is later than the issued slot, otherwise in the following week (Thursday 09:00 → Thursday 09:00 means a week later). An instance is created at its issue; a course with no open instance gets the next one ahead of its issue (it waits under "In future"), and a week whose deadline passed before the course was added is skipped. An instance that never receives an assignment is closed as *skipped* 24 h after its deadline. | `null` |
+| `deadlinePolicy` | `{ kind: "hard" }` or `{ kind: "resubmission", softDays, finalAt, finalTz }` | **Hard**: the deadline is the end; once it passes the task stays open and reads as overdue (nothing closes it automatically since feedback 5; "To sort" asks what became of it). **Resubmission**: late work is still welcome; the soft target is `softDays` after the deadline, and `finalAt` (an instant in the zone `finalTz`, or `null` for none) is the hard end. | `hard` |
+| `progressMode` | `subtasks`, `slider`, `none` | What progress means: the share of subtasks done, a 0–10 slider, or nothing. | `subtasks` |
+| `recurrence` | `{ issued: { weekday, time }, due: { weekday, time }, tz, firstNumber? }` or `null` | Weekly homework rhythm. `weekday` is ISO (1 = Monday … 7 = Sunday) or its English name (`"wed"`, `"Wednesday"`, any case; stored as the number), `time` is `HH:MM` on the wall clock of `tz` (an IANA zone such as `Europe/Moscow`). One instance belongs to every ISO week; its deadline is the due slot in the same week when that slot is later than the issued slot, otherwise in the following week (Thursday 09:00 → Thursday 09:00 means a week later). An instance is created at its issue; a course with no open instance gets the next one ahead of its issue (it waits under "In future"), and a week whose deadline passed before the course was added is skipped. An instance that never receives an assignment is closed as *skipped* 24 h after its deadline. Instances are titled `<preset name> <n>`, where n = `firstNumber` (default 1) + the instances of the preset already in the store (closed ones counted, revoked ones not). | `null` |
 | `fields.ticket` | `true` / `false` | Show a ticket / reference field. | `false` |
 | `fields.description` | `true` / `false` | Show a free-text description. | `true` |
 | `fields.startAt` | `true` / `false` | Show a start date; a task whose start is in the future waits under "In future" until then. | `false` |
@@ -77,8 +80,9 @@ others differ.
 Stage 6 removed urgency scoring, the waiting status and their settings (`urgencyPolicy`,
 `notify.criticalScore`, `notify.waitingDays`); stage 8 removed the other `notify` thresholds
 (`criticalHours`, `criticalProgress`, `inProgressIdleDays`), which no notification ever read
-(deadlines come in the deadline digest instead). Old presets
-that still carry them parse, and the values are dropped.
+(deadlines come in the deadline digest instead); the owner removed `submission` (`whole` /
+`per_subtask`) on 2026-11-09, since a subtask has one mark, done, with its instant. Old presets
+and events that still carry them parse, and the values are dropped; nothing writes them.
 
 ## Base presets
 
@@ -87,7 +91,6 @@ that still carry them parse, and the values are dropped.
 | Name | Homework | Work | Personal | Deferred | Inbox |
 | `defaultImportance` | `normal` | `normal` | `normal` | `nice_to_have` | `nice_to_have` |
 | `deadlinePolicy` | hard | hard | hard | hard | hard |
-| `submission` | `per_subtask` | `whole` | `whole` | `whole` | `whole` |
 | `progressMode` | `subtasks` | `slider` | `subtasks` | `none` | `none` |
 | `recurrence` | `null` | `null` | `null` | `null` | `null` |
 | `fields` | description | ticket, description, startAt | — | startAt | — |
@@ -96,8 +99,8 @@ that still carry them parse, and the values are dropped.
 
 What they are for:
 
-- **`hw`** — a course's weekly homework: subtasks are the problem numbers, each is solved
-  and then submitted. Course presets extend it with a schedule (see below).
+- **`hw`** — a course's weekly homework: subtasks are the problem numbers, each is marked
+  done when it is done. Course presets extend it with a schedule (see below).
 - **`work`** — a ticket with a start, an optional due date and a 0–10 slider.
 - **`personal`** — errands and small projects with an optional checklist.
 - **`deferred`** — "check the exam grade on the 20th": a start date in the future keeps it
@@ -120,7 +123,7 @@ nothing. Edit or archive them freely.
 | `deadlinePolicy` | resubmission, soft target 7 days after the deadline, no final date yet | hard (inherited) | hard (inherited) |
 | `defaultImportance` | `normal` (inherited) | `normal` (inherited) | `nice_to_have` |
 
-Everything not listed (per-subtask submission, subtasks as progress, the description
+Everything not listed (subtasks as progress, the description
 field, 60-minute estimate, 12-hour critical window, blue) comes from `hw`.
 
 ## Overrides on a task

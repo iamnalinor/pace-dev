@@ -1,12 +1,13 @@
-import { useState } from "react";
-
 import type { NowRow } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { Composer } from "#app/features/now/composer/composer.tsx";
+import { requestNewTask } from "#app/shared/new-task-request.ts";
 import { FoldedSection, TaskRows } from "#app/shared/task-list.tsx";
 import { TimeBar } from "#app/shared/tracking/time-bar.tsx";
+import { useSearchParam } from "#app/shared/use-search-param.ts";
 import { ZoneBanner } from "#app/shared/zone-banner.tsx";
+import { Button } from "#app/ui/button.tsx";
 import { EmptyState } from "#app/ui/empty-state.tsx";
 import { Screen } from "#app/ui/screen.tsx";
 
@@ -28,7 +29,8 @@ export const NowBoard = ({
 }) => {
   const t = useT();
   const { hooks } = usePace();
-  const [projectId, setProjectId] = useState<null | string>(null);
+  // In the address (`?project=<id>`, feedback 5 item 6): a reload keeps the filter.
+  const [projectId, setProjectId] = useSearchParam("project");
   const board = hooks.useNow();
   // A filter whose project has nothing open any more lets go, or the list would stay empty.
   const selected = board.projects.some((chip) => chip.id === projectId) ? projectId : null;
@@ -37,13 +39,23 @@ export const NowBoard = ({
   const future = board.future.filter((row) => isInProject(row));
   const isEmpty = rows.length === 0 && future.length === 0;
   return (
-    <Screen footer={<TimeBar />} header={<NowHeader />}>
+    <Screen anchor="content" footer={<TimeBar />} header={<NowHeader />}>
       {/* On /add (a share) the cursor is in the composer. */}
       <Composer isFocused={isComposerFocused} />
       <ZoneBanner />
       <CalendarPrompt />
       <ProjectChips chips={board.projects} onSelect={setProjectId} selected={selected} />
-      {isEmpty ? <EmptyState>{t("now.empty")}</EmptyState> : null}
+      {isEmpty ? (
+        <EmptyState
+          action={
+            <Button onPress={requestNewTask} variant="secondary">
+              {t("now.emptyAdd")}
+            </Button>
+          }
+          body={t("now.emptyBody")}
+          title={t("now.empty")}
+        />
+      ) : null}
       <NowTaskGroups rows={rows} />
       <FoldedSection count={future.length} title={t("now.future")}>
         <TaskRows animateLayout={false} label={t("now.future")} rows={future} />

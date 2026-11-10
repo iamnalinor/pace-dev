@@ -13,10 +13,9 @@ export type { InboxActions } from "./actions/inbox-actions.ts";
 export type { InstanceActions } from "./actions/instances.ts";
 export type { PresetActions } from "./actions/preset-actions.ts";
 export {
+  archiveInEffect,
   type ProjectActions,
-  type ProjectDraft,
   projectNameError,
-  type ProjectPatch,
 } from "./actions/project-actions.ts";
 export type { ProjectTarget } from "./actions/projects.ts";
 export type { ReviewActions } from "./actions/review-actions.ts";
@@ -38,7 +37,7 @@ export type {
   StopWhen,
   TimeActions,
 } from "./actions/time-actions.ts";
-export type { CloseInput, SubmitInput, WorkActions } from "./actions/work-actions.ts";
+export type { CloseInput, WorkActions } from "./actions/work-actions.ts";
 export { createMemoryEventStore } from "./adapters/memory-event-store.ts";
 export { type ApiClient, ApiError, createApiClient } from "./api-client.ts";
 export { type AiOutcome, type Assistant, type Unread, unreadOf } from "./assistant.ts";
@@ -120,6 +119,14 @@ export {
   requiresAiFirst,
   taskFormOptions,
 } from "./view-models/composer.ts";
+export {
+  dayRail,
+  type DayRail,
+  type RailBar,
+  type RailBlock,
+  type RailEntry,
+  type RailGap,
+} from "./view-models/day-rail.ts";
 export {
   type DayEntry,
   type DayModel,
@@ -269,14 +276,15 @@ export {
   type DayRowProps,
   type FormPartProps,
   hasEnd,
+  readTime,
   type TypedTime,
   typeTime,
 } from "./view-models/time-forms.ts";
+export * from "./view-models/week-layout.ts";
 export {
   fitHourPx,
   gridFromHour,
   type Lane,
-  lanesOf,
   placeIn,
   type Placement,
   type WeekBlock,

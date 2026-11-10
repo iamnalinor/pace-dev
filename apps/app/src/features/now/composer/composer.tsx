@@ -4,12 +4,13 @@ import { View } from "react-native";
 import { useT } from "#app/app-state.tsx";
 import { ActionCards } from "#app/shared/assistant/action-cards.tsx";
 import { ReadingIssueLine } from "#app/shared/assistant/reading-issue-line.tsx";
-import { AnimatedHeight } from "#app/ui/animated-height.tsx";
 import { cx } from "#app/ui/cx.ts";
+import { Presence } from "#app/ui/presence.tsx";
 
 import { AiStatus } from "./ai-status.tsx";
 import { type ComposerFlow, useComposerFlow } from "./composer-flow.tsx";
 import { ComposerForm, type FormVariant } from "./composer-form.tsx";
+import { ComposerUnfold, useComposerUnfold } from "./composer-unfold.tsx";
 import { formTitleKey } from "./form-title.ts";
 import { QuickLine } from "./quick-line.tsx";
 
@@ -49,15 +50,57 @@ const IssueLine = ({ flow }: { readonly flow: ComposerFlow }) =>
     />
   );
 
+/**
+The assistant's preview (spec §6 "assistant preview appears"): it lifts 4 px in with a fade where it
+lands (160) and fades out (110) keeping what it showed, deaf to touches while it goes. The card
+takes its height at once, so Approve is never clipped while it grows (QA 22, bug-lessons 5).
+*/
+const Preview = ({ flow }: { readonly flow: ComposerFlow }) => {
+  const { pending } = flow.pending;
+  // What the preview last showed: it stays through the fade out, after the answer is gone.
+  const [kept, setKept] = useState(pending);
+  if (pending !== null && pending !== kept) {
+    setKept(pending);
+  }
+  return kept === null ? null : (
+    // Room under it for its 4 px lift: it rises from inside the card, never from below its edge
+    // (overlays e2e, bug-lessons 5).
+    <View className="pb-1">
+      <Presence
+        enter="lift"
+        exit="fade"
+        initial
+        onExited={() => {
+          setKept(null);
+        }}
+        pointerEvents={pending === null ? "none" : "auto"}
+        show={pending !== null}
+      >
+        <ActionCards
+          actions={kept.actions}
+          busy={flow.pending.busy}
+          onApprove={() => {
+            void flow.pending.approve();
+          }}
+          onCancel={flow.dismiss}
+          onFollowup={flow.pending.followup}
+          // Offered once: after a press the status line below says what came of it.
+          onLater={flow.ai.state.status === "idle" ? () => void flow.readLater() : undefined}
+          questions={kept.questions}
+          unread={kept.unread}
+        />
+      </Presence>
+    </View>
+  );
+};
+
 /** The line and, while the assistant works on it (and no form shows its reading), its status. */
 const LineBlock = ({
   flow,
   isFocused,
-  onFocusChange,
 }: {
   readonly flow: ComposerFlow;
   readonly isFocused: boolean;
-  readonly onFocusChange: (isInFocus: boolean) => void;
 }) => (
   <>
     <QuickLine
@@ -65,23 +108,8 @@ const LineBlock = ({
       isFocused={isFocused}
       isLocked={flow.form !== null && flow.isFormInPane}
       isReading={flow.pending.busy}
-      onFocusChange={onFocusChange}
     />
-    {flow.pending.pending === null ? null : (
-      <ActionCards
-        actions={flow.pending.pending.actions}
-        busy={flow.pending.busy}
-        onApprove={() => {
-          void flow.pending.approve();
-        }}
-        onCancel={flow.dismiss}
-        onFollowup={flow.pending.followup}
-        // Offered once: after a press the status line below says what came of it.
-        onLater={flow.ai.state.status === "idle" ? () => void flow.readLater() : undefined}
-        questions={flow.pending.pending.questions}
-        unread={flow.pending.pending.unread}
-      />
-    )}
+    <Preview flow={flow} />
     <IssueLine flow={flow} />
     {flow.text.trim() === "" || flow.form !== null || flow.ai.state.status === "read" ? null : (
       <Status flow={flow} />
@@ -90,35 +118,31 @@ const LineBlock = ({
 );
 
 /**
-Now's composer, one card. The line takes a task in words: Enter (or Send) has the assistant
-read it into the task form, a second Enter adds it; + opens the form by hand (the line moves
-into the title); Alt+Enter (or To Inbox) keeps the raw line in the Inbox. Nothing is sent to
-the assistant while typing; a paste is read at once. On a phone the card unfolds into the form
-in place; on a computer the form opens in the right pane and the line stays.
+Now's composer. The line takes a task in words: Enter (or Send) has the assistant read it into the
+task form, a second Enter adds it; + opens the form by hand (the line moves into the title);
+Alt+Enter (or To Inbox) keeps the raw line in the Inbox. Nothing is sent to the assistant while
+typing; a paste is read at once. On a phone the line unfolds into the form's card in place (grow,
+then fade, spec §6); on a computer the form opens in the inspector and the line stays.
 */
 export const Composer = ({ isFocused = false }: { readonly isFocused?: boolean }) => {
   const flow = useComposerFlow();
-  const [isLineInFocus, setIsLineInFocus] = useState(false);
   const isFormHere = flow.form !== null && !flow.isFormInPane;
+  const unfold = useComposerUnfold(isFormHere ? "form" : "line");
+  const isCard = unfold.shape === "form" || unfold.phase === "grow";
   return (
-    // One card that changes shape: its height follows the line or the form, and the focused
-    // line rings it in the quiet accent.
+    // The line is the field's own cell; the form is a card that takes its shape and height
+    // without ever clipping its content (bug-lessons 5).
     <View
-      className={cx(
-        "mx-4 mb-3 rounded-xl border bg-cell px-1 py-1",
-        isLineInFocus && !isFormHere ? "border-accent" : "border-outline",
-      )}
+      className={cx("mx-gutter mb-3", isCard && "rounded-xl border border-outline bg-cell p-1")}
+      testID="composer-card"
     >
-      <AnimatedHeight>
-        {/* No entering animation here: it would keep the field from taking the cursor. */}
-        <View key={isFormHere ? "form" : "line"}>
-          {isFormHere ? (
-            <ComposerFlowForm variant="card" />
-          ) : (
-            <LineBlock flow={flow} isFocused={isFocused} onFocusChange={setIsLineInFocus} />
-          )}
-        </View>
-      </AnimatedHeight>
+      <ComposerUnfold {...unfold}>
+        {unfold.shape === "form" ? (
+          <ComposerFlowForm variant="card" />
+        ) : (
+          <LineBlock flow={flow} isFocused={isFocused} />
+        )}
+      </ComposerUnfold>
     </View>
   );
 };

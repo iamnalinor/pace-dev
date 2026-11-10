@@ -51,7 +51,7 @@ test("a touch screen's sheets put no text field in focus, so no keyboard covers 
       "Edit task",
       async () => {
         await nowTasks(page).getByText(title).click();
-        await page.getByRole("button", { name: "Edit details" }).click();
+        await page.getByRole("button", { exact: true, name: "Edit" }).click();
       },
     ],
     [
@@ -85,7 +85,8 @@ test("a wide touch screen's Task picker keeps its search closed until tapped (fi
     .getByRole("region", { name: "Time" })
     .getByRole("button", { exact: true, name: "Task" })
     .click();
-  await expect(page.locator('[data-pace-surface="sheet"]')).toBeVisible();
+  // A wide window's picker is a popover under the tile.
+  await expect(page.getByTestId("popover-surface")).toBeVisible();
   const focused = await focusedOverFrames(page);
   expect(focused).not.toContain("INPUT");
   expect(focused).not.toContain("TEXTAREA");

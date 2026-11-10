@@ -478,6 +478,23 @@ describe("missingInstanceEvents", () => {
     ]);
   });
 
+  it("starts the numbering at the recurrence's firstNumber and counts on from it", () => {
+    const presets = foldPresets([
+      presetCreated("hw.alg", "ДЗ по алгебре", {
+        recurrence: { ...weekly([1, "10:00"], [3, "23:59"], MOSCOW), firstNumber: 9 },
+      }),
+    ]);
+    const first = missingInstanceEvents({ tasks: INITIAL_TASKS_STATE, presets, now: TUESDAY_W41 });
+    expect(first.map((input) => input.payload)).toMatchObject([{ title: "ДЗ по алгебре 9" }]);
+
+    const tasks = foldTasks([
+      instanceCreated("hw.alg", "2026-W40"),
+      instanceCreated("hw.alg", "2026-W41"),
+    ]);
+    const third = missingInstanceEvents({ tasks, presets, now: "2026-10-13T12:00:00.000Z" });
+    expect(third.map((input) => input.payload)).toMatchObject([{ title: "ДЗ по алгебре 11" }]);
+  });
+
   it("inherits the estimate of the latest instance by week, whatever the event order", () => {
     const tasks = foldTasks([
       instanceCreated("hw.algebra", "2026-W40", { estimateMinutes: 90 }),

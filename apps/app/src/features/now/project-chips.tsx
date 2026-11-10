@@ -1,9 +1,12 @@
-import { ScrollView } from "react-native";
-
 import type { ProjectChip } from "@pace/client";
 
 import { useT } from "#app/app-state.tsx";
+import { ChipScroller } from "#app/ui/chip-scroller.tsx";
 import { Chip } from "#app/ui/chip.tsx";
+import { RadioGroup } from "#app/ui/radio-group.tsx";
+
+/** "All projects" among the project ids (a radio needs a value; no id is empty). */
+const ALL = "";
 
 /** "All" and one chip per project with open tasks; nothing when there is nothing to filter. */
 export const ProjectChips = ({
@@ -20,32 +23,23 @@ export const ProjectChips = ({
     return null;
   }
   return (
-    <ScrollView
-      accessibilityLabel={t("now.filterByProject")}
-      contentContainerClassName="gap-2 px-4 pb-2"
-      horizontal
-      showsHorizontalScrollIndicator={false}
-    >
-      <Chip
-        onPress={() => {
-          onSelect(null);
+    <ChipScroller>
+      <RadioGroup
+        className="flex-row gap-x-2"
+        label={t("now.filterByProject")}
+        onChange={(id: string) => {
+          onSelect(id === ALL ? null : id);
         }}
-        selected={selected === null}
+        value={selected ?? ALL}
+        values={[ALL, ...chips.map((chip) => chip.id)]}
       >
-        {t("now.allProjects")}
-      </Chip>
-      {chips.map((chip) => (
-        <Chip
-          color={chip.color}
-          key={chip.id}
-          onPress={() => {
-            onSelect(chip.id);
-          }}
-          selected={selected === chip.id}
-        >
-          {chip.name}
-        </Chip>
-      ))}
-    </ScrollView>
+        <Chip value={ALL}>{t("now.allProjects")}</Chip>
+        {chips.map((chip) => (
+          <Chip hue={chip.color} key={chip.id} value={chip.id}>
+            {chip.name}
+          </Chip>
+        ))}
+      </RadioGroup>
+    </ChipScroller>
   );
 };

@@ -36,7 +36,7 @@ describe("summarize", () => {
       }),
     ).toBe("The assistant will change “Return library books”: title, due date, project");
     expect(en({ kind: "task.markSubtasks", subtaskIds: ["s5", "s6"], taskId: HW_ID })).toBe(
-      "The assistant will mark solved in “Algebra HW 6”: Kronecker–Capelli, Block matrices",
+      "The assistant will mark done in “Algebra HW 6”: Kronecker–Capelli, Block matrices",
     );
     expect(
       en({ kind: "task.addSubtasks", subtasks: [{ label: "8", number: 8 }], taskId: HW_ID }),

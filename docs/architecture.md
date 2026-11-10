@@ -99,7 +99,8 @@ every device and the server produce the same event once:
   n-th instance; `n` counts from the series' `template.startAt`, which `seriesAnchor` sets to the
   start the person chose or else to 00:00 of the day the series was made, so later instances start
   at the person's time of day or at the start of their day, never at the minute of creation)
-- `autoOutcomeId(taskId, kind)` → `auto:<taskId>:missed|skipped` (automatic outcomes)
+- `autoOutcomeId(taskId, kind)` → `auto:<taskId>:skipped` (automatic outcomes; `:missed` is the
+  automatic `cancelled_missed` of old logs, no longer made since feedback 5)
 - automatic sleep: `auto:sleep-<night>:start-<yyyyMMddTHHmm>` (the start and its activity),
   `auto:sleep-stop-<digest of the activity id>-<yyyyMMddTHHmm>`, and `auto:<stop id>:reopen` /
   `auto:<start id>:discard` for the revocations; a `-2`, `-3`… suffix where the first is used
@@ -440,7 +441,7 @@ log. The log as last loaded is kept in step with what goes in, so a pass that re
 writes, or a write out of order, does not load it again. After every
 append (a client's sync push, an `apply`) and before every read and every `apply`,
 `derive(now)` appends the system events the state calls for: this week's homework instances, the automatic
-`cancelled_missed` / `skipped` outcomes, then the next instance of a course left with none open
+`skipped` outcome of an empty instance (a task past its deadline stays open, overdue), then the next instance of a course left with none open
 (`user-store/derive-steps.ts`), with deterministic ids, so they are idempotent
 against clients that derived the same events.
 

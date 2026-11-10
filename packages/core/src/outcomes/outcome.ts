@@ -1,8 +1,8 @@
-import type { EventInput } from "../events/event-schema.ts";
+import type { Event, EventInput } from "../events/event-schema.ts";
 import type { ResolvedPreset } from "../model/preset.ts";
 import type { PresetsState } from "../presets/preset-reducer.ts";
 
-import { autoOutcomeId, type AutoOutcomeKind } from "../ids.ts";
+import { autoOutcomeId, retiredId } from "../ids.ts";
 import { isOpen, type Subtask, type Task, type TasksState } from "../model/task.ts";
 import { taskPreset } from "../presets/resolve-preset.ts";
 import { addDaysIn, addMinutesIso } from "../time.ts";
@@ -58,37 +58,47 @@ const lateness = (at: string, dueAt: null | string): "done" | "done_late" =>
   dueAt !== null && isAfter(at, dueAt) ? "done_late" : "done";
 
 export const subtaskOutcome = (subtask: Subtask, dueAt: null | string): SubtaskOutcome =>
-  subtask.submittedAt === null ? "pending" : lateness(subtask.submittedAt, dueAt);
+  subtask.doneAt === null ? "pending" : lateness(subtask.doneAt, dueAt);
 
 /**
-Per-subtask submission: the submitted problems decide, and the ones still unsubmitted
-when the task was closed as done were simply not needed. Whole submission (or a
-per-subtask task without problems) goes by the closing instant.
+Whether a task closed as done at `closedAt` reads late (owner, 2026-11-09): its subtasks decide
+only when every one of them is done, by the latest done instant (problems solved before the
+deadline and the task closed after it is on time); while any is left open, or with no subtasks,
+the closing instant decides. `doneAts` holds each subtask's done instant or `null`. The close
+sheet's preview reads the same rule.
 */
-const doneOutcome = (
-  task: Task,
+export const doneLateness = (
+  doneAts: readonly (null | string)[],
   closedAt: string,
-  preset: ResolvedPreset,
+  dueAt: null | string,
 ): "done" | "done_late" => {
-  if (preset.submission === "per_subtask" && task.subtasks.length > 0) {
-    const isLate = task.subtasks.some((item) => subtaskOutcome(item, task.dueAt) === "done_late");
-    return isLate ? "done_late" : "done";
+  const done = doneAts.filter((when) => when !== null);
+  if (doneAts.length === 0 || done.length < doneAts.length) {
+    return lateness(closedAt, dueAt);
   }
-  return lateness(closedAt, task.dueAt);
+  // The latest done instant is after the due exactly when any of them is.
+  return done.some((when) => lateness(when, dueAt) === "done_late") ? "done_late" : "done";
 };
 
+const doneOutcome = (task: Task, closedAt: string): "done" | "done_late" =>
+  doneLateness(
+    task.subtasks.map((item) => item.doneAt),
+    closedAt,
+    task.dueAt,
+  );
+
 /**
-`null` while the task is open. An automatic `cancelled_missed` is beaten by a retro
+`null` while the task is open. An automatic `cancelled_missed` (only in old logs) is beaten by a retro
 "done before the deadline" because the reducer keeps the earliest closure; the action
 layer also revokes the automatic event so the log tells the same story.
 */
-export const taskOutcome = (task: Task, preset: ResolvedPreset): null | Outcome => {
+export const taskOutcome = (task: Task): null | Outcome => {
   if (task.closed === null) {
     return null;
   }
   switch (task.closed.outcome) {
     case "done": {
-      return doneOutcome(task, task.closed.at, preset);
+      return doneOutcome(task, task.closed.at);
     }
     case "cancelled":
     case "cancelled_missed":
@@ -122,42 +132,26 @@ const isEmptyInstance = (task: Task): boolean =>
   task.slider === null &&
   task.status === "not_started";
 
-type ClosePayload =
-  | { readonly outcome: "cancelled_missed" }
-  | { readonly outcome: "skipped"; readonly reason: string };
-
-const closeEvent = (
-  task: Task,
-  kind: AutoOutcomeKind,
-  when: { readonly occurredAt: string; readonly payload: ClosePayload },
-): AutoOutcomeEvent => ({
-  id: autoOutcomeId(task.id, kind),
+const closeEvent = (task: Task, occurredAt: string): AutoOutcomeEvent => ({
+  id: autoOutcomeId(task.id, "skipped"),
   type: "task.closed",
-  occurredAt: when.occurredAt,
+  occurredAt,
   precision: "exact",
   source: "system",
-  payload: { taskId: task.id, ...when.payload },
+  payload: { taskId: task.id, outcome: "skipped", reason: NOT_ASSIGNED_REASON },
 });
 
-/** Empty instances are skipped, never missed: nothing was ever assigned to miss. */
-const autoOutcome = (
-  task: Task,
-  preset: ResolvedPreset,
-  now: string,
-): AutoOutcomeEvent | undefined => {
-  if (isEmptyInstance(task)) {
-    const skipAt = task.dueAt === null ? null : addMinutesIso(task.dueAt, SKIP_GRACE_MINUTES);
-    return skipAt !== null && isAfter(now, skipAt)
-      ? closeEvent(task, "skipped", {
-          occurredAt: skipAt,
-          payload: { outcome: "skipped", reason: NOT_ASSIGNED_REASON },
-        })
-      : undefined;
+/**
+Only an empty instance is closed by the system, as skipped: nothing was ever assigned to it.
+A task past its final deadline stays open and reads as overdue (feedback 5: the automatic
+`cancelled_missed` was dropped); old ones in a log still materialize and can be reopened.
+*/
+const autoOutcome = (task: Task): AutoOutcomeEvent | undefined => {
+  if (!isEmptyInstance(task)) {
+    return undefined;
   }
-  const { finalAt } = deadlineOf(task, preset);
-  return finalAt !== null && isAfter(now, finalAt)
-    ? closeEvent(task, "missed", { occurredAt: finalAt, payload: { outcome: "cancelled_missed" } })
-    : undefined;
+  const skipAt = task.dueAt === null ? null : addMinutesIso(task.dueAt, SKIP_GRACE_MINUTES);
+  return skipAt === null ? undefined : closeEvent(task, skipAt);
 };
 
 const compare = (a: AutoOutcomeEvent, b: AutoOutcomeEvent): number => {
@@ -168,16 +162,47 @@ const compare = (a: AutoOutcomeEvent, b: AutoOutcomeEvent): number => {
 };
 
 /**
-The automatic outcomes due by `now`: `cancelled_missed` at the final deadline and
-`skipped` for empty recurring instances a day after their due date. Deterministic ids
-(`auto:<taskId>:<kind>`) keep them idempotent across devices and the server.
+The automatic outcomes due by `now`: `skipped` for empty recurring instances a day after their
+due date (of a preset that still resolves). Deterministic ids (`auto:<taskId>:skipped`) keep them
+idempotent across devices and the server.
 */
 export const autoOutcomeEvents = (input: AutoOutcomeInput): readonly EventInput[] =>
   Object.values(input.tasks.byId)
     .filter(isOpen)
     .flatMap((task) => {
-      const preset = taskPreset(input.presets, task);
-      const event = preset.ok ? autoOutcome(task, preset.value, input.now) : undefined;
-      return event === undefined || input.existingEventIds.has(event.id) ? [] : [event];
+      const event = taskPreset(input.presets, task).ok ? autoOutcome(task) : undefined;
+      const isDue = event !== undefined && isAfter(input.now, event.occurredAt);
+      return !isDue || input.existingEventIds.has(event.id) ? [] : [event];
     })
     .toSorted(compare);
+
+/**
+An automatic `cancelled_missed` close, which only an older client still writes (feedback 5: no
+task is closed automatically any more).
+*/
+const isRetiredAutoMiss = (event: Event): boolean =>
+  event.type === "task.closed" &&
+  event.source === "system" &&
+  event.payload.outcome === "cancelled_missed";
+
+/**
+The revocations of the automatic misses an older client just pushed: the server takes the event
+(an old client keeps a refused one in its outbox and sends it on every sync) and revokes it at
+once, so the task stays open on every device, that one included. Deterministic ids
+(`retiredId`) keep it idempotent. Misses already in a log are not touched (the owner kept
+old automatic closes as they are).
+*/
+export const retiredAutoMissRevokes = (
+  pushed: readonly Event[],
+  now: string,
+): readonly EventInput[] =>
+  pushed
+    .filter((event) => isRetiredAutoMiss(event))
+    .map((event) => ({
+      id: retiredId(event.id),
+      type: "event.revoked",
+      occurredAt: now,
+      precision: "exact",
+      source: "system",
+      payload: { targetId: event.id },
+    }));

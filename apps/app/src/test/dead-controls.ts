@@ -1,6 +1,6 @@
 import { act, fireEvent, screen } from "@testing-library/react-native";
 
-import { redirected, router } from "./router.ts";
+import { paramsSet, redirected, router, setSearchParams } from "./router.ts";
 
 type Instance = NonNullable<typeof screen.root>;
 
@@ -66,7 +66,10 @@ const nameOf = (instance: Instance): string => {
 const stateOf = (extra: () => unknown): string =>
   JSON.stringify([
     screen.toJSON(),
-    Object.values(router).map((call) => call.mock.calls.length),
+    Object.entries(router)
+      .filter(([name]) => name !== "setParams")
+      .map(([, call]) => (call as jest.Mock).mock.calls.length),
+    paramsSet.mock.calls.length,
     redirected.mock.calls.length,
     extra(),
   ]);
@@ -110,6 +113,8 @@ export const deadControls = async (
   for (const [index, name] of names.entries()) {
     await screen.unmount();
     jest.clearAllMocks();
+    // A fresh render starts on a fresh address: an earlier press may have put a filter in it.
+    setSearchParams({});
     const { extra } = await render();
     await settle();
     const occurrence = names.slice(0, index).filter((earlier) => earlier === name).length;

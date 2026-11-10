@@ -1,4 +1,3 @@
-import { CalendarDays } from "lucide-react-native";
 import { Text, View } from "react-native";
 
 import type { QuickTime } from "@pace/client";
@@ -6,10 +5,16 @@ import type { QuickTime } from "@pace/client";
 import { useT } from "#app/app-state.tsx";
 import { RadioChips } from "#app/ui/radio-chips.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
+import { TimeInput } from "#app/ui/time-input.tsx";
 
 import type { CloseForm } from "./use-close-form.ts";
 
-/** The exact date and time, typed on the device's wall clock. */
+/**
+The exact date and time, typed on the device's wall clock. The time is the app's one time field
+(«930», «9.30» read as 09:30, its own message, Enter presses Done; QA round 27 R27-01); a date
+that cannot be read is said under the date. The time only ever holds a time, so an instant that
+is missing means the date.
+*/
 const TypedTime = ({ deviceTz, form }: { readonly deviceTz: string; readonly form: CloseForm }) => {
   const t = useT();
   return (
@@ -17,6 +22,7 @@ const TypedTime = ({ deviceTz, form }: { readonly deviceTz: string; readonly for
       <View className="flex-row gap-2">
         <View className="flex-3">
           <TextField
+            error={form.at === null ? t("close.dateInvalid") : undefined}
             inputMode="numeric"
             label={t("close.date")}
             onChangeText={(date) => {
@@ -27,13 +33,13 @@ const TypedTime = ({ deviceTz, form }: { readonly deviceTz: string; readonly for
           />
         </View>
         <View className="flex-2">
-          <TextField
-            inputMode="numeric"
+          <TimeInput
+            className="w-full"
+            isDraft
             label={t("close.time")}
-            onChangeText={(time) => {
+            onTime={(time) => {
               form.setTyped({ ...form.typed, time });
             }}
-            placeholder="14:52"
             value={form.typed.time}
           />
         </View>
@@ -41,14 +47,14 @@ const TypedTime = ({ deviceTz, form }: { readonly deviceTz: string; readonly for
       <Text className="font-sans text-caption font-normal text-label-tertiary">
         {t("edit.inZone", { zone: deviceTz })}
       </Text>
-      {form.at === null || form.problem !== null ? (
+      {form.problem === null ? null : (
         <Text
           accessibilityLiveRegion="polite"
           className="font-sans text-caption font-normal text-danger"
         >
-          {t(form.problem === null ? "close.timeInvalid" : `actionError.${form.problem}`)}
+          {t(`actionError.${form.problem}`)}
         </Text>
-      ) : null}
+      )}
     </View>
   );
 };
@@ -76,7 +82,7 @@ export const WhenPicker = ({
             value: quick.key,
           })),
           {
-            leading: (color: string) => <CalendarDays color={color} size={16} />,
+            icon: "calendar-days",
             // Said as it is shown: the chip that opens the date and time (QA round 20 L5).
             text: t("close.pickExact"),
             value: "custom",

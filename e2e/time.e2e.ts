@@ -1,9 +1,11 @@
 import type { Locator, Page } from "@playwright/test";
 
-import { addTask, approve, nowTasks } from "./support/composer.ts";
+import { addTask, approve, deleteOpenTask, nowTasks } from "./support/composer.ts";
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { controlsUnder } from "./support/geometry.ts";
 import { API_URL, loginViaApi } from "./support/login.ts";
+import { pushAsClient, ulid } from "./support/seed.ts";
+import { typedField } from "./support/time-bar.ts";
 
 const SIZES = [
   { height: 844, name: "phone", width: 390 },
@@ -33,6 +35,17 @@ const gapAbove = async (above: Locator, below: Locator): Promise<number> => {
   return bottom.y - (top.y + top.height);
 };
 
+/** The air between two boxes that do not overlap, on whichever side they meet (0 if touching). */
+const gapBeside = async (one: Locator, other: Locator): Promise<number> => {
+  const [a, b] = await Promise.all([one.boundingBox(), other.boundingBox()]);
+  if (a === null || b === null) {
+    throw new Error("both boxes must be on the screen");
+  }
+  const across = Math.max(b.x - (a.x + a.width), a.x - (b.x + b.width), 0);
+  const along = Math.max(b.y - (a.y + a.height), a.y - (b.y + b.height), 0);
+  return Math.max(across, along);
+};
+
 const timeBar = (page: Page) => page.getByRole("region", { name: "Time" });
 
 for (const size of SIZES) {
@@ -49,7 +62,7 @@ for (const size of SIZES) {
       await addTask(page, `Write the lab report ${size.name}`);
       const bar = timeBar(page);
       // Four buttons, nothing else: no «⋯», no switches.
-      await expect(bar.getByRole("button", { name: /^(Calendar|Task|Chores|Rest)$/u })).toHaveCount(
+      await expect(bar.getByRole("button", { name: /^(Calendar|Task|Chores|Misc)$/u })).toHaveCount(
         4,
       );
       await expect(page.getByRole("button", { name: /More about/u })).toHaveCount(0);
@@ -68,16 +81,16 @@ for (const size of SIZES) {
       await expect(
         tasks.getByRole("button", { name: `Write the lab report ${size.name}` }),
       ).toBeVisible();
-      await page.getByRole("textbox", { name: "Find a task" }).fill("zzz");
+      await page.getByRole("searchbox", { name: "Find a task" }).fill("zzz");
       await expect(page.getByText("No open task matches.")).toBeVisible();
-      await page.getByRole("textbox", { name: "Find a task" }).fill("lab report");
+      await page.getByRole("searchbox", { name: "Find a task" }).fill("lab report");
       await shoot(page, `day-picker-task-${size.name}`, (name) => info.outputPath(name));
       await expectNoA11yViolations(page);
       await tasks.getByRole("button", { name: `Write the lab report ${size.name}` }).click();
       await expect(bar.getByRole("button", { name: "Task, running" })).toBeVisible();
 
-      await bar.getByRole("button", { name: "Rest", exact: true }).click();
-      const rest = page.getByRole("list", { name: "Rest" });
+      await bar.getByRole("button", { name: "Misc", exact: true }).click();
+      const rest = page.getByRole("list", { name: "Misc" });
       await expect(rest.getByRole("button")).toHaveText([
         /Short break/u,
         /Rest/u,
@@ -89,7 +102,7 @@ for (const size of SIZES) {
       await shoot(page, `day-picker-rest-${size.name}`, (name) => info.outputPath(name));
       await expectNoA11yViolations(page);
       await rest.getByRole("button", { name: "Walk" }).click();
-      await expect(bar.getByRole("button", { name: "Rest, running" })).toBeVisible();
+      await expect(bar.getByRole("button", { name: "Misc, running" })).toBeVisible();
       await expect(bar.getByText(/of ~30m/u)).toBeVisible();
 
       // Chores: a pick switches over from what ran.
@@ -97,14 +110,29 @@ for (const size of SIZES) {
       await shoot(page, `day-picker-chores-${size.name}`, (name) => info.outputPath(name));
       await page.getByRole("button", { name: "Getting ready" }).click();
       await expect(bar.getByRole("button", { name: "Chores, running" })).toBeVisible();
-      await expect(bar.getByRole("button", { name: "Rest", exact: true })).toBeVisible();
+      await expect(bar.getByRole("button", { name: "Misc", exact: true })).toBeVisible();
 
       // A workout alongside, from the switch in the picker's header.
-      await bar.getByRole("button", { name: "Rest", exact: true }).click();
+      await bar.getByRole("button", { name: "Misc", exact: true }).click();
       await page.getByLabel("Alongside what is running").click();
       await page.getByRole("button", { name: "Workout" }).click();
       await expect(bar.getByRole("button", { name: "Stop: Getting ready" })).toBeVisible();
       await expect(bar.getByRole("button", { name: "Stop: Workout" })).toBeVisible();
+      // Two running: the bar (and on a phone the nav bar) stay within 40 % of the window, the
+      // second one a compact row in the same card, never a card cut under the tiles (spec §5.1,
+      // design review B2; docs/design.md 2026-11-10 says what the budget guarantees). The field folds
+      // once the bar is left alone over the budget.
+      await expect(bar.getByTestId("running-card")).toHaveCount(1);
+      await expect
+        .poll(
+          async () => {
+            const box = await bar.boundingBox();
+            return box === null ? Infinity : size.height - box.y;
+          },
+          { timeout: 10_000 },
+        )
+        .toBeLessThanOrEqual(size.height * 0.4);
+      await typedField(bar, { field: "What are you doing?", unfold: "Start something else" });
 
       // The running button's picker offers Stop first.
       await bar.getByRole("button", { name: "Chores, running" }).click();
@@ -118,7 +146,11 @@ for (const size of SIZES) {
       const typed = bar.getByRole("textbox", { name: "What are you doing?" });
       await typed.fill("Пошел в ЦСС, 20мин");
       await typed.press("Enter");
-      await approve(bar);
+      // A phone opens the proposal as a sheet (it never scrolls under the tiles, design review
+      // B2); a computer shows it in the bar above the field.
+      await approve(
+        size.name === "phone" ? page.locator('[data-pace-sheet="time-proposal"]') : bar,
+      );
       await expect(bar.getByRole("button", { name: "Stop: Пошел в ЦСС" })).toBeVisible();
       await expect(bar.getByText(/of ~20m/u)).toBeVisible();
       await bar.getByRole("button", { name: "Stop: Пошел в ЦСС" }).click();
@@ -134,9 +166,9 @@ for (const size of SIZES) {
       await addTask(page, `Planes and lines ${size.name}`);
       await expect(timeBar(page)).toBeVisible();
       await expect(timeBar(page).getByText("Walk")).toHaveCount(0);
-      await timeBar(page).getByRole("button", { name: "Rest", exact: true }).click();
-      await page.getByRole("list", { name: "Rest" }).getByRole("button", { name: "Walk" }).click();
-      await expect(timeBar(page).getByRole("button", { name: "Rest, running" })).toBeVisible();
+      await timeBar(page).getByRole("button", { name: "Misc", exact: true }).click();
+      await page.getByRole("list", { name: "Misc" }).getByRole("button", { name: "Walk" }).click();
+      await expect(timeBar(page).getByRole("button", { name: "Misc, running" })).toBeVisible();
       const running = timeBar(page);
       await expect(running.getByText("Walk")).toBeVisible();
       const firstRow = nowTasks(page).getByRole("listitem").first();
@@ -146,6 +178,17 @@ for (const size of SIZES) {
       await page.goto("/day");
       await expect(page.getByRole("heading", { level: 1, name: "Day" })).toBeVisible();
       await expect(timeBar(page)).toHaveCount(0);
+      // The red now line is there on every size and theme, its time inside the timeline's edge
+      // (design review H4: missing on the phone and in dark; the time ran past the card).
+      const margin = page.getByTestId("now-margin");
+      await expect(margin).toBeVisible();
+      const [line, timeline] = await Promise.all([
+        margin.getByText(/^\d{2}:\d{2}$/u).boundingBox(),
+        page.getByTestId("day-timeline").boundingBox(),
+      ]);
+      expect((line?.x ?? Infinity) + (line?.width ?? 0)).toBeLessThanOrEqual(
+        (timeline?.x ?? 0) + (timeline?.width ?? 0),
+      );
       await page.goto("/");
       await timeBar(page).getByRole("button", { name: "Stop: Walk" }).click();
       await expect(timeBar(page).getByRole("button", { name: "Stop: Walk" })).toHaveCount(0);
@@ -159,7 +202,8 @@ for (const size of SIZES) {
       await page.getByRole("textbox", { exact: true, name: "What" }).fill("Lecture");
       await page.getByRole("radio", { name: "Study" }).click();
       await page.getByRole("button", { name: "Save" }).click();
-      await expect(page.getByText("Lecture")).toBeVisible();
+      // The row, not the form's hint naming a block it replaces (owner R27-05).
+      await expect(page.getByRole("button", { name: /Lecture Study/u })).toBeVisible();
       await shoot(page, `day-${size.name}`, (shot) => info.outputPath(shot));
       await expectNoA11yViolations(page);
       await page.goto("/insights");
@@ -170,6 +214,64 @@ for (const size of SIZES) {
     });
   });
 }
+
+const MINUTE = 60_000;
+
+/** `activity.started` as a client pushes it, `minutesAgo` before now. */
+const started = (minutesAgo: number, payload: Readonly<Record<string, unknown>>) => {
+  const at = Date.now() - minutesAgo * MINUTE;
+  return {
+    deviceId: "e2e-time",
+    id: ulid(at),
+    occurredAt: new Date(at).toISOString(),
+    payload: { activityId: ulid(at), ...payload },
+    precision: "exact",
+    recordedAt: new Date().toISOString(),
+    source: "web",
+    type: "activity.started",
+  };
+};
+
+test.describe("the time bar's budget while it asks, phone (390px)", () => {
+  test.use({ viewport: { height: 844, width: 390 } });
+
+  test("two running, the first past twice its Expect: the question keeps the bar within 40 %", async ({
+    page,
+  }) => {
+    const { token } = await loginViaApi(page);
+    const response = await pushAsClient(token, [
+      started(122, { category: "other", expectMinutes: 20, label: "Went to the study centre" }),
+      started(92, { alongside: true, category: "rest", label: "Music" }),
+    ]);
+    expect(response.ok).toBe(true);
+    await page.goto("/");
+    const bar = timeBar(page);
+    // The state every lived-in shot is in (design review 2 N3): «Ещё занимаетесь?» on a row of its
+    // own took the bar and the nav bar to 377 of 844 px. It now sits on the name's second line,
+    // with "Yes, still" beside Stop, and the fold row has no gap of its own above or below.
+    await expect(bar.getByText("Still doing this?")).toBeVisible();
+    await expect(bar.getByRole("button", { name: "Yes, still" })).toBeVisible();
+    await expect(bar.getByRole("button", { name: "Stop: Music" })).toBeVisible();
+    await expect
+      .poll(
+        async () => {
+          const box = await bar.boundingBox();
+          return box === null ? Infinity : 844 - box.y;
+        },
+        { timeout: 10_000 },
+      )
+      .toBeLessThanOrEqual(844 * 0.4);
+    // «Start something else» starts on the card's edge, not at a list row's inset.
+    const [more, card] = await Promise.all([
+      bar.getByRole("button", { name: "Start something else" }).boundingBox(),
+      bar.getByTestId("running-card").boundingBox(),
+    ]);
+    expect(more?.x).toBe(card?.x);
+    await bar.getByRole("button", { name: "Yes, still" }).click();
+    await expect(bar.getByText("Still doing this?")).toHaveCount(0);
+    await expect(bar.getByText(/of ~20m/u)).toBeVisible();
+  });
+});
 
 /** The element's box; a missing one fails the test at once. */
 const boxOf = async (locator: Locator): Promise<{ left: number; right: number; width: number }> => {
@@ -215,8 +317,8 @@ for (const size of SIZES) {
     // Deleting a task says so in a toast (with Undo); the bar is below it on Now.
     await addTask(page, `Toast ${size.name}`);
     await nowTasks(page).getByText(`Toast ${size.name}`).click();
-    await page.getByRole("button", { name: "Delete the task" }).click();
-    const toast = page.getByRole("alert");
+    await deleteOpenTask(page);
+    const toast = page.getByTestId("toast-card");
     await expect(toast).toBeVisible();
     // In the app, not a reload: a reload would drop the toast.
     await page
@@ -226,8 +328,8 @@ for (const size of SIZES) {
     const bar = timeBar(page);
     await expect(bar).toBeVisible();
     await expect(toast).toBeVisible();
-    // Above the bar on a phone, at the sidebar's foot on a computer: over none of its buttons.
-    expect(await controlsUnder(page, '[role="alert"]')).toEqual([]);
+    // Above the bar on a phone and on a computer alike: over none of its buttons.
+    expect(await controlsUnder(page, '[data-testid="toast-card"]')).toEqual([]);
   });
 }
 
@@ -239,12 +341,12 @@ test("the greyed Calendar button says why the moment the pointer is over it", as
   await expect(calendar).toHaveAttribute("aria-describedby", /.+/u);
   await calendar.hover();
   const tooltip = page.getByRole("tooltip");
-  // No toast and no delay: the bubble is there at once, right above the button.
+  // No toast and no delay: the bubble is there at once, right beside the button, on the first
+  // side where it covers no other control (the typed field above the bar: bug class 6).
   await expect(tooltip).toBeVisible({ timeout: 300 });
-  await expect(page.getByRole("alert")).toHaveCount(0);
-  const gap = await gapAbove(tooltip, calendar);
-  expect(gap).toBeGreaterThanOrEqual(0);
-  expect(gap).toBeLessThan(16);
+  await expect(page.getByTestId("toast-card")).toHaveCount(0);
+  expect(await gapBeside(tooltip, calendar)).toBeLessThan(16);
+  expect(await controlsUnder(page, '[role="tooltip"]', ["Calendar"])).toEqual([]);
   await expectNoA11yViolations(page);
   await page.mouse.move(0, 0);
   await expect(tooltip).toBeHidden();
@@ -257,7 +359,7 @@ test("the Calendar picker on the web offers no phone calendar to set up (QA 19 L
   await page.setViewportSize({ height: 900, width: 1280 });
   await page.goto("/");
   await timeBar(page).getByRole("button", { exact: true, name: "Calendar" }).click();
-  const sheet = page.locator('[data-pace-surface="sheet"]');
+  const sheet = page.locator('[data-pace-surface="sheet"], [data-testid="popover-surface"]');
   await expect(
     sheet.getByRole("button", { name: "Start a meeting without an event" }),
   ).toBeVisible();
@@ -312,4 +414,57 @@ test.describe("the calendar's Attend or skip on Now, phone (390px)", () => {
     await expect(page.getByText("That time is in the future.")).toHaveCount(0);
     await expect(timeBar(page).getByText("Colloquium")).toBeVisible();
   });
+});
+
+test("the phone's activity sheet keeps Save in view without a scroll, Delete below the fields (QA round 25 R25-10)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 844, width: 390 });
+  await loginViaApi(page);
+  await page.goto("/day");
+  await page.getByRole("button", { name: "Log past activity" }).click();
+  await page.getByLabel("What", { exact: true }).fill("Commute");
+  await page.getByRole("button", { exact: true, name: "Save" }).click();
+  await page.getByRole("button", { name: /Commute/u }).click();
+  const save = page.getByRole("button", { exact: true, name: "Save" });
+  await expect(save).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole("button", { name: "Delete activity" })).toBeAttached();
+});
+
+test("the phone's activity sheet scrolls an error under To into view above the pinned Save (QA round 26 R26-01)", async ({
+  page,
+}) => {
+  // A short phone (the message under To lands below the fold of the sheet's body).
+  await page.setViewportSize({ height: 700, width: 390 });
+  // Yesterday noon on the page's clock: Log past offers 11:30–12:00.
+  const noon = new Date();
+  noon.setDate(noon.getDate() - 1);
+  noon.setHours(12, 0, 0, 0);
+  await page.clock.setFixedTime(noon);
+  await loginViaApi(page);
+  await page.goto("/day");
+  const save = page.getByRole("button", { exact: true, name: "Save" });
+  await page.getByRole("button", { name: "Log past activity" }).click();
+  await page.getByLabel("What", { exact: true }).fill("Commute");
+  await save.click();
+  await expect(page.getByRole("button", { name: /Commute/u })).toBeVisible();
+  // An end still ahead (half past noon): said under To, two lines in its half of the row. (Over
+  // Commute it would now be taken, as in a calendar: owner R27-05.)
+  await page.getByRole("button", { name: "Log past activity" }).click();
+  await page.getByLabel("What", { exact: true }).fill("Nap");
+  await page.getByLabel("From", { exact: true }).fill("10:00");
+  await page.getByLabel("To", { exact: true }).fill("12:30");
+  const body = page.getByTestId("overlay-body");
+  // Back to the top, as the sheet opened: the reveal, not the typing, must bring the message up.
+  await body.evaluate((element) => {
+    element.scrollTo({ top: 0 });
+  });
+  await save.click();
+  const error = page
+    .getByRole("alert")
+    .filter({ hasText: "That is still ahead: log what already happened." });
+  await expect(error).toBeInViewport({ ratio: 1 });
+  // Whole above the footer's Save, not under it: the body moved to show it.
+  await expect.poll(async () => await gapAbove(error, save)).toBeGreaterThanOrEqual(0);
+  expect(await body.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
 });

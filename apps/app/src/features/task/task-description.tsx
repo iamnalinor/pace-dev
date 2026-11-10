@@ -1,13 +1,38 @@
-import { Pencil } from "lucide-react-native";
-import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Fragment, useRef, useState } from "react";
+import { View } from "react-native";
 
 import type { TaskViewModel } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
+import { editFieldProps } from "#app/platform/enter-key.ts";
+import { focusPlace } from "#app/platform/focus-place.ts";
+import { useIsInPane } from "#app/shared/task-opener.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
+import { Button } from "#app/ui/button.tsx";
+import { cx } from "#app/ui/cx.ts";
+import { HOTKEYS } from "#app/ui/hotkeys.ts";
+import { Pressable } from "#app/ui/pressable.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
+import { TextLink } from "#app/ui/text-link.tsx";
+import { Text } from "#app/ui/text.tsx";
+import { useDiscardDraft, useDraft } from "#app/ui/use-draft.ts";
+import { splitLinks, type TextPart } from "@pace/core";
+
+import { titleInset } from "./task-summary.tsx";
+
+/** ⌘↵ or Ctrl+↵, as a computer's browser reports the key press. */
+const isModEnter = (pressed: object): boolean => {
+  const { ctrlKey, key, metaKey } = pressed as {
+    readonly key?: string;
+    readonly ctrlKey?: boolean;
+    readonly metaKey?: boolean;
+  };
+  return key === "Enter" && (ctrlKey === true || metaKey === true);
+};
+
+/** Lines of the description before «Show all». */
+const DESCRIPTION_LINES = 6;
+const LONG_DESCRIPTION = 240;
 
 const DescriptionEditor = ({
   draft,
@@ -24,54 +49,58 @@ const DescriptionEditor = ({
 }) => {
   const t = useT();
   return (
-    <View className="mx-5 gap-3 rounded-xl border border-separator bg-cell p-4">
+    <View className="mx-gutter gap-3">
       <TextField
+        {...editFieldProps}
         autoFocus
         editable={!isSaving}
         label={t("edit.description")}
         maxLength={4000}
         multiline
         onChangeText={onChange}
+        onKeyPress={(event) => {
+          if (isSaving) {
+            return;
+          }
+          // The field owns Escape (R24-01): it cancels the edit; the pane stays for the next one.
+          if (event.nativeEvent.key === "Escape") {
+            onCancel();
+          }
+          // And ⌘/Ctrl+Enter, a form's submit: it saves the text, never the task's Done (R26-02).
+          if (!isModEnter(event.nativeEvent)) {
+            return;
+          }
+
+          event.preventDefault();
+          onSave();
+        }}
         value={draft}
       />
       <View className="flex-row justify-end gap-2">
-        <Pressable
-          accessibilityRole="button"
-          className="min-h-hit-web justify-center rounded-lg px-4"
-          disabled={isSaving}
-          onPress={onCancel}
-        >
-          <Text className="font-sans text-footnote text-label-secondary">{t("common.cancel")}</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          className="min-h-hit-web justify-center rounded-lg bg-accent px-4"
-          disabled={isSaving}
+        <Button disabled={isSaving} onPress={onCancel} size="small" variant="plain">
+          {t("common.cancel")}
+        </Button>
+        {/* Ctrl/⌘+Enter saves (the field's own key): named on the button (R27-08, R28-07). */}
+        <Button
+          busy={isSaving}
           onPress={onSave}
+          shortcut={HOTKEYS.primary}
+          shortcutMode="hint"
+          size="small"
         >
-          <Text className="font-sans text-footnote font-semibold text-accent-on">
-            {t("common.save")}
-          </Text>
-        </Pressable>
+          {t("common.save")}
+        </Button>
       </View>
     </View>
   );
 };
 
-/** A quick description edit on the task itself, without opening the full task form. */
-export const TaskDescription = ({ view }: { readonly view: TaskViewModel }) => {
-  const t = useT();
+/** Saves the draft as the description (empty clears it); closes the editor when it went through. */
+const useSaveDescription = (view: TaskViewModel, close: () => void) => {
   const { actions } = usePace();
   const run = useRunAction();
-  const { palette } = useTheme();
-  const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [draft, setDraft] = useState("");
-  const hasDescription = view.description !== null && view.description !== "";
-  const close = (): void => {
-    setIsEditing(false);
-  };
-  const save = async (): Promise<void> => {
+  const save = async (draft: string): Promise<void> => {
     if (isSaving) {
       return;
     }
@@ -90,39 +119,149 @@ export const TaskDescription = ({ view }: { readonly view: TaskViewModel }) => {
       setIsSaving(false);
     }
   };
-  if (isEditing) {
+  return { isSaving, save };
+};
+
+/** The description's words with each web address in it a link of its own (feedback 5 item 8). */
+const LinkedWords = ({ parts }: { readonly parts: readonly TextPart[] }) =>
+  parts.map((part) =>
+    part.kind === "link" ? (
+      <TextLink key={part.at} url={part.url}>
+        {part.text}
+      </TextLink>
+    ) : (
+      <Fragment key={part.at}>{part.text}</Fragment>
+    ),
+  );
+
+/**
+The description as it reads, cut to six lines while `isCut`. Without an address it is one button
+that starts editing. With one it cannot be a button (a link inside a button, bug-lessons 14 and
+132): the words start editing on a tap, each address is a link of its own, and the keyboard's
+way to edit is the task's Edit (its form holds the description).
+*/
+const DescriptionBody = ({
+  description,
+  isCut,
+  onEdit,
+}: {
+  readonly description: string;
+  readonly isCut: boolean;
+  readonly onEdit: () => void;
+}) => {
+  const t = useT();
+  const parts = splitLinks(description);
+  const clamp = isCut ? ({ lines: DESCRIPTION_LINES, policy: "clamp" } as const) : {};
+  if (parts.some((part) => part.kind === "link")) {
     return (
-      <DescriptionEditor
-        draft={draft}
-        isSaving={isSaving}
-        onCancel={close}
-        onChange={setDraft}
-        onSave={() => {
-          void save();
-        }}
-      />
+      <Text full={description} onPress={onEdit} role="body" {...clamp}>
+        <LinkedWords parts={parts} />
+      </Text>
     );
   }
   return (
-    <Pressable
-      accessibilityLabel={t(hasDescription ? "task.editDescription" : "task.addDescription")}
-      accessibilityRole="button"
-      className="mx-5 min-h-hit-web flex-row items-start gap-2 rounded-lg py-2"
-      onPress={() => {
-        setDraft(view.description ?? "");
-        setIsEditing(true);
-      }}
-    >
-      <Text
-        className={
-          hasDescription
-            ? "min-w-0 flex-1 font-sans text-subhead font-normal text-label-secondary"
-            : "min-w-0 flex-1 font-sans text-subhead font-normal text-label-tertiary"
-        }
-      >
-        {hasDescription ? view.description : t("task.addDescription")}
+    <Pressable label={t("task.editDescription")} onPress={onEdit} role="button">
+      <Text role="body" {...clamp}>
+        {description}
       </Text>
-      <Pencil color={palette["label.secondary"]} size={15} strokeWidth={1.8} />
     </Pressable>
+  );
+};
+
+/** The description: six lines and «Show all» when long, a tap to edit, or the row that adds one. */
+const DescriptionText = ({
+  onEdit,
+  view,
+}: {
+  readonly view: TaskViewModel;
+  readonly onEdit: () => void;
+}) => {
+  const t = useT();
+  const [isFull, setIsFull] = useState(false);
+  // Where the title starts: at the gutter it stood a row inset short of it on a computer (N6).
+  const inset = titleInset(useIsInPane());
+  if (view.description === null || view.description === "") {
+    return (
+      <Pressable
+        className={cx("min-h-hit-web justify-center", inset)}
+        label={t("task.addDescription")}
+        onPress={onEdit}
+        role="button"
+      >
+        <Text role="body" tone="tertiary">
+          {t("task.addDescription")}
+        </Text>
+      </Pressable>
+    );
+  }
+  // Only a text that may run past six lines offers the rest (a clamped text cannot say it was cut).
+  const isCut = view.description.length > LONG_DESCRIPTION && !isFull;
+  return (
+    <View className={cx("gap-1", inset)} testID="task-description">
+      <DescriptionBody description={view.description} isCut={isCut} onEdit={onEdit} />
+      {isCut ? (
+        <Button
+          onPress={() => {
+            setIsFull(true);
+          }}
+          size="small"
+          variant="plain"
+        >
+          {t("task.showFull")}
+        </Button>
+      ) : null}
+    </View>
+  );
+};
+
+/** A quick description edit on the task itself, without opening the full task form. */
+export const TaskDescription = ({
+  isEditing,
+  onEditing: setIsEditing,
+  view,
+}: {
+  /** Whether the description is open in its editor (the summary shows its link meanwhile). */
+  readonly isEditing: boolean;
+  readonly onEditing: (isEditing: boolean) => void;
+  readonly view: TaskViewModel;
+}) => {
+  const [draft, setDraft] = useState(view.description ?? "");
+  // An edit left unsaved by a reload comes back open (feedback 5 item 7); saved or cancelled, it goes.
+  const draftKey = `task.${view.id}.about`;
+  useDraft(draftKey, draft, (kept) => {
+    setDraft(kept);
+    setIsEditing(true);
+  });
+  const discardDraft = useDiscardDraft();
+  // Where the description stands: focus comes back here when the editor closes (R25-09).
+  const placeRef = useRef<View>(null);
+  const close = (): void => {
+    discardDraft(draftKey);
+    setIsEditing(false);
+    focusPlace(placeRef);
+  };
+  const { isSaving, save } = useSaveDescription(view, close);
+  return (
+    <View ref={placeRef}>
+      {isEditing ? (
+        <DescriptionEditor
+          draft={draft}
+          isSaving={isSaving}
+          onCancel={close}
+          onChange={setDraft}
+          onSave={() => {
+            void save(draft);
+          }}
+        />
+      ) : (
+        <DescriptionText
+          onEdit={() => {
+            setDraft(view.description ?? "");
+            setIsEditing(true);
+          }}
+          view={view}
+        />
+      )}
+    </View>
   );
 };

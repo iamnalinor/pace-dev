@@ -27,7 +27,7 @@ import {
   seedExamplePresets,
   updatePreset,
 } from "./tools/preset-tools.ts";
-import { closeTask, markSubtasks, reopen, submit } from "./tools/progress-tools.ts";
+import { closeTask, markSubtasks, reopen } from "./tools/progress-tools.ts";
 import { fetchDocument, search } from "./tools/search-tools.ts";
 import { captureInbox, taskCreation, updateTask } from "./tools/task-tools.ts";
 import { dayTool, listActivityButtons, summaryTime } from "./tools/time-read-tools.ts";
@@ -62,7 +62,6 @@ export const TOOLS: readonly Tool[] = [
   taskCreation,
   captureInbox,
   markSubtasks,
-  submit,
   closeTask,
   reopen,
   updateTask,

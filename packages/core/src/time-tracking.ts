@@ -116,3 +116,4 @@ export {
 } from "./tracking/timeline.ts";
 export { typedActivity, type TypedActivity, typedSpan, type TypedSpan } from "./tracking/typed.ts";
 export { type SatRow, whereSat } from "./tracking/where-sat.ts";
+export { type Yield, yieldEvents, yieldsTo } from "./tracking/yield.ts";

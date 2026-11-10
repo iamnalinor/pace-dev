@@ -6,6 +6,7 @@ import type { ActionBody, ActionBodyOf, ActivityPatch } from "./schema.ts";
 import { err, ok } from "../result.ts";
 import { defaultsFor } from "../tracking/expect.ts";
 import { runningActivity } from "../tracking/timeline.ts";
+import { yieldEvents, yieldsTo } from "../tracking/yield.ts";
 import { ACTION_LIMITS, fitMinutes } from "./limits.ts";
 import {
   type Bodies,
@@ -57,8 +58,16 @@ const startActivity = (
   return ok([stamped(ctx, body, startedAt(state, action.startAt, ctx.now))]);
 };
 
-/** A past block, stamped at its end; one that ends ahead of now is not tracked yet. */
-const logActivity = (action: ActionBodyOf<"activity.log">, ctx: PlanContext): Planned => {
+/**
+A past block, stamped at its end; one that ends ahead of now is not tracked yet. The blocks it
+lands on give that time up, as the app's Log past does (owner, R27-05): their cut is a correction
+made now, in the same plan.
+*/
+const logActivity = (
+  state: CoreState,
+  action: ActionBodyOf<"activity.log">,
+  ctx: PlanContext,
+): Planned => {
   const label = action.label.trim();
   if (label === "" || !isAfter(action.end, action.start)) {
     return err("action/invalid");
@@ -76,7 +85,13 @@ const logActivity = (action: ActionBodyOf<"activity.log">, ctx: PlanContext): Pl
     },
     type: "activity.logged",
   };
-  return ok([stamped(ctx, body, action.end)]);
+  const span = { endAt: action.end, startAt: action.start };
+  return ok([
+    stamped(ctx, body, action.end),
+    ...yieldEvents(yieldsTo(state.time, span, ctx.now), span, ctx.newId).map((cut) =>
+      stamped(ctx, cut),
+    ),
+  ]);
 };
 
 const isAhead = (at: string | undefined, now: string): boolean =>
@@ -170,7 +185,7 @@ export const planActivity = (
     return startActivity(state, action, ctx);
   }
   if (action.kind === "activity.log") {
-    return logActivity(action, ctx);
+    return logActivity(state, action, ctx);
   }
   const activity = state.time.activities[action.activityId];
   if (activity === undefined) {

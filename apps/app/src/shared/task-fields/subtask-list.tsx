@@ -1,24 +1,24 @@
-import { Plus, X } from "lucide-react-native";
 import { useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
 import { entryFieldProps } from "#app/platform/enter-key.ts";
 import { cx } from "#app/ui/cx.ts";
-import { useTheme } from "#app/ui/theme-provider.tsx";
+import { Icon } from "#app/ui/icon.tsx";
+import { TextField } from "#app/ui/text-field.tsx";
 import { KEYBOARD } from "#app/ui/use-hotkey.tsx";
 
-/** A subtask the task already has; a sent one is on the record and cannot be taken off. */
-export type KeptSubtask = { readonly id: string; readonly label: string; readonly isSent: boolean };
+/** A subtask the task already has; a done one says so (taking it off is undone in History). */
+export type KeptSubtask = { readonly id: string; readonly label: string; readonly isDone: boolean };
 
 const NONE: readonly KeptSubtask[] = [];
 
-/** The row's bullet: a small open circle, like an unticked box (filled once sent). */
-const Bullet = ({ isSent = false }: { readonly isSent?: boolean }) => (
+/** The row's bullet: a small open circle, like an unticked box (filled once done). */
+const Bullet = ({ isDone = false }: { readonly isDone?: boolean }) => (
   <View
     className={cx(
       "h-4 w-4 rounded-pill border-stroke border-outline",
-      isSent && "bg-label-tertiary",
+      isDone && "bg-label-tertiary",
     )}
   />
 );
@@ -28,16 +28,15 @@ One subtask: the bullet, its text and a remove "×". With a mouse the × waits u
 pointed at (or the × has the keyboard's focus); on a touch screen it is always there.
 */
 const Row = ({
-  isSent = false,
+  isDone = false,
   label,
   onRemove,
 }: {
-  readonly isSent?: boolean;
+  readonly isDone?: boolean;
   readonly label: string;
   readonly onRemove?: (() => void) | undefined;
 }) => {
   const t = useT();
-  const { palette } = useTheme();
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const isShowsRemove = KEYBOARD === null || isHovered || isFocused;
@@ -52,18 +51,18 @@ const Row = ({
       }}
       role="listitem"
     >
-      <Bullet isSent={isSent} />
+      <Bullet isDone={isDone} />
       <Text
         className={cx(
           "flex-1 font-sans text-subhead font-normal",
-          isSent ? "text-label-secondary" : "text-label-primary",
+          isDone ? "text-label-secondary" : "text-label-primary",
         )}
       >
         {label}
       </Text>
-      {isSent ? (
+      {isDone ? (
         <Text className="font-sans text-caption font-normal text-label-tertiary">
-          {t("task.subtaskSentLabel")}
+          {t("task.subtaskDoneLabel")}
         </Text>
       ) : null}
       {onRemove === undefined ? null : (
@@ -80,7 +79,7 @@ const Row = ({
           onPress={onRemove}
           style={{ opacity: isShowsRemove ? 1 : 0 }}
         >
-          <X color={palette["label.secondary"]} size={16} strokeWidth={2} />
+          <Icon name="x" size="inline" />
         </Pressable>
       )}
     </View>
@@ -102,7 +101,6 @@ const AddSubtask = ({
   readonly onDraftChange: (draft: string) => void;
 }) => {
   const t = useT();
-  const { palette } = useTheme();
   const [isOpenByPress, setIsOpenByPress] = useState(false);
   // A typed one keeps the field open (its text is part of the form's save).
   const isOpen = isOpenByPress || draft !== "";
@@ -116,7 +114,7 @@ const AddSubtask = ({
           setIsOpenByPress(true);
         }}
       >
-        <Plus color={palette["label.secondary"]} size={16} strokeWidth={2} />
+        <Icon name="plus" size="inline" />
         <Text className="font-sans text-subhead font-normal text-label-secondary">
           {t("form.addSubtask")}
         </Text>
@@ -130,36 +128,37 @@ const AddSubtask = ({
   return (
     <View className="min-h-10 flex-row items-center gap-3 pl-1">
       <Bullet />
-      <TextInput
-        {...entryFieldProps}
-        accessibilityLabel={t("form.addSubtask")}
-        autoFocus
-        className="h-10 flex-1 font-sans text-subhead font-normal text-label-primary"
-        onBlur={() => {
-          if (draft.trim() === "") {
-            close();
-          }
-        }}
-        onChangeText={onDraftChange}
-        onKeyPress={(event) => {
-          if (event.nativeEvent.key === "Escape") {
-            close();
-          }
-        }}
-        onSubmitEditing={() => {
-          const label = draft.trim();
-          if (label === "") {
-            close();
-            return;
-          }
-          onAdd(label);
-          onDraftChange("");
-        }}
-        placeholder={t("form.addSubtask")}
-        placeholderTextColor={palette["label.tertiary"]}
-        returnKeyType="next"
-        value={draft}
-      />
+      <View className="flex-1">
+        <TextField
+          {...entryFieldProps}
+          autoFocus
+          isLabelHidden
+          label={t("form.addSubtask")}
+          onBlur={() => {
+            if (draft.trim() === "") {
+              close();
+            }
+          }}
+          onChangeText={onDraftChange}
+          onKeyPress={(event) => {
+            if (event.nativeEvent.key === "Escape") {
+              close();
+            }
+          }}
+          onSubmitEditing={() => {
+            const label = draft.trim();
+            if (label === "") {
+              close();
+              return;
+            }
+            onAdd(label);
+            onDraftChange("");
+          }}
+          placeholder={t("form.addSubtask")}
+          returnKeyType="next"
+          value={draft}
+        />
+      </View>
     </View>
   );
 };
@@ -202,11 +201,11 @@ export const SubtaskList = ({
         <View aria-label={t("form.subtasks")} role="list">
           {kept.map((subtask) => (
             <Row
-              isSent={subtask.isSent}
+              isDone={subtask.isDone}
               key={subtask.id}
               label={subtask.label}
               onRemove={
-                onRemoveKept === undefined || subtask.isSent
+                onRemoveKept === undefined
                   ? undefined
                   : () => {
                       onRemoveKept(subtask.id);

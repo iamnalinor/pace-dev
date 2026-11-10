@@ -24,6 +24,10 @@ describe("app config", () => {
 
   // The native grounds (first frame, splash, adaptive icon) are the tokens' dark app ground, as the
   // web page's (F-WEB-02): no hand-typed hex that drifts when the palette changes.
+  it("turns with the device: no portrait lock, a tablet and an unfolded phone get the rail (Q8, F-LAY-04)", () => {
+    expect(config.orientation ?? "default").toBe("default");
+  });
+
   it("paints the splash, the adaptive icon and the first frame with the tokens' app ground", () => {
     const ground = THEME_VARS.dark["--pace-app"];
     expect(config.backgroundColor).toBe(ground);

@@ -14,10 +14,10 @@ import {
 } from "@pace/core";
 
 import type { ActivityReading } from "./actions/time-actions.ts";
-import type { ApiClient } from "./api-client.ts";
 import type { Clock } from "./clock.ts";
 import type { AppStateHandle } from "./state.ts";
 
+import { type ApiClient, ApiUnreachable } from "./api-client.ts";
 import { type AiReading, aiReading } from "./view-models/ai-reading.ts";
 
 /** Why no model read a text, and whether the server can keep it for one that can later. */
@@ -112,6 +112,35 @@ const localReading = (
   };
 };
 
+/**
+The log's answer is sent without awaiting after an Approve: a reload or a closed tab right after
+the press must not cancel it (bug-lessons 192). Its body is a few ids, far under keepalive's 64 KB.
+*/
+const OUTLIVES_PAGE = { keepalive: true } as const;
+
+/**
+The log's answers, sent so they outlive the page; a browser that refuses keepalive with a
+preflight fails before the network, so it goes once more as an ordinary request and the log still
+gets it (review of round 24, minor 7).
+*/
+const sendAnswers = async (
+  deps: AssistantDeps,
+  answers: ReturnType<typeof resolutionsOf>,
+): Promise<void> => {
+  const body = { decisions: [...answers] };
+  try {
+    await deps.api.call(endpoints.decisions.resolve, { body }, OUTLIVES_PAGE);
+  } catch (error) {
+    if (error instanceof ApiUnreachable) {
+      try {
+        await deps.api.call(endpoints.decisions.resolve, { body });
+      } catch {
+        // The log is a record for the person, not a step of the action: nothing to undo.
+      }
+    }
+  }
+};
+
 export const createAssistant = (deps: AssistantDeps): Assistant => ({
   propose: async (text, domain, thread) => {
     try {
@@ -147,11 +176,7 @@ export const createAssistant = (deps: AssistantDeps): Assistant => ({
     if (answers.length === 0) {
       return;
     }
-    try {
-      await deps.api.call(endpoints.decisions.resolve, { body: { decisions: [...answers] } });
-    } catch {
-      // The log is a record for the person, not a step of the action: nothing to undo.
-    }
+    await sendAnswers(deps, answers);
   },
   readActivity: async (text) => {
     try {

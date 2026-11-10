@@ -26,9 +26,9 @@ export type SectionProps = {
   readonly onChange: (definition: PresetDefinition) => void;
 };
 
-type ChoiceKey = "color" | "defaultImportance" | "progressMode" | "submission";
+type ChoiceKey = "color" | "defaultImportance" | "progressMode";
 
-/** A setting picked from a short list (importance, submission, progress, color). */
+/** A setting picked from a short list (importance, progress, color). */
 export const ChoiceRow = <K extends ChoiceKey>({
   colorOf,
   field,

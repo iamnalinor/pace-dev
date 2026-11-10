@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { endpoints } from "@pace/core";
+
 import { createApiClient } from "./api-client.ts";
 import { type Auth, createAuth } from "./auth.ts";
 import { createFakeFetch, fakeMe, type FakeRoute, fakeUser, problem } from "./fake-fetch.fake.ts";
@@ -181,6 +183,56 @@ describe("createAuth bot login", () => {
       { deviceId: "dev-1", deviceName: "Pixel 9a" },
       undefined,
     ]);
+  });
+
+  it("cuts what the phone says to the server's limits and drops blanks, so a long model cannot block the sign-in", async () => {
+    const { auth, calls } = await setup({ "POST /api/auth/nonce": () => NONCE_CREATED });
+    await auth.startBotLogin("app", {
+      deviceBrand: " ".repeat(3),
+      deviceId: "dev-1",
+      deviceModel: `  ${"👨‍👩‍👧".repeat(100)}  `,
+      deviceName: "x".repeat(200),
+      osVersion: "1".repeat(50),
+    });
+    const body = calls[0]?.body as Record<string, string>;
+    expect(body["deviceBrand"]).toBeUndefined();
+    expect(body["deviceId"]).toBe("dev-1");
+    // The server's `.max()` counts UTF-16 units: the cut must fit that, between two characters.
+    expect(body["deviceModel"]?.length).toBeLessThanOrEqual(60);
+    expect(body["deviceModel"]).toBe("👨‍👩‍👧".repeat(7));
+    expect(body["deviceName"]).toBe("x".repeat(80));
+    expect(body["osVersion"]).toBe("1".repeat(20));
+    // What the server parses keeps every field (a field over its limit would be dropped).
+    expect(endpoints.auth.nonceCreate.body.parse(body)).toEqual(body);
+  });
+
+  it("keeps an emoji model the server can store: within its UTF-16 limit, no half character (bug-lessons 186)", async () => {
+    const { auth, calls } = await setup({ "POST /api/auth/nonce": () => NONCE_CREATED });
+    await auth.startBotLogin("app", { deviceModel: `Pixel ${"🚀".repeat(40)}` });
+    const body = calls[0]?.body as Record<string, string>;
+    expect(endpoints.auth.nonceCreate.body.parse(body)).toEqual(body);
+    expect(body["deviceModel"]).toBe(`Pixel ${"🚀".repeat(27)}`);
+  });
+
+  it("signs in against an older Worker that refuses the phone's newer fields: asks again with the old ones", async () => {
+    let asked = 0;
+    const { auth, calls } = await setup({
+      "POST /api/auth/nonce": () => {
+        asked += 1;
+        const isKnown = Object.keys(calls.at(-1)?.body as object).every((key) =>
+          ["deviceId", "deviceName"].includes(key),
+        );
+        return isKnown ? NONCE_CREATED : problem(422, "validation");
+      },
+    });
+    const login = await auth.startBotLogin("app", {
+      deviceId: "dev-1",
+      deviceModel: "Pixel 9a",
+      deviceName: "Pixel 9a",
+    });
+    expect(login.nonce).toBe("n1");
+    expect(asked).toBe(2);
+    expect(calls.at(-1)?.body).toEqual({ deviceId: "dev-1", deviceName: "Pixel 9a" });
   });
 
   it("polls until the nonce is ready and stores the token", async () => {

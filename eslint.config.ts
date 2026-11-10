@@ -27,6 +27,7 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import tseslint from "typescript-eslint";
 
 import { GENERATED_CLASSES } from "./scripts/design/generate-design.ts";
+import { BARE_PRESSABLE_MARKER } from "./scripts/eslint-ratchet.ts";
 import { plugin as pace } from "./scripts/eslint-rules/index.ts";
 
 /** Fails loudly if a plugin stops shipping a config we rely on (instead of silently linting less). */
@@ -45,6 +46,12 @@ const UNTYPED_RULES = {
 
 /** Syntax banned everywhere; a block that adds its own entries must spread these (the option replaces). */
 const RESTRICTED_SYNTAX = [
+  {
+    message:
+      "A reanimated view takes no className on the web (NativeWind does not reach it): put the classes on a plain View inside, or the value in its style (bug-lessons 148).",
+    selector:
+      "JSXOpeningElement[name.object.name='Animated'] > JSXAttribute[name.name='className']",
+  },
   {
     message: "Use a union of string literals instead of enum.",
     selector: "TSEnumDeclaration",
@@ -105,6 +112,15 @@ const ACTION_ANSWER_SYNTAX = [
     selector:
       "UnaryExpression[operator='void'] > CallExpression[callee.object.name='actions'][callee.property.name!='ensureInstances'], UnaryExpression[operator='void'] > CallExpression[callee.object.property.name='actions']",
   },
+];
+
+/** React Native's (and gesture-handler's) pressables with no state layer (bug-lessons 122). */
+const BARE_PRESSABLES = [
+  "Pressable",
+  "TouchableHighlight",
+  "TouchableNativeFeedback",
+  "TouchableOpacity",
+  "TouchableWithoutFeedback",
 ];
 
 const TESTS = [
@@ -525,6 +541,37 @@ export default defineConfig([
     ignores: TESTS,
     plugins: { pace },
     rules: { "pace/no-raw-design-values": ["warn", { allowedClasses: GENERATED_CLASSES }] },
+  },
+  // Icons and line limits come from the kit's Icon and Text (spec §4.1.1, §4.1.2 rule 9; bug-lessons
+  // 109). A warning counted by its own exact ratchet (KIT_PRIMITIVE_WARNINGS in
+  // scripts/eslint-all.ts) while the screens migrate in their tasks; then it becomes an error.
+  {
+    files: APP,
+    ignores: TESTS,
+    plugins: { pace },
+    rules: { "pace/kit-primitives": "warn" },
+  },
+  // Features and shared rows press through the kit's Pressable, which draws the state layer
+  // (bug-lessons F-CMP-01). A warning counted by its own exact ratchet (BARE_PRESSABLE_WARNINGS in
+  // scripts/eslint-all.ts) while the kit tasks migrate the callers; then it becomes an error.
+  {
+    files: ["apps/app/src/features/**/*.{ts,tsx}", "apps/app/src/shared/**/*.{ts,tsx}"],
+    ignores: TESTS,
+    rules: {
+      "no-restricted-imports": [
+        "warn",
+        {
+          paths: [
+            { importNames: BARE_PRESSABLES, message: BARE_PRESSABLE_MARKER, name: "react-native" },
+            {
+              importNames: BARE_PRESSABLES,
+              message: BARE_PRESSABLE_MARKER,
+              name: "react-native-gesture-handler",
+            },
+          ],
+        },
+      ],
+    },
   },
   {
     // Plain scripts the web page loads before the app (no bundler, no types): checked as browser JS.

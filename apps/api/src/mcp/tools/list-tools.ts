@@ -177,7 +177,7 @@ const PresetSchema = z.object({
 export const listPresets = defineTool({
   annotations: READ_ONLY,
   description:
-    "Every preset: the five defaults, editable like any other (hw = homework with numbered problems and per-problem submission, work = a link and a progress slider, personal, deferred, inbox) and the user's own (courses extend hw; archived ones stay listed for their existing tasks). Each comes with its own definition and the fully resolved settings: urgency policy, default importance, deadline policy, submission mode, progress mode, weekly recurrence, default estimate. Use it to pick a presetId for create_task or to check a course's schedule.",
+    "Every preset: the five defaults, editable like any other (hw = homework with numbered problems, each marked done on its own, work = a link and a progress slider, personal, deferred, inbox) and the user's own (courses extend hw; archived ones stay listed for their existing tasks). Each comes with its own definition and the fully resolved settings: default importance, deadline policy, progress mode, weekly recurrence, default estimate. Use it to pick a presetId for create_task or to check a course's schedule.",
   handler: async (_args, ctx) =>
     await runRead(ctx, (scope) => {
       const presets = Object.values(scope.state.presets.byId)
@@ -254,7 +254,7 @@ const ReviewItemSchema = z.object({
   actions: z.array(z.string()).describe("Keys accepted by review_action for this item."),
   kind: z
     .string()
-    .describe("submitted | deadline-passed | unsorted-too-long | confirm-auto-outcome"),
+    .describe("all-done | deadline-passed | unsorted-too-long | confirm-auto-outcome"),
   since: z.string(),
   taskId: z.string(),
   title: z.string(),
@@ -264,7 +264,7 @@ const ReviewItemSchema = z.object({
 export const listReview = defineTool({
   annotations: READ_ONLY,
   description:
-    "What the person forgot to tell the system, oldest first: tasks fully solved but still open a day later ('submitted?'), deadlines that passed with no news, inbox items unsorted for days, and automatic outcomes (missed, skipped) awaiting confirmation. Each item lists the action keys review_action accepts: submit-now, mark-done, cancel, skip, keep-open, sort, confirm, undo.",
+    "What the person forgot to tell the system, oldest first: tasks with every subtask done (or the slider full) but still open a day later ('all done, close it?'), deadlines that passed with no news, inbox items unsorted for days, and automatic outcomes awaiting confirmation (an empty homework instance skipped; a miss closed by an older version: nothing closes a task past its deadline any more, it stays open and overdue). Each item lists the action keys review_action accepts: mark-done, cancel, skip, keep-open, sort, confirm, undo.",
   handler: async (_args, ctx) =>
     await runRead(ctx, (scope) => {
       const items = reviewItems(scope.state, scope.qctx).map((item) => ({

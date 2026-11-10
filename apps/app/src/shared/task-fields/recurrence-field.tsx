@@ -7,6 +7,7 @@ import { useLanguage, useSettings, useT } from "#app/app-state.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Calendar } from "#app/ui/calendar.tsx";
 import { Chip } from "#app/ui/chip.tsx";
+import { RadioGroup } from "#app/ui/radio-group.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 import { formatInZone, type SeriesSchedule } from "@pace/core";
 
@@ -25,6 +26,11 @@ const untilText = (until: string, language: string): string =>
     year: "numeric",
   }).format(new Date(`${until}T00:00:00.000Z`));
 const KINDS = ["daily", "weekdays", "every_n_days", "weekly", "monthly"] as const;
+
+/** "Does not repeat" among the rhythms (a radio needs a value). */
+const NO_REPEAT = "none";
+const REPEAT_CHOICES = [NO_REPEAT, ...KINDS] as const;
+const END_CHOICES = ["none", "date"] as const;
 
 const withKind = (
   kind: (typeof KINDS)[number],
@@ -52,27 +58,22 @@ const RepeatKindPicker = ({
   );
   return (
     <View className="gap-2">
-      <View className="flex-row flex-wrap gap-2">
-        <Chip
-          onPress={() => {
-            onChange(null);
-          }}
-          selected={value === null}
-        >
-          {t("form.repeat.none")}
-        </Chip>
+      <RadioGroup
+        className="flex-row flex-wrap gap-x-2"
+        label={t("form.repeat")}
+        onChange={(kind: (typeof KINDS)[number] | typeof NO_REPEAT) => {
+          onChange(kind === NO_REPEAT ? null : withKind(kind, daysText, value));
+        }}
+        value={value?.kind ?? NO_REPEAT}
+        values={REPEAT_CHOICES}
+      >
+        <Chip value={NO_REPEAT}>{t("form.repeat.none")}</Chip>
         {KINDS.map((kind) => (
-          <Chip
-            key={kind}
-            onPress={() => {
-              onChange(withKind(kind, daysText, value));
-            }}
-            selected={value?.kind === kind}
-          >
+          <Chip key={kind} value={kind}>
             {t(`form.repeat.${kind}`)}
           </Chip>
         ))}
-      </View>
+      </RadioGroup>
       {value?.kind === "every_n_days" ? (
         <TextField
           inputMode="numeric"
@@ -112,25 +113,25 @@ const RepeatEndPicker = ({
   const zone = start?.tz ?? timezone ?? viewer.deviceTz;
   return (
     <View className="gap-2">
-      <View className="flex-row flex-wrap gap-2">
-        <Chip
-          onPress={() => {
+      <RadioGroup
+        className="flex-row flex-wrap gap-x-2"
+        label={t("form.repeat.endDate")}
+        onChange={(end: "date" | "none") => {
+          if (end === "none") {
             onChange({ ...value, until: undefined });
             setIsOpen(false);
-          }}
-          selected={value.until === undefined}
-        >
-          {t("form.repeat.noEnd")}
-        </Chip>
-        <Chip
-          onPress={() => {
+          } else {
             setIsOpen((current) => !current);
-          }}
-          selected={value.until !== undefined}
-        >
+          }
+        }}
+        value={value.until === undefined ? "none" : "date"}
+        values={END_CHOICES}
+      >
+        <Chip value="none">{t("form.repeat.noEnd")}</Chip>
+        <Chip value="date">
           {value.until === undefined ? t("form.repeat.endDate") : untilText(value.until, language)}
         </Chip>
-      </View>
+      </RadioGroup>
       {isOpen ? (
         <View className="rounded-xl border border-separator bg-app p-3">
           <Calendar

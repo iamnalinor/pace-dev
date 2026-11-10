@@ -1,93 +1,109 @@
-import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
-import { Text, View } from "react-native";
+import type { ReactNode } from "react";
+
+import { Redirect, useRouter } from "expo-router";
 
 import type { SharedIn } from "#app/platform/shared-line.ts";
 
-import { useT } from "#app/app-state.tsx";
+import { useAppState, useT } from "#app/app-state.tsx";
 import { ComposerProvider, useComposerFlow } from "#app/features/now/composer/composer-flow.tsx";
 import { ComposerPane } from "#app/features/now/composer/composer-pane.tsx";
 import { NowBoard } from "#app/features/now/now-screen.tsx";
 import { TaskScreen } from "#app/features/task/task-screen.tsx";
 import { useLineDraftNote } from "#app/platform/shared-in.ts";
 import { TaskOpenerProvider, TaskPaneProvider } from "#app/shared/task-opener.tsx";
+import { useSearchParam } from "#app/shared/use-search-param.ts";
 import { useIsWide } from "#app/ui/layout.ts";
-
-type Picked = { readonly id: string; readonly close: boolean };
-
-/** The pane beside the list when no form is open: the picked task, or how to pick one. */
-const PickedTask = ({
-  onClose,
-  picked,
-}: {
-  readonly picked: null | Picked;
-  readonly onClose: () => void;
-}) => {
-  const t = useT();
-  if (picked === null) {
-    return (
-      <View className="flex-1 items-center justify-center">
-        <Text className="font-sans text-subhead font-normal text-label-secondary">
-          {t("now.pickTask")}
-        </Text>
-      </View>
-    );
-  }
-  return (
-    <TaskPaneProvider onClose={onClose}>
-      <TaskScreen id={picked.id} key={picked.id} openClose={picked.close} />
-    </TaskPaneProvider>
-  );
-};
+import { Shell } from "#app/ui/shell.tsx";
 
 /**
-On a wide window the picked task opens next to the list, as on the old web app, and so does
-the task form: while it is open the pane holds it, and closing it (or adding the task) brings
+The task open beside the list, from the address (`?task=<id>`, feedback 5 item 6): a reload, a
+link and the browser's history open the same one. An id the store does not know (a deleted task,
+a mistyped link, the log still loading) leaves the pane closed and the address as it is: nothing
+is written back, so nothing loops (bug-lessons 1).
+*/
+const usePickedTask = (): readonly [
+  picked: null | string,
+  pick: (taskId: null | string) => void,
+  forget: () => void,
+] => {
+  const [taskId, setTaskId, forget] = useSearchParam("task");
+  const isKnown = useAppState(
+    (state) => taskId !== null && Object.hasOwn(state.tasks.byId, taskId),
+  );
+  return [taskId !== null && isKnown ? taskId : null, setTaskId, forget];
+};
+
+/** The inspector's task: the picked one, with its pane's close. */
+const PickedTask = ({
+  onClose,
+  onGone,
+  picked,
+}: {
+  readonly picked: string;
+  readonly onClose: () => void;
+  readonly onGone: () => void;
+}) => (
+  <TaskPaneProvider onClose={onClose} onGone={onGone}>
+    <TaskScreen id={picked} key={picked} />
+  </TaskPaneProvider>
+);
+
+/**
+On a wide window the picked task opens in the shell's inspector, and so does the task form: while
+it is open the inspector holds it, collapsed when there is neither, and closing it (or adding the task) brings
 the picked task back. Picking a task while the form is open closes it: its draft goes, the
 line keeps its text.
 */
 const NowSplit = ({
   isComposerFocused,
+  onGone,
   onPick,
   picked,
 }: {
+  /** The picked task was deleted: it leaves the address without a step. */
+  readonly onGone: () => void;
   readonly isComposerFocused: boolean;
-  readonly picked: null | Picked;
-  readonly onPick: (picked: null | Picked) => void;
+  readonly picked: null | string;
+  readonly onPick: (picked: null | string) => void;
 }) => {
+  const t = useT();
   const flow = useComposerFlow();
-  // The check's submit sheet opens once: the form taking the pane over has used it up, so
-  // the task coming back after the form does not open the sheet again by itself.
-  useEffect(() => {
-    if (flow.form !== null && picked?.close === true) {
-      onPick({ ...picked, close: false });
-    }
-  }, [flow.form, onPick, picked]);
+  // The inspector opens with the form or a pick and is collapsed otherwise (F-LAY-03).
+  let inspector: ReactNode;
+  if (flow.form !== null) {
+    inspector = <ComposerPane />;
+  } else if (picked !== null) {
+    inspector = (
+      <PickedTask
+        onClose={() => {
+          onPick(null);
+        }}
+        onGone={onGone}
+        picked={picked}
+      />
+    );
+  }
   return (
     <TaskOpenerProvider
-      open={(id, options) => {
+      open={(id) => {
         flow.hide();
-        onPick({ close: options?.close === true, id });
+        onPick(id);
       }}
-      selectedId={flow.form === null ? (picked?.id ?? null) : null}
+      selectedId={flow.form === null ? picked : null}
     >
-      <View className="flex-1 flex-row bg-app">
-        <View className="w-narrow-column max-w-1/2 border-r border-separator">
-          <NowBoard isComposerFocused={isComposerFocused} />
-        </View>
-        <View className="flex-1">
-          {flow.form === null ? (
-            <PickedTask
-              onClose={() => {
-                onPick(null);
-              }}
-              picked={picked}
-            />
-          ) : (
-            <ComposerPane />
-          )}
-        </View>
-      </View>
+      <Shell
+        content={<NowBoard isComposerFocused={isComposerFocused} />}
+        inspector={inspector}
+        inspectorLabel={t("now.details")}
+        inspectorOpen={inspector !== undefined}
+        // Escape closes the picked task (R24-01); the task form owns its own Escape (its close).
+        {...(flow.form === null &&
+          picked !== null && {
+            onInspectorClose: () => {
+              onPick(null);
+            },
+          })}
+      />
     </TaskOpenerProvider>
   );
 };
@@ -107,10 +123,13 @@ so each share fills the line, the same text again included.
 */
 export const NowScreen = ({
   compose,
+  lineDraftKey = "now.line",
   notesLineDraft = false,
   opensForm = false,
 }: {
   readonly compose?: SharedIn | undefined;
+  /** Where the line's unsent text is kept: Now's own, or the Add tab's (feedback 5 item 7). */
+  readonly lineDraftKey?: string;
   /** The line a share goes after (Now at "/" on the web, the Add tab on a phone) tells what it holds. */
   readonly notesLineDraft?: boolean;
   /** New task arriving on /add: the empty form opens at once. */
@@ -118,16 +137,22 @@ export const NowScreen = ({
 }) => {
   const router = useRouter();
   const isWide = useIsWide();
-  const [picked, setPicked] = useState<null | Picked>(null);
+  const [picked, setPicked, forgetPicked] = usePickedTask();
+  // A `?task=` link copied on a computer and opened at a phone's width (or a window narrowed with
+  // a task open) opens the task on its own page, as a phone opens one (session review minor 6).
+  if (!isWide && picked !== null) {
+    return <Redirect href={`/task/${picked}`} />;
+  }
   const isComposerFocused = compose !== undefined;
   return (
     <ComposerProvider
       initialText={compose?.text}
       isFormInPane={isWide}
       key={compose === undefined ? "now" : `share-${compose.seq}`}
+      lineDraftKey={lineDraftKey}
       onCreatedTask={(taskId) => {
         if (isWide) {
-          setPicked({ close: false, id: taskId });
+          setPicked(taskId);
         } else {
           router.push(`/task/${taskId}`);
         }
@@ -136,7 +161,12 @@ export const NowScreen = ({
     >
       {notesLineDraft ? <LineDraftNote /> : null}
       {isWide ? (
-        <NowSplit isComposerFocused={isComposerFocused} onPick={setPicked} picked={picked} />
+        <NowSplit
+          isComposerFocused={isComposerFocused}
+          onGone={forgetPicked}
+          onPick={setPicked}
+          picked={picked}
+        />
       ) : (
         <NowBoard isComposerFocused={isComposerFocused} />
       )}

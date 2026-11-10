@@ -22,9 +22,10 @@ import { IS_PHONE } from "./platform/device.ts";
 import { clearPresentedPoolNotifications } from "./platform/notification-cleanup.ts";
 import { useServerOrigin, watchServer } from "./platform/server-origin.ts";
 import { forgetLineDraft } from "./platform/shared-in.ts";
-import { poolOf, retryOnWindowFocus } from "./runtime-pool.ts";
+import { followReturns, poolOf } from "./runtime-pool.ts";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
 import { canStartSenders, POLL_LIVE_MS, POLL_OFFLINE_MS } from "./senders.ts";
+import { DraftOwnerContext, forgetDrafts } from "./ui/use-draft.ts";
 import { createZoneStep } from "./zone-after-sync.ts";
 
 const RuntimeContext = createContext<null | PaceRuntime>(null);
@@ -79,6 +80,27 @@ const followSyncedLanguage = (runtime: PaceRuntime, onSynced: OnSynced): (() => 
   });
 };
 
+/** The half-typed line and the fields' drafts were this account's (class 103, feedback 5 item 7). */
+const forgetTyped = (): void => {
+  forgetLineDraft();
+  forgetDrafts();
+};
+
+/**
+The first status followed. Signed out at start (a token that expired while away), the fields'
+drafts go too: no draft outlives its account (security review L5); a sign-out later forgets them
+on its transition.
+*/
+const followFromStart = (
+  follow: (status: AuthState["status"]) => void,
+  status: AuthState["status"],
+): void => {
+  follow(status);
+  if (status === "signed-out") {
+    forgetDrafts();
+  }
+};
+
 /** Starts/stops the sync loop with the auth status; a foreground return syncs at once. */
 const runSyncLoop = (runtime: PaceRuntime, onSynced: OnSynced): (() => void) => {
   const { actions, auth, sync } = runtime;
@@ -102,7 +124,7 @@ const runSyncLoop = (runtime: PaceRuntime, onSynced: OnSynced): (() => void) => 
       runtime.live.stop();
     }
   };
-  follow(auth.store.getState().status);
+  followFromStart(follow, auth.store.getState().status);
   const unsubscribe = auth.store.subscribe((current, previous) => {
     if (current.status === previous.status) {
       return;
@@ -120,8 +142,7 @@ const runSyncLoop = (runtime: PaceRuntime, onSynced: OnSynced): (() => void) => 
     }
     const leaving = activeSession;
     activeSession = undefined;
-    // The half-typed line was this account's: a share after the next sign-in is only the share.
-    forgetLineDraft();
+    forgetTyped();
     void dropLocalCopyOnSignOut(runtime, { cause: signOutCauseOf(current), leaving });
   });
   // The poll is a safety net while the server can say "changed" itself.
@@ -156,7 +177,7 @@ const runSyncLoop = (runtime: PaceRuntime, onSynced: OnSynced): (() => void) => 
   });
   const stopNotices = followPhoneNotices(runtime);
   const stopServerChecks = watchServer(runtime);
-  const stopFocus = retryOnWindowFocus(runtime);
+  const stopFocus = followReturns(runtime);
   return () => {
     stopFocus();
     stopServerChecks();
@@ -221,7 +242,9 @@ export const PaceProvider = ({
     <View className="flex-1 bg-app" />
   ) : (
     <RuntimeContext value={runtime}>
-      <SyncedContext value={synced}>{children}</SyncedContext>
+      <SyncedContext value={synced}>
+        <DraftOwnerContext value={runtime.api.currentSessionToken}>{children}</DraftOwnerContext>
+      </SyncedContext>
     </RuntimeContext>
   );
 };

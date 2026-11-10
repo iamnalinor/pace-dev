@@ -76,16 +76,27 @@ them twice.
 */
 export type ClassScope = {
   readonly allowed: ReadonlySet<string> | undefined;
+  /** The file is the kit's state layer, the one place a pressed (`active:`) class may live. */
+  readonly isStateLayer: boolean;
   readonly seen: WeakSet<Literal | TemplateElement>;
 };
+
+/** `active:opacity-80`, `dark:active:bg-fill-2`: NativeWind's pressed state, a React render late. */
+const isPressedClass = (token: string): boolean => token.split(":").slice(0, -1).includes("active");
 
 const words = (piece: Piece): readonly string[] =>
   piece.text.split(/\s+/).filter((token) => token !== "");
 
-const checkPiece = (context: Context, { allowed }: ClassScope, piece: Piece): void => {
+const checkPiece = (
+  context: Context,
+  { allowed, isStateLayer }: ClassScope,
+  piece: Piece,
+): void => {
   const tokens = words(piece);
   for (const [index, token] of tokens.entries()) {
-    if (isArbitrary(token)) {
+    if (!isStateLayer && isPressedClass(token) && !isFragment(piece, index, tokens.length)) {
+      context.report({ data: { name: token }, messageId: "pressedClass", node: piece.node });
+    } else if (isArbitrary(token)) {
       context.report({ data: { name: token }, messageId: "arbitraryClass", node: piece.node });
     } else if (
       allowed !== undefined &&

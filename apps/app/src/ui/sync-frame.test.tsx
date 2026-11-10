@@ -86,7 +86,7 @@ describe("the first-sync cover (QA round 17 M4)", () => {
 /** A screen's own empty states, as Now, Day and the others draw them. */
 const Screens = () => (
   <SyncFrame isBare={false}>
-    <EmptyState>{en("now.empty")}</EmptyState>
+    <EmptyState title={en("now.empty")} />
     <EmptyText className="">{en("day.empty")}</EmptyText>
   </SyncFrame>
 );
@@ -175,7 +175,7 @@ describe("the first-sync cover's bound (QA round 17 review I2)", () => {
     // A screen's own empty state, as Now, Inbox and the others draw it.
     await renderScreen(
       <SyncFrame isBare={false}>
-        <EmptyState>{en("now.empty")}</EmptyState>
+        <EmptyState title={en("now.empty")} />
         <EmptyText className="">{en("day.empty")}</EmptyText>
       </SyncFrame>,
       runtime,
@@ -307,4 +307,11 @@ describe("back on the network (QA round 17 review m9)", () => {
       expect(sync).toHaveBeenCalledTimes(1);
     },
   );
+
+  it("sends a Log out the server did not hear again, signed out too (R22-02)", async () => {
+    const runtime = await createTestRuntime({ routes: DEV_LOGIN });
+    const retry = jest.spyOn(runtime.auth, "retryEndedSessions");
+    backOnline(runtime);
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
 });

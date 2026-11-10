@@ -30,6 +30,7 @@ export const enShell = {
   "account.unknown": "Unknown confirmation.",
   "account.notYours": "This confirmation is not yours.",
   "nav.main": "Main",
+  "nav.skipToContent": "Skip to content",
   "nav.signedInAs": "Signed in as {name}",
   "login.title": "Sign in to Pace",
   "login.subtitle": "Your tasks and time, at your own pace.",
@@ -40,7 +41,7 @@ export const enShell = {
   "login.openBot": "Open {bot} in Telegram",
   "login.waiting": "Waiting for Telegram…",
   "login.openBotAgain": "Open the bot again",
-  "login.webFallback": "Log in on the web instead",
+  "login.webFallback": "Sign in on the web instead",
   "login.notAllowed": "This Telegram account is not on the list.",
   "login.openTelegram": "Open Telegram",
   "login.timeout": "Telegram did not answer in time. Try again.",
@@ -48,7 +49,7 @@ export const enShell = {
   "auth.signingIn": "Signing you in…",
   "auth.invalidLink": "This sign-in link is not valid anymore.",
   "auth.backToLogin": "Back to sign-in",
-  "login.botFallback": "Log in with the bot instead",
+  "login.botFallback": "Sign in with the bot instead",
   "login.botHint": "Open the bot, press Start, then come back here.",
   "login.widgetLoading": "Loading the Telegram button…",
   "login.widgetSlow":
@@ -86,7 +87,7 @@ export const enShell = {
   "oauth.signedInAs": "Signed in as {name}",
   "oauth.sessionEnded": "Your Pace session has ended. Sign in again to continue.",
   "oauth.deviceToken":
-    "This Pace sign-in cannot connect apps. Log out of Pace in this browser, sign in again and retry.",
+    "This Pace sign-in cannot connect apps. Sign out of Pace in this browser, sign in again and retry.",
   "oauth.identityConflict": "This page sent two sign-ins at once. Reload it and allow again.",
   "oauth.widgetMissing": "Can't see the Telegram button?",
   "oauth.signInFirst": "Sign in to Pace first",
@@ -165,18 +166,18 @@ export const enShell = {
   "settings.categoryEstimates": "Activity estimates",
   "settings.categoryEstimates.hint":
     "An activity's own estimate comes first, then this setting, past runs and the built-in value.",
-  "settings.logout": "Log out",
-  "settings.logout.unsynced.one": "{count} change has not synced yet: logging out now loses it.",
+  "settings.logout": "Sign out",
+  "settings.logout.unsynced.one": "{count} change has not synced yet: signing out now loses it.",
   "settings.logout.unsynced.few":
-    "{count} changes have not synced yet: logging out now loses them.",
+    "{count} changes have not synced yet: signing out now loses them.",
   "settings.logout.unsynced.many":
-    "{count} changes have not synced yet: logging out now loses them.",
+    "{count} changes have not synced yet: signing out now loses them.",
   "settings.logout.unsynced.other":
-    "{count} changes have not synced yet: logging out now loses them.",
+    "{count} changes have not synced yet: signing out now loses them.",
   "settings.logout.unsynced.unknown":
-    "Some changes may not have synced yet: logging out now loses them.",
+    "Some changes may not have synced yet: signing out now loses them.",
   "settings.logout.wait": "Wait",
-  "settings.logout.anyway": "Log out anyway",
+  "settings.logout.anyway": "Sign out anyway",
   "settings.deleteAccount": "Delete account",
   "settings.deleteAccount.warning":
     "This deletes the account for good: tasks, time, presets, the decision log and every connected app. It cannot be undone.",
@@ -216,8 +217,8 @@ export const enShell = {
   "errors.notFound": "Not found.",
   "errors.pageNotFound": "Page not found",
   "errors.pageNotFoundBody": "There is nothing at {path}.",
-  "update.message": "We changed a few things. Refresh to see them.",
-  "update.refresh": "Refresh",
+  "update.message": "A new version of Pace is ready.",
+  "update.refresh": "Refresh page",
   "common.and": "and",
   "common.close": "Close",
   "time.zoned": "{time} {zone} (your time {local})",
@@ -231,6 +232,8 @@ export const enShell = {
   "settings.quietHours.to": "To",
   "settings.nightHours": "Show night hours",
   "settings.nightHours.hint": "Week shows the whole day, from 00 to 24.",
+  "settings.nightHours.hintOff":
+    "Week starts at 07, earlier only when the week has something before 07. The moon on Week turns this on too.",
   "settings.presets": "Presets",
   "settings.presets.hint": "Courses, work, personal: how each kind of task behaves.",
   "settings.review": "To sort",
@@ -261,7 +264,7 @@ export const enShell = {
   "nav.history": "History",
   "nav.newTask": "New task",
   "bot.notLinked":
-    "This Telegram account is not linked to Pace yet. Open Pace and log in with the bot first.",
+    "This Telegram account is not linked to Pace yet. Open Pace and sign in with the bot first.",
   "bot.preview": "The assistant will create this task:",
   "bot.rulesPreview": "AI is unavailable. This suggestion uses simple rules.",
   "bot.rulesPreviewUnreadable":

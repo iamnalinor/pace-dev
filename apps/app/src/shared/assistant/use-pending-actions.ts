@@ -9,6 +9,7 @@ import type {
 } from "@pace/core";
 
 import { usePace, useT } from "#app/app-state.tsx";
+import { markAccepted } from "#app/shared/assistant/accepted-highlight.tsx";
 import { type ReadingIssue, readingIssue } from "#app/shared/assistant/reading-issue.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
@@ -34,15 +35,12 @@ type Pending = {
 const undoWritten =
   (
     written: readonly Event[],
-    actions: Pick<Actions, "revoke">,
+    actions: Pick<Actions, "revokeAll">,
     run: ReturnType<typeof useRunAction>,
   ): (() => void) =>
   () => {
-    void (async (): Promise<void> => {
-      for (const event of written.toReversed()) {
-        await run(actions.revoke(event.id));
-      }
-    })();
+    // One action, all or none (review M2).
+    void run(actions.revokeAll(written.map((event) => event.id)));
   };
 
 /** After Approve: what was done, in words (not a bare "Done", QA round 11 L3), and Undo. */
@@ -53,7 +51,7 @@ const approvalFeedback = ({
   t,
   written,
 }: {
-  readonly actions: Pick<Actions, "revoke">;
+  readonly actions: Pick<Actions, "revokeAll">;
   /** What was approved, in the past tense ("Created task “X”"), bounded (`approvalText`). */
   readonly done: string;
   readonly run: ReturnType<typeof useRunAction>;
@@ -63,7 +61,11 @@ const approvalFeedback = ({
   written.length === 0
     ? undefined
     : {
-        action: { label: t("common.undo"), onPress: undoWritten(written, actions, run) },
+        action: {
+          label: t("common.undo"),
+          onPress: undoWritten(written, actions, run),
+          undoes: written.map((event) => event.id),
+        },
         success: done,
       };
 
@@ -122,6 +124,16 @@ const revise = (
 type Thread = Pending["thread"];
 type Ids = Pending["decisionIds"];
 
+const createdTaskIds = (written: readonly Event[]): readonly string[] => {
+  const ids: string[] = [];
+  for (const event of written) {
+    if (event.type === "task.created") {
+      ids.push(event.payload.taskId);
+    }
+  }
+  return ids;
+};
+
 /**
 Tells the assistant log what became of the conversation (best effort, not awaited); answers
 the task an approval created, if any (the last, as the screen opens it).
@@ -138,6 +150,9 @@ const tellLog = (
   const taskId = created?.type === "task.created" ? created.payload.taskId : null;
   if (pending !== null) {
     void assistant.resolve(pending.decisionIds, resolution, taskId);
+  }
+  if (resolution === "approved") {
+    markAccepted(createdTaskIds(written));
   }
   return taskId;
 };

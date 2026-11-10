@@ -3,7 +3,7 @@ import type { AppStateHandle } from "../state.ts";
 
 import { type AssistantActions, assistantActions } from "./assistant-actions.ts";
 import { type ComposerActions, composerActions } from "./composer-actions.ts";
-import { type ActionDeps, type ActionResult, fromStore } from "./deps.ts";
+import { type ActionDeps, type ActionResult, fromStore, fromStoreAll } from "./deps.ts";
 import { defaultEstimateHints, type EstimateBucket, type EstimateHints } from "./estimate-hints.ts";
 import { type InboxActions, inboxActions } from "./inbox-actions.ts";
 import { type InstanceActions, instanceActions } from "./instances.ts";
@@ -37,7 +37,10 @@ export type Actions = AssistantActions &
   TimeActions &
   WorkActions & {
     readonly estimateHints: (presetId: string) => readonly EstimateBucket[];
+    /** Revokes one event; `action/nothing-to-do` when it is revoked already. */
     readonly revoke: (eventId: string) => ActionResult;
+    /** Revokes several events as one action (an Undo of what one action wrote): all or none. */
+    readonly revokeAll: (eventIds: readonly string[]) => ActionResult;
     /** Revokes the latest event this device recorded. */
     readonly undoLast: () => ActionResult;
   };
@@ -65,6 +68,7 @@ export const createActions = (options: ActionsOptions): Actions => {
     ...workActions(deps),
     estimateHints: (presetId) => hints.bucketsFor(presetId),
     revoke: async (eventId) => fromStore(await options.state.revoke(eventId)),
+    revokeAll: async (eventIds) => fromStoreAll(await options.state.revokeAll(eventIds)),
     undoLast: async () => fromStore(await options.state.undoLast()),
   };
 };

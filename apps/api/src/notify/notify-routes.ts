@@ -13,6 +13,7 @@ import { userStoreOf } from "../shared/user-store-of.ts";
 
 /** Each refusal of an answer as HTTP: every code has its entry (the type makes it exhaustive). */
 const RESOLVE_PROBLEMS: Readonly<Record<ResolveErrorCode, Omit<Problem, "code">>> = {
+  "action/nothing-to-do": { message: "The answer could not be written", status: 409 },
   "event/invalid": { message: "The answer could not be written", status: 409 },
   "event/not-found": { message: "The answer could not be written", status: 409 },
   "notification/mismatch": { message: "That answer does not fit this notification", status: 422 },
@@ -26,7 +27,6 @@ const RESOLVE_PROBLEMS: Readonly<Record<ResolveErrorCode, Omit<Problem, "code">>
   "retro/future": { message: "The answer could not be written", status: 409 },
   "retro/nothing-to-submit": { message: "The answer could not be written", status: 409 },
   "retro/task-closed": { message: "The answer could not be written", status: 409 },
-  "subtask/submitted": { message: "The answer could not be written", status: 409 },
   "subtask/unknown": { message: "The answer could not be written", status: 409 },
   "task/unknown": { message: "The answer could not be written", status: 409 },
 };

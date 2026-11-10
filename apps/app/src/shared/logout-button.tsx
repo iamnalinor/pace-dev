@@ -82,8 +82,10 @@ export const LogoutButton = () => {
   }
   const question = questionOf(t, language, asked.count);
   // On a computer, a card on a line of its own, as the app's other inline confirms (Delete preset,
-  // Wipe data): beside Export its buttons sat 500 px from the question. On a phone the row is a
-  // column already, and a card's padding would wrap «Всё равно выйти» onto two lines at 390 px.
+  // Wipe data): beside Export its buttons sat 500 px from the question. On a phone no card (its
+  // padding would narrow the buttons), and Wait over Sign out anyway, each the column's width, as
+  // the danger zone's confirm: side by side at the text inset each half was 159 px at 390 and
+  // «Всё равно выйти» ran two lines (bug class 191).
   return (
     <View
       aria-label={question}
@@ -100,10 +102,9 @@ export const LogoutButton = () => {
       >
         {question}
       </Text>
-      <View className={cx("flex-row gap-2", isWide && "justify-end")}>
-        <View className={cx(!isWide && "flex-1")}>
+      <View className={isWide ? "flex-row justify-end gap-2" : "gap-2"}>
+        <View className={cx(!isWide && "self-stretch")}>
           <Button
-            hotkey={HOTKEYS.escape}
             onPress={() => {
               focus.toOpener();
               setAsked(null);
@@ -111,16 +112,17 @@ export const LogoutButton = () => {
               sync.soon();
             }}
             ref={focus.cancelRef(question)}
+            shortcut={HOTKEYS.escape}
             variant="secondary"
             width={isWide ? "auto" : "fill"}
           >
             {t("settings.logout.wait")}
           </Button>
         </View>
-        <View className={cx(!isWide && "flex-1")}>
+        <View className={cx(!isWide && "self-stretch")}>
           <Button
             onPress={() => void auth.logout()}
-            variant="danger"
+            variant="destructive"
             width={isWide ? "auto" : "fill"}
           >
             {t("settings.logout.anyway")}

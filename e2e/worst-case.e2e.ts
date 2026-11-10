@@ -36,29 +36,19 @@ The breaks that exist today, per set, element by element. An overflowing element
 entry fails the case (a new break cannot hide behind an old one). An entry that matches nothing
 in any size or language of its set fails the set: the task that fixes a finding deletes its
 entries. Sideways scrolling of the page or the gallery is allowed only where an entry that says
-`scrolls` matched. F-DAT-01: the submit label lists every solved subtask. F-DAT-02: text in a
+`scrolls` matched (F-DAT-01, the submit label, went with the label in feedback 5). F-DAT-02: text in a
 flex row never shrinks (tags, labels, chips, long words and addresses). F-DAT-07: a text that
 ellipsizes carries neither `data-text-policy="truncate"` nor its full value.
 */
-const REALISTIC: readonly Known[] = [
-  // At 320 the footer holds Focus, Submit and main's "another time or outcome" button (QA round 20
-  // L3): Submit's label and its hotkey no longer fit (Task 4.5 rebuilds the footer).
-  { finding: "F-DAT-01", match: /: (Сдать|Submit) 1( (и|and) 2)?Ctrl\+Enter$/u },
-  { finding: "F-DAT-02", match: /: (Домашка по алгебре 6|Algebra homework 6)$/u },
-  { finding: "F-DAT-02", match: /: (Алгебра|Algebra)$/u },
-  { finding: "F-DAT-02", match: /: (Это не я|Not me)/u },
-];
+const REALISTIC: readonly Known[] = [{ finding: "F-DAT-02", match: /: (Алгебра|Algebra)$/u }];
 const KNOWN: Readonly<Record<(typeof SETS)[number], readonly Known[]>> = {
   demo: REALISTIC,
   empty: [],
   one: REALISTIC,
   worst: [
-    { finding: "F-DAT-01", match: /: (Сдать|Submit) 1, 2, 3/u },
     { finding: "F-DAT-02", match: /: \d+\. (Междисциплинарная|Interdisciplinary)/u, scrolls: true },
     { finding: "F-DAT-02", match: /: (Чтение предложений|Reading the committee)/u },
-    { finding: "F-DAT-02", match: /: (Это не я|Not me)/u },
     { finding: "F-DAT-07", match: /: 🍽️ Обед/u },
-    { finding: "F-DAT-07", match: /: 🌿 Bartholomew/u },
   ],
 };
 
@@ -90,6 +80,11 @@ const measure = async (page: Page): Promise<Overflow> =>
     const isDeclared = (element: HTMLElement): boolean =>
       element.dataset["textPolicy"] === "truncate" &&
       (element.title !== "" || (element.getAttribute("aria-label") ?? "") !== "");
+    // A count badge hangs off its icon's corner by design (`BadgeAnchor`, F-DAT-10): the boxes
+    // around it are wider than themselves because of the badge, not of a text that did not yield
+    // (a text inside them that overflows is still the innermost and still reported).
+    const hasHangingBadge = (element: HTMLElement): boolean =>
+      element.querySelector("[data-pace-hangs]") !== null;
     const isScroller = (element: HTMLElement): boolean =>
       ["auto", "scroll"].includes(getComputedStyle(element).overflowX);
     const wider = [...document.body.querySelectorAll<HTMLElement>("*")].filter(
@@ -98,6 +93,7 @@ const measure = async (page: Page): Promise<Overflow> =>
         // Inline boxes have no width of their own (clientWidth 0): their block parent is measured.
         element.clientWidth > 0 &&
         !isScroller(element) &&
+        !hasHangingBadge(element) &&
         !isDeclared(element) &&
         element.scrollWidth > element.clientWidth + 1,
     );

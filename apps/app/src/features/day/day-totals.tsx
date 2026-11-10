@@ -4,7 +4,7 @@ import type { DayModel } from "@pace/client";
 
 import { useT } from "#app/app-state.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { ColorTag } from "#app/ui/color.tsx";
+import { Tag } from "#app/ui/tag.tsx";
 import { formatDuration } from "@pace/core";
 
 /** The day's tracked time and its split by category. */
@@ -17,12 +17,12 @@ export const Totals = ({ day }: { readonly day: DayModel }) => {
         {t("day.tracked", { duration: formatDuration(day.trackedMinutes, language) })}
       </Text>
       {day.totals.map((total) => (
-        <ColorTag color={total.color} key={total.category}>
+        <Tag hue={total.color} key={total.category}>
           {t("day.total", {
             category: t(`category.${total.category}`),
             duration: formatDuration(total.minutes, language),
           })}
-        </ColorTag>
+        </Tag>
       ))}
     </View>
   );

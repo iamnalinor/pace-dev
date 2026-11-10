@@ -9,6 +9,7 @@ import { errorText } from "#app/format/action-error.ts";
 import { Button } from "#app/ui/button.tsx";
 import { HOTKEYS } from "#app/ui/hotkeys.ts";
 import { TextField } from "#app/ui/text-field.tsx";
+import { useDiscardDraft } from "#app/ui/use-draft.ts";
 
 import { ColorSwatches } from "./color-swatches.tsx";
 
@@ -19,12 +20,22 @@ export type ProjectFormValues = {
   readonly description?: string;
 };
 
+/** Lets the form's drafts go (created, saved or cancelled). */
+const useDiscardDrafts = (draftKey: string): (() => void) => {
+  const discardDraft = useDiscardDraft();
+  return () => {
+    discardDraft(`${draftKey}.name`);
+    discardDraft(`${draftKey}.description`);
+  };
+};
+
 /**
 Name, color (and description when editing), then Cancel / Save; refusals show inline. Opened
 by hand it takes the cursor in its name, Enter saves (an empty name says so) and Escape cancels
 (QA round 17 L6).
 */
 export const ProjectForm = ({
+  draftKey,
   extra,
   isNameFocused = false,
   initial,
@@ -33,6 +44,8 @@ export const ProjectForm = ({
   submitLabel,
 }: {
   readonly initial: ProjectFormValues;
+  /** Where its unsaved text is kept on the device (`project.new`, `project.<id>`; feedback 5 item 7). */
+  readonly draftKey: string;
   readonly submitLabel: string;
   readonly onSave: (values: ProjectFormValues) => ActionResult;
   readonly onCancel: () => void;
@@ -44,17 +57,22 @@ export const ProjectForm = ({
   const t = useT();
   const [values, setValues] = useState(initial);
   const [problem, setProblem] = useState<null | string>(null);
+  const discardDrafts = useDiscardDrafts(draftKey);
   const save = async (): Promise<void> => {
     const result = await onSave(values);
+    if (result.ok) {
+      discardDrafts();
+    }
     setProblem(result.ok ? null : errorText(t, result.error));
   };
   return (
     <View className="gap-3 rounded-xl border border-separator bg-cell p-4">
       <TextField
         autoFocus={isNameFocused}
+        draftKey={`${draftKey}.name`}
         label={t("projects.name")}
         onChangeText={(name) => {
-          setValues({ ...values, name });
+          setValues((current) => ({ ...current, name }));
         }}
         onSubmitEditing={() => void save()}
         value={values.name}
@@ -62,16 +80,17 @@ export const ProjectForm = ({
       <ColorSwatches
         label={t("projects.color")}
         onChange={(color) => {
-          setValues({ ...values, color });
+          setValues((current) => ({ ...current, color }));
         }}
         value={values.color}
       />
       {values.description === undefined ? null : (
         <TextField
+          draftKey={`${draftKey}.description`}
           label={t("project.description")}
           multiline
           onChangeText={(description) => {
-            setValues({ ...values, description });
+            setValues((current) => ({ ...current, description }));
           }}
           value={values.description}
         />
@@ -83,7 +102,14 @@ export const ProjectForm = ({
       )}
       <View className="flex-row flex-wrap items-center justify-end gap-2">
         {extra === undefined ? null : <View className="mr-auto">{extra}</View>}
-        <Button hotkey={HOTKEYS.escape} onPress={onCancel} variant="ghost">
+        <Button
+          onPress={() => {
+            discardDrafts();
+            onCancel();
+          }}
+          shortcut={HOTKEYS.escape}
+          variant="plain"
+        >
           {t("common.cancel")}
         </Button>
         <Button onPress={() => void save()}>{submitLabel}</Button>

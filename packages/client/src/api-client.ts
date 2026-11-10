@@ -35,10 +35,15 @@ export class ApiUnreachable extends Error {
 }
 
 /**
-What a caller may add to one request: a signal that gives up on it, and a credential sent instead of
-the one in use.
+What a caller may add to one request: a signal that gives up on it, a credential sent instead of
+the one in use, and `keepalive` for a small request sent without awaiting it that must outlive the
+page (a reload or a closed tab right after; the browser caps such bodies at 64 KB).
 */
-export type CallOptions = { readonly credential?: string; readonly signal?: AbortSignal };
+export type CallOptions = {
+  readonly credential?: string;
+  readonly keepalive?: boolean;
+  readonly signal?: AbortSignal;
+};
 
 export type ApiClient = {
   /** The in-memory credential the next request will send. */
@@ -98,6 +103,22 @@ const reach = async (doFetch: FetchLike, url: string, init: RequestInit): Promis
     throw new ApiUnreachable(error instanceof Error ? error.message : String(error));
   }
 };
+
+/** The request as `fetch` takes it, with what the caller added (a signal, keepalive). */
+const requestInit = (
+  {
+    body,
+    headers,
+    method,
+  }: { readonly body: unknown; readonly headers: HeadersInit; readonly method: string },
+  { keepalive, signal }: CallOptions,
+): RequestInit => ({
+  ...(body !== undefined && { body: JSON.stringify(body) }),
+  headers,
+  method,
+  ...(signal !== undefined && { signal }),
+  ...(keepalive === true && { keepalive: true }),
+});
 
 /**
 The answer's body. A connection cut while it is read fails as the fetch itself does (a
@@ -196,12 +217,7 @@ export const createApiClient = (options: ApiClientOptions): ApiClient => {
         headers["Content-Type"] = "application/json";
       }
       const url = `${options.baseUrl}${withQuery(buildPath(endpoint.path, params), query)}`;
-      const init: RequestInit = {
-        ...(body !== undefined && { body: JSON.stringify(body) }),
-        headers,
-        method: endpoint.method,
-        ...(callOptions.signal !== undefined && { signal: callOptions.signal }),
-      };
+      const init = requestInit({ body, headers, method: endpoint.method }, callOptions);
       const response = await reach(doFetch, url, init);
       if (!response.ok) {
         if (credential !== undefined && response.status === 401) {

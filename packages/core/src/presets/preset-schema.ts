@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { PresetDefinition } from "../model/preset.ts";
+import type { PresetDefinition, Weekday } from "../model/preset.ts";
 
 import {
   ImportanceSchema,
@@ -25,8 +25,39 @@ export const PresetIdSchema = z
 
 const TimeOfDaySchema = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/, "Expected HH:MM");
 
+const WEEKDAY_NAMES: Readonly<Record<string, Weekday>> = {
+  mon: 1,
+  monday: 1,
+  tue: 2,
+  tuesday: 2,
+  wed: 3,
+  wednesday: 3,
+  thu: 4,
+  thursday: 4,
+  fri: 5,
+  friday: 5,
+  sat: 6,
+  saturday: 6,
+  sun: 7,
+  sunday: 7,
+};
+
+/** A weekday name (`"wed"`, `"Wednesday"`, any case) as its ISO number; anything else as given. */
+const weekdayNumber = (value: unknown): unknown =>
+  typeof value === "string" ? (WEEKDAY_NAMES[value.trim().toLowerCase()] ?? value) : value;
+
+/** What the error text says about a weekday, so an MCP caller can fix the value. */
+const WEEKDAY_HINT =
+  "Expected a weekday: 1-7 (1 = Monday, 2 = Tuesday, 3 = Wednesday, 4 = Thursday, 5 = Friday, 6 = Saturday, 7 = Sunday) or its English name ('wed', 'Wednesday'; any case)";
+
+/** Names are read as numbers, so a definition always stores (and old clients read) the number. */
+const WeekdaySchema = z.preprocess(
+  weekdayNumber,
+  z.literal([1, 2, 3, 4, 5, 6, 7], { error: WEEKDAY_HINT }),
+);
+
 const WeekSlotSchema = z.strictObject({
-  weekday: z.literal([1, 2, 3, 4, 5, 6, 7]),
+  weekday: WeekdaySchema,
   time: TimeOfDaySchema,
 });
 
@@ -34,6 +65,10 @@ const RecurrenceSchema = z.strictObject({
   issued: WeekSlotSchema,
   due: WeekSlotSchema,
   tz: TimeZoneSchema,
+  firstNumber: z
+    .int({ error: "Expected a whole number (the first instance's number)" })
+    .min(0)
+    .exactOptional(),
 });
 
 const DeadlinePolicySchema = z.discriminatedUnion("kind", [
@@ -83,6 +118,13 @@ const FieldsSchema = z.preprocess(
 );
 
 /**
+Legacy: the submission mode (`whole` / `per_subtask`) went on 2026-11-09 (a task's check closes
+it, subtasks are marked one by one). Accepted so old events and old clients parse, then dropped
+(`parsePresetDefinition`); nothing reads it.
+*/
+const LegacySubmissionSchema = z.enum(["per_subtask", "whole"]);
+
+/**
 Legacy: notification thresholds no feature ever read (score alerts and the waiting status went
 in stage 6, the rest in stage 8). Accepted so old events parse, then dropped
 (`parsePresetDefinition`).
@@ -105,7 +147,8 @@ export const PresetDefinitionSchema = z.strictObject({
   urgencyPolicy: z.enum(["age", "lag", "pace", "resubmission"]).exactOptional(),
   defaultImportance: ImportanceSchema.exactOptional(),
   deadlinePolicy: DeadlinePolicySchema.exactOptional(),
-  submission: z.enum(["per_subtask", "whole"]).exactOptional(),
+  // Deprecated (2026-11-09): read and dropped, see `LegacySubmissionSchema`.
+  submission: LegacySubmissionSchema.exactOptional(),
   progressMode: z.enum(["none", "slider", "subtasks"]).exactOptional(),
   recurrence: RecurrenceSchema.nullable().exactOptional(),
   fields: FieldsSchema.exactOptional(),
@@ -114,16 +157,24 @@ export const PresetDefinitionSchema = z.strictObject({
   color: ProjectColorSchema.exactOptional(),
 });
 
-/** A stored or entered definition, checked; the legacy notification thresholds are dropped. */
+/**
+Every refusal as `key.path: reason`, joined by `; ` (`(definition)` for the top level), so the
+person or the MCP client sees which key or value to fix (feedback 5).
+*/
+const describeIssues = (issues: readonly z.core.$ZodIssue[]): string =>
+  issues
+    .map((issue) => {
+      const path = issue.path.map(String).join(".");
+      return `${path === "" ? "(definition)" : path}: ${issue.message}`;
+    })
+    .join("; ");
+
+/** A stored or entered definition, checked; the legacy thresholds and submission mode are dropped. */
 export const parsePresetDefinition = (value: unknown): Result<PresetDefinition, string> => {
   const parsed = PresetDefinitionSchema.safeParse(value);
   if (parsed.success) {
-    const { notify: _legacy, ...definition } = parsed.data;
+    const { notify: _thresholds, submission: _submission, ...definition } = parsed.data;
     return ok(definition);
   }
-  return err(
-    parsed.error.issues
-      .map((issue) => `${issue.path.map(String).join(".")}: ${issue.message}`)
-      .join("; "),
-  );
+  return err(describeIssues(parsed.error.issues));
 };

@@ -21,10 +21,9 @@ const SIZES: readonly Size[] = [
     details: (page) => page.locator("body"),
     height: 844,
     leaveDetails: async (page) => {
-      await page
-        .getByRole("button", { name: "Close" })
-        .first()
-        .click({ position: { x: 5, y: 5 } });
+      // The sheet's dim is no button any more: Escape closes it, as the system Back does.
+      await page.keyboard.press("Escape");
+      await expect(page.locator('[data-pace-surface="sheet"]')).toHaveCount(0);
     },
     name: "phone",
     // A phone keeps Week behind More.
@@ -52,6 +51,9 @@ const SIZES: readonly Size[] = [
 const SHOT_DIR = process.env["E2E_SHOT_DIR"];
 
 const HOUR = 60 * 60_000;
+
+/** A run folded into one «+N» block (`week.folded`). */
+const FOLDED = /^\d+ overlapping, /u;
 const DAY = 24 * HOUR;
 
 const shoot = async (page: Page, name: string, outputPath: (name: string) => string) => {
@@ -156,13 +158,13 @@ for (const size of SIZES) {
       await seedWeek(token);
       await size.openWeek(page);
       await expect(page.getByRole("heading", { level: 1, name: "Week" })).toBeVisible();
-      const back = page.getByRole("button", { name: "Back to today" });
+      const back = page.getByRole("button", { name: "This week" });
       await expect(back).toHaveCount(0);
       expect(await isGridScrolling(page)).toBe(false);
 
       await page.getByRole("button", { name: "Previous week" }).click();
       await expect(back).toBeVisible();
-      const seminar = page.getByRole("button", { name: "From the calendar: Seminar" });
+      const seminar = page.getByRole("button", { name: /, From the calendar: Seminar$/u });
       await seminar.click();
       const details = size.details(page);
       await expect(details.getByText("Room 214")).toBeVisible();
@@ -197,7 +199,7 @@ for (const size of SIZES) {
       await page.goto("/settings");
       await expect(page.getByText("Account: UTC")).toBeVisible();
       await page.goto("/day");
-      const back = page.getByRole("button", { name: "Back to today" });
+      const back = page.getByRole("button", { exact: true, name: "Today" });
       await expect(back).toHaveCount(0);
       // Back to last week's Wednesday, one day at a time.
       const days = Math.round((todayMidnight() - wednesday) / DAY);
@@ -208,22 +210,36 @@ for (const size of SIZES) {
       const gap = page.getByRole("button", { name: /10:00 – 12:00.*2h not logged/u });
       await expect(gap).toBeVisible();
       await expect(gap.getByText("Log", { exact: true })).toBeVisible();
-      // A hairline between every two rows and none above the first (the web drops class names
-      // on animated views, so this is checked where it is drawn).
-      const borders = await page
-        .getByTestId("day-entry")
-        .evaluateAll((rows) => rows.map((row) => getComputedStyle(row).borderTopWidth));
-      expect(borders.length).toBeGreaterThan(2);
-      expect(borders[0]).toBe("0px");
-      expect(borders.slice(1).filter((width) => width === "0px")).toEqual([]);
+      // One divider rule: the list's own separator between every two rows (entries and the
+      // Log past activity row), none above the first.
+      const entries = await page.getByTestId("day-entry").count();
+      expect(entries).toBeGreaterThan(2);
+      await expect(page.getByTestId("day-timeline").getByTestId("group-separator")).toHaveCount(
+        entries,
+      );
+      // The rail lines up with the rows (owner 2026-11-09): one bar per row, at its row's top and
+      // height, measured in the browser (not jest's layout events).
+      const bars = page.getByTestId("rail-bar");
+      await expect(bars).toHaveCount(entries);
+      const boxes = async (testID: string) =>
+        await page
+          .getByTestId(testID)
+          .evaluateAll((nodes) =>
+            nodes
+              .map((node) => node.getBoundingClientRect())
+              .map(({ height, y }) => ({ height, y })),
+          );
+      const [rowBoxes, barBoxes] = [await boxes("day-entry"), await boxes("rail-bar")];
+      for (const [index, row] of rowBoxes.entries()) {
+        expect(Math.abs((barBoxes[index]?.y ?? NaN) - row.y)).toBeLessThanOrEqual(1);
+        expect(Math.abs((barBoxes[index]?.height ?? NaN) - row.height)).toBeLessThanOrEqual(1);
+      }
       await shoot(page, `day-gaps-${size.name}`, (name) => info.outputPath(name));
       await expectNoA11yViolations(page);
       await gap.click();
       await expect(page.getByRole("textbox", { name: "From" })).toHaveValue("10:00");
-      await page
-        .getByRole("button", { name: "Close" })
-        .first()
-        .click({ position: { x: 5, y: 5 } });
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("textbox", { name: "From" })).toHaveCount(0);
       await back.click();
       await expect(back).toHaveCount(0);
     });
@@ -284,8 +300,8 @@ test("a block of a few seconds sits beside the next one, never under it (QA 17 L
   ]);
   expect(pushed.ok).toBe(true);
   await page.goto("/week");
-  const chessBox = page.getByRole("button", { name: /^chess, / });
-  const walkBox = page.getByRole("button", { name: /^walk, / });
+  const chessBox = page.getByRole("button", { name: /, chess$/u });
+  const walkBox = page.getByRole("button", { name: /, walk$/u });
   await expect(chessBox).toBeVisible();
   const [chessAt, walkAt] = [await chessBox.boundingBox(), await walkBox.boundingBox()];
   expect(chessAt?.height ?? 0).toBeGreaterThanOrEqual(24);
@@ -331,12 +347,15 @@ test("narrow side-by-side blocks say their whole name on hover, and a 0-minute b
     });
   const zero = ulid(start + 101);
   const zeroAt = { offsetMs: 90 * minute };
-  // Four blocks over the same half hour (four lanes), and one started and stopped the same instant.
+  // Two blocks side by side (two narrow lanes), a run of four an hour later (more lanes than a
+  // computer's column holds at 44 px each: folded), and one started and stopped the same instant.
   const pushed = await pushAsClient(token, [
     logged(1, "Email the dean", 0),
     logged(2, "Call the bank", 1),
-    logged(3, "Snack", 2),
-    logged(4, "Walk", 3),
+    logged(3, "Snack", 45),
+    logged(4, "Walk", 46),
+    logged(5, "Read", 47),
+    logged(6, "Stretch", 48),
     event({ ...zeroAt, index: 10 }, "activity.started", {
       activityId: zero,
       category: "rest",
@@ -346,14 +365,120 @@ test("narrow side-by-side blocks say their whole name on hover, and a 0-minute b
   ]);
   expect(pushed.ok).toBe(true);
   await page.goto("/week");
-  const email = page.getByRole("button", { name: /^Email the dean, / });
+  const email = page.getByRole("button", { name: /, Email the dean$/u });
   await expect(email).toBeVisible();
+  // The narrow box cannot show the whole name (it is cut to one line with an ellipsis, design
+  // review H6); the tooltip says it with the times. Scoped to the bubble: the box keeps the whole
+  // name in its own text and title too.
+  // Polled: the box is drawn before the week's layout settles (its lane, the hours' share of the
+  // height, its measured width), and a one-shot read in the full run caught it before the cut.
+  await expect
+    .poll(
+      async () =>
+        await email.evaluate((box) =>
+          // Any line of its text drawn narrower than it is long: cut with an ellipsis.
+          [...box.querySelectorAll<HTMLElement>('[dir="auto"]')].some(
+            (label) => label.scrollWidth > label.clientWidth,
+          ),
+        ),
+    )
+    .toBe(true);
   await email.hover();
-  await expect(page.getByText(/^Email the dean, \d\d:\d\d–\d\d:\d\d$/u)).toBeVisible();
+  await expect(
+    page.getByRole("tooltip").filter({ hasText: /^Email the dean, \d\d:\d\d–\d\d:\d\d$/u }),
+  ).toBeVisible();
+  // No lane under a thumb's width: the run of four is one «+N» block (spec §5.6 ruling).
+  for (const name of [/, Snack$/u, /, Walk$/u, /, Read$/u, /, Stretch$/u]) {
+    await expect(page.getByRole("button", { name })).toHaveCount(0);
+  }
+  const fold = page.getByRole("button", { name: FOLDED });
+  await expect(fold).toBeVisible();
+  expect((await fold.boundingBox())?.width ?? 0).toBeGreaterThanOrEqual(44);
   // Drawn, a target, and it opens like any block.
-  const zeroBox = page.getByRole("button", { name: /^Zero, / });
+  const zeroBox = page.getByRole("button", { name: /, Zero$/u });
   expect((await zeroBox.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(24);
   await zeroBox.click();
   await expect(page.getByRole("region", { name: "Details" }).getByText("Zero")).toBeVisible();
+  await expectNoA11yViolations(page);
+});
+
+/** A logged activity on `midnight`'s eve, from and to a number of minutes before it. */
+const loggedBeforeMidnight = (
+  midnight: Date,
+  { from, index, label, to }: { from: number; index: number; label: string; to: number },
+) => {
+  const at = (minutes: number): string =>
+    new Date(midnight.getTime() - minutes * 60_000).toISOString();
+  return {
+    deviceId: "e2e-seed",
+    id: ulid(midnight.getTime() - index),
+    occurredAt: at(to),
+    payload: {
+      activityId: ulid(midnight.getTime() - index - 100),
+      category: "work",
+      endAt: at(to),
+      label,
+      startAt: at(from),
+    },
+    precision: "exact",
+    recordedAt: at(to),
+    source: "web",
+    type: "activity.logged",
+  };
+};
+
+type Rect = null | {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+};
+
+/** One box sits beside the other or wholly above it: neither covers the other. */
+const isClear = (above: Rect, below: Rect): boolean =>
+  above !== null &&
+  below !== null &&
+  (isSideBySide(above, below) || above.y + above.height <= below.y);
+
+/** The inner box ends no lower than the outer one: none of it is clipped away. */
+const isEndingWithin = (inner: Rect, outer: Rect): boolean =>
+  inner !== null && outer !== null && inner.y + inner.height <= outer.y + outer.height;
+
+test("a 3-minute item at 23:56 is wholly inside the sideways scroller and covers no neighbour (day's end, bug-lessons log 2026-11-02)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 844, width: 390 });
+  const { token } = await loginViaApi(page);
+  const lastWednesday = new Date(Date.now() - 24 * 60 * 60_000);
+  lastWednesday.setUTCDate(lastWednesday.getUTCDate() - ((lastWednesday.getUTCDay() + 4) % 7));
+  lastWednesday.setUTCHours(23, 59, 0, 0);
+  await page.clock.setFixedTime(lastWednesday);
+  const midnight = new Date(lastWednesday);
+  midnight.setUTCHours(24, 0, 0, 0);
+  const pushed = await pushAsClient(token, [
+    {
+      deviceId: "e2e-seed",
+      id: ulid(lastWednesday.getTime() - DAY),
+      occurredAt: new Date(lastWednesday.getTime() - DAY).toISOString(),
+      payload: { language: "en", timezone: "UTC" },
+      precision: "exact",
+      recordedAt: new Date().toISOString(),
+      source: "web",
+      type: "settings.updated",
+    },
+    loggedBeforeMidnight(midnight, { from: 30, index: 1, label: "Before", to: 5 }),
+    loggedBeforeMidnight(midnight, { from: 4, index: 2, label: "Last", to: 1 }),
+  ]);
+  expect(pushed.ok).toBe(true);
+  await page.goto("/week");
+  const last = page.getByRole("button", { name: /, Last$/u });
+  await expect(last).toBeVisible();
+  const lastAt = await last.boundingBox();
+  const beforeAt = await page.getByRole("button", { name: /, Before$/u }).boundingBox();
+  const scroller = await page.getByTestId("week-days").boundingBox();
+  expect(lastAt?.height).toBeGreaterThanOrEqual(24);
+  // Wholly inside the scroller: nothing of its target is clipped away.
+  expect(isEndingWithin(lastAt, scroller)).toBe(true);
+  expect(isClear(beforeAt, lastAt)).toBe(true);
   await expectNoA11yViolations(page);
 });

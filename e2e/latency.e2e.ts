@@ -324,13 +324,13 @@ test.describe("a tap shows its result within 100 ms on a slow phone (p75 of 9)",
 
   test("a tab of the phone's bar", async ({ page }) => {
     const timeTap = await openNow(page);
-    const tabs = page.getByRole("tablist", { name: "Main" });
+    const tabs = page.getByRole("navigation", { name: "Main" });
     const order = ["Day", "Now", "Inbox", "Now", "Day", "Inbox", "Day", "Now", "Inbox", "Now"];
     const durations = await timeTaps(timeTap, (index) => {
-      const tab = tabs.getByRole("tab", { exact: true, name: order[index] ?? "Now" });
+      const tab = tabs.getByRole("link", { exact: true, name: order[index] ?? "Now" });
       return {
         check: async () => {
-          await expect(tab).toHaveAttribute("aria-selected", "true");
+          await expect(tab).toHaveAttribute("aria-current", "page");
         },
         target: tab,
       };
@@ -400,7 +400,11 @@ Stepping a period back and forth: the reset button shows away from the current o
 the way back, so each tap's result is the screen of the other period.
 */
 const timeSteps = async (timeTap: TimeTap, page: Page, unit: "day" | "week") => {
-  const back = page.getByRole("button", { name: "Back to today" });
+  // Day's period control says "Today"; Week's says "This week".
+  const back = page.getByRole("button", {
+    exact: true,
+    name: unit === "day" ? "Today" : "This week",
+  });
   return await timeTaps(timeTap, (index) => {
     const isBack = index % 2 === 0;
     return {
@@ -437,37 +441,37 @@ test.describe("the other frequent taps within 100 ms on a slow phone (p75 of 9)"
 
   test("Day: previous and next day", async ({ page }) => {
     const timeTap = await openNow(page);
-    const tabs = page.getByRole("tablist", { name: "Main" });
+    const tabs = page.getByRole("navigation", { name: "Main" });
     await go(
       page,
-      [tabs.getByRole("tab", { exact: true, name: "Day" })],
+      [tabs.getByRole("link", { exact: true, name: "Day" })],
       page.getByRole("button", { name: "Previous day" }),
     );
     // The steps start on today: the reset is not there yet.
-    await expect(page.getByRole("button", { name: "Back to today" })).toHaveCount(0);
+    await expect(page.getByRole("button", { exact: true, name: "Today" })).toHaveCount(0);
     expectWithinBudget("dayStep", await timeSteps(timeTap, page, "day"));
   });
 
   test("Week: previous and next week", async ({ page }) => {
     const timeTap = await openNow(page);
-    const tabs = page.getByRole("tablist", { name: "Main" });
+    const tabs = page.getByRole("navigation", { name: "Main" });
     await go(
       page,
       [
-        tabs.getByRole("tab", { exact: true, name: "More" }),
+        tabs.getByRole("link", { exact: true, name: "More" }),
         page.getByRole("link", { name: "Week" }),
       ],
       page.getByRole("button", { name: "Previous week" }),
     );
-    await expect(page.getByRole("button", { name: "Back to today" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "This week" })).toHaveCount(0);
     expectWithinBudget("weekStep", await timeSteps(timeTap, page, "week"));
   });
 
   test("Day: opening Log past activity", async ({ page }) => {
     const timeTap = await openNow(page);
-    const tabs = page.getByRole("tablist", { name: "Main" });
+    const tabs = page.getByRole("navigation", { name: "Main" });
     const target = page.getByRole("button", { name: "Log past activity" });
-    await go(page, [tabs.getByRole("tab", { exact: true, name: "Day" })], target);
+    await go(page, [tabs.getByRole("link", { exact: true, name: "Day" })], target);
     const what = page.getByRole("textbox", { exact: true, name: "What" });
     await expect(what).toHaveCount(0);
     const durations = await timeOpens(timeTap, page, {
@@ -482,11 +486,11 @@ test.describe("the other frequent taps within 100 ms on a slow phone (p75 of 9)"
 
   test("Settings: the theme chip", async ({ page }) => {
     const timeTap = await openNow(page);
-    const tabs = page.getByRole("tablist", { name: "Main" });
+    const tabs = page.getByRole("navigation", { name: "Main" });
     await go(
       page,
       [
-        tabs.getByRole("tab", { exact: true, name: "More" }),
+        tabs.getByRole("link", { exact: true, name: "More" }),
         page.getByRole("link", { name: "Settings" }),
       ],
       page.getByRole("radio", { name: "Light" }),
@@ -532,14 +536,14 @@ test.describe("the other frequent taps within 100 ms on a slow phone (p75 of 9)"
   test("Now: opening a time-bar picker", async ({ page }) => {
     // Nothing runs on the seeded account, so the bar's tiles are out (no "Start something else").
     const timeTap = await openNow(page);
-    const picker = page.getByRole("list", { name: "Rest" });
+    const picker = page.getByRole("list", { name: "Misc" });
     await expect(picker).toHaveCount(0);
     const durations = await timeOpens(timeTap, page, {
       close: async () => {
         await page.keyboard.press("Escape");
       },
       shown: picker,
-      target: page.getByRole("button", { exact: true, name: "Rest" }),
+      target: page.getByRole("button", { exact: true, name: "Misc" }),
     });
     expectWithinBudget("picker", durations);
   });

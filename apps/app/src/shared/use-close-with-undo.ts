@@ -4,6 +4,7 @@ import type { ActionResult } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { toastQuote } from "#app/ui/toast.tsx";
+import { taskById } from "@pace/core";
 
 import { useRunAction } from "./use-run-action.ts";
 
@@ -30,6 +31,9 @@ export const useCloseWithUndo = (): ((taskId: string, title: string) => ActionRe
                 onPress: () => {
                   void run(actions.revoke(closed.id));
                 },
+                undoes: [closed.id],
+                // Reopened another way (no revocation): the toast goes (R28-02's class).
+                holds: (state) => taskById(state.tasks, taskId)?.closed?.eventId === closed.id,
               },
             },
       );

@@ -1,6 +1,7 @@
-import { screen, within } from "@testing-library/react-native";
+import { fireEvent, screen, within } from "@testing-library/react-native";
 
-import { renderScreen } from "#app/test/render.tsx";
+import { en, renderScreen } from "#app/test/render.tsx";
+import { paramsSet, searchParams, setSearchParams } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { addMinutesIso } from "@pace/core";
 import { NOW } from "@pace/core/testing";
@@ -8,6 +9,23 @@ import { NOW } from "@pace/core/testing";
 import { InsightsScreen } from "./insights-screen.tsx";
 
 describe("InsightsScreen", () => {
+  it("keeps the week in the address, and opens the week it names (feedback 5 item 6)", async () => {
+    const runtime = await createTestRuntime();
+    const page = await renderScreen(<InsightsScreen />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("insights.previous") }));
+    expect(searchParams()).toEqual({ week: "2026-09-28" });
+    await page.unmount();
+    await renderScreen(<InsightsScreen />, runtime);
+    expect(screen.getByText("Sep 28 – Oct 4")).toBeOnTheScreen();
+  });
+
+  it("shows this week for a week it cannot read, writing nothing back", async () => {
+    setSearchParams({ week: "last" });
+    await renderScreen(<InsightsScreen />, await createTestRuntime());
+    expect(screen.getByText("Oct 5 – 11")).toBeOnTheScreen();
+    expect(paramsSet).not.toHaveBeenCalled();
+  });
+
   it("lets a keyboard reach and scroll its body, which holds no control (QA round 11 L8)", async () => {
     await renderScreen(<InsightsScreen />, await createTestRuntime());
     const body = screen.getByLabelText("Insights, the week's numbers");
@@ -34,6 +52,21 @@ describe("InsightsScreen", () => {
     // Study is focus: 12:30–14:00 Moscow by hour, one unbroken block.
     expect(screen.getByText("Most focus between 13:00 and 14:00")).toBeOnTheScreen();
     expect(screen.getByLabelText("Typical focus block: 1h 30m")).toBeOnTheScreen();
+  });
+
+  it("draws no empty hours for a week with no focus, only a line that says so (QA round 22 R22-18)", async () => {
+    const runtime = await createTestRuntime();
+    await runtime.actions.logPast({
+      category: "sleep",
+      endAt: "2026-10-06T04:00:00.000Z",
+      label: "Sleep",
+      startAt: "2026-10-05T20:30:00.000Z",
+    });
+    await renderScreen(<InsightsScreen />, runtime);
+    expect(screen.getByText("Focus by hour of day")).toBeOnTheScreen();
+    expect(screen.getByText("No focus time this week.")).toBeOnTheScreen();
+    expect(screen.queryByTestId("hours-chart")).toBeNull();
+    expect(screen.queryByText(/^Most focus/u)).toBeNull();
   });
 
   it("draws a bar with no project in a data colour, never the disabled one (V2-04)", async () => {

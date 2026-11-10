@@ -20,7 +20,7 @@ import { relativeDay } from "./relative-day.ts";
 const PREVIEW_ID = "preview";
 const MINUTES_PER_DAY = 24 * 60;
 /** The sample task is 40 % done where the pace expects 60 %. */
-export const PREVIEW_SAMPLE = { progress: 0.4, solved: 2, total: 5 } as const;
+export const PREVIEW_SAMPLE = { done: 2, progress: 0.4, total: 5 } as const;
 
 /** A sample task of the draft, drawn like a Now row. */
 export type PresetPreviewModel = {
@@ -44,7 +44,11 @@ const withDraft = (
     return {
       id: draft.id,
       state: {
-        byId: { ...presets.byId, [draft.id]: { ...current, definition: draft.definition } },
+        // A deleted preset previews what Restore would bring back (R26-07).
+        byId: {
+          ...presets.byId,
+          [draft.id]: { ...current, archived: false, definition: draft.definition },
+        },
       },
     };
   }
@@ -68,7 +72,7 @@ const progressParts = (resolved: ResolvedPreset): readonly MetaPart[] => {
       return [];
     }
     case "subtasks": {
-      return [{ kind: "solved", solved: PREVIEW_SAMPLE.solved, total: PREVIEW_SAMPLE.total }];
+      return [{ done: PREVIEW_SAMPLE.done, kind: "done", total: PREVIEW_SAMPLE.total }];
     }
   }
 };

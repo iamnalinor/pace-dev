@@ -1,5 +1,6 @@
 import { createContext, type ReactNode, use, useEffect, useRef, useState } from "react";
 
+import { didTakeEscape, listenForEscape } from "./escape-first.ts";
 import {
   canFireWhileTyping,
   type Hotkey,
@@ -50,11 +51,17 @@ const INTERACTIVE =
   'input, textarea, select, button, a, [contenteditable="true"], [role="button"], [role="radio"], [role="checkbox"], [role="switch"], [role="tab"], [role="link"]';
 
 /**
-A field that handles its own keys is left alone: entirely (the composer's line, "own"), or
-only for Escape (a subtask being typed closes itself on it, "escape").
+A field that handles its own keys is left alone: entirely (the composer's line, "own"), only for
+Escape (a subtask being typed closes itself on it, "escape"), or for Escape and ⌘/Ctrl+Enter (a
+text edited in place in a pane cancels and saves itself on them, "edit": the pane's Done shortcut
+must not fire from inside it, QA round 26 R26-02).
 */
 const OWNS_KEYS = '[data-pace-keys="own"]';
-const OWNS_ESCAPE = '[data-pace-keys="escape"]';
+const OWNS_ESCAPE = '[data-pace-keys="escape"], [data-pace-keys="edit"]';
+const OWNS_SUBMIT = '[data-pace-keys="edit"]';
+
+const isModEnter = (event: KeyboardEvent): boolean =>
+  event.key === "Enter" && (event.ctrlKey || event.metaKey);
 
 const isWithin = (target: EventTarget | null, selector: string): boolean =>
   target instanceof Element && target.closest(selector) !== null;
@@ -69,10 +76,19 @@ const isTakenByTarget = (hotkey: Hotkey, target: EventTarget | null): boolean =>
 
 const hasOwnKeys = (event: KeyboardEvent): boolean =>
   isWithin(event.target, OWNS_KEYS) ||
-  (event.key === "Escape" && isWithin(event.target, OWNS_ESCAPE));
+  (event.key === "Escape" && isWithin(event.target, OWNS_ESCAPE)) ||
+  (isModEnter(event) && isWithin(event.target, OWNS_SUBMIT));
 
 const onKeyDown = (event: KeyboardEvent): void => {
-  if (KEYBOARD === null || event.defaultPrevented || event.isComposing || hasOwnKeys(event)) {
+  // A shown tooltip hears Escape before any shortcut (it goes, and the pane or sheet under it
+  // stays); on a touch screen its own listener (`escape-first.ts`) takes it.
+  if (
+    KEYBOARD === null ||
+    event.defaultPrevented ||
+    event.isComposing ||
+    didTakeEscape(event) ||
+    hasOwnKeys(event)
+  ) {
     return;
   }
   const top = layers.at(-1) ?? 0;
@@ -100,6 +116,8 @@ const listen = (): void => {
   registry.isListening = true;
   // The capture phase: react-native-web's fields stop a keydown from bubbling to the window.
   globalThis.addEventListener("keydown", onKeyDown, { capture: true });
+  // Escape's keyup, which react-native-web's Modal closes on, is held back where Escape was taken.
+  listenForEscape();
 };
 
 const LayerContext = createContext(0);

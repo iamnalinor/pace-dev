@@ -11,6 +11,8 @@ import {
   runningActivities,
   runningActivity,
   t,
+  yieldEvents,
+  yieldsTo,
 } from "@pace/core";
 
 import { WRITE_INPUT } from "../inputs.ts";
@@ -170,18 +172,21 @@ export const stopActivity = defineTool({
   title: "Stop activity",
 });
 
-/** Records a block that already happened; it wins over live time it overlaps. */
+/**
+Records a block that already happened; it takes its time out of the blocks it lands on, live or
+logged, as the app's Log past does (owner, R27-05).
+*/
 export const logActivity = defineTool({
   annotations: WRITE,
   description:
-    "Records a past block of time (startAt..endAt, ISO 8601 UTC) with a label and a category, e.g. a lecture that was not tracked live. It takes precedence over live tracking it overlaps. taskId links it to a task.",
+    "Records a past block of time (startAt..endAt, ISO 8601 UTC) with a label and a category, e.g. a lecture that was not tracked live. It takes its time out of every block it overlaps, as a calendar does: live time yields to it, a logged block is cut, split in two, or removed when covered whole (in the same write; revoking its events undoes all of it). taskId links it to a task.",
   handler: async (args, ctx) => {
     const activityId = newId();
     return await runWrite(
       ctx,
       { ...args, at: args.endAt },
       {
-        build: (_scope, when) =>
+        build: (scope, when) =>
           Date.parse(args.endAt) <= Date.parse(args.startAt)
             ? err({ code: "activity/bad-range", message: "endAt must be after startAt." })
             : ok([
@@ -196,6 +201,11 @@ export const logActivity = defineTool({
                   },
                   type: "activity.logged",
                 }),
+                // The blocks it lands on give that time up, as the app's Log past does (R27-05):
+                // a correction made now, in the same batch.
+                ...yieldEvents(yieldsTo(scope.state.time, args, ctx.now), args, newId).map((body) =>
+                  stamp({ ...when, at: ctx.now }, body),
+                ),
               ]),
         render: () => ({ structured: { activityId }, summary: `Logged ${activityId}.` }),
       },

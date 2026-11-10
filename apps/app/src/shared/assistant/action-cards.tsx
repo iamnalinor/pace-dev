@@ -7,7 +7,7 @@ import { useAppState, useLanguage, useT } from "#app/app-state.tsx";
 import { Questions } from "#app/shared/assistant/questions.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { KeyHint } from "#app/ui/button.tsx";
-import { ActionChip } from "#app/ui/chip.tsx";
+import { Chip } from "#app/ui/chip.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { HOTKEYS } from "#app/ui/hotkeys.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
@@ -73,12 +73,10 @@ const RulesNote = ({
   return (
     <View className="items-start gap-2">
       <Text className="font-sans text-footnote text-label-secondary">
-        {t(
-          unread.reason === "unreadable" ? "assistant.rulesUsedUnreadable" : "assistant.rulesUsed",
-        )}
+        {t(`assistant.rulesUsed.${unread.reason}`)}
       </Text>
       {onLater !== undefined && unread.canReadLater ? (
-        <ActionChip onPress={onLater}>{t("composer.aiLater")}</ActionChip>
+        <Chip onPress={onLater}>{t("composer.aiLater")}</Chip>
       ) : null}
     </View>
   );

@@ -10,6 +10,8 @@ import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
+import { TimeCheckScope, useCheckedSubmit, useTimeChecks } from "#app/ui/time-check.tsx";
+import { useDiscardDraft, useDraft } from "#app/ui/use-draft.ts";
 import {
   type AppState,
   type RepeatChangeProblem,
@@ -241,16 +243,56 @@ Everything about a task, editable in one place: title, category, importance, pro
 due (clearable), estimate (clearable), description, link, new subtasks and unsent ones taken
 off. Only what changed is written.
 */
+/** Save: only what changed is written; the editor closes once every write went through. */
+const useSave = (input: Omit<SaveInput, "actions">, onSaved: () => void) => {
+  const { actions } = usePace();
+  const run = useRunAction();
+  return async (): Promise<void> => {
+    if (await didRunAll(run, saveSteps({ ...input, actions }))) {
+      onSaved();
+    }
+  };
+};
+
+/** The editor's fields that keep their unsaved text on the device (feedback 5 item 7). */
+const EDIT_DRAFTS = ["title", "description", "link", "subtask"] as const;
+
+/**
+The editor's drafts (`task.<id>.*`): the subtask being added kept with the fields', and all of
+them let go when the editor closes (saved or not); a reload is not a close.
+*/
+const useEditDrafts = (
+  taskId: string,
+  subtask: { readonly draft: string; readonly set: (draft: string) => void },
+  close: () => void,
+) => {
+  const draftKey = `task.${taskId}`;
+  const discardDraft = useDiscardDraft();
+  useDraft(`${draftKey}.subtask`, subtask.draft, subtask.set);
+  const onClose = (): void => {
+    for (const field of EDIT_DRAFTS) {
+      discardDraft(`${draftKey}.${field}`);
+    }
+    close();
+  };
+  return { draftKey, onClose };
+};
+
+/** Save behind the time fields (R27-02); a time the press hands over is saved by it (review I3). */
+const useEditSubmit = (isDisabled: boolean, save: () => Promise<unknown>) => {
+  const times = useTimeChecks();
+  const submit = useCheckedSubmit(times, () => !isDisabled && void save());
+  return { isDisabled, submit, times };
+};
+
 export const EditTaskSheet = ({
-  onClose,
+  onClose: close,
   view,
 }: {
   readonly view: TaskViewModel;
   readonly onClose: () => void;
 }) => {
   const t = useT();
-  const { actions } = usePace();
-  const run = useRunAction();
   const { deviceTz } = useViewer();
   const state = useAppState((current) => current);
   const { recurrence, seriesId } = liveSeriesOf(state, view.id);
@@ -258,49 +300,43 @@ export const EditTaskSheet = ({
   const before = useMemo(() => valuesOf(view, deviceTz, recurrence), [view, deviceTz, recurrence]);
   const [values, setValues] = useState(before);
   const { added, removed, setAdded, setRemoved, setSubtaskDraft, subtaskDraft } = useSubtaskEdits();
+  const { draftKey, onClose } = useEditDrafts(
+    view.id,
+    { draft: subtaskDraft, set: setSubtaskDraft },
+    close,
+  );
   const deadline = deadlineStatus(before, values);
   const repeatProblem = useRepeatProblem(view.id, before, values);
-  const save = async (): Promise<void> => {
-    const steps = saveSteps({
-      actions,
-      added: withDraft(added, subtaskDraft),
-      before,
-      removed,
-      seriesId,
-      values,
-      view,
-    });
-    if (await didRunAll(run, steps)) {
-      onClose();
-    }
-  };
+  const toAdd = withDraft(added, subtaskDraft);
+  const save = useSave({ added: toAdd, before, removed, seriesId, values, view }, onClose);
+  const { isDisabled, submit, times } = useEditSubmit(
+    values.title.trim() === "" || !deadline.valid || repeatProblem !== null,
+    save,
+  );
   return (
     <Sheet
       closeLabel={t("common.close")}
       footer={
-        <SheetActions
-          isDisabled={values.title.trim() === "" || !deadline.valid || repeatProblem !== null}
-          onPrimary={() => {
-            void save();
-          }}
-          primaryLabel={t("common.save")}
-        />
+        <SheetActions isDisabled={isDisabled} onPrimary={submit} primaryLabel={t("common.save")} />
       }
       name="task-edit"
       onClose={onClose}
+      open
       title={t("edit.title")}
-      visible
     >
-      <TaskFields
-        isStartChosen={isStartChosen(state, { before, taskId: view.id, values })}
-        onChange={(patch) => {
-          setValues((current) => ({ ...current, ...patch }));
-        }}
-        options={options}
-        repeatProblem={repeatProblem}
-        showDeadlineIssue={deadline.changed}
-        values={values}
-      />
+      <TimeCheckScope checks={times}>
+        <TaskFields
+          draftKey={draftKey}
+          isStartChosen={isStartChosen(state, { before, taskId: view.id, values })}
+          onChange={(patch) => {
+            setValues((current) => ({ ...current, ...patch }));
+          }}
+          options={options}
+          repeatProblem={repeatProblem}
+          showDeadlineIssue={deadline.changed}
+          values={values}
+        />
+      </TimeCheckScope>
       <SubtaskList
         draft={subtaskDraft}
         items={added}
@@ -308,7 +344,7 @@ export const EditTaskSheet = ({
           .filter((subtask) => !removed.includes(subtask.id))
           .map((subtask) => ({
             id: subtask.id,
-            isSent: subtask.submittedAt !== null,
+            isDone: subtask.doneAt !== null,
             label: subtask.label,
           }))}
         onChange={setAdded}

@@ -35,7 +35,7 @@ const choice = (
 
 /**
 The four buttons, always in these places. The chores are everyday upkeep, each with its usual
-length; Rest is a pause of some kind, from a short break to a night's sleep (a workout counts
+length; Misc («Прочее», owner 2026-11-09) holds the rest of a day: a pause of some kind, from a short break to a night's sleep (a workout counts
 as sport, a nap and sleep as sleep).
 */
 const BUTTONS: { readonly [Id in TimeButton["id"]]: TimeButton & { readonly id: Id } } = {
@@ -81,7 +81,8 @@ const BUTTONS: { readonly [Id in TimeButton["id"]]: TimeButton & { readonly id: 
         id: "rest",
       },
       choice("rest", "time.choice.walk", { category: "rest", expectMinutes: 30 }),
-      choice("rest", "time.choice.workout", { category: "sport", expectMinutes: 60 }),
+      // A workout with the way there and back, the shower after (owner 2026-11-09).
+      choice("rest", "time.choice.workout", { category: "sport", expectMinutes: 3 * 60 }),
       choice("rest", "time.choice.nap", { category: "sleep", expectMinutes: 30 }),
       choice("rest", "time.choice.sleep", { category: "sleep", expectMinutes: 8 * 60 }),
     ],

@@ -14,9 +14,7 @@ import {
   INITIAL_TASKS_STATE,
   INITIAL_TIME_STATE,
   mergeEvents,
-  newId,
   ok,
-  parseEvent,
   presetReducer,
   type PresetsState,
   projectReducer,
@@ -37,6 +35,7 @@ import {
 import type { EventStore } from "./event-store.ts";
 import type { StoreChange } from "./peer-tabs.ts";
 
+import { batchInstant, parseBatch } from "./batch.ts";
 import {
   createLocalLog,
   createQueue,
@@ -45,6 +44,7 @@ import {
   type Persisted,
   type Staged,
 } from "./local-log.ts";
+import { createRevocations } from "./revocations.ts";
 
 /**
 The whole client state: the materialized slices (the same four as the core's `CoreState`,
@@ -87,8 +87,13 @@ export type AppStateHandle = {
   Validates every input, then shows them all in the state at once and writes them to the local
   store in one go, answering as soon as the state shows them (or with the first refusal, before
   anything is shown). `persisted` settles with the write: refused, the events leave the state.
+  `refusal` runs in the write queue, on the log as every write before it left it, so a check and
+  the write it guards cannot be split by another write (check, then act; review I4).
   */
-  readonly stage: (inputs: readonly DispatchInput[]) => Promise<Result<Staged, string>>;
+  readonly stage: (
+    inputs: readonly DispatchInput[],
+    refusal?: () => null | string,
+  ) => Promise<Result<Staged, string>>;
   /** One event, staged; answers once its local write landed (`persist_failed` when refused). */
   readonly dispatch: (input: DispatchInput) => Promise<Result<Event, string>>;
   /**
@@ -96,7 +101,13 @@ export type AppStateHandle = {
   (and takes them back) when the local store refuses them.
   */
   readonly ingest: (events: readonly Event[]) => Promise<void>;
+  /** Revokes one event; `action/nothing-to-do` when it is revoked already (review M2). */
   readonly revoke: (eventId: string) => Promise<Result<Event, string>>;
+  /**
+  Revokes several events as one action: the revocations share their instants and are staged and
+  written in one go, or none is (one refused, one revoked already: nothing is written).
+  */
+  readonly revokeAll: (eventIds: readonly string[]) => Promise<Result<readonly Event[], string>>;
   /** Revokes the latest effective event recorded by this device. */
   readonly undoLast: () => Promise<Result<Event, string>>;
   /** Full rebuild from the event store (after another writer touched it). */
@@ -205,18 +216,6 @@ const latestOwn = (events: readonly Event[], deviceId: string): Event | undefine
     .at(0);
 
 /** Fills what the caller left out: the store owns the envelope. */
-const envelope = (
-  input: DispatchInput,
-  defaults: { readonly deviceId: string; readonly now: () => string; readonly source: string },
-): unknown => ({
-  precision: "exact",
-  source: defaults.source,
-  ...input,
-  deviceId: input.deviceId ?? defaults.deviceId,
-  id: input.id ?? newId(),
-  recordedAt: input.recordedAt ?? defaults.now(),
-});
-
 /**
 Changes from outside this tab's own writes (the server, another tab, another writer); the other
 tabs hear only what this state itself put into the store.
@@ -282,31 +281,31 @@ const announced = async (persisted: Persisted, options: Options): Persisted => {
 };
 
 /** Validates every input (a refusal shows nothing), then shows them all and starts their write. */
-const createStage =
-  (
-    log: LocalLog,
-    enqueue: ReturnType<typeof createQueue>,
-    options: Options,
-  ): AppStateHandle["stage"] =>
-  async (inputs) =>
+const createStage = (
+  log: LocalLog,
+  enqueue: ReturnType<typeof createQueue>,
+  options: Options,
+): AppStateHandle["stage"] => {
+  let previous: null | string = null;
+  return async (inputs, refusal) =>
     await enqueue(() => {
-      const events: Event[] = [];
-      const ids = new Set<string>();
-      for (const input of inputs) {
-        const parsed = parseEvent(envelope(input, options));
-        if (!parsed.ok) {
-          return parsed;
-        }
-        const { id } = parsed.value;
-        if (ids.has(id) || log.has(id)) {
-          return err("event/duplicate");
-        }
-        ids.add(id);
-        events.push(parsed.value);
+      const refused = refusal?.() ?? null;
+      if (refused !== null) {
+        return err(refused);
       }
+      const recordedAt = batchInstant(options.now(), previous);
+      const batch = parseBatch(inputs, { ...options, recordedAt }, (id) => log.has(id));
+      if (!batch.ok) {
+        return batch;
+      }
+      previous = recordedAt;
       // Not awaited here: the next action integrates while this write is on its way.
-      return ok({ events, persisted: announced(log.persistLocal(events), options) });
+      return ok({
+        events: batch.value,
+        persisted: announced(log.persistLocal(batch.value), options),
+      });
     });
+};
 
 export const createAppState = (options: Options): AppStateHandle => {
   const { deviceId, now } = options;
@@ -327,17 +326,13 @@ export const createAppState = (options: Options): AppStateHandle => {
     return event !== undefined && written.ok ? ok(event) : err("persist_failed");
   };
 
-  const revoke: AppStateHandle["revoke"] = async (eventId) => {
-    await ready;
-    if (!log.has(eventId)) {
-      return err("event/not-found");
-    }
-    return await dispatch({
-      occurredAt: now(),
-      payload: { targetId: eventId },
-      type: "event.revoked",
-    });
-  };
+  const { revoke, revokeAll } = createRevocations({
+    hasEvent: (eventId) => log.has(eventId),
+    log: () => store.getState().log,
+    now,
+    ready,
+    stage,
+  });
 
   return {
     ...externalChanges(log, enqueue, options.onStored),
@@ -358,6 +353,7 @@ export const createAppState = (options: Options): AppStateHandle => {
     dispatch,
     ready,
     revoke,
+    revokeAll,
     stage,
     store,
     undoLast: async () => {

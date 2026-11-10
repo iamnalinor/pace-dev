@@ -14,6 +14,7 @@ export * from "./api/protocol.ts";
 export {
   AccountDeletedSchema,
   AuthSessionSchema,
+  DEVICE_FIELD_LIMITS,
   DevLoginSchema,
   LogoutSchema,
   type Me,
@@ -86,7 +87,9 @@ export {
   TimeZoneSchema,
 } from "./events/payloads.ts";
 export { mergeEvents, sortEvents } from "./events/sort.ts";
-export { capitalize, clipText, clipWords, initials, splitGraphemes } from "./format/initials.ts";
+export { clipText, clipWords, sliceWhole } from "./format/cut-text.ts";
+export { splitGraphemes } from "./format/graphemes.ts";
+export { capitalize, initials } from "./format/initials.ts";
 export { formatCount, formatNumber, formatPercent, type NumberOptions } from "./format/numbers.ts";
 export { en } from "./i18n/en.ts";
 export { EVENT_LABEL_KEYS } from "./i18n/event-labels.ts";
@@ -121,10 +124,12 @@ export {
   effectiveInOrder,
   foldEffective,
   isCorrection,
+  isRevokedIn,
   materialize,
   materializeAt,
   type MaterializeOptions,
   type Reducer,
+  revokedIdsIn,
   shouldRematerialize,
 } from "./materialize/materializer.ts";
 export { projectReducer } from "./materialize/project-reducer.ts";
@@ -139,7 +144,6 @@ export {
   type ProgressMode,
   type Recurrence,
   type ResolvedPreset,
-  type Submission,
   type Weekday,
   type WeekSlot,
 } from "./model/preset.ts";
@@ -154,11 +158,10 @@ export { DEFAULT_SETTINGS, type Settings } from "./model/settings.ts";
 export {
   type CloseOutcome,
   type Closure,
+  doneCount,
   INITIAL_TASKS_STATE,
   isOpen,
   progressOf,
-  solvedCount,
-  submittedCount,
   type Subtask,
   type Task,
   taskById,
@@ -166,16 +169,17 @@ export {
   type TaskSource,
   type TasksState,
   type TaskStatus,
-  unsubmittedSubtasks,
 } from "./model/task.ts";
 export {
   autoOutcomeEvents,
   type AutoOutcomeInput,
   type Deadline,
   deadlineOf,
+  doneLateness,
   finalDeadlineOf,
   NOT_ASSIGNED_REASON,
   type Outcome,
+  retiredAutoMissRevokes,
   subtaskOutcome,
   type SubtaskOutcome,
   taskOutcome,
@@ -231,7 +235,6 @@ export {
 export { foldToLatin, suggestFor, type Suggestion } from "./queries/suggest.ts";
 export {
   estimateMinutesOf,
-  type SubmitPreview,
   type TaskView,
   taskView,
 } from "./queries/task-view.ts";

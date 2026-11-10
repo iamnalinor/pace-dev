@@ -1,215 +1,31 @@
-import { CalendarDays, Coffee, House, type LucideIcon, Play, Timer } from "lucide-react-native";
 import { useRef, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { useWindowDimensions, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { TimeButtonView } from "@pace/client";
-import type { MessageKey } from "@pace/core";
 
 import { usePace, useT } from "#app/app-state.tsx";
-import { ActionCards } from "#app/shared/assistant/action-cards.tsx";
-import { ReadingIssueLine } from "#app/shared/assistant/reading-issue-line.tsx";
-import { usePendingActions } from "#app/shared/assistant/use-pending-actions.ts";
-import { inkClass, outlineClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
-import { useTheme } from "#app/ui/theme-provider.tsx";
-import { Tooltip } from "#app/ui/tooltip.tsx";
+import { Disclosure } from "#app/ui/disclosure.tsx";
+import { useIsWide } from "#app/ui/layout.ts";
+import { OverlayPresence } from "#app/ui/overlay-presence.tsx";
+import { layout } from "@pace/core";
 
 import type { CalendarToday } from "./calendar-today.ts";
 
+import { BarTiles } from "./bar-tiles.tsx";
 import { ChoicesSheet } from "./choices-sheet.tsx";
-import { RunningRow } from "./running-row.tsx";
-import { FoldToggle, HIDDEN, useFold } from "./time-bar-fold.tsx";
+import { RunningCard } from "./running-card.tsx";
+import { useFold } from "./time-bar-fold.tsx";
+import { TypedStart, useTypedStart } from "./typed-start.tsx";
 import { useCalendarButton } from "./use-calendar-button.ts";
+import { useRunningAnnouncements } from "./use-running-announcements.ts";
 
-const ICONS: Readonly<Record<TimeButtonView["id"], LucideIcon>> = {
-  calendar: CalendarDays,
-  chores: House,
-  rest: Coffee,
-  task: Timer,
-};
+/** The share of the window the time bar and the nav bar under it may take (spec §5.1). */
+const BUDGET = 0.4;
 
-/** The line's start: the assistant reads it first, so it is named "see the actions" (an icon only). */
-const ReviewButton = ({
-  isDim,
-  isDisabled,
-  onPress,
-}: {
-  readonly isDim: boolean;
-  readonly isDisabled: boolean;
-  readonly onPress: () => void;
-}) => {
-  const t = useT();
-  const { palette } = useTheme();
-  return (
-    <Tooltip label={t("assistant.review")} showsOnTap={false}>
-      <Pressable
-        accessibilityLabel={t("assistant.review")}
-        accessibilityRole="button"
-        accessibilityState={{ disabled: isDisabled }}
-        className={cx(
-          "h-hit-web w-hit-web items-center justify-center rounded-lg bg-accent active:opacity-80",
-          isDim && "opacity-50",
-        )}
-        disabled={isDisabled}
-        onPress={onPress}
-      >
-        <Play color={palette["accent.on"]} fill={palette["accent.on"]} size={16} />
-      </Pressable>
-    </Tooltip>
-  );
-};
-
-const NOTE = "font-sans text-footnote";
-
-/**
-"What are you doing?" first reads actions; the owner approves before anything is written.
-*/
-const TypedStart = ({ onUse }: { readonly onUse: () => void }) => {
-  const t = useT();
-  const { palette } = useTheme();
-  const [text, setText] = useState("");
-  const fieldRef = useRef<TextInput>(null);
-  const pending = usePendingActions("activity", () => {
-    setText("");
-  });
-  const typed = text.trim();
-  const start = (): void => {
-    onUse();
-    if (pending.pending !== null) {
-      void pending.approve();
-      // Reading already: Enter again would only send the same request twice.
-    } else if (typed !== "" && !pending.busy) {
-      pending.submit(typed);
-    }
-  };
-  return (
-    <View className="gap-2">
-      {pending.pending === null ? null : (
-        <ActionCards
-          actions={pending.pending.actions}
-          busy={pending.busy}
-          onApprove={() => {
-            onUse();
-            void pending.approve();
-          }}
-          onCancel={() => {
-            // The card goes; the cursor goes back to the field that opened it.
-            pending.cancel();
-            fieldRef.current?.focus();
-          }}
-          onFollowup={pending.followup}
-          questions={pending.pending.questions}
-          unread={pending.pending.unread}
-        />
-      )}
-      {pending.busy && pending.pending === null ? (
-        <Text accessibilityLiveRegion="polite" className={cx(NOTE, "text-label-secondary")}>
-          {t("assistant.reading")}
-        </Text>
-      ) : null}
-      {pending.issue === null ? null : <ReadingIssueLine issue={pending.issue} />}
-      <View className="flex-row items-center gap-2">
-        <TextInput
-          accessibilityLabel={t("time.whatDoing")}
-          className="h-hit-web flex-1 rounded-lg border border-outline bg-cell px-3 font-sans text-callout text-label-primary"
-          maxLength={200}
-          onChangeText={(next) => {
-            onUse();
-            pending.discard();
-            setText(next);
-          }}
-          onSubmitEditing={start}
-          placeholder={t("time.whatDoing")}
-          placeholderTextColor={palette["label.tertiary"]}
-          ref={fieldRef}
-          returnKeyType="go"
-          value={text}
-        />
-        <ReviewButton
-          isDim={typed === ""}
-          isDisabled={typed === "" || pending.busy}
-          onPress={start}
-        />
-      </View>
-    </View>
-  );
-};
-
-type ButtonProps = {
-  readonly button: TimeButtonView;
-  /** Greyed: why it cannot start anything now (the Calendar button), shown in its tooltip. */
-  readonly unavailable?: string | undefined;
-  readonly onTap: (button: TimeButtonView) => void;
-};
-
-/**
-How a button looks, and what its hint says a tap does: on (its activity runs: the picker opens
-on Stop), greyed (cannot start now) or resting in its color.
-*/
-const buttonLook = (
-  button: TimeButtonView,
-  isGreyed: boolean,
-): { readonly box: string; readonly ink: string; readonly hintKey: MessageKey } => {
-  if (button.isRunning) {
-    return {
-      box: "border-accent bg-accent-quiet",
-      hintKey: "time.buttonRunningHint",
-      ink: "font-medium text-accent-text",
-    };
-  }
-  return isGreyed
-    ? {
-        box: "border-dashed border-outline bg-cell",
-        hintKey: "time.buttonHint",
-        ink: "text-label-secondary",
-      }
-    : {
-        box: `bg-cell ${outlineClass(button.color)}`,
-        hintKey: "time.buttonHint",
-        ink: inkClass(button.color),
-      };
-};
-
-/**
-A big button in its fixed place: icon over name, its color's outline, filled with the quiet
-accent while its activity runs (a state, said in its name too). A tap always opens its picker.
-*/
-const BarButton = ({ button, onTap, unavailable }: ButtonProps) => {
-  const t = useT();
-  const { palette } = useTheme();
-  const label = t(button.labelKey);
-  const Icon = ICONS[button.id];
-  const look = buttonLook(button, unavailable !== undefined);
-  const restingColor =
-    unavailable === undefined ? palette["label.secondary"] : palette["label.tertiary"];
-  return (
-    <View className="flex-1">
-      {/* Greyed, it says why the moment the pointer is over it; a tap opens the picker, which says it too. */}
-      <Tooltip label={unavailable} showsOnTap={false}>
-        <Pressable
-          accessibilityHint={unavailable ?? t(look.hintKey)}
-          accessibilityLabel={button.isRunning ? t("time.buttonRunning", { label }) : label}
-          accessibilityRole="button"
-          className={cx(
-            "h-row items-center justify-center gap-0.5 rounded-xl border-2 px-1 active:opacity-80",
-            look.box,
-          )}
-          onPress={() => {
-            onTap(button);
-          }}
-        >
-          <Icon color={button.isRunning ? palette["accent.text"] : restingColor} size={18} />
-          <Text
-            className={cx("text-center font-sans text-caption font-normal", look.ink)}
-            numberOfLines={1}
-          >
-            {label}
-          </Text>
-        </Pressable>
-      </Tooltip>
-    </View>
-  );
-};
+/** From this width the bar lays what runs beside the field and the tiles (spec §5.1, desktop). */
+const SIDE_BY_SIDE = 680;
 
 /**
 Which picker is open. Calendar's opens once today's calendar is read; only the picker asked for
@@ -237,63 +53,167 @@ const usePicker = (readCalendar: () => Promise<CalendarToday>) => {
   };
 };
 
-/** The four buttons in their fixed places. */
-const BarButtons = ({
-  buttons,
-  calendarUnavailable,
-  onTap,
+/** The anchors of the four tiles: a wide window opens each picker as a popover on its tile. */
+const useTileAnchors = () => ({
+  calendar: useRef<null | View>(null),
+  chores: useRef<null | View>(null),
+  rest: useRef<null | View>(null),
+  task: useRef<null | View>(null),
+});
+
+/**
+The bar's measured size against the region budget (spec §5.1): on a phone the time bar and the nav
+bar under it take at most 40 % of the window, so the list keeps the rest. Measured, never guessed
+from a count of what runs (bug-lessons 142); a wide window has no nav bar and lays the bar out side
+by side once it is 680 wide.
+*/
+const useBarSize = () => {
+  const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const isWide = useIsWide();
+  const [size, setSize] = useState({ height: 0, width: 0 });
+  const nav = isWide ? 0 : layout.navBar + insets.bottom;
+  return {
+    isOverBudget: size.height + nav > height * BUDGET,
+    isSideBySide: size.width >= SIDE_BY_SIDE,
+    onLayout: (event: { readonly nativeEvent: { readonly layout: typeof size } }): void => {
+      const { height: barHeight, width } = event.nativeEvent.layout;
+      setSize((was) =>
+        was.height === barHeight && was.width === width ? was : { height: barHeight, width },
+      );
+    },
+  };
+};
+
+/** The fold of the typed field, and the mark a use of the bar leaves so a start it made never folds it. */
+const useBarFold = (runningId: null | string, isPicking: boolean, isOverBudget: boolean) => {
+  const lastUseRef = useRef(0);
+  const fold = useFold(runningId, { isOverBudget, isPicking, lastUseRef });
+  return {
+    fold,
+    markUse: (): void => {
+      lastUseRef.current = Date.now();
+    },
+  };
+};
+
+/** The open picker's tile, read live (so Stop shows the moment it runs), and what it opened with. */
+const pickedOf = (
+  buttons: readonly TimeButtonView[],
+  opened: null | { readonly id: TimeButtonView["id"]; readonly calendar: CalendarToday | null },
+) => {
+  const button = buttons.find((each) => each.id === opened?.id);
+  return opened === null || button === undefined ? null : { button, opened };
+};
+
+/** What runs, as the bar shows it: the main activity's card, with the others alongside in it. */
+const useBarCards = () => {
+  const { alongside, running } = usePace().hooks.useTimeBar();
+  const [main, ...others] = running === null ? alongside : [running, ...alongside];
+  useRunningAnnouncements(main === undefined ? others : [main, ...others]);
+  return { main, others };
+};
+
+/** The typed field, folded under «Start something else» while the bar says so. */
+const FoldedField = ({
+  children,
+  fold,
 }: {
-  readonly buttons: readonly TimeButtonView[];
-  readonly calendarUnavailable: string | undefined;
-  readonly onTap: (button: TimeButtonView) => void;
+  readonly children: React.ReactNode;
+  readonly fold: ReturnType<typeof useFold>;
+}) => {
+  const t = useT();
+  // On the bar's edge, with its own target's air as the gap above and below (design review 2 N3);
+  // open, the field keeps the bar's 8 px from the tiles.
+  return fold.isFoldable ? (
+    <Disclosure
+      inset="edge"
+      label={t("time.startOther")}
+      onToggle={fold.toggle}
+      open={fold.isUnfolded}
+    >
+      <View className="pb-2">{children}</View>
+    </Disclosure>
+  ) : (
+    children
+  );
+};
+
+/** The picker a tile opened, kept through its exit: the sheet leaves with what it showed (F-MOT-05). */
+const OpenedPicker = ({
+  anchors,
+  isSomethingRunning,
+  onClose,
+  picked,
+}: {
+  readonly anchors: ReturnType<typeof useTileAnchors>;
+  readonly isSomethingRunning: boolean;
+  readonly onClose: () => void;
+  readonly picked: null | {
+    readonly button: TimeButtonView;
+    readonly opened: { readonly calendar: CalendarToday | null };
+  };
 }) => (
-  <View className="flex-row gap-2">
-    {buttons.map((button) => (
-      <BarButton
-        button={button}
-        key={button.id}
-        onTap={onTap}
-        // Running its own activity, it is on, whatever the calendar says.
-        unavailable={
-          button.kind === "calendar" && !button.isRunning ? calendarUnavailable : undefined
-        }
+  <OverlayPresence value={picked}>
+    {(kept) => (
+      <ChoicesSheet
+        anchor={anchors[kept.button.id]}
+        button={kept.button}
+        calendar={kept.opened.calendar}
+        canGoAlongside={isSomethingRunning && !kept.button.isRunning}
+        onClose={onClose}
       />
-    ))}
-  </View>
+    )}
+  </OverlayPresence>
 );
 
 /**
-The time bar at the foot of Now: what runs (and what runs alongside), "What are you
-doing?", and four buttons that never move — Calendar, Task, Chores and Rest — each opening
-what it can start. On a phone, opened on something running, the field and the buttons fold
-into one line under it, so the bar leaves room for the tasks; a tap unfolds them.
+The time bar at the foot of Now: what runs (what runs alongside as compact rows in the same card),
+"What are you doing?", and four tiles that never move and never fold — Calendar, Task, Chores and
+Rest — each opening what it can start. Nothing in it scrolls and nothing is covered (design review
+B2): on a phone the typed field folds under «Start something else» once the bar would pass the
+budget, and a proposal for the typed line opens as a sheet. On a computer's column of 680 and more,
+what runs sits on the left and the field and the tiles on the right.
 */
 export const TimeBar = () => {
   const t = useT();
-  const { hooks } = usePace();
-  const { alongside, buttons, running } = hooks.useTimeBar();
+  const { buttons, running } = usePace().hooks.useTimeBar();
   const calendar = useCalendarButton();
   const { close, open, opened } = usePicker(calendar.forPicker);
-  const openedButton = buttons.find((button) => button.id === opened?.id) ?? null;
-  const lastUseRef = useRef(0);
-  const markUse = (): void => {
-    lastUseRef.current = Date.now();
-  };
-  const fold = useFold(running?.activityId ?? null, { isPicking: opened !== null, lastUseRef });
+  const anchors = useTileAnchors();
+  const [text, setText] = useState("");
+  const typed = useTypedStart(text, setText);
+  const size = useBarSize();
+  const { main, others } = useBarCards();
+  const { fold, markUse } = useBarFold(
+    running?.activityId ?? null,
+    opened !== null,
+    size.isOverBudget,
+  );
+  const isSideBySide = size.isSideBySide && main !== undefined;
   return (
     <View
       accessibilityLabel={t("time.bar")}
-      className="gap-2 border-t border-separator bg-app px-3 pb-3 pt-3"
+      className={cx(
+        "border-t border-separator bg-app px-3 pb-2 pt-2",
+        // The fold row's own target is the air around it; without it the parts keep 8 px apart.
+        !fold.isFoldable && "gap-2",
+        isSideBySide && "flex-row items-start gap-3",
+      )}
+      onLayout={size.onLayout}
       role="region"
     >
-      {[...(running === null ? [] : [running]), ...alongside].map((item) => (
-        <RunningRow key={item.activityId} running={item} />
-      ))}
-      {fold.isFoldable ? <FoldToggle isOpen={fold.isUnfolded} onToggle={fold.toggle} /> : null}
-      {/* Folded, the field stays mounted (hidden) so what was typed waits for the next unfold. */}
-      <View className="gap-2" style={fold.isShown ? undefined : HIDDEN}>
-        <TypedStart onUse={markUse} />
-        <BarButtons
+      {main === undefined ? null : (
+        <View className={cx(isSideBySide && "flex-1")}>
+          <RunningCard alongside={others} running={main} />
+        </View>
+      )}
+      <View className={cx(!fold.isFoldable && "gap-2", isSideBySide && "flex-1")}>
+        <FoldedField fold={fold}>
+          <TypedStart onUse={markUse} setText={setText} typed={typed} />
+        </FoldedField>
+        <BarTiles
+          anchors={anchors}
           buttons={buttons}
           calendarUnavailable={calendar.unavailable}
           onTap={(pressed) => {
@@ -302,18 +222,16 @@ export const TimeBar = () => {
           }}
         />
       </View>
-      {opened === null || openedButton === null ? null : (
-        <ChoicesSheet
-          button={openedButton}
-          calendar={opened.calendar}
-          canGoAlongside={running !== null && !openedButton.isRunning}
-          onClose={() => {
-            // A start picked here is the bar's own: closing must not fold it.
-            markUse();
-            close();
-          }}
-        />
-      )}
+      <OpenedPicker
+        anchors={anchors}
+        isSomethingRunning={running !== null}
+        onClose={() => {
+          // A start picked here is the bar's own: closing must not fold it.
+          markUse();
+          close();
+        }}
+        picked={pickedOf(buttons, opened)}
+      />
     </View>
   );
 };

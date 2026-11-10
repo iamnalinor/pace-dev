@@ -17,7 +17,7 @@ const APPROVED_ACTIONS = 10;
 const GALLERY_TASK_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
 
 /**
-The toast at its narrowest (docked in the sidebar's column) and at a phone's width: the refusal
+The toast at its narrowest (a narrow column) and at its widest (`toast.max`): the refusal
 sentence of a rolled-back tap whole (QA round 22 R22-01), a done task quoted short with Undo, and
 an approval of ten actions (two named, the rest counted).
 The overflow sweep reads every line of it.
@@ -66,13 +66,7 @@ export const Toasts = ({ data }: { readonly data: GalleryData }) => {
       {["w-sidebar-inner", "w-full max-w-toast-max"].map((width) => (
         <View className="gap-3" key={width}>
           {toasts.map((toast) => (
-            <ToastCard
-              className={width}
-              isDocked={width === "w-sidebar-inner"}
-              key={toast.message}
-              onDone={NOTHING}
-              toast={toast}
-            />
+            <ToastCard className={width} key={toast.message} onDone={NOTHING} toast={toast} />
           ))}
         </View>
       ))}

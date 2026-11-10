@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef } from "react";
-import { Text, type TextInput, View } from "react-native";
+import { type TextInput, View } from "react-native";
 
 import { useAppState, useT } from "#app/app-state.tsx";
 import { focusField } from "#app/platform/focus-field.ts";
-import { Chip } from "#app/ui/chip.tsx";
+import { RadioChips } from "#app/ui/radio-chips.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 import { KEYBOARD } from "#app/ui/use-hotkey.tsx";
 import { recentReasons } from "@pace/client";
@@ -46,24 +46,14 @@ export const GiveUpFields = ({
         value={form.reason}
       />
       {reasons.length === 0 ? null : (
-        <View className="gap-2">
-          <Text className="font-sans text-caption font-normal text-label-tertiary">
-            {t("close.recentReasons")}
-          </Text>
-          <View className="flex-row flex-wrap gap-2">
-            {reasons.map((reason) => (
-              <Chip
-                key={reason}
-                onPress={() => {
-                  form.setReason(reason);
-                }}
-                selected={form.reason === reason}
-              >
-                {reason}
-              </Chip>
-            ))}
-          </View>
-        </View>
+        <RadioChips
+          choices={reasons.map((reason) => ({ text: reason, value: reason }))}
+          label={t("close.recentReasons")}
+          onChange={(reason) => {
+            form.setReason(reason);
+          }}
+          value={form.reason}
+        />
       )}
     </View>
   );

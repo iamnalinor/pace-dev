@@ -18,6 +18,11 @@ describe("wallClock / fromWallClock", () => {
     expect(fromWallClock({ date: "2026-03-30", time: "12:00", tz: "Europe/Berlin" })).toBe(
       "2026-03-30T10:00:00.000Z",
     );
+    // A time the clocks skip is an instant all the same (the hour after it), never null: a form
+    // that reads null as "the date is wrong" cannot say so for a correct date (QA 27 review M2).
+    expect(fromWallClock({ date: "2026-03-29", time: "02:30", tz: "Europe/Berlin" })).toBe(
+      "2026-03-29T01:30:00.000Z",
+    );
   });
 
   it("rejects malformed dates, times and zones", () => {

@@ -1,58 +1,20 @@
-import { Check } from "lucide-react-native";
-import { Pressable, Text, View } from "react-native";
-
 import type { TaskViewModel } from "@pace/client";
 import type { ProjectColorName } from "@pace/core";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
-import { fillClass } from "#app/ui/color.tsx";
-import { cx } from "#app/ui/cx.ts";
+import { ListRow } from "#app/ui/list-row.tsx";
+import { RadioGroup } from "#app/ui/radio-group.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
-import { spacePress } from "#app/ui/space-press.ts";
-import { useTheme } from "#app/ui/theme-provider.tsx";
+import { HueTile } from "#app/ui/tag.tsx";
 
-type Choice = {
-  readonly id: null | string;
-  readonly name: string;
-  readonly color: null | ProjectColorName;
-};
+/** A project as a value: its colour tile before the name; "No project" a neutral one (never a dot). */
+const ProjectDot = ({ color }: { readonly color: null | ProjectColorName }) => (
+  <HueTile hue={color} icon="folder" />
+);
 
-const ChoiceRow = ({
-  choice,
-  isCurrent,
-  onChoose,
-}: {
-  readonly choice: Choice;
-  readonly isCurrent: boolean;
-  readonly onChoose: () => void;
-}) => {
-  const { palette } = useTheme();
-  return (
-    <Pressable
-      accessibilityLabel={choice.name}
-      accessibilityRole="radio"
-      aria-checked={isCurrent}
-      className={cx(
-        "min-h-12 flex-row items-center gap-3 rounded-lg border px-3 active:opacity-70",
-        isCurrent ? "border-label-primary bg-fill-3" : "border-outline",
-      )}
-      onPress={onChoose}
-      {...spacePress(onChoose)}
-    >
-      <View
-        className={cx(
-          "size-3 rounded-pill",
-          choice.color === null ? "border border-outline" : fillClass(choice.color),
-        )}
-      />
-      <Text className="flex-1 font-sans text-callout text-label-primary" numberOfLines={1}>
-        {choice.name}
-      </Text>
-      {isCurrent ? <Check color={palette["label.primary"]} size={18} /> : null}
-    </Pressable>
-  );
-};
+/** "No project" among the project ids (a radio needs a value; no id is empty). */
+const NO_PROJECT = "";
 
 /** Moves the task to another project, or out of any. */
 export const ProjectSheet = ({
@@ -66,6 +28,12 @@ export const ProjectSheet = ({
   const { actions, hooks } = usePace();
   const run = useRunAction();
   const projects = hooks.useAppState((state) => state.projects);
+  /** A project to move to, or none. */
+  type Choice = {
+    readonly id: null | string;
+    readonly name: string;
+    readonly color: null | ProjectColorName;
+  };
   const choices: readonly Choice[] = [
     { color: null, id: null, name: t("task.noProject") },
     ...Object.values(projects.byId)
@@ -85,21 +53,27 @@ export const ProjectSheet = ({
       closeLabel={t("common.close")}
       name="move-to-project"
       onClose={onClose}
+      open
       title={t("task.moveTitle")}
-      visible
     >
-      <View accessibilityRole="radiogroup" className="gap-2">
+      <RadioGroup
+        label={t("task.moveTitle")}
+        onChange={(id: string) => {
+          void move(id === NO_PROJECT ? null : id);
+        }}
+        value={view.project?.id ?? NO_PROJECT}
+        values={choices.map((choice) => choice.id ?? NO_PROJECT)}
+      >
         {choices.map((choice) => (
-          <ChoiceRow
-            choice={choice}
-            isCurrent={(view.project?.id ?? null) === choice.id}
-            key={choice.id ?? "none"}
-            onChoose={() => {
-              void move(choice.id);
-            }}
+          <ListRow
+            key={choice.id ?? NO_PROJECT}
+            leading={<ProjectDot color={choice.color} />}
+            select={choice.id ?? NO_PROJECT}
+            title={choice.name}
+            titleLines={2}
           />
         ))}
-      </View>
+      </RadioGroup>
     </Sheet>
   );
 };

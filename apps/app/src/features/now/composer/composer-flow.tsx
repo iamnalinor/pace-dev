@@ -9,6 +9,7 @@ import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { HOTKEYS } from "#app/ui/hotkeys.ts";
 import { useToast } from "#app/ui/toast.tsx";
+import { useDraft } from "#app/ui/use-draft.ts";
 import { useHotkey } from "#app/ui/use-hotkey.tsx";
 import {
   type AiOutcome,
@@ -23,6 +24,8 @@ import { useAiRead } from "@pace/client/react";
 
 import type { FormOrigin } from "./form-title.ts";
 
+import { useToInbox } from "./to-inbox.ts";
+
 /** A bare number is a subtask number ("290"); anything else is a label. */
 export const subtaskOf = (label: string): ComposerModel["subtasks"][number] => {
   const number = /^\d+$/u.test(label) ? Number(label) : null;
@@ -30,7 +33,7 @@ export const subtaskOf = (label: string): ComposerModel["subtasks"][number] => {
 };
 
 /** The typed line, the chip taps and the assistant's reading, kept consistent with each other. */
-const useDraft = (initialText: string, assistant: Assistant) => {
+const useComposerDraft = (initialText: string, assistant: Assistant) => {
   const [text, setText] = useState(initialText);
   const [edits, setEdits] = useState<ComposerEdits>({});
   // A subtask typed into the form's field and not yet added with Enter: Create keeps it too.
@@ -90,32 +93,6 @@ const useReadLater = (ask: () => Promise<AiOutcome | null>, onSaved: () => void)
           : t("composer.aiQueued", { time: clockTime(outcome.retryAt, deviceTz) }),
     });
     onSaved();
-  };
-};
-
-/**
-To Inbox: the line is kept as a note and a toast says so; a preview of it goes, and the assistant
-log hears so.
-*/
-const useToInbox = (
-  text: string,
-  pending: Pick<ReturnType<typeof usePendingActions>, "keptInInbox">,
-  done: () => void,
-) => {
-  const { actions } = usePace();
-  const run = useRunAction();
-  const toast = useToast();
-  const t = useT();
-  return async (): Promise<void> => {
-    const capture = await run(actions.captureInbox(text));
-    if (!capture.ok) {
-      return;
-    }
-    // Where the line went, in words: only the Inbox badge moved before (QA round 14 L10).
-    toast.show({ message: t("composer.toInboxDone") });
-
-    pending.keptInInbox();
-    done();
   };
 };
 
@@ -235,7 +212,7 @@ const useFlowState = ({
   readonly onCreatedTask: (taskId: string) => void;
 }) => {
   const { assistant, hooks } = usePace();
-  const draft = useDraft(initialText, assistant);
+  const draft = useComposerDraft(initialText, assistant);
   const { ai, edits, onReading, onText, reset, setEdits, text } = draft;
   const model = hooks.useComposer({ edits, text });
   // What Create adds: the form as shown, with a subtask still being typed.
@@ -294,7 +271,7 @@ const useFlowState = ({
     setSubtaskDraft: draft.setSubtaskDraft,
     subtaskDraft: draft.subtaskDraft,
     text,
-    toInbox: useToInbox(text, pending, done),
+    toInbox: useToInbox(text, pending, { done, onText }),
     /** A paste is read at once; typing never is. */
     type: (next: string): void => {
       // Against the line as it stands: after adding, the line is empty again.
@@ -322,11 +299,14 @@ export const ComposerProvider = ({
   children,
   initialText = "",
   isFormInPane = false,
+  lineDraftKey,
   onCreatedTask = ignoreCreatedTask,
   opensForm = false,
 }: {
   readonly children: ReactNode;
   readonly initialText?: string | undefined;
+  /** Where the line's unsent text is kept on the device (feedback 5 item 7); none keeps nothing. */
+  readonly lineDraftKey?: string | undefined;
   readonly isFormInPane?: boolean;
   readonly onCreatedTask?: (taskId: string) => void;
   readonly opensForm?: boolean;
@@ -339,6 +319,8 @@ export const ComposerProvider = ({
   });
   useNewTaskRequest(flow.expand);
   useHotkey(HOTKEYS.newTask, flow.expand);
+  // The line's text comes back after a reload as plain text: never read again as a paste.
+  useDraft(lineDraftKey, flow.text, flow.onText);
   return <ComposerContext value={flow}>{children}</ComposerContext>;
 };
 

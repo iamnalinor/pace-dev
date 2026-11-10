@@ -55,19 +55,22 @@ const CATALOG: Readonly<Record<Lang, Readonly<Record<string, string>>>> = { en, 
 
 const escape = (text: string): string => text.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
 
-type LabelOptions = { readonly prefix?: boolean };
+type LabelOptions = { readonly prefix?: boolean; readonly suffix?: boolean };
 
 /**
 An English label as it reads in `lang`: every catalog key whose English text is `label`, so a
 label shared by several keys matches any of their translations. Exact by default; `{ prefix }`
-matches labels that start with it (dynamic tails such as counts).
+matches labels that start with it (dynamic tails such as counts), `{ suffix }` labels that end
+with it (Day's date button: "<the day>. Pick a day").
 */
 const label = (lang: Lang, text: string, options: LabelOptions = {}): RegExp => {
   const keys = Object.keys(en).filter((key) => CATALOG.en[key] === text);
   const variants = keys.length === 0 ? [text] : keys.map((key) => CATALOG[lang][key] ?? text);
   const body = [...new Set(variants)].map((variant) => escape(variant)).join("|");
+  const start = options.suffix === true ? "" : "^";
+  const end = options.prefix === true ? "" : "$";
   // eslint-disable-next-line security/detect-non-literal-regexp -- built from regex-escaped catalog strings of this repo, never from user input
-  return new RegExp(options.prefix === true ? `^(?:${body})` : `^(?:${body})$`, "u");
+  return new RegExp(`${start}(?:${body})${end}`, "u");
 };
 
 const day = (at: number): string => new Date(at).toISOString();
@@ -513,7 +516,7 @@ const STATES: readonly State[] = [
     name: "day-pick-date",
     run: async ({ page, L }) => {
       await open(page, "/day");
-      await first(page.getByRole("button", { name: L("Pick a day") })).click();
+      await first(page.getByRole("button", { name: L("Pick a day", { suffix: true }) })).click();
     },
   },
   {
@@ -537,7 +540,7 @@ const STATES: readonly State[] = [
     run: async (ctx) => {
       const { page, L } = ctx;
       await openTimeBar(ctx);
-      await first(page.getByRole("button", { exact: true, name: L("Rest") })).click();
+      await first(page.getByRole("button", { exact: true, name: L("Misc") })).click();
     },
   },
   {
@@ -580,14 +583,15 @@ const STATES: readonly State[] = [
     name: "task-edit-sheet",
     run: async ({ page, L, seeded }) => {
       await open(page, `/task/${seeded.openTaskId}`);
-      await first(page.getByRole("button", { name: L("Edit details") })).click();
+      await first(page.getByRole("button", { name: L("Edit") })).click();
     },
   },
   {
     name: "task-close-as",
     run: async ({ page, L, seeded }) => {
       await open(page, `/task/${seeded.openTaskId}`);
-      await first(page.getByRole("button", { name: L("Cancel or skip the task…") })).click();
+      await first(page.getByRole("button", { name: L("More actions") })).click();
+      await first(page.getByRole("button", { name: L("Close as…") })).click();
     },
   },
   {
@@ -609,6 +613,8 @@ const STATES: readonly State[] = [
     name: "task-delete-confirm",
     run: async ({ page, L, seeded }) => {
       await open(page, `/task/${seeded.openTaskId}`);
+      // Delete lives in the task's ⋯ menu (Task 4.5).
+      await first(page.getByRole("button", { name: L("More actions") })).click();
       await first(page.getByRole("button", { name: L("Delete the task") })).click();
     },
   },

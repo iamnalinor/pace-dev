@@ -1,5 +1,6 @@
 import {
   err,
+  type Event,
   findProjectByName,
   newId,
   projectById,
@@ -7,7 +8,14 @@ import {
   type ProjectsState,
 } from "@pace/core";
 
-import { type ActionDeps, type ActionResult, emit, type ProjectNameError, stamp } from "./deps.ts";
+import {
+  type ActionDeps,
+  type ActionResult,
+  emit,
+  fromStoreAll,
+  type ProjectNameError,
+  stamp,
+} from "./deps.ts";
 
 export type ProjectDraft = { readonly name: string; readonly color: ProjectColorName };
 
@@ -20,6 +28,26 @@ export type ProjectActions = {
   readonly createProject: (draft: ProjectDraft) => ActionResult;
   /** An empty description clears it; `archived` archives or restores. */
   readonly updateProject: (projectId: string, patch: ProjectPatch) => ActionResult;
+  /**
+  The archive toast's Undo: revokes `archiveId` while it is the archive in effect, else writes
+  nothing (`action/nothing-to-do`): restored another way, archived again, or revoked already (QA
+  round 28 R28-02). Checked in the write queue (class 222).
+  */
+  readonly undoArchive: (projectId: string, archiveId: string) => ActionResult;
+};
+
+/**
+The event in effect that archived the project, while it is archived: the last of its events in
+effect that set `archived`, when that set it to true. An archive toast stands while it is its own.
+*/
+export const archiveInEffect = (events: readonly Event[], projectId: string): null | string => {
+  const last = events.findLast(
+    (event) =>
+      event.type === "project.updated" &&
+      event.payload.projectId === projectId &&
+      event.payload.archived !== undefined,
+  );
+  return last?.type === "project.updated" && last.payload.archived === true ? last.id : null;
 };
 
 /**
@@ -52,6 +80,16 @@ const patchPayload = (projectId: string, patch: ProjectPatch) => {
 };
 
 export const projectActions = (deps: ActionDeps): ProjectActions => ({
+  undoArchive: async (projectId, archiveId) => {
+    const staged = await deps.state.stage(
+      [{ occurredAt: deps.clock.now(), payload: { targetId: archiveId }, type: "event.revoked" }],
+      () =>
+        archiveInEffect(deps.state.store.getState().events, projectId) === archiveId
+          ? null
+          : "action/nothing-to-do",
+    );
+    return fromStoreAll(staged.ok ? await staged.value.persisted : staged);
+  },
   createProject: async ({ color, name }) => {
     const problem = projectNameError(deps.state.store.getState().projects, name);
     if (problem !== null) {
@@ -70,8 +108,15 @@ export const projectActions = (deps: ActionDeps): ProjectActions => ({
     if (problem !== null) {
       return err(problem);
     }
-    return await emit(deps, [
-      stamp(deps, { payload: patchPayload(projectId, patch), type: "project.updated" }),
-    ]);
+    // An archive or a restore it already is writes nothing, asked in the write queue (class 222).
+    const isAlready = (): boolean =>
+      patch.archived !== undefined &&
+      Object.keys(patch).length === 1 &&
+      projectById(deps.state.store.getState().projects, projectId)?.archived === patch.archived;
+    return await emit(
+      deps,
+      [stamp(deps, { payload: patchPayload(projectId, patch), type: "project.updated" })],
+      () => (isAlready() ? "action/nothing-to-do" : null),
+    );
   },
 });

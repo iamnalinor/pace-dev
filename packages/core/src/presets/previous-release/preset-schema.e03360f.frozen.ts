@@ -1,0 +1,137 @@
+/**
+FROZEN — do not edit or "fix". The preset definition schema of the previous release (commit
+e03360f, `packages/core/src/presets/preset-schema.ts`), copied verbatim but for the import paths, so
+`old-reader-compat.test.ts` can parse what this build writes the way an older installed app does
+(bug-lessons 13, 150). Its old reducer drops a whole `preset.created` / `preset.updated` event whose
+definition this refuses. Replace it with the next release's copy when that release ships. The
+shared leaf schemas (importance, instant, colour, zone) are the current ones: they did not change.
+*/
+import { z } from "zod";
+
+import type { PresetDefinition } from "../../model/preset.ts";
+
+import {
+  ImportanceSchema,
+  InstantSchema,
+  ProjectColorSchema,
+  TimeZoneSchema,
+} from "../../events/payloads.ts";
+import { err, ok, type Result } from "../../result.ts";
+
+/**
+Lowercase slug: `[a-z0-9]` segments joined by single `.` or `-`, 1–64 characters. Each
+separator must be followed by a segment character, which rules out trailing and doubled
+separators without a nested quantifier.
+*/
+export const PresetIdSchema = z
+  .string()
+  .max(64)
+  .regex(
+    /^[a-z0-9](?:[a-z0-9]|[.-](?=[a-z0-9]))*$/,
+    "Expected a lowercase slug (a-z, 0-9, '.', '-')",
+  );
+
+const TimeOfDaySchema = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/, "Expected HH:MM");
+
+const WeekSlotSchema = z.strictObject({
+  weekday: z.literal([1, 2, 3, 4, 5, 6, 7]),
+  time: TimeOfDaySchema,
+});
+
+const RecurrenceSchema = z.strictObject({
+  issued: WeekSlotSchema,
+  due: WeekSlotSchema,
+  tz: TimeZoneSchema,
+});
+
+const DeadlinePolicySchema = z.discriminatedUnion("kind", [
+  z.strictObject({ kind: z.literal("hard") }),
+  z
+    .strictObject({
+      kind: z.literal("resubmission"),
+      softDays: z.int().min(0),
+      finalMode: z.enum(["fixed", "offset"]).optional(),
+      finalAt: InstantSchema.nullable(),
+      finalTz: TimeZoneSchema.nullable(),
+    })
+    .refine((policy) => policy.finalAt === null || policy.finalTz !== null, {
+      message: "finalTz is required with finalAt",
+      path: ["finalTz"],
+    })
+    .refine((policy) => policy.finalMode !== "fixed" || policy.finalAt !== null, {
+      message: "A fixed final deadline needs a date",
+      path: ["finalAt"],
+    })
+    .refine((policy) => policy.finalMode !== "offset" || policy.finalAt === null, {
+      message: "An offset final deadline has no fixed date",
+      path: ["finalAt"],
+    }),
+]);
+
+const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** Presets saved before `link` replaced `ticket` keep their toggle under the new name. */
+const renameLegacyTicket = (value: unknown): unknown => {
+  if (!isRecord(value) || !("ticket" in value)) {
+    return value;
+  }
+  const { ticket, ...rest } = value;
+  return "link" in rest ? rest : { ...rest, link: ticket };
+};
+
+const FieldsSchema = z.preprocess(
+  renameLegacyTicket,
+  z.strictObject({
+    link: z.boolean().exactOptional(),
+    description: z.boolean().exactOptional(),
+    startAt: z.boolean().exactOptional(),
+    submitVia: z.boolean().exactOptional(),
+  }),
+);
+
+/**
+Legacy: notification thresholds no feature ever read (score alerts and the waiting status went
+in stage 6, the rest in stage 8). Accepted so old events parse, then dropped
+(`parsePresetDefinition`).
+*/
+const LegacyNotifySchema = z.strictObject({
+  criticalHours: z.number().min(0).exactOptional(),
+  criticalProgress: z.number().min(0).max(1).exactOptional(),
+  criticalScore: z.number().min(0).exactOptional(),
+  waitingDays: z.number().min(0).exactOptional(),
+  inProgressIdleDays: z.number().min(0).exactOptional(),
+});
+
+/**
+Strict: unknown keys fail, so a typo in the editor or an MCP call cannot silently become
+an ignored setting. Every key is exact-optional (absent, never `undefined`) because a
+preset stores only what it changes.
+*/
+export const PresetDefinitionSchema = z.strictObject({
+  // Legacy (urgency scoring was removed in stage 6): accepted so old events parse, ignored.
+  urgencyPolicy: z.enum(["age", "lag", "pace", "resubmission"]).exactOptional(),
+  defaultImportance: ImportanceSchema.exactOptional(),
+  deadlinePolicy: DeadlinePolicySchema.exactOptional(),
+  submission: z.enum(["per_subtask", "whole"]).exactOptional(),
+  progressMode: z.enum(["none", "slider", "subtasks"]).exactOptional(),
+  recurrence: RecurrenceSchema.nullable().exactOptional(),
+  fields: FieldsSchema.exactOptional(),
+  notify: LegacyNotifySchema.exactOptional(),
+  defaultEstimateMinutes: z.int().min(0).exactOptional(),
+  color: ProjectColorSchema.exactOptional(),
+});
+
+/** A stored or entered definition, checked; the legacy notification thresholds are dropped. */
+export const parsePresetDefinition = (value: unknown): Result<PresetDefinition, string> => {
+  const parsed = PresetDefinitionSchema.safeParse(value);
+  if (parsed.success) {
+    const { notify: _legacy, ...definition } = parsed.data;
+    return ok(definition);
+  }
+  return err(
+    parsed.error.issues
+      .map((issue) => `${issue.path.map(String).join(".")}: ${issue.message}`)
+      .join("; "),
+  );
+};

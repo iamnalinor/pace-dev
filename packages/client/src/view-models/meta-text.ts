@@ -8,7 +8,7 @@ export type PlainMetaPart = Exclude<
   { readonly kind: "due" | "final" | "final-passed" | "importance" | "starts" }
 >;
 
-/** "6d 12h left", "15h late", "2 subtasks left", "4/7 solved" … */
+/** "6d 12h left", "15h late", "2 subtasks left", "4/7 done" … */
 export const plainMetaText = (part: PlainMetaPart, language: Language): string => {
   switch (part.kind) {
     case "age": {
@@ -38,11 +38,8 @@ export const plainMetaText = (part: PlainMetaPart, language: Language): string =
         other: t(language, "meta.subtasksLeft.other"),
       });
     }
-    case "sent": {
-      return t(language, "meta.sent", { count: part.submitted });
-    }
-    case "solved": {
-      return t(language, "meta.solved", { solved: part.solved, total: part.total });
+    case "done": {
+      return t(language, "meta.done", { done: part.done, total: part.total });
     }
   }
 };

@@ -155,9 +155,9 @@ export const demoData = (language: Language): GalleryData => ({
   set: "demo",
   signIn: DEMO_SIGN_IN,
   subtasks: [
-    { id: "subtask-1", isSolved: true, label: "1", number: 1 },
-    { id: "subtask-2", isSolved: true, label: "2", number: 2 },
-    { id: "subtask-3", isSolved: false, label: "3", number: 3 },
+    { id: "subtask-1", isDone: true, label: "1", number: 1 },
+    { id: "subtask-2", isDone: true, label: "2", number: 2 },
+    { id: "subtask-3", isDone: false, label: "3", number: 3 },
   ],
   tasks: demoTasks(language),
 });

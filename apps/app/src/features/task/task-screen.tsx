@@ -3,6 +3,7 @@ import { View } from "react-native";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { EmptyState } from "#app/ui/empty-state.tsx";
+import { OverlayPresence } from "#app/ui/overlay-presence.tsx";
 import { Screen } from "#app/ui/screen.tsx";
 import { type TaskViewModel, workLeftAt } from "@pace/client";
 
@@ -28,13 +29,19 @@ type Open = "close" | "close-as" | "edit" | "project" | null;
 const TaskBody = ({ view }: { readonly view: TaskViewModel }) => {
   const live = useLiveProgress(view);
   const isSlider = view.progress.mode === "slider" && view.closed === null;
+  const [isDescriptionEditing, setIsDescriptionEditing] = useState(false);
   return (
     <View className="gap-5 pt-1">
       <TaskSummary
+        isDescriptionEditing={isDescriptionEditing}
         view={view}
         {...(isSlider && { workLeftMinutes: workLeftAt(view, live.step) })}
       />
-      <TaskDescription view={view} />
+      <TaskDescription
+        isEditing={isDescriptionEditing}
+        onEditing={setIsDescriptionEditing}
+        view={view}
+      />
       <WorkProgress live={live} view={view} />
       <SubtaskChecklist view={view} />
       <SourceText text={view.sourceText} />
@@ -53,38 +60,38 @@ const OpenSheet = ({
   readonly onDismiss: () => void;
 }) => (
   <>
-    {open === "close" || open === "close-as" ? (
-      <CloseSheet
-        onClose={dismiss}
-        {...(open === "close-as" && { startMode: CLOSE_AS })}
-        view={task}
-      />
-    ) : null}
-    {open === "edit" ? <EditTaskSheet onClose={dismiss} view={task} /> : null}
-    {open === "project" ? <ProjectSheet onClose={dismiss} view={task} /> : null}
+    {/* Each kept through its exit (F-MOT-05). */}
+    <OverlayPresence value={open === "close" || open === "close-as" ? open : null}>
+      {(kept) => (
+        <CloseSheet
+          onClose={dismiss}
+          {...(kept === "close-as" && { startMode: CLOSE_AS })}
+          view={task}
+        />
+      )}
+    </OverlayPresence>
+    <OverlayPresence value={open === "edit" ? open : null}>
+      {() => <EditTaskSheet onClose={dismiss} view={task} />}
+    </OverlayPresence>
+    <OverlayPresence value={open === "project" ? open : null}>
+      {() => <ProjectSheet onClose={dismiss} view={task} />}
+    </OverlayPresence>
   </>
 );
 
 /**
 The task (artboards 2 and 3): summary, progress or subtasks, the source text; the footer
-holds Focus and Done / Submit.
+holds Focus and Done.
 */
-export const TaskScreen = ({
-  id,
-  openClose = false,
-}: {
-  readonly id: string;
-  /** Lands with the close sheet open (a per-subtask check on Now). */
-  readonly openClose?: boolean;
-}) => {
+export const TaskScreen = ({ id }: { readonly id: string }) => {
   const t = useT();
   const { hooks } = usePace();
   const view = hooks.useTaskView(id);
-  const [open, setOpen] = useState<Open>(openClose ? "close" : null);
+  const [open, setOpen] = useState<Open>(null);
   if (!view.ok) {
     return (
       <Screen header={<TaskHeader />}>
-        <EmptyState>{t("task.notFound")}</EmptyState>
+        <EmptyState title={t("task.notFound")} />
       </Screen>
     );
   }

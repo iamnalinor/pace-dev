@@ -6,7 +6,6 @@ import type { ActivityCategory } from "./model.ts";
 
 import { isOpen, type Task, taskById } from "../model/task.ts";
 import { type Outcome, taskOutcome } from "../outcomes/outcome.ts";
-import { presetOf } from "../queries/classify.ts";
 import { startOfWeekIn } from "../time.ts";
 import { type Range, type Segment, sumMinutes, timeline } from "./timeline.ts";
 
@@ -105,13 +104,7 @@ const isClosedIn = (task: Task, { from, to }: Range): boolean =>
 export const onTimeByProject = (state: CoreState, range: Range): readonly OnTimeRow[] => {
   const outcomes = Object.values(state.tasks.byId)
     .filter((task) => isClosedIn(task, range))
-    .map((task) => {
-      const preset = presetOf(state, task);
-      return {
-        outcome: preset.ok ? taskOutcome(task, preset.value) : null,
-        projectId: task.projectId ?? NO_PROJECT,
-      };
-    })
+    .map((task) => ({ outcome: taskOutcome(task), projectId: task.projectId ?? NO_PROJECT }))
     .filter((entry) => entry.outcome !== null && DEADLINE_OUTCOMES.has(entry.outcome))
     .map((entry) => ({ isOnTime: entry.outcome === "done", projectId: entry.projectId }));
   const keys = [...new Set(outcomes.map((entry) => entry.projectId))];

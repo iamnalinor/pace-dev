@@ -128,9 +128,9 @@ if (SHOT_DIR !== undefined) {
       }
       // The full time bar is on Now.
       await desktop.goto("/");
-      await desktop.getByRole("button", { name: "Rest", exact: true }).click();
+      await desktop.getByRole("button", { name: "Misc", exact: true }).click();
       await desktop
-        .getByRole("list", { name: "Rest" })
+        .getByRole("list", { name: "Misc" })
         .getByRole("button", { name: "Rest" })
         .click();
       await expect(desktop.getByRole("region", { name: "Time" }).getByText("Rest")).toBeVisible();

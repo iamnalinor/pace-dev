@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 import { act } from "@testing-library/react-native";
 
 import { DayScreen } from "#app/features/day/day-screen.tsx";
+import { InboxScreen } from "#app/features/inbox/inbox-screen.tsx";
 import { NotificationsScreen } from "#app/features/notifications/notifications-screen.tsx";
 import { WeekScreen } from "#app/features/week/week-screen.tsx";
 import { deadControls } from "#app/test/dead-controls.ts";
@@ -10,7 +11,6 @@ import { controlsInsideControls } from "#app/test/nested-controls.ts";
 import { renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 
-import { InboxScreen } from "./inbox-screen.tsx";
 import { MoreScreen } from "./more-screen.tsx";
 import { NowScreen } from "./now-screen.tsx";
 import { SettingsScreen } from "./settings-screen.tsx";
@@ -23,9 +23,13 @@ activities), with the store's log as what a press may change besides the screen.
 
 /** Renders `ui` on a fresh artboard runtime; the store's log length is what a write changes. */
 const onArtboard = (ui: ReactElement) => async () => {
-  // A server that answers: Day's usage read succeeds (its failure line has its own test, R23-08).
+  // A server that answers: Day's usage and Week's calendar reads succeed (their failure lines have
+  // their own tests, R23-08).
   const runtime = await createTestRuntime({
-    routes: { "GET /api/usage": () => ({ sessions: [] }) },
+    routes: {
+      "GET /api/calendar": () => ({ events: [] }),
+      "GET /api/usage": () => ({ sessions: [] }),
+    },
   });
   await renderScreen(ui, runtime);
   return { extra: () => runtime.state.store.getState().log.length };
@@ -50,9 +54,7 @@ jest.setTimeout(120_000);
 Controls whose result is outside the app, so nothing on the screen changes: Day's usage access
 opens Android's settings page (the screen reads the permission again on the way back).
 */
-const OUTSIDE_THE_APP = [
-  'button without a label, showing "Allow usage access to see your sleep and"',
-];
+const OUTSIDE_THE_APP = ['button "Allow usage access to see your sleep and phone time here"'];
 
 describe("every control on a phone screen does something", () => {
   it.each([

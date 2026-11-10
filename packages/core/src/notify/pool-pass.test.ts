@@ -105,6 +105,14 @@ describe("the deadline digest in a pass", () => {
     expect(evening.memory.reported).toEqual([]);
   });
 
+  it("forgets a task once its deadline passed, though it stays open (nothing closes it now)", () => {
+    const first = pass("2026-10-07T11:05:00.000Z", { events: [report] });
+    expect(first.memory.reported).toHaveLength(1);
+    const after = pass("2026-10-08T09:01:00.000Z", { events: [report], memory: first.memory });
+    expect(after.memory.reported).toEqual([]);
+    expect(after.created).toEqual([]);
+  });
+
   it("sends nothing for an empty slot and arms for the next one", () => {
     const result = pass("2026-10-07T11:05:00.000Z");
     expect(result.created).toEqual([]);

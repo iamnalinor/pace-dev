@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { addMinutesIso } from "@pace/core";
 import { CALC_HW5_ID, HW_ID, MOSCOW, NOW, sheetId, TRK_ID } from "@pace/core/testing";
 
 import { setupActions, unwrap } from "../actions/fixture.fake.ts";
@@ -16,6 +17,123 @@ describe("historyViewModel", () => {
     expect(history.events.find((entry) => entry.id === skipped?.id)?.labelKey).toBe(
       "event.task.skipped",
     );
+  });
+
+  it("shows the revocations one Undo wrote together as one row that undoes them all (QA round 26 R26-10)", async () => {
+    const world = await setupActions();
+    const [done] = unwrap(await world.actions.closeTask({ outcome: "done", taskId: TRK_ID }));
+    const [started] = unwrap(await world.actions.startChoice("rest"));
+    if (done === undefined || started === undefined) {
+      throw new Error("written");
+    }
+    const batch = unwrap(await world.actions.revokeAll([done.id, started.id]));
+    const history = historyViewModel(world.state.store.getState(), {
+      atIso: NOW,
+      deviceTz: MOSCOW,
+    });
+    const rows = history.events.filter((entry) => entry.type === "event.revoked");
+    expect(rows).toHaveLength(1);
+    expect(new Set(rows[0]?.ids)).toEqual(new Set(batch.map((event) => event.id)));
+  });
+
+  it("shows one write of several events as one row whose Undo takes all of it back (owner R27-05, QA round 28 R28-05)", async () => {
+    const world = await setupActions([]);
+    unwrap(
+      await world.actions.logPast({
+        category: "study",
+        endAt: addMinutesIso(NOW, -60),
+        label: "Lecture",
+        startAt: addMinutesIso(NOW, -180),
+      }),
+    );
+    // Logged inside the lecture: one write of three events (the block, the cut, the rest of it).
+    const written = unwrap(
+      await world.actions.logPast({
+        category: "rest",
+        endAt: addMinutesIso(NOW, -120),
+        label: "Call",
+        startAt: addMinutesIso(NOW, -150),
+      }),
+    );
+    const rows = () =>
+      historyViewModel(world.state.store.getState(), { atIso: NOW, deviceTz: MOSCOW }).events;
+    const row = rows().find((entry) => entry.ids.includes(written[0]?.id ?? ""));
+    expect(row).toMatchObject({ revocable: true, type: "activity.logged" });
+    expect(new Set(row?.ids)).toEqual(new Set(written.map((event) => event.id)));
+    // The earlier write, recorded at the same clock reading, stays a row of its own.
+    expect(rows().filter((entry) => entry.type === "activity.logged")).toHaveLength(2);
+    unwrap(await world.actions.revokeAll(row?.ids ?? []));
+    expect(
+      Object.values(world.state.store.getState().time.activities).map((item) => item.label),
+    ).toEqual(["Lecture"]);
+  });
+
+  it("undoes what is still in effect of a batch partly taken back another way (review I2)", async () => {
+    const world = await setupActions();
+    const [done] = unwrap(await world.actions.closeTask({ outcome: "done", taskId: TRK_ID }));
+    const [started] = unwrap(await world.actions.startChoice("rest"));
+    if (done === undefined || started === undefined) {
+      throw new Error("written");
+    }
+    const [first, second] = unwrap(await world.actions.revokeAll([done.id, started.id]));
+    if (first === undefined || second === undefined) {
+      throw new Error("revoked");
+    }
+    // One member of the batch taken back alone (an older client, MCP's revoke_event), later.
+    world.setNow(addMinutesIso(NOW, 1));
+    unwrap(await world.actions.revoke(first.id));
+    const rowsOf = () =>
+      historyViewModel(world.state.store.getState(), {
+        atIso: NOW,
+        deviceTz: MOSCOW,
+      }).events.filter((entry) => entry.ids.includes(first.id) || entry.ids.includes(second.id));
+    // The row says what holds: the part still in effect can be undone, the other says revoked.
+    const inEffect = rowsOf().find((entry) => entry.revokedBy === null);
+    expect(inEffect?.ids).toEqual([second.id]);
+    expect(rowsOf().find((entry) => entry.revokedBy !== null)?.ids).toEqual([first.id]);
+    // Its Undo goes through, and nothing of the batch is left to undo after it.
+    unwrap(await world.actions.revokeAll(inEffect?.ids ?? []));
+    expect(rowsOf().every((entry) => entry.revokedBy !== null)).toBe(true);
+  });
+
+  it("keeps naming a task whose creation was undone, and offers no Undo for its later rows (QA round 27 R27-07)", async () => {
+    const world = await setupActions();
+    const [created] = unwrap(
+      await world.actions.createTask({ presetId: "personal", title: "Call the bank" }),
+    );
+    const taskId = created?.type === "task.created" ? created.payload.taskId : "";
+    const [importance] = unwrap(await world.actions.setImportance(taskId, "asap"));
+    unwrap(await world.actions.revoke(created?.id ?? ""));
+    const row = historyViewModel(world.state.store.getState(), {
+      atIso: NOW,
+      deviceTz: MOSCOW,
+    }).events.find((entry) => entry.id === importance?.id);
+    expect(row).toMatchObject({ revocable: false, taskTitle: "Call the bank" });
+  });
+
+  it("names a gone task by a title an amendment wrote last (QA 27 wave review M6)", async () => {
+    const world = await setupActions();
+    const [created] = unwrap(
+      await world.actions.createTask({ presetId: "personal", title: "Call the bank" }),
+    );
+    const taskId = created?.type === "task.created" ? created.payload.taskId : "";
+    const [importance] = unwrap(await world.actions.setImportance(taskId, "asap"));
+    // A retitle written as an amendment of the creation (an assistant's correction), then undone.
+    unwrap(
+      await world.state.dispatch({
+        occurredAt: NOW,
+        payload: { patch: { title: "Call the bank about the card" }, targetId: created?.id ?? "" },
+        precision: "exact",
+        source: "app",
+        type: "event.amended",
+      }),
+    );
+    unwrap(await world.actions.revoke(created?.id ?? ""));
+    const row = historyViewModel(world.state.store.getState(), {
+      atIso: NOW,
+      deviceTz: MOSCOW,
+    }).events.find((entry) => entry.id === importance?.id);
+    expect(row).toMatchObject({ taskTitle: "Call the bank about the card" });
   });
 
   it("names the activity an activity event is about", async () => {
@@ -54,7 +172,7 @@ describe("historyViewModel", () => {
 
   it("shows the board at an instant and the log newest first with what can be undone", async () => {
     const world = await setupActions();
-    const [solved] = unwrap(await world.actions.markSolved(HW_ID, "s5"));
+    const [solved] = unwrap(await world.actions.markDone(HW_ID, "s5"));
     const [revoked] = unwrap(await world.actions.undoLast());
     const history = historyViewModel(world.state.store.getState(), {
       atIso: NOW,

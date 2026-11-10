@@ -23,11 +23,11 @@ import { requestPlace, type RequestPlace } from "../shared/request-place.ts";
 import { deleteSession } from "../shared/session-rows.ts";
 import { storeOfUser, userStoreOf } from "../shared/user-store-of.ts";
 import { cachedAvatar, refreshAvatar } from "./avatar.ts";
+import { nonceSession } from "./nonce-session.ts";
 import {
   consumeNonce,
   createNonce,
   linkNonceSession,
-  type NonceLogin,
   type NonceReply,
   type NonceState,
 } from "./nonce.ts";
@@ -53,20 +53,6 @@ const NONCE_NOT_FOUND: Problem = {
   message: "Unknown or expired login",
   status: 404,
 };
-
-/** An app that did not name its phone (one from before it could) is the Android app. */
-const UNNAMED_APP = "Android";
-
-/**
-What a session opened by a bot login is: the app's, named by the phone it named, or the
-browser's that asked for the nonce, named after that browser.
-*/
-const nonceSession = (
-  login: NonceLogin,
-): { readonly kind: SessionKind; readonly name: string; readonly deviceId: null | string } =>
-  login.from === "app"
-    ? { deviceId: login.deviceId, kind: "app", name: login.deviceName ?? UNNAMED_APP }
-    : { deviceId: null, kind: "browser", name: clientName(login.place.userAgent) };
 
 /** The longest place part a sign-in notice keeps (its payload's bound). */
 const PLACE_PART_MAX = 80;
@@ -299,10 +285,13 @@ export const mountAuthRoutes = (app: Hono<AppEnv>, telegramFetch: TelegramTransp
   mount(app, endpoints.auth.nonceCreate, async ({ body, c, query }) => {
     const from = query.from ?? "app";
     const { nonce } = await createNonce(d1(c.env.DB), {
+      deviceBrand: body?.deviceBrand,
       deviceId: body?.deviceId,
+      deviceModel: body?.deviceModel,
       deviceName: body?.deviceName,
       from,
       now: Date.now(),
+      osVersion: body?.osVersion,
       place: requestPlace(c.req.raw),
     });
     const payload = loginPayload(nonce, from);

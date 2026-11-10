@@ -1,8 +1,7 @@
 import type { EventInput } from "../events/event-schema.ts";
 
-import { solvedCount, type Task, taskById, type TasksState } from "../model/task.ts";
+import { type Task, taskById, type TasksState } from "../model/task.ts";
 import { presetById, type PresetsState } from "../presets/preset-reducer.ts";
-import { taskPreset } from "../presets/resolve-preset.ts";
 import { err, ok, type Result } from "../result.ts";
 import { addMinutesIso } from "../time.ts";
 
@@ -12,7 +11,6 @@ export type RetroError =
   | "retro/future"
   | "retro/nothing-to-submit"
   | "retro/task-closed"
-  | "subtask/submitted"
   | "subtask/unknown"
   | "task/unknown";
 
@@ -64,27 +62,23 @@ export const taskInstantProblem = (
 const checkPreset = (presets: PresetsState, presetId: string): RetroError | undefined =>
   presetById(presets, presetId) === undefined ? "preset/unknown" : undefined;
 
-/** A whole submission of a per-subtask task needs at least one solved problem to send. */
-const isWholeSubmittable = (presets: PresetsState, task: Task): boolean => {
-  const preset = taskPreset(presets, task);
-  return !preset.ok || preset.value.submission === "whole" || solvedCount(task) > 0;
-};
-
+/**
+Only an older client still writes `task.submitted` (feedback 5 made done the one mark): one that
+names subtasks names done ones. A whole one is a stamp, let through: the preset's submission
+mode that once refused it went on 2026-11-09.
+*/
 const checkSubmission = (
-  presets: PresetsState,
   task: Task,
   ids: readonly string[] | undefined,
 ): RetroError | undefined => {
   if (ids === undefined) {
-    return isWholeSubmittable(presets, task) ? undefined : "retro/nothing-to-submit";
+    return undefined;
   }
   const picked = ids.map((id) => task.subtasks.find((item) => item.id === id));
   if (picked.includes(undefined)) {
     return "subtask/unknown";
   }
-  const isSolved = picked.every((item) => item?.solvedAt !== null);
-  const isPending = picked.some((item) => item?.submittedAt === null);
-  return isSolved && isPending ? undefined : "retro/nothing-to-submit";
+  return picked.every((item) => item?.doneAt !== null) ? undefined : "retro/nothing-to-submit";
 };
 
 const checkDetails = (
@@ -97,16 +91,10 @@ const checkDetails = (
   }
   if (input.type === "task.subtask.solved" || input.type === "task.subtask.removed") {
     const subtask = task.subtasks.find((item) => item.id === input.payload.subtaskId);
-    if (subtask === undefined) {
-      return "subtask/unknown";
-    }
-    // A sent problem is on the record: it stays.
-    return input.type === "task.subtask.removed" && subtask.submittedAt !== null
-      ? "subtask/submitted"
-      : undefined;
+    return subtask === undefined ? "subtask/unknown" : undefined;
   }
   return input.type === "task.submitted"
-    ? checkSubmission(presets, task, input.payload.subtaskIds)
+    ? checkSubmission(task, input.payload.subtaskIds)
     : undefined;
 };
 

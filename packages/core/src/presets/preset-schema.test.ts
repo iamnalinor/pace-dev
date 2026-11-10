@@ -45,9 +45,71 @@ describe("PresetDefinitionSchema", () => {
       submission: "per_subtask",
       urgencyPolicy: "resubmission",
     };
-    // The notification thresholds were never used (stage 8): old presets parse, they are dropped.
-    const { notify: _thresholds, ...kept } = full;
+    // The notification thresholds were never used (stage 8) and the submission mode went
+    // (2026-11-09): old presets parse, both are dropped.
+    const { notify: _thresholds, submission: _submission, ...kept } = full;
     expect(parsePresetDefinition(full)).toEqual({ ok: true, value: kept });
+  });
+
+  it("accepts a first number for the numbered title", () => {
+    expect(parsePresetDefinition({ recurrence: { ...recurrence, firstNumber: 9 } })).toEqual({
+      ok: true,
+      value: { recurrence: { ...recurrence, firstNumber: 9 } },
+    });
+    expect(
+      PresetDefinitionSchema.safeParse({ recurrence: { ...recurrence, firstNumber: 1.5 } }).success,
+    ).toBe(false);
+    expect(
+      PresetDefinitionSchema.safeParse({ recurrence: { ...recurrence, firstNumber: -1 } }).success,
+    ).toBe(false);
+  });
+
+  it("reads weekday names (short or full, any case) as their ISO numbers", () => {
+    const named = {
+      due: { time: "23:59", weekday: "Wednesday" },
+      issued: { time: "10:00", weekday: "MON" },
+      tz: "Europe/Moscow",
+    };
+    expect(parsePresetDefinition({ recurrence: named })).toEqual({
+      ok: true,
+      value: { recurrence },
+    });
+    const days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+    const full = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+    for (const [index, day] of days.entries()) {
+      const slot = { time: "10:00", weekday: day };
+      const fullSlot = { time: "10:00", weekday: full[index] };
+      expect(
+        parsePresetDefinition({ recurrence: { ...recurrence, issued: slot, due: fullSlot } }),
+      ).toMatchObject({
+        ok: true,
+        value: { recurrence: { issued: { weekday: index + 1 }, due: { weekday: index + 1 } } },
+      });
+    }
+    expect(
+      PresetDefinitionSchema.safeParse({
+        recurrence: { ...recurrence, issued: { time: "10:00", weekday: "someday" } },
+      }).success,
+    ).toBe(false);
+    expect(
+      PresetDefinitionSchema.safeParse({
+        recurrence: { ...recurrence, issued: { time: "10:00", weekday: 8 } },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("names the key path and the reason when a definition is refused", () => {
+    const named = parsePresetDefinition({
+      recurrence: { ...recurrence, issued: { time: "10:00", weekday: "someday" } },
+    });
+    expect(named.ok).toBe(false);
+    expect(named.ok ? "" : named.error).toMatch(/^recurrence\.issued\.weekday: .*1 = Monday/u);
+
+    const unknown = parsePresetDefinition({ recurrence: { ...recurrence, first: 9 } });
+    expect(unknown.ok ? "" : unknown.error).toMatch(/^recurrence: .*first/u);
+
+    const topLevel = parsePresetDefinition({ display: "card" });
+    expect(topLevel.ok ? "" : topLevel.error).toMatch(/^\(definition\): .*display/u);
   });
 
   it("is strict: an unknown key fails", () => {
@@ -61,6 +123,15 @@ describe("PresetDefinitionSchema", () => {
 
   it("rejects an explicit undefined (exact optional keys)", () => {
     expect(PresetDefinitionSchema.safeParse({ urgencyPolicy: undefined }).success).toBe(false);
+  });
+
+  it("reads an old preset's submission mode and drops it (no longer a setting)", () => {
+    for (const submission of ["per_subtask", "whole"]) {
+      expect(parsePresetDefinition({ color: "blue", submission })).toEqual({
+        ok: true,
+        value: { color: "blue" },
+      });
+    }
   });
 
   it("accepts null recurrence (removes an inherited schedule)", () => {

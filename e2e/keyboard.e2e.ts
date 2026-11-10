@@ -1,5 +1,6 @@
 import type { Locator } from "@playwright/test";
 
+import { addTask, nowTasks } from "./support/composer.ts";
 import { expect, test } from "./support/fixtures.ts";
 import { loginViaApi } from "./support/login.ts";
 import { seedLivedIn } from "./support/seed.ts";
@@ -61,8 +62,10 @@ test("the keyboard ring is the focus role on a switch and on the range slider", 
   await page.keyboard.press("Shift+Tab");
   await page.keyboard.press("Tab");
   await expect(toggle).toBeFocused();
-  expect(await ringOf(toggle)).toEqual({
-    color: await focusColor(toggle),
+  // A switch's ring is on the drawn track (the kit's small visual), not on its 44 px target.
+  const visual = toggle.locator("[data-pace-visual]");
+  expect(await ringOf(visual)).toEqual({
+    color: await focusColor(visual),
     style: "solid",
     width: "2px",
   });
@@ -83,14 +86,84 @@ test("the keyboard ring is the focus role on a switch and on the range slider", 
   });
 });
 
-test("Space opens a tab of the phone's bar, as Enter does", async ({ page }) => {
+/**
+The phone web's bar is a `nav` of links (spec §4.2.27, F-A11Y-11): Enter follows one, as for any
+link, and the current one says `aria-current="page"`. (It was a tablist, where Space had to open a
+tab too: Android keeps that role for TalkBack.)
+*/
+test("Enter opens a destination of the phone's bar, which then says it is the current page", async ({
+  page,
+}) => {
   await page.setViewportSize({ height: 844, width: 390 });
   await loginViaApi(page);
   await page.goto("/");
-  const day = page.getByRole("tab", { name: "Day" });
+  const bar = page.getByRole("navigation", { name: "Main" });
+  const day = bar.getByRole("link", { exact: true, name: "Day" });
   await expect(day).toBeVisible();
+  await expect(day).toHaveAttribute("href", "/day");
   await day.focus();
-  await page.keyboard.press("Space");
+  await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/day$/);
-  await expect(day).toHaveAttribute("aria-selected", "true");
+  await expect(day).toHaveAttribute("aria-current", "page");
+  await expect(bar.getByRole("link", { exact: true, name: "Now" })).not.toHaveAttribute(
+    "aria-current",
+  );
+});
+
+test("Escape closes Now's task pane and gives the focus back to its row; an edit in the pane takes the first Escape (QA round 24 R24-01)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 800, width: 1280 });
+  await loginViaApi(page);
+  await page.goto("/");
+  await addTask(page, "Pack the cables");
+  const header = page.getByRole("heading", { exact: true, name: "Pack the cables" });
+  await page.getByRole("button", { exact: true, name: "Close" }).first().click();
+  await expect(header).toHaveCount(0);
+  const row = nowTasks(page).getByRole("link", { name: /^Pack the cables/u });
+
+  await row.click();
+  await expect(header).toBeVisible();
+  await expect(page).toHaveURL(/[?&]task=/u);
+  await page.keyboard.press("Escape");
+  await expect(header).toHaveCount(0);
+  await expect(page).not.toHaveURL(/[?&]task=/u);
+  await expect(row).toBeFocused();
+
+  // The description edited in place owns the first Escape: the edit goes, the pane stays.
+  await row.click();
+  await page.getByRole("button", { exact: true, name: "Add description" }).click();
+  const field = page.getByRole("textbox", { exact: true, name: "Description" });
+  await expect(field).toBeFocused();
+  await field.pressSequentially("draft");
+  await page.keyboard.press("Escape");
+  await expect(field).toHaveCount(0);
+  await expect(header).toBeVisible();
+  // Focus stays at the description's place, not on the page (QA round 25 R25-09).
+  await expect(page.getByRole("button", { exact: true, name: "Add description" })).toBeFocused();
+  await expect(page).toHaveURL(/[?&]task=/u);
+  await page.keyboard.press("Escape");
+  await expect(header).toHaveCount(0);
+});
+
+test("Ctrl+Enter in the description edited in the pane saves it, never the task's Done (QA round 26 R26-02)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 800, width: 1280 });
+  await loginViaApi(page);
+  await page.goto("/");
+  await addTask(page, "Water the ficus");
+  const header = page.getByRole("heading", { exact: true, name: "Water the ficus" });
+  await expect(header).toBeVisible();
+  await page.getByRole("button", { exact: true, name: "Add description" }).click();
+  const field = page.getByRole("textbox", { exact: true, name: "Description" });
+  await expect(field).toBeFocused();
+  await field.pressSequentially("Half a can");
+  await page.keyboard.press("Control+Enter");
+  await expect(field).toHaveCount(0);
+  await expect(page.getByText("Half a can", { exact: true })).toBeVisible();
+  await expect(header).toBeVisible();
+  // Still open: the row stays in Now, and no Done toast came.
+  await expect(nowTasks(page).getByRole("link", { name: /^Water the ficus/u })).toBeVisible();
+  await expect(page.getByText(/^Done:/u)).toHaveCount(0);
 });

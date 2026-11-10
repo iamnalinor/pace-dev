@@ -1,14 +1,13 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 
+import { HistoryScreen } from "#app/features/history/history-screen.tsx";
+import { InboxScreen } from "#app/features/inbox/inbox-screen.tsx";
+import { ProjectScreen } from "#app/features/projects/project-screen.tsx";
+import { ProjectsScreen } from "#app/features/projects/projects-screen.tsx";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { ALGEBRA_ID, HW_ID, INBOX_CABLE_ID, INBOX_TEXTS } from "@pace/core/testing";
-
-import { HistoryScreen } from "./history-screen.tsx";
-import { InboxScreen } from "./inbox-screen.tsx";
-import { ProjectScreen } from "./project-screen.tsx";
-import { ProjectsScreen } from "./projects-screen.tsx";
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -19,13 +18,12 @@ describe("InboxScreen", () => {
     const runtime = await createTestRuntime();
     await renderScreen(<InboxScreen />, runtime);
     expect(screen.getByText(INBOX_TEXTS[INBOX_CABLE_ID])).toBeOnTheScreen();
-    const [accept] = screen.getAllByRole("button", { name: en("common.accept") });
-    if (accept === undefined) {
-      throw new Error("no Accept button");
-    }
+    const accept = screen.getByRole("button", {
+      name: `${en("common.accept")}: ${INBOX_TEXTS[INBOX_CABLE_ID]}`,
+    });
     await fireEvent.press(accept);
     await waitFor(() => {
-      expect(screen.getAllByRole("button", { name: en("common.accept") })).toHaveLength(2);
+      expect(screen.getAllByRole("button", { name: /^Accept: / })).toHaveLength(2);
     });
   });
 });
@@ -39,19 +37,26 @@ describe("InboxScreen — decisions", () => {
   });
 });
 
+/** A project's row, named by the project and its count (the count is read too, 4.8). */
 const row = (name: string) => screen.getByRole("link", { name });
 
 describe("ProjectsScreen and ProjectScreen", () => {
   it("lists the projects and opens one", async () => {
     await renderScreen(<ProjectsScreen />, await createTestRuntime());
-    await fireEvent.press(screen.getByRole("link", { name: "Algebra" }));
+    await fireEvent.press(row("Algebra, 2 tasks"));
     expect(router.push).toHaveBeenCalledWith(`/project/${ALGEBRA_ID}`);
+  });
+
+  it("says each row's open tasks to a screen reader too, not the name alone (audit 4.8)", async () => {
+    await renderScreen(<ProjectsScreen />, await createTestRuntime());
+    expect(screen.getByRole("link", { name: "Algebra, 2 tasks" })).toBeOnTheScreen();
+    expect(screen.getByRole("link", { name: "Work, 3 tasks" })).toBeOnTheScreen();
   });
 
   it("says how many tasks are open in each project, whatever Now's chips show", async () => {
     await renderScreen(<ProjectsScreen />, await createTestRuntime());
-    expect(within(row("Algebra")).getByText("2 tasks")).toBeOnTheScreen();
-    expect(within(row("Work")).getByText("3 tasks")).toBeOnTheScreen();
+    expect(within(row("Algebra, 2 tasks")).getByText("2 tasks")).toBeOnTheScreen();
+    expect(within(row("Work, 3 tasks")).getByText("3 tasks")).toBeOnTheScreen();
   });
 
   it("says one task, and none", async () => {
@@ -67,14 +72,16 @@ describe("ProjectsScreen and ProjectScreen", () => {
       title: "Weed",
     });
     await renderScreen(<ProjectsScreen />, runtime);
-    expect(within(row("Garden")).getByText("1 task")).toBeOnTheScreen();
-    expect(within(row("Attic")).getByText("No open tasks")).toBeOnTheScreen();
+    expect(within(row("Garden, 1 task")).getByText("1 task")).toBeOnTheScreen();
+    expect(within(row("Attic, No open tasks")).getByText("No open tasks")).toBeOnTheScreen();
   });
 
   it("shows a project's figures and open tasks", async () => {
     await renderScreen(<ProjectScreen id={ALGEBRA_ID} />, await createTestRuntime());
     expect(screen.getByRole("header", { name: "Algebra" })).toBeOnTheScreen();
-    expect(screen.getByLabelText(`${en("project.stat.onTime")}: 9/11`)).toBeOnTheScreen();
+    expect(screen.getByText("2 open · 9/11 on time · 2 late")).toBeOnTheScreen();
+    // The figures are one quiet line, not a strip of tiles (F-CMP-16).
+    expect(screen.queryByLabelText(/^On time: /u)).toBeNull();
     await fireEvent.press(screen.getByText("Algebra HW 6"));
     expect(router.push).toHaveBeenCalledWith(`/task/${HW_ID}`);
   });
@@ -86,7 +93,7 @@ describe("HistoryScreen", () => {
     const revoke = jest.spyOn(runtime.actions, "revoke");
     await renderScreen(<HistoryScreen />, runtime);
 
-    const [firstUndo] = screen.getAllByRole("button", { name: en("common.undo") });
+    const [firstUndo] = screen.getAllByRole("button", { name: /^Undo: /u });
     if (firstUndo === undefined) {
       throw new Error("no History Undo button");
     }
@@ -100,7 +107,7 @@ describe("HistoryScreen", () => {
     expect(revoke).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: en("history.undoConfirm") })).toBeNull();
 
-    const [secondUndo] = screen.getAllByRole("button", { name: en("common.undo") });
+    const [secondUndo] = screen.getAllByRole("button", { name: /^Undo: /u });
     if (secondUndo === undefined) {
       throw new Error("no History Undo button after Cancel");
     }
@@ -116,14 +123,15 @@ describe("HistoryScreen", () => {
   it("shows the board and the events, each undoable", async () => {
     await renderScreen(<HistoryScreen />, await createTestRuntime());
     expect(screen.getByRole("header", { name: en("history.title") })).toBeOnTheScreen();
-    expect(screen.getAllByRole("button", { name: en("common.undo") }).length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: en("history.now") })).toBeDisabled();
+    expect(screen.getAllByRole("button", { name: /^Undo: /u }).length).toBeGreaterThan(0);
+    // Today is offered only away from now (F-CPY-06).
+    expect(screen.queryByRole("button", { name: en("period.today") })).toBeNull();
     await fireEvent.press(screen.getByRole("button", { name: en("history.dayBack") }));
     // The day viewed is in the label, and the events stop there.
-    expect(screen.getByText(/^Tasks as they were at .*Oct 5/u)).toBeOnTheScreen();
+    expect(screen.getByText(/^Tasks at .*Oct 5/u)).toBeOnTheScreen();
     expect(screen.getByText(/^Events up to/u)).toBeOnTheScreen();
     // Relative words count from the moment shown: a task due on 5 Oct is "today" there.
     expect(screen.getByText("Due today 23:59")).toBeOnTheScreen();
-    expect(screen.getByRole("button", { name: en("history.now") })).toBeEnabled();
+    expect(screen.getByRole("button", { name: en("period.today") })).toBeEnabled();
   });
 });

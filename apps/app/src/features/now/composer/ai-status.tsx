@@ -5,7 +5,7 @@ import type { AiState } from "@pace/client/react";
 import { useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { ActionChip, Chip } from "#app/ui/chip.tsx";
+import { Chip } from "#app/ui/chip.tsx";
 import { answerText } from "@pace/core";
 
 type Props = {
@@ -54,7 +54,6 @@ const Reading = ({
                 onPress={() => {
                   onAnswer(answerText(question.question, option));
                 }}
-                selected={false}
               >
                 {option}
               </Chip>
@@ -122,9 +121,7 @@ export const AiStatus = ({ onAnswer, onLater, state }: Props) => {
           <Text className="font-sans text-caption font-normal text-label-primary">
             {unreadText(state, { deviceTz: viewer.deviceTz, t })}
           </Text>
-          {state.canReadLater ? (
-            <ActionChip onPress={onLater}>{t("composer.aiLater")}</ActionChip>
-          ) : null}
+          {state.canReadLater ? <Chip onPress={onLater}>{t("composer.aiLater")}</Chip> : null}
         </View>
       );
     }

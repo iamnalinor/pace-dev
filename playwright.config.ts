@@ -70,6 +70,10 @@ export default defineConfig({
   testMatch: "**/*.e2e.ts",
   use: {
     baseURL: WEB_URL,
+    // The host's zone and language are no input of a test: every account is seeded on UTC (a test
+    // that needs another zone sets its own `timezoneId`).
+    locale: "en-US",
+    timezoneId: "UTC",
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
   },

@@ -56,7 +56,6 @@ describe("exampleCoursePresetEvents", () => {
           issued: { time: "10:00", weekday: 1 },
           tz: "Europe/Moscow",
         },
-        submission: "per_subtask",
       },
     });
   });

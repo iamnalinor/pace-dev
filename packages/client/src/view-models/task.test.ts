@@ -118,23 +118,26 @@ describe("taskViewModel", () => {
     expect(trk.outcome).toBeNull();
   });
 
-  it("shows Algebra HW 6 on Wednesday: the subtasks, Submit 3 and 4, and the quick times", () => {
+  it("shows Algebra HW 6 on Wednesday: the subtasks done or not, Done, the quick times, no submission tag", () => {
     const hw = view(HW_ID, HW_VIEW_NOW);
     expect(hw.subtasks.map((subtask) => [subtask.number, subtask.state])).toEqual([
-      [1, "submitted"],
-      [2, "submitted"],
-      [3, "solved"],
-      [4, "solved"],
+      [1, "done"],
+      [2, "done"],
+      [3, "done"],
+      [4, "done"],
       [5, "pending"],
       [6, "pending"],
       [null, "pending"],
     ]);
-    expect(hw.subtasks[0]).toMatchObject({
+    // Solved at 12:00 and sent at 13:00 in the old log: done at the earlier mark.
+    expect(hw.subtasks[0]).toEqual({
+      doneAt: "2026-10-05T12:00:00.000Z",
+      id: "s1",
       label: "Matrix rank",
-      solvedAt: "2026-10-05T12:00:00.000Z",
-      submittedAt: "2026-10-05T13:00:00.000Z",
+      number: 1,
+      state: "done",
     });
-    expect(hw.primaryAction).toEqual({ kind: "submit", subtaskIds: ["s3", "s4"] });
+    expect(hw.primaryAction).toEqual({ kind: "done" });
     // Due tonight: "at the deadline" is ahead, which the close would refuse, so it is not offered.
     expect(hw.quickTimes.map((entry) => entry.key)).toEqual([
       "now",
@@ -146,7 +149,6 @@ describe("taskViewModel", () => {
     expect(hw.tags).toEqual([
       { importance: "normal", kind: "importance" },
       { kind: "status", status: "in_progress" },
-      { kind: "submission", submission: "per_subtask" },
     ]);
   });
 

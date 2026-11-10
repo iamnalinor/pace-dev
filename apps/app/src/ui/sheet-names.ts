@@ -12,9 +12,12 @@ export const SHEET_NAMES = [
   "connect-ai",
   "day-picker",
   "history-undo",
+  "inbox-detail",
   "move-to-project",
   "task-edit",
+  "task-menu",
   "time-choices",
+  "time-proposal",
   "week-pick",
 ] as const;
 

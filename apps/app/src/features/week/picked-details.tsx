@@ -1,16 +1,6 @@
 import type { ReactNode } from "react";
 
-import {
-  AlignLeft,
-  CalendarDays,
-  ExternalLink,
-  type LucideIcon,
-  MapPin,
-  User,
-  Users,
-  Video,
-  X,
-} from "lucide-react-native";
+import { useRouter } from "expo-router";
 import { Linking, ScrollView, Text, View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
@@ -19,13 +9,16 @@ import { ActivityApps } from "#app/shared/activity-usage.tsx";
 import { useOpenTask } from "#app/shared/task-opener.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
+import { Group } from "#app/ui/group.tsx";
 import { IconButton } from "#app/ui/icon-button.tsx";
+import { Icon, type IconName } from "#app/ui/icon.tsx";
+import { ListRow } from "#app/ui/list-row.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
 import { type EventDetails, eventDetails, type WeekBlock, type WeekModel } from "@pace/client";
-import { formatDuration, type Language, plural } from "@pace/core";
+import { formatDuration, formatInZone, type Language, plural } from "@pace/core";
 
-import { dayLabel, type Picked } from "./week-grid.tsx";
+import { dayLabel } from "./day-strip.tsx";
+import { type Picked, pickedKey } from "./week-picked.ts";
 
 /** Opens an address from the calendar; a refusal (no app for it) leaves the screen as it is. */
 const openAsync = async (url: string): Promise<void> => {
@@ -60,6 +53,13 @@ const useHeading = (
   zone: string,
 ): { readonly title: string; readonly when: string } => {
   const { language } = useViewer();
+  const t = useT();
+  if (picked.kind === "group") {
+    return {
+      title: t("week.foldedTitle", { count: picked.items.length }),
+      when: t("week.foldedHint"),
+    };
+  }
   if (picked.kind === "block") {
     const when = whenText({ ...picked.block, isMultiDay: false }, zone, language);
     return { title: picked.block.label, when };
@@ -69,18 +69,11 @@ const useHeading = (
 };
 
 /** One fact about the event: a small icon, then the words. */
-const Fact = ({
-  children,
-  icon: Icon,
-}: {
-  readonly children: ReactNode;
-  readonly icon: LucideIcon;
-}) => {
-  const { palette } = useTheme();
+const Fact = ({ children, icon }: { readonly children: ReactNode; readonly icon: IconName }) => {
   return (
     <View className="flex-row items-start gap-3">
       <View className="pt-0.5">
-        <Icon color={palette["label.secondary"]} size={16} strokeWidth={1.75} />
+        <Icon name={icon} size="inline" />
       </View>
       <View className="min-w-0 flex-1 gap-1">{children}</View>
     </View>
@@ -131,11 +124,11 @@ const EventFacts = ({ details }: { readonly details: EventDetails }) => {
   const { attendeeCount, calendarName, link, location, notes, organizer } = details;
   return (
     <View className="gap-3">
-      <Fact icon={CalendarDays}>
+      <Fact icon={"calendar-days"}>
         <Text className={FACT_TEXT}>{calendarName ?? t("week.calendarEvent")}</Text>
       </Fact>
       {location === null ? null : (
-        <Fact icon={MapPin}>
+        <Fact icon={"map-pin"}>
           <Text
             accessibilityHint={t("calendar.openMaps")}
             accessibilityRole="link"
@@ -149,12 +142,12 @@ const EventFacts = ({ details }: { readonly details: EventDetails }) => {
         </Fact>
       )}
       {organizer === null ? null : (
-        <Fact icon={User}>
+        <Fact icon={"user"}>
           <Text className={FACT_TEXT}>{t("calendar.organizer", { name: organizer })}</Text>
         </Fact>
       )}
       {attendeeCount === null ? null : (
-        <Fact icon={Users}>
+        <Fact icon={"users"}>
           <Text className={FACT_TEXT}>
             {plural(language, attendeeCount, {
               few: t("calendar.people.few"),
@@ -166,13 +159,13 @@ const EventFacts = ({ details }: { readonly details: EventDetails }) => {
         </Fact>
       )}
       {notes === null ? null : (
-        <Fact icon={AlignLeft}>
+        <Fact icon={"align-left"}>
           <Notes notes={notes} />
         </Fact>
       )}
       {link === null ? null : (
         <Button
-          icon={link.isCall ? Video : ExternalLink}
+          icon={link.isCall ? "video" : "external-link"}
           onPress={() => {
             open(link.url);
           }}
@@ -198,6 +191,7 @@ const BlockFacts = ({
   const t = useT();
   const { language } = useViewer();
   const openTask = useOpenTask();
+  const router = useRouter();
   const { taskId } = block;
   return (
     <View className="gap-1">
@@ -216,13 +210,58 @@ const BlockFacts = ({
           {t("week.openTask")}
         </Button>
       )}
+      {/* Week only shows a block; its day is where it is edited, with it open (R25-07, R26-04). */}
+      <Button
+        onPress={() => {
+          onLeave();
+          router.push({
+            params: { block: block.id, date: formatInZone(block.startAt, week.zone, "yyyy-MM-dd") },
+            pathname: "/day",
+          });
+        }}
+        variant="plain"
+      >
+        {t("week.editInDay")}
+      </Button>
     </View>
+  );
+};
+
+/** The items of a folded run, each a row that opens its own details. */
+const GroupList = ({
+  items,
+  onPick,
+  week,
+}: {
+  readonly items: readonly Extract<Picked, { kind: "block" | "event" }>[];
+  readonly onPick: (picked: Picked) => void;
+  readonly week: WeekModel;
+}) => {
+  const { language } = useViewer();
+  return (
+    <Group inset={false}>
+      {items.map((item) => {
+        const stretch = item.kind === "event" ? item.event : item.block;
+        return (
+          <ListRow
+            key={pickedKey(item)}
+            onPress={() => {
+              onPick(item);
+            }}
+            subtitle={whenText({ ...stretch, isMultiDay: false }, week.zone, language)}
+            title={item.kind === "event" ? item.event.title : item.block.label}
+            titleLines={2}
+          />
+        );
+      })}
+    </Group>
   );
 };
 
 /** The facts of a pick, the same in the pane and in the sheet. */
 const PickedFacts = ({
   onLeave,
+  onPick,
   picked,
   week,
 }: {
@@ -230,22 +269,32 @@ const PickedFacts = ({
   readonly week: WeekModel;
   /** The pick is being left for another screen (its task). */
   readonly onLeave: () => void;
-}) =>
-  picked.kind === "block" ? (
-    <BlockFacts block={picked.block} onLeave={onLeave} week={week} />
-  ) : (
-    <EventFacts details={eventDetails(picked.event, week.zone)} />
-  );
+  readonly onPick: (picked: Picked) => void;
+}) => {
+  switch (picked.kind) {
+    case "block": {
+      return <BlockFacts block={picked.block} onLeave={onLeave} week={week} />;
+    }
+    case "event": {
+      return <EventFacts details={eventDetails(picked.event, week.zone)} />;
+    }
+    case "group": {
+      return <GroupList items={picked.items} onPick={onPick} week={week} />;
+    }
+  }
+};
 
 /** A pick, the week it is on, and how to let it go. */
 type PickedProps = {
   readonly picked: Picked;
+  /** Opens one of a folded run's items in its place. */
+  readonly onPick: (picked: Picked) => void;
   readonly week: WeekModel;
   readonly onClose: () => void;
 };
 
 /** A phone's details: the bottom sheet over the grid. */
-export const PickedSheet = ({ onClose, picked, week }: PickedProps) => {
+export const PickedSheet = ({ onClose, onPick, picked, week }: PickedProps) => {
   const t = useT();
   const { title, when } = useHeading(picked, week.zone);
   return (
@@ -253,35 +302,20 @@ export const PickedSheet = ({ onClose, picked, week }: PickedProps) => {
       closeLabel={t("common.close")}
       name="week-pick"
       onClose={onClose}
+      open
       subtitle={when}
       title={title}
-      visible
     >
-      <PickedFacts onLeave={onClose} picked={picked} week={week} />
+      <PickedFacts onLeave={onClose} onPick={onPick} picked={picked} week={week} />
     </Sheet>
   );
 };
 
-/** A wide window's details beside the grid: the pick, or how to make one. */
-export const PickedPane = ({
-  onClose,
-  picked,
-  week,
-}: Omit<PickedProps, "picked"> & { readonly picked: null | Picked }) => {
-  const t = useT();
-  if (picked === null) {
-    return (
-      <View className="flex-1 items-center justify-center px-8">
-        <Text className="text-center font-sans text-subhead font-normal text-label-secondary">
-          {t("week.pickHint")}
-        </Text>
-      </View>
-    );
-  }
-  return <PickedPaneBody onClose={onClose} picked={picked} week={week} />;
-};
-
-const PickedPaneBody = ({ onClose, picked, week }: PickedProps) => {
+/**
+A wide window's details beside the grid, in the shell's inspector: it is there only while
+something is picked (F-LAY-03).
+*/
+export const PickedPane = ({ onClose, onPick, picked, week }: PickedProps) => {
   const t = useT();
   const { title, when } = useHeading(picked, week.zone);
   return (
@@ -295,10 +329,10 @@ const PickedPaneBody = ({ onClose, picked, week }: PickedProps) => {
         </View>
         {/* The cross's middle on the title's first line, as in the sheets (QA round 16 L10). */}
         <View className="-mr-2 h-6 justify-center">
-          <IconButton icon={X} label={t("common.close")} onPress={onClose} variant="plain" />
+          <IconButton icon={"x"} label={t("common.close")} onPress={onClose} />
         </View>
       </View>
-      <PickedFacts onLeave={onClose} picked={picked} week={week} />
+      <PickedFacts onLeave={onClose} onPick={onPick} picked={picked} week={week} />
     </ScrollView>
   );
 };

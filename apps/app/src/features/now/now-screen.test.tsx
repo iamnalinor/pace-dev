@@ -10,7 +10,7 @@ import { removeSeriesRule, setSeriesRule } from "#app/platform/phone-memory.ts";
 import { heldRoute } from "#app/test/held-route.ts";
 import { controlsInsideControls } from "#app/test/nested-controls.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
-import { router } from "#app/test/router.ts";
+import { paramsSet, router, searchParams, setSearchParams } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { rowsInFlattenableBoxes } from "#app/test/sliding-rows.ts";
 import { DISSOLVE_MS } from "#app/ui/dissolve.tsx";
@@ -121,27 +121,45 @@ const rowLayouts = (node: unknown): readonly unknown[] => {
   ];
 };
 
-describe("NowBoard", () => {
-  it("shows two compact groups when both dated and undated tasks exist", async () => {
-    await renderScreen(<Board />, await createTestRuntime());
-    expect(screen.getByText(en("now.withDeadline"))).toBeOnTheScreen();
-    expect(screen.getByText(en("now.withoutDeadline"))).toBeOnTheScreen();
-    expect(checks()).toHaveLength(6);
-    const title = en("now.withDeadline");
-    const expand = screen.getByRole("button", { name: en("now.expandGroup", { title }) });
-    await fireEvent.press(expand);
-    expect(checks()).toHaveLength(9);
-    const collapse = screen.getByRole("button", { name: en("now.collapseGroup", { title }) });
-    await fireEvent.press(collapse);
-    expect(checks()).toHaveLength(6);
-  });
+/** The check names and the boundary's label in tree order: where the rule sits among the rows. */
+const flatLabels = (node: unknown): readonly string[] => {
+  if (Array.isArray(node)) {
+    return node.flatMap((child) => flatLabels(child));
+  }
+  if (typeof node !== "object" || node === null) {
+    return [];
+  }
+  const view = node as { children?: unknown; props: Record<string, unknown> };
+  const label = view.props["aria-label"] ?? view.props["accessibilityLabel"];
+  const own =
+    typeof label === "string" &&
+    (view.props["role"] === "separator" || /^Mark .* done$/u.test(label))
+      ? [label]
+      : [];
+  return [...own, ...flatLabels(view.children)];
+};
 
-  it("uses a plain list when filtering leaves only one type of task", async () => {
-    await renderScreen(<Board />, await createTestRuntime());
-    const chips = screen.getByLabelText("Filter by project");
-    await fireEvent.press(within(chips).getByRole("radio", { name: "Algebra" }));
+describe("NowBoard", () => {
+  it("is one list: dated tasks first, one labelled hairline, then the undated; no headers or folds", async () => {
+    const rendered = await renderScreen(<Board />, await createTestRuntime());
     expect(screen.queryByText(en("now.withDeadline"))).toBeNull();
     expect(screen.queryByText(en("now.withoutDeadline"))).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Show all/u })).toBeNull();
+    expect(checks()).toHaveLength(9);
+    // The rule sits between rows: dated ones above it, the undated below.
+    const marks = flatLabels(rendered.toJSON());
+    const boundary = en("now.withoutDeadline");
+    const at = marks.indexOf(boundary);
+    expect(at).toBeGreaterThan(0);
+    expect(at).toBeLessThan(marks.length - 1);
+    expect(marks.filter((mark) => mark === boundary)).toHaveLength(1);
+  });
+
+  it("has no hairline when filtering leaves only one kind of task", async () => {
+    const rendered = await renderScreen(<Board />, await createTestRuntime());
+    const chips = screen.getByLabelText("Filter by project");
+    await fireEvent.press(within(chips).getByRole("radio", { name: "Algebra" }));
+    expect(flatLabels(rendered.toJSON())).not.toContain(en("now.withoutDeadline"));
     expect(checks()).toEqual(["Mark Algebra HW 6 done"]);
   });
 
@@ -158,9 +176,6 @@ describe("NowBoard", () => {
     await renderScreen(<Board />, await createTestRuntime());
     expect(screen.getByText("Tuesday · Oct 6")).toBeOnTheScreen();
     expect(screen.getByText("Now")).toBeOnTheScreen();
-    const title = en("now.withDeadline");
-    const expand = screen.getByRole("button", { name: en("now.expandGroup", { title }) });
-    await fireEvent.press(expand);
     expect(checks()).toEqual([
       "Mark Calculus HW 5 done",
       "Mark Algebra HW 6 done",
@@ -172,12 +187,11 @@ describe("NowBoard", () => {
       "Mark RFC: dedicated runner pool done",
       "Mark Return library books done",
     ]);
-    expect(
-      screen.getByText("Due tomorrow 23:59 · 1d 8h left · 4/7 solved · 2 sent"),
-    ).toBeOnTheScreen();
-    // The project (else the category) and the importance are coloured tags before the meta text.
+    // On a phone the date goes last: the line's cut takes it, not the countdown (design review 2 N10).
+    expect(screen.getByText("1d 8h left · 4/7 done · Due tomorrow 23:59")).toBeOnTheScreen();
+    // The project (else the category) is a tag and a non-Normal importance a word; Normal says nothing.
     expect(screen.getAllByText("ASAP").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Normal").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Normal")).not.toBeOnTheScreen();
     expect(screen.getByText("15h late · 2 subtasks left")).toBeOnTheScreen();
     expect(screen.getByText("12d old")).toBeOnTheScreen();
     expect(screen.getAllByText("Nice-to-have").length).toBeGreaterThan(0);
@@ -191,8 +205,6 @@ describe("NowBoard", () => {
     const runtime = await createTestRuntime({ now: late });
     await runtime.state.ingest(rentSeriesEvents());
     await renderScreen(<Board />, runtime);
-    const title = en("now.withDeadline");
-    await fireEvent.press(screen.getByRole("button", { name: en("now.expandGroup", { title }) }));
     const repeats = en("meta.repeats");
     const rent = screen.getByRole("link", { name: /^Rent/u });
     expect(within(rent).getByRole("image", { name: repeats })).toBeOnTheScreen();
@@ -205,8 +217,6 @@ describe("NowBoard", () => {
     const runtime = await createTestRuntime({ now: "2026-11-10T12:00:00.000Z" });
     await runtime.state.ingest(rentSeriesEvents());
     await renderScreen(<Board />, runtime);
-    const title = en("now.withDeadline");
-    await fireEvent.press(screen.getByRole("button", { name: en("now.expandGroup", { title }) }));
     const rent = screen.getByRole("link", { name: /^Rent/u });
     expect(within(rent).getByText("9d late")).toBeOnTheScreen();
     expect(within(rent).getByText("final deadline passed Nov 7 23:59")).toBeOnTheScreen();
@@ -240,6 +250,28 @@ describe("NowBoard", () => {
     await fireEvent.press(screen.getByRole("button", { name: "Undo" }));
     await waitFor(() => {
       expect(screen.getByText("Reply to course curator")).toBeOnTheScreen();
+    });
+  });
+
+  it("takes the Done toast away once the task is reopened another way (R28-02's class)", async () => {
+    const runtime = await createTestRuntime();
+    await renderScreen(<Board />, runtime);
+    await fireEvent.press(
+      screen.getByRole("checkbox", { name: "Mark Reply to course curator done" }),
+    );
+    const task = () =>
+      Object.values(runtime.state.store.getState().tasks.byId).find(
+        (item) => item.title === "Reply to course curator",
+      );
+    await waitFor(() => {
+      expect(task()?.closed).not.toBeNull();
+    });
+    expect(await screen.findByRole("button", { name: "Undo" })).toBeOnTheScreen();
+    await act(async () => {
+      await runtime.actions.reopen(task()?.id ?? "");
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
     });
   });
 
@@ -333,12 +365,20 @@ describe("NowBoard", () => {
     }
   });
 
-  it("opens the submit sheet for a per-subtask task instead of closing it", async () => {
-    const runtime = await createTestRuntime();
-    await renderScreen(<Board />, runtime);
-    await fireEvent.press(screen.getByRole("checkbox", { name: "Mark Algebra HW 6 done" }));
-    expect(router.push).toHaveBeenCalledWith(`/task/${HW_ID}?close=1`);
-    expect(runtime.state.store.getState().tasks.byId[HW_ID]?.closed).toBeNull();
+  it("closes a homework task as done from its check, like any other (no submit sheet)", async () => {
+    jest.useFakeTimers();
+    try {
+      const runtime = await createTestRuntime();
+      await renderScreen(<Board />, runtime);
+      await fireEvent.press(screen.getByRole("checkbox", { name: "Mark Algebra HW 6 done" }));
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(DISSOLVE_MS + 50);
+      });
+      expect(router.push).not.toHaveBeenCalled();
+      expect(runtime.state.store.getState().tasks.byId[HW_ID]?.closed?.outcome).toBe("done");
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("filters by project and folds the tasks that start later under In future", async () => {
@@ -351,12 +391,44 @@ describe("NowBoard", () => {
       "Mark RFC: dedicated runner pool done",
     ]);
     await fireEvent.press(screen.getByRole("radio", { name: "All" }));
-    expect(checks()).toHaveLength(6);
+    expect(checks()).toHaveLength(9);
     const fold = screen.getByRole("button", { name: "In future · 4" });
+    // A hairline sets the fold apart from the list above it (as before the kit Disclosure).
+    expect(String(screen.getByTestId("fold-hairline").props["className"])).toContain(
+      "border-separator",
+    );
     expect(screen.queryByText("Check test 1 grade")).toBeNull();
     await fireEvent.press(fold);
     expect(screen.getByText("Check test 1 grade")).toBeOnTheScreen();
     expect(screen.getByText(/^Starts Oct 20/u)).toBeOnTheScreen();
+  });
+
+  it("keeps the project filter in the address: a reload shows the same filter (feedback 5 item 6)", async () => {
+    const runtime = await createTestRuntime();
+    const page = await renderScreen(<Board />, runtime);
+    const chips = screen.getByLabelText("Filter by project");
+    await fireEvent.press(within(chips).getByRole("radio", { name: "Work" }));
+    const { project } = searchParams();
+    expect(project).toBeDefined();
+    await page.unmount();
+    await renderScreen(<Board />, runtime);
+    expect(
+      within(screen.getByLabelText("Filter by project")).getByRole("radio", {
+        checked: true,
+        name: "Work",
+      }),
+    ).toBeOnTheScreen();
+    expect(checks()).toHaveLength(3);
+    await fireEvent.press(screen.getByRole("radio", { name: "All" }));
+    expect(searchParams()).toEqual({});
+  });
+
+  it("reads an unknown project in the address as All, and writes nothing back", async () => {
+    setSearchParams({ project: "gone" });
+    await renderScreen(<Board />, await createTestRuntime());
+    expect(screen.getByRole("radio", { checked: true, name: "All" })).toBeOnTheScreen();
+    expect(checks()).toHaveLength(9);
+    expect(paramsSet).not.toHaveBeenCalled();
   });
 
   it("offers the device zone when the account sits in another one", async () => {
@@ -744,10 +816,10 @@ describe("NowBoard", () => {
       await waitFor(() => {
         expect(within(bar()).getByRole("button", { name: "Chores, running" })).toBeOnTheScreen();
       });
-      await fireEvent.press(within(bar()).getByRole("button", { name: "Rest" }));
+      await fireEvent.press(within(bar()).getByRole("button", { name: "Misc" }));
       await fireEvent.press(await screen.findByRole("button", { name: "Short break" }));
       await waitFor(() => {
-        expect(within(bar()).getByRole("button", { name: "Rest, running" })).toBeOnTheScreen();
+        expect(within(bar()).getByRole("button", { name: "Misc, running" })).toBeOnTheScreen();
       });
       expect(within(bar()).getByText("Short break")).toBeOnTheScreen();
       expect(runtime.state.store.getState().time.activities).not.toEqual({});
@@ -762,8 +834,10 @@ describe("NowBoard", () => {
     });
   });
 
-  it("shows the empty state on a fresh account", async () => {
+  it("shows the empty state on a fresh account: what will appear, and a way to add a task (spec §5.1, M6)", async () => {
     await renderScreen(<Board />, await createTestRuntime({ world: "empty" }));
     expect(screen.getByText(en("now.empty"))).toBeOnTheScreen();
+    expect(screen.getByText(en("now.emptyBody"))).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: en("now.emptyAdd") })).toBeOnTheScreen();
   });
 });

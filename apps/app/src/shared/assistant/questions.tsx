@@ -1,10 +1,9 @@
-import { Check } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
 import { cx } from "#app/ui/cx.ts";
-import { useTheme } from "#app/ui/theme-provider.tsx";
+import { Icon } from "#app/ui/icon.tsx";
 import { answerText, type MessageKey, type ParseQuestion } from "@pace/core";
 
 /**
@@ -70,19 +69,15 @@ type Answered = { readonly question: string; readonly option: string };
 /** A question answered by a tap and no longer asked: what was answered stays in view. */
 const AnsweredLine = ({ answered }: { readonly answered: Answered }) => {
   const t = useT();
-  const { palette } = useTheme();
   return (
     <View
       accessibilityLabel={t("assistant.answered", answered)}
       accessible
       className="flex-row items-start gap-2"
     >
-      <Check
-        color={palette["label.secondary"]}
-        size={16}
-        strokeWidth={2}
-        style={{ marginTop: 2 }}
-      />
+      <View className="pt-0.5">
+        <Icon name="check" size="inline" />
+      </View>
       <Text className="shrink font-sans text-footnote text-label-secondary">
         {`${answered.question} — ${answered.option}`}
       </Text>

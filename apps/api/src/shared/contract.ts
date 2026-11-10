@@ -56,7 +56,11 @@ export type ApplyMeta = {
   readonly now: string;
 };
 
-export type ApplyErrorCode = "event/invalid" | "event/not-found" | RetroError;
+export type ApplyErrorCode =
+  | "action/nothing-to-do"
+  | "event/invalid"
+  | "event/not-found"
+  | RetroError;
 
 /** The first input the store refused, and why. */
 export type ApplyError = {

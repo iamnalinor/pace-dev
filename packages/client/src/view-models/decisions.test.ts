@@ -207,7 +207,7 @@ describe("decisionView", () => {
       "The assistant will delete task “Return library books”",
       "The assistant will close “Return library books” as Done",
       "The assistant will add subtasks to “Return library books”",
-      "The assistant will mark subtasks solved in “Return library books”",
+      "The assistant will mark subtasks done in “Return library books”",
       "The assistant will start “Gym”",
       "The assistant will log “Walk”",
       "The assistant will change “…”: name",

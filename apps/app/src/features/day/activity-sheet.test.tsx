@@ -167,6 +167,43 @@ const logSheet = async (day = "2026-10-06") => {
 };
 
 describe("the log-past sheet's times", () => {
+  it("keeps a deleted hour digit as typed, and reads «930» pasted as 09:30 (QA-25 review I1, R26-05)", async () => {
+    const { onClose, runtime } = await logSheet();
+    const from = screen.getByLabelText("From");
+    expect(from.props["value"]).toBe("12:00");
+    // The caret after the 2, Backspace: half an hour, not a complete 01:00.
+    await fireEvent.changeText(from, "1:00");
+    expect(screen.getByLabelText("From").props["value"]).toBe("1:00");
+    await fireEvent.changeText(screen.getByLabelText("From"), "930");
+    expect(screen.getByLabelText("From").props["value"]).toBe("09:30");
+    await fireEvent.press(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalled();
+    });
+    const [nap] = Object.values(runtime.state.store.getState().time.activities);
+    expect(nap?.startAt).toBe("2026-10-06T06:30:00.000Z");
+  });
+
+  it("reads an hour alone as that hour sharp, and says a wrong time once the field is left (R27-04)", async () => {
+    const { onClose, runtime } = await logSheet();
+    await fireEvent.changeText(screen.getByLabelText("From"), "7");
+    await fireEvent(screen.getByLabelText("From"), "blur");
+    expect(screen.getByLabelText("From").props["value"]).toBe("07:00");
+    // Before any Save, as every other time field does.
+    await fireEvent.changeText(screen.getByLabelText("To"), "25");
+    await fireEvent(screen.getByLabelText("To"), "blur");
+    expect(screen.getByText("Type a time like 09:30.")).toBeOnTheScreen();
+    // An hour alone in To, saved without leaving the field, is that hour too.
+    await fireEvent.changeText(screen.getByLabelText("To"), "8");
+    await fireEvent.press(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalled();
+    });
+    const [nap] = Object.values(runtime.state.store.getState().time.activities);
+    expect(nap?.startAt).toBe("2026-10-06T04:00:00.000Z");
+    expect(nap?.endAt).toBe("2026-10-06T05:00:00.000Z");
+  });
+
   it("refuses an end at or well before the start instead of a day-long block", async () => {
     const { onClose } = await logSheet();
     await fireEvent.changeText(screen.getByLabelText("From"), "1000");
@@ -524,24 +561,27 @@ describe("a time put on another day (round 6: a runaway block cut back)", () => 
     ]);
   });
 
-  it("keeps a one-day block's days behind a button, then offers the next day for its end", async () => {
-    const { activityId, saved } = await editSheet();
+  it("keeps a one-day block's days behind a button, offers the next day only once it has begun (QA21 L3)", async () => {
+    const { activityId, saved } = await editSheet({
+      endAt: "2026-10-05T10:00:00.000Z",
+      startAt: "2026-10-05T09:00:00.000Z",
+    });
     expect(screen.queryByText("End day")).toBeNull();
     await fireEvent.press(screen.getByRole("button", { name: "Other days" }));
     expect(screen.getByText("End day")).toBeOnTheScreen();
     expect(screen.queryByText("Start day")).toBeNull();
-    await fireEvent.press(screen.getByRole("radio", { name: "Ends Wed · Oct 7" }));
-    await fireEvent.changeText(screen.getByLabelText("To"), "0100");
-    await fireEvent.press(screen.getByRole("button", { name: "Save" }));
-    // The next day's 01:00 is still ahead of the test world's clock (6 Oct, 15:00).
-    expect(
-      await screen.findByText("That is still ahead: log what already happened."),
-    ).toBeOnTheScreen();
+    // The test world's clock is 6 Oct, 15:00: today is offered, tomorrow (always refused) is not.
+    expect(screen.queryByRole("radio", { name: "Ends Wed · Oct 7" })).toBeNull();
     await fireEvent.press(screen.getByRole("radio", { name: "Ends Tue · Oct 6" }));
     await fireEvent.changeText(screen.getByLabelText("To"), "1400");
     expect((await saved()).map((event) => [event.type, event.payload])).toEqual([
       ["activity.adjusted", { activityId, endAt: "2026-10-06T11:00:00.000Z" }],
     ]);
+  });
+
+  it("offers no days to choose for today's block: its only end day is today", async () => {
+    await editSheet();
+    expect(screen.queryByRole("button", { name: "Other days" })).toBeNull();
   });
 });
 
@@ -571,6 +611,8 @@ describe("deleting a block", () => {
       />,
       runtime,
     );
+    // A step that removes is said in the danger colour, never the ink of a plain action (M1).
+    expect(screen.getByText("Delete activity").props["className"]).toContain("text-danger");
     await fireEvent.press(screen.getByRole("button", { name: "Delete activity" }));
     await fireEvent.press(screen.getByRole("button", { name: "Delete activity? Tap again" }));
     await waitFor(() => {

@@ -1,43 +1,56 @@
 import type { ReactNode } from "react";
 
-import { Text, View } from "react-native";
+import { View } from "react-native";
 
 import { useIsAccountUnknown, useT } from "#app/app-state.tsx";
 
+import { Icon, type IconName } from "./icon.tsx";
 import { Skeleton } from "./skeleton.tsx";
+import { Text } from "./text.tsx";
 
 /**
-Centered hint for screens with nothing to show yet. Until a sync of this session has succeeded on
+A screen's "nothing here" (spec §4.2.10): leading-aligned at the gutter where the first row would
+be, never centred, so nothing jumps when the first row lands; [an icon] · the title (`headline`) ·
+what lands here (`callout`, secondary) · one action. Until a sync of this session has succeeded on
 an empty copy nothing is known to be empty: grey rows stand in, never the final copy (QA round 18
 M5: "Nothing to do right now" showed, in the device's language, before the account's tasks came).
 A failed first sync keeps them too (QA round 21 M4: a pull answered 500 drew "Nothing to do" for an
 account with seven tasks); the sync frame's line says it has not loaded and offers Retry.
 */
 export const EmptyState = ({
-  children,
+  action,
+  body,
   icon,
+  title,
 }: {
-  readonly children: string;
-  readonly icon?: ReactNode;
+  readonly title: string;
+  readonly body?: string | undefined;
+  readonly icon?: IconName | undefined;
+  /** One action (a small secondary `Button` or a `Link`). */
+  readonly action?: ReactNode;
 }) => {
   const t = useT();
   const isUnknown = useIsAccountUnknown();
   return isUnknown ? (
-    <View className="w-full px-4">
+    <View className="w-full px-gutter lg:px-gutter-lg">
       <Skeleton label={t("sync.loadingData")} />
     </View>
   ) : (
-    <View className="flex-1 items-center justify-center gap-3 px-10">
-      {icon}
-      <Text className="text-center font-sans text-subhead font-normal text-label-secondary">
-        {children}
-      </Text>
+    <View className="items-start gap-2 px-gutter py-6 lg:px-gutter-lg" testID="empty-state">
+      {icon === undefined ? null : <Icon name={icon} size="bar" tone="tertiary" />}
+      <Text role="headline">{title}</Text>
+      {body === undefined ? null : (
+        <Text role="callout" tone="secondary">
+          {body}
+        </Text>
+      )}
+      {action}
     </View>
   );
 };
 
 /**
-A screen's inline "nothing here" line (Day, Insights, History), with the same rule: grey rows,
+A screen's inline "nothing here" line (Day, Insights, History), with the same rule: a grey line,
 never the final words, until a sync of this session has succeeded on an empty copy.
 */
 export const EmptyText = ({
@@ -50,9 +63,11 @@ export const EmptyText = ({
   const t = useT();
   const isUnknown = useIsAccountUnknown();
   return isUnknown ? (
-    <Skeleton label={t("sync.loadingData")} rows={1} />
+    <Skeleton label={t("sync.loadingData")} rows={1} shape="text" />
   ) : (
-    <Text className={className}>{children}</Text>
+    <Text className={className} role="callout" tone="secondary">
+      {children}
+    </Text>
   );
 };
 
@@ -76,7 +91,7 @@ export const FirstSyncBody = ({
     return <>{children}</>;
   }
   return (
-    <View className="w-full px-5 py-2">
+    <View className="w-full px-gutter py-2 lg:px-gutter-lg">
       <Skeleton label={t("sync.loadingData")} />
     </View>
   );
@@ -91,5 +106,5 @@ round 20 M1); a failed first sync keeps it waiting (round 7 review 12).
 export const KnownAfterSync = ({ children }: { readonly children: ReactNode }) => {
   const t = useT();
   const isUnknown = useIsAccountUnknown();
-  return isUnknown ? <Skeleton label={t("sync.loadingData")} rows={1} /> : children;
+  return isUnknown ? <Skeleton label={t("sync.loadingData")} rows={1} shape="listRow" /> : children;
 };

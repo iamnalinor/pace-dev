@@ -1,14 +1,6 @@
 import { drizzle, type DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
 
-import {
-  err,
-  type Event,
-  type EventInput,
-  ok,
-  parseEvent,
-  type Result,
-  STORE_CHANGED,
-} from "@pace/core";
+import { err, type Event, type EventInput, ok, type Result, STORE_CHANGED } from "@pace/core";
 
 import type {
   ApplyError,
@@ -36,7 +28,7 @@ import { runEach } from "./alarm.ts";
 import { describeTables, runReadOnly, simulate } from "./analytics.ts";
 import { CloudStore } from "./cloud-store.ts";
 import { insertDecisions, listDecisions, resolveDecisions } from "./decision-log.ts";
-import { DERIVE_STEPS } from "./derive-steps.ts";
+import { DERIVE_STEPS, type DeriveStep } from "./derive-steps.ts";
 import * as eventLog from "./event-log.ts";
 import { announceChange } from "./live-sockets.ts";
 import * as log from "./log-queries.ts";
@@ -49,11 +41,9 @@ import { runSleepPass, sleepAtAlarm } from "./sleep-pass.ts";
 import { StateCache } from "./state-cache.ts";
 import { prepareBatch, toRpcState } from "./state.ts";
 import { openStore, resetStore, SCHEMA_TAG, storeIdOf } from "./store-identity.ts";
+import { SERVER_DEVICE_ID, stampedOrNone, withRetiredMisses } from "./system-events.ts";
 
 type Db = DrizzleSqliteDODatabase<typeof schema>;
-
-/** System events are the server's own: this is their device. */
-const SERVER_DEVICE_ID = "server";
 
 /** A parsed event is JSON by construction, so the stored view is the same object. */
 const toStored = (event: Event): StoredEvent => event;
@@ -69,6 +59,9 @@ export class UserStore extends CloudStore {
   readonly #state: StateCache;
 
   readonly #pool: NotificationPool;
+
+  /** What `derive` runs, in order (`DERIVE_STEPS`; tests swap it through `useDeriveSteps`). */
+  #deriveSteps: readonly DeriveStep[] = DERIVE_STEPS;
 
   readonly db: Db;
 
@@ -117,12 +110,32 @@ export class UserStore extends CloudStore {
     return inserted;
   }
 
-  async #system(inputs: readonly EventInput[], now: string): Promise<readonly Event[]> {
-    const events = inputs.flatMap((input) => {
-      const parsed = parseEvent({ ...input, deviceId: SERVER_DEVICE_ID, recordedAt: now });
-      return parsed.ok ? [parsed.value] : [];
+  async #append(
+    raw: readonly unknown[],
+    options: eventLog.AppendOptions,
+    { isClientPush }: { readonly isClientPush: boolean },
+  ): Promise<eventLog.AppendResult> {
+    const { accepted, events, rejected } = eventLog.screenBatch(raw, {
+      now: options.now,
+      validateEvent: options.validateEvent ?? eventLog.coreValidator,
     });
-    return await this.#insert(events);
+    // An older client's automatic miss is taken and revoked at once, in the same write.
+    const { ids } = await this.#state.current();
+    await this.#insert(
+      isClientPush ? withRetiredMisses(events, { known: ids, now: options.now }) : events,
+    );
+    await this.derive(options.now);
+    await this.#pool.afterWrite(options.now);
+    return { accepted, rejected, seq: await log.latestSeq(this.db) };
+  }
+
+  /** The store's own events as one group; one that does not parse is reported and left out. */
+  async #system(
+    inputs: readonly EventInput[],
+    now: string,
+    where: string,
+  ): Promise<readonly Event[]> {
+    return await this.#insert(stampedOrNone(inputs, now, where));
   }
   protected override get pool(): NotificationPool {
     return this.#pool;
@@ -158,14 +171,7 @@ export class UserStore extends CloudStore {
     raw: readonly unknown[],
     options: eventLog.AppendOptions,
   ): Promise<eventLog.AppendResult> {
-    const { accepted, events, rejected } = eventLog.screenBatch(raw, {
-      now: options.now,
-      validateEvent: options.validateEvent ?? eventLog.coreValidator,
-    });
-    await this.#insert(events);
-    await this.derive(options.now);
-    await this.#pool.afterWrite(options.now);
-    return { accepted, rejected, seq: await log.latestSeq(this.db) };
+    return await this.#append(raw, options, { isClientPush: false });
   }
 
   /**
@@ -179,7 +185,7 @@ export class UserStore extends CloudStore {
     options: eventLog.AppendOptions,
   ): Promise<Result<eventLog.AppendResult, typeof STORE_CHANGED>> {
     return storeId === (await storeIdOf(this.ctx.storage))
-      ? ok(await this.append(raw, options))
+      ? ok(await this.#append(raw, options, { isClientPush: true }))
       : err(STORE_CHANGED);
   }
 
@@ -269,7 +275,7 @@ export class UserStore extends CloudStore {
     return await runSleepPass(
       {
         insert: async (inputs, at) => {
-          const made = await this.#system(inputs, at);
+          const made = await this.#system(inputs, at, "sleep pass");
           if (made.length > 0) {
             await this.derive(at);
             await this.#pool.afterWrite(at);
@@ -391,16 +397,21 @@ export class UserStore extends CloudStore {
     });
   }
 
+  /** A seam for tests: a step that writes a bad event is skipped, not fatal (bug-lessons 184). */
+  useDeriveSteps(steps: readonly DeriveStep[]): void {
+    this.#deriveSteps = steps;
+  }
+
   /**
   Appends the system events the state calls for at `now` (see `DERIVE_STEPS`). Deterministic ids
   make this idempotent against clients that derived the same events. Returns their ids.
   */
   async derive(now: string): Promise<readonly string[]> {
     const made: string[] = [];
-    for (const step of DERIVE_STEPS) {
+    for (const [index, step] of this.#deriveSteps.entries()) {
       const current = await this.#state.current();
       const events = step({ ...current.state, existingEventIds: current.ids, now });
-      const appended = await this.#system(events, now);
+      const appended = await this.#system(events, now, `derive step ${String(index)}`);
       made.push(...appended.map((event) => event.id));
     }
     return made;

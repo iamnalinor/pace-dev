@@ -1,43 +1,27 @@
-import { Pressable, Text, View } from "react-native";
-
 import type { NowRow } from "@pace/client";
 
 import { useT } from "#app/app-state.tsx";
+import { AcceptedHighlight } from "#app/shared/assistant/accepted-highlight.tsx";
 import { CheckCircle } from "#app/ui/check-circle.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { Dissolve } from "#app/ui/dissolve.tsx";
+import { ListRow } from "#app/ui/list-row.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 
-import { MetaLine } from "./meta-line.tsx";
+import { MetaLine, RepeatMark } from "./meta-line.tsx";
 import { useSelectedTask } from "./task-opener.tsx";
 
-/** The title: muted and struck through once closed, quiet for an undated Nice-to-have. */
-const RowTitle = ({
-  isChecked,
-  isDimmed,
-  title,
-}: {
-  readonly isChecked: boolean;
-  readonly isDimmed: boolean;
-  readonly title: string;
-}) => (
-  <Text
-    className={cx(
-      "font-sans text-callout",
-      isChecked || isDimmed ? "text-label-secondary" : "font-medium text-label-primary",
-      isChecked && "line-through",
-    )}
-    numberOfLines={2}
-  >
-    {title}
-  </Text>
-);
+/** Muted and struck through once closed, quiet for an undated Nice-to-have, else medium. */
+const titleLook = (isChecked: boolean, isDimmed: boolean) =>
+  isChecked || isDimmed
+    ? { className: cx(isChecked && "line-through"), tone: "secondary" as const }
+    : { className: "font-medium" };
 
 const NOTHING = (): void => undefined;
 
 /**
-A task as every list shows it (Now, a project's open and done lists, History): the check, the
-title, then the project (or category) and the importance as tags with the meta line.
+A task as every list shows it (Now, a project's open and done lists, History): a `ListRow` with
+the check beside it, the title (two lines at most), the meta line and a repeat mark trailing.
 */
 export const TaskRow = ({
   asOf,
@@ -67,29 +51,32 @@ export const TaskRow = ({
   const { palette } = useTheme();
   const isSelected = useSelectedTask() === row.id;
   return (
-    <Dissolve
-      color={palette["label.secondary"]}
-      isActive={isDissolving}
-      onDone={onDissolved ?? NOTHING}
-    >
-      {/* The selection is the lightest fill: the whole meta line (tertiary times, danger words,
-          every tag) is measured on it (`SELECTED_ROW_FILL`, bug-lessons 112). */}
-      <View className={cx("flex-row gap-3 rounded-lg py-3 pl-3 pr-3", isSelected && "bg-fill-1")}>
-        <CheckCircle
-          checked={checked || isDissolving}
-          label={t("now.markDone", { title: row.title })}
-          {...(onCheck !== undefined && { onPress: onCheck })}
-        />
-        <Pressable
-          accessibilityRole="link"
-          aria-current={isSelected ? "page" : undefined}
-          className="flex-1 gap-1 active:opacity-70"
+    <AcceptedHighlight id={row.id}>
+      <Dissolve
+        color={palette["label.secondary"]}
+        isActive={isDissolving}
+        onDone={onDissolved ?? NOTHING}
+      >
+        <ListRow
+          control={
+            <CheckCircle
+              checked={checked || isDissolving}
+              label={t("now.markDone", { title: row.title })}
+              {...(onCheck !== undefined && { onPress: onCheck })}
+            />
+          }
+          meta={
+            <MetaLine asOf={asOf} parts={row.meta} showRepeat={false} tag={withTag ? row : null} />
+          }
           onPress={onOpen}
-        >
-          <RowTitle isChecked={checked} isDimmed={row.dimmed} title={row.title} />
-          <MetaLine asOf={asOf} parts={row.meta} tag={withTag ? row : null} />
-        </Pressable>
-      </View>
-    </Dissolve>
+          role="link"
+          selected={isSelected}
+          title={row.title}
+          titleLines={2}
+          titleLook={titleLook(checked, row.dimmed)}
+          trailing={row.meta.some((part) => part.kind === "repeats") ? <RepeatMark /> : undefined}
+        />
+      </Dissolve>
+    </AcceptedHighlight>
   );
 };

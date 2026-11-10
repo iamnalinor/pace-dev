@@ -67,6 +67,7 @@ const FinalAt = ({
       </View>
       <TimeInput
         className="w-24"
+        isDraft
         label={t("presets.finalAt")}
         onTime={(time) => {
           save({ date, time });

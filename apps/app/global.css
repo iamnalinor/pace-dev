@@ -68,8 +68,9 @@ below the AA contrast; our fields color their placeholders themselves.
 }
 
 /*
-The progress slider (ui/slider.web.tsx): the browser's range input drawn like the phone's, a
-thick track filled up to the thumb (`--pace-share`) and a round thumb.
+The progress slider (ui/slider.web.tsx; spec §4.2.24): the browser's range input drawn like the
+phone's, a 4 high `fill.4` track filled in `label.primary` up to the thumb (`--pace-share`) and a 24
+`label.primary` thumb in a 2 px `bg.cell` ring, the same size in WebKit and Firefox (F-A11Y-16).
 */
 [data-pace-slider] {
   appearance: none;
@@ -81,7 +82,7 @@ thick track filled up to the thumb (`--pace-share`) and a round thumb.
 }
 
 [data-pace-slider]::-webkit-slider-runnable-track {
-  height: 8px;
+  height: 4px;
   border-radius: 999px;
   background: linear-gradient(
     to right,
@@ -91,35 +92,168 @@ thick track filled up to the thumb (`--pace-share`) and a round thumb.
 }
 
 [data-pace-slider]::-moz-range-track {
-  height: 8px;
+  height: 4px;
   border-radius: 999px;
   background: var(--pace-fill-4);
 }
 
 [data-pace-slider]::-moz-range-progress {
-  height: 8px;
+  height: 4px;
   border-radius: 999px;
   background: var(--pace-label-primary);
 }
 
 [data-pace-slider]::-webkit-slider-thumb {
   appearance: none;
-  width: 26px;
-  height: 26px;
-  margin-top: -9px;
-  border: 2px solid var(--pace-label-primary);
+  box-sizing: border-box;
+  width: 24px;
+  height: 24px;
+  margin-top: -10px;
+  border: 2px solid var(--pace-cell);
   border-radius: 50%;
-  background: var(--pace-cell);
+  background: var(--pace-label-primary);
 }
 
 [data-pace-slider]::-moz-range-thumb {
-  width: 22px;
-  height: 22px;
-  border: 2px solid var(--pace-label-primary);
+  box-sizing: border-box;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--pace-cell);
   border-radius: 50%;
-  background: var(--pace-cell);
+  background: var(--pace-label-primary);
 }
 
 [data-pace-slider]:focus-visible {
   border-radius: 8px;
+}
+
+/*
+The shell's skip link (ui/shell.web.tsx; spec §4.2.18, F-A11Y-12): above the top edge of the page,
+whole (nothing clipped, nothing under the pointer), until the keyboard reaches it; then it comes
+down to where it sits, the first stop of the page.
+*/
+[data-skip-link]:not(:focus-within) {
+  transform: translateY(-200%);
+}
+
+/*
+The kit's state layer on the web (ui/pressable.web.tsx marks every control that has something to do
+`data-pace-press`; spec §3.7). The overlay is the control's `::after`: above its content (an opaque
+child cannot hide it), as round as the control (`border-radius: inherit`), deaf to the pointer, and
+it leaves the control's own shadow and transition alone. Pressed comes in at once and goes out in
+`duration.xs` on `easing.exit` (`state-layer.test.ts` holds these to the motion tokens). Hover only
+for a pointer that hovers, so a phone's tap never leaves it stuck. React Native Web's views are
+`position: relative` already, so the overlay sits on the control.
+*/
+[data-pace-press] {
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+[data-pace-inner] > [data-pace-visual]::after,
+[data-pace-press]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background-color: transparent;
+  transition: background-color 100ms cubic-bezier(0.4, 0, 1, 1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  [data-pace-press]:not([aria-disabled="true"]):hover::after {
+    background-color: var(--pace-fill-1);
+  }
+
+  [data-pace-inner]:not([aria-disabled="true"]):hover > [data-pace-visual]::after {
+    background-color: var(--pace-fill-1);
+  }
+
+  [data-pace-row] > [data-pace-press]:not([aria-disabled="true"]):hover::after {
+    background-color: transparent;
+  }
+
+  [data-pace-row]:has(> [data-pace-press]:not([aria-disabled="true"]):hover)::after {
+    background-color: var(--pace-fill-1);
+  }
+}
+
+/*
+A row whose control sits beside its press area (`ControlRow`: a task's check, then the title): a
+hover on the press area tints the whole row, the check's column too, as one object; the press area
+alone started at the title and left the check on the bare ground (design review 2 N7).
+*/
+[data-pace-row]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-color: transparent;
+  transition: background-color 100ms cubic-bezier(0.4, 0, 1, 1);
+}
+
+[data-pace-press]:not([aria-disabled="true"]):active::after {
+  background-color: var(--pace-fill-2);
+  transition-duration: 0s;
+}
+
+/*
+A small visual inside its target (`PressableProps.visual`: a 32 chip, a 24 check, a small button):
+the target stays transparent and the overlay and the ring are the visual's, so the press reads on
+the shape the eye sees while the finger has the whole 44 px. The visual's overlay shares the
+control's rule above.
+*/
+[data-pace-inner]::after {
+  display: none;
+}
+
+/*
+The visual is drawing only: the pointer lands on the target. A visual that redraws on press-in (the
+check circle's tick) otherwise takes the mouseup itself, the press and the release have different
+targets, and the browser fires no click (bug-lessons class 138).
+*/
+[data-pace-inner] > [data-pace-visual] {
+  pointer-events: none;
+}
+
+[data-pace-inner]:not([aria-disabled="true"]):active > [data-pace-visual]::after {
+  background-color: var(--pace-fill-2);
+  transition-duration: 0s;
+}
+
+[data-pace-inner]:focus-visible {
+  outline: none;
+}
+
+[data-pace-inner]:focus-visible > [data-pace-visual] {
+  outline: 2px solid var(--pace-focus);
+  outline-offset: 2px;
+}
+
+/*
+Forced colours drop author colours and shadows: each control's boundary, the selected or checked
+state and the ring take the system's (F-A11Y-04). The tinted overlay goes: the system would repaint
+it in an opaque colour over the label. Keep this block last (`focus-ring.test.ts` reads up to it).
+*/
+@media (forced-colors: active) {
+  [data-pace-press] {
+    outline: 1px solid ButtonBorder;
+    outline-offset: -1px;
+  }
+
+  [data-pace-press]:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  [data-pace-press]:is([aria-selected="true"], [aria-checked="true"]) {
+    background-color: Highlight;
+    color: HighlightText;
+  }
+
+  [data-pace-press]::after {
+    display: none;
+  }
 }

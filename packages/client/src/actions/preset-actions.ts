@@ -11,12 +11,14 @@ import {
   validatePresetInput,
 } from "@pace/core";
 
-import { type ActionDeps, type ActionResult, emit, stamp } from "./deps.ts";
+import { type ActionDeps, type ActionResult, emit, fromStoreAll, stamp } from "./deps.ts";
 
 export type PresetActions = {
   readonly createPreset: (input: PresetInput) => ActionResult;
   readonly updatePreset: (input: PresetInput) => ActionResult;
   readonly archivePreset: (presetId: string) => ActionResult;
+  /** Brings a deleted preset back: the archive event is revoked (a correction, never an edit). */
+  readonly restorePreset: (presetId: string) => ActionResult;
   /** One place up (`-1`) or down (`1`) in the pickers. */
   readonly movePreset: (presetId: string, step: -1 | 1) => ActionResult;
   /** The one-click seed of the example course presets; ids already present are left alone. */
@@ -78,9 +80,36 @@ const archivePreset =
     if (preset.id === "inbox") {
       return err("preset/built-in");
     }
-    return preset.archived
+    // Asked again in the write queue: two presses at once write one archive (class 222).
+    const isArchived = (): boolean =>
+      presetById(deps.state.store.getState().presets, presetId)?.archived === true;
+    return isArchived()
       ? err("action/nothing-to-do")
-      : await emit(deps, [stamp(deps, { type: "preset.archived", payload: { id: presetId } })]);
+      : await emit(
+          deps,
+          [stamp(deps, { type: "preset.archived", payload: { id: presetId } })],
+          () => (isArchived() ? "action/nothing-to-do" : null),
+        );
+  };
+
+const restorePreset =
+  (deps: ActionDeps): PresetActions["restorePreset"] =>
+  async (presetId) => {
+    const { events, presets } = deps.state.store.getState();
+    const preset = presetById(presets, presetId);
+    if (preset === undefined) {
+      return err("preset/unknown");
+    }
+    if (!preset.archived) {
+      return err("action/nothing-to-do");
+    }
+    // Every archive in effect, in one batch: two devices may have archived it offline (review M1).
+    const archives = events.filter(
+      (event) => event.type === "preset.archived" && event.payload.id === presetId,
+    );
+    return archives.length === 0
+      ? err("action/nothing-to-do")
+      : fromStoreAll(await deps.state.revokeAll(archives.map((event) => event.id)));
   };
 
 /**
@@ -116,6 +145,7 @@ const movePreset =
 
 export const presetActions = (deps: ActionDeps): PresetActions => ({
   archivePreset: archivePreset(deps),
+  restorePreset: restorePreset(deps),
   movePreset: movePreset(deps),
   createPreset: async (input) => await savePreset(deps, input, "create"),
   seedExamplePresets: async () => {

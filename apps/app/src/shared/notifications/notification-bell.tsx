@@ -1,50 +1,37 @@
 import { useRouter } from "expo-router";
-import { Bell } from "lucide-react-native";
-import { Pressable, View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
-import { CountBadge } from "#app/ui/count-badge.tsx";
-import { cx } from "#app/ui/cx.ts";
-import { useTheme } from "#app/ui/theme-provider.tsx";
-import { Tooltip } from "#app/ui/tooltip.tsx";
+import { IconButton } from "#app/ui/icon-button.tsx";
 
 import { useFeed } from "./use-feed.ts";
 
 /**
-The bell: opens the notifications, with the unread count of what this client shows. `plain`
-sits in the sidebar's header, `surface` in a screen header.
+The bell (spec §4.3.12): an `IconButton` like every other (no border; F-CMP-06) that opens the
+notifications, with the unread count of what this client shows on the glyph's top-right corner,
+growing away from it (F-DAT-10, R23-13b). `sidebar` draws the glyph at `icon.control`, a screen
+header at `icon.bar`.
 */
 export const NotificationBell = ({
-  variant = "surface",
+  place = "header",
 }: {
-  readonly variant?: "plain" | "surface";
+  readonly place?: "header" | "sidebar";
 }) => {
   const t = useT();
   const router = useRouter();
-  const { palette } = useTheme();
   const { model } = useFeed();
   const label =
     model.unread > 0
       ? t("notifications.openUnread", { count: model.unread })
       : t("notifications.open");
   return (
-    <Tooltip label={label} showsOnTap={false}>
-      <Pressable
-        accessibilityLabel={label}
-        accessibilityRole="button"
-        className={cx(
-          "h-hit-web w-hit-web items-center justify-center rounded-md active:opacity-80",
-          variant === "surface" && "border border-outline bg-cell",
-        )}
-        onPress={() => {
-          router.push("/notifications");
-        }}
-      >
-        <Bell color={palette["label.secondary"]} size={18} strokeWidth={1.75} />
-        <View className="absolute right-0.5 top-0.5">
-          <CountBadge count={model.unread} tone="neutral" />
-        </View>
-      </Pressable>
-    </Tooltip>
+    <IconButton
+      badge={{ count: model.unread, tone: "neutral" }}
+      icon="bell"
+      label={label}
+      onPress={() => {
+        router.push("/notifications");
+      }}
+      size={place === "sidebar" ? "control" : "bar"}
+    />
   );
 };

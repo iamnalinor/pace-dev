@@ -154,7 +154,7 @@ const DangerOpeners = ({
   // Both outlined, side by side on a computer and full width on a phone, like Export data and
   // Log out above them (QA round 15 L6: Delete was a bare link beside a bordered Wipe).
   return (
-    <View className={cx("gap-2", isWide && "flex-row flex-wrap")}>
+    <View className={cx("gap-2 px-row-x", isWide && "flex-row flex-wrap")}>
       <Button
         onPress={() => {
           focus.toCancel();
@@ -162,7 +162,7 @@ const DangerOpeners = ({
           flow.setNotice(null);
         }}
         ref={focus.openerRef("wipe")}
-        variant="secondary"
+        variant="destructive"
       >
         {t("settings.wipe")}
       </Button>
@@ -173,7 +173,7 @@ const DangerOpeners = ({
           flow.setNotice(null);
         }}
         ref={focus.openerRef("delete")}
-        variant="secondary"
+        variant="destructive"
       >
         {t("settings.deleteAccount")}
       </Button>
@@ -184,6 +184,7 @@ const DangerOpeners = ({
 /** Wipe or Delete, then its warning with Cancel; focus goes to Cancel and back to the opener (class 5). */
 const DangerPrompt = ({ flow }: { readonly flow: ReturnType<typeof useDangerFlow> }) => {
   const t = useT();
+  const isWide = useIsWide();
   const focus = useConfirmFocus();
   const warning = t(
     flow.action === "wipe" ? "settings.wipe.warning" : "settings.deleteAccount.warning",
@@ -209,6 +210,7 @@ const DangerPrompt = ({ flow }: { readonly flow: ReturnType<typeof useDangerFlow
           cancelRef={focus.cancelRef(warning)}
           isBusy={flow.isBusy}
           isDestructive
+          isStacked={!isWide}
           onCancel={() => {
             focus.toOpener(flow.action ?? undefined);
             flow.setAction(null);
@@ -233,7 +235,7 @@ const DangerPrompt = ({ flow }: { readonly flow: ReturnType<typeof useDangerFlow
               onPress={() => {
                 void flow.cancel();
               }}
-              variant="ghost"
+              variant="plain"
             >
               {t("common.cancel")}
             </Button>
@@ -251,12 +253,17 @@ export const DangerZone = () => {
   return (
     // Set apart from the account's actions: a rule and room above it (QA round 15 L6).
     <View className="mt-3 gap-3 border-t border-separator pt-5">
-      <Text accessibilityRole="header" className="font-sans text-subhead font-semibold text-danger">
+      <Text
+        accessibilityRole="header"
+        // At the section headers' text inset, as the account's actions above (N6); the confirm's
+        // bordered box keeps the groups' edge.
+        className="px-row-x font-sans text-subhead font-semibold text-label-secondary"
+      >
         {t("settings.danger")}
       </Text>
       <DangerPrompt flow={flow} />
       {flow.notice === null ? null : (
-        <Text accessibilityRole="alert" className="font-sans text-footnote text-danger">
+        <Text accessibilityRole="alert" className="px-row-x font-sans text-footnote text-danger">
           {t(NOTICE_KEY[flow.notice])}
         </Text>
       )}

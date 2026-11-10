@@ -25,7 +25,7 @@ const activities = (runtime: PaceRuntime) =>
 const running = (runtime: PaceRuntime): readonly string[] =>
   activities(runtime).map((activity) => activity.label);
 
-const BUTTONS = ["Calendar", "Task", "Chores", "Rest"];
+const BUTTONS = ["Calendar", "Task", "Chores", "Misc"];
 
 /** The bar's four buttons, by their accessible names, in the order they stand. */
 const barButtons = (): readonly string[] =>
@@ -52,6 +52,12 @@ const choicesIn = async (name: string): Promise<readonly string[]> =>
   within(await picker(name))
     .getAllByRole("button")
     .map((button): string => String(button.props["accessibilityLabel"]));
+
+/** A node's NativeWind classes. */
+const classesOf = (node: { readonly props: Record<string, unknown> }): readonly string[] => {
+  const name = node.props["className"];
+  return typeof name === "string" ? name.split(" ") : [];
+};
 
 /** A promise the test settles when it wants to. */
 const deferred = <T,>() => {
@@ -89,29 +95,53 @@ const CSS_READ = {
   status: "parsed",
 };
 
+const startBoth = async (runtime: PaceRuntime): Promise<void> => {
+  await runtime.actions.startActivity(
+    { buttonId: "chores:commute", category: "chores", expectMinutes: 30, label: "Commute" },
+    { at: addMinutesIso(NOW, -20) },
+  );
+  await runtime.actions.startActivity(
+    {
+      alongside: true,
+      buttonId: "rest:workout",
+      category: "sport",
+      expectMinutes: 180,
+      label: "Workout",
+    },
+    { at: addMinutesIso(NOW, -10) },
+  );
+};
+
+/** The bar measured at a height: the window is 844 high in jest, so 40 % is 338 with the nav bar in it. */
+const layOut = async (height: number): Promise<void> => {
+  await fireEvent(screen.getByLabelText(en("time.bar")), "layout", {
+    nativeEvent: { layout: { height, width: 390 } },
+  });
+};
+
 describe("TimeBar", () => {
-  it("has Calendar, Task, Chores and Rest in this order, with no «⋯» and no switches", async () => {
+  it("has Calendar, Task, Chores and Misc in this order, with no «⋯» and no switches", async () => {
     await renderScreen(<TimeBar />, await createTestRuntime());
     expect(barButtons()).toEqual(BUTTONS);
     expect(screen.queryByRole("switch")).toBeNull();
     expect(screen.queryByRole("button", { name: /More about/u })).toBeNull();
   });
 
-  it("folds the field and the buttons on a phone while something runs, one tap away", async () => {
+  it("folds only the typed field on a phone while something runs: the four tiles stay (Q12)", async () => {
     const runtime = await createTestRuntime();
     await runtime.actions.startActivity(
       { buttonId: "rest:walk", category: "rest", expectMinutes: 30, label: "Walk" },
       { at: addMinutesIso(NOW, -10) },
     );
     await renderScreen(<TimeBar />, runtime);
-    // What runs and its Stop stay; the rest folds into one line.
+    // What runs, its Stop and the tiles stay; the field folds into one line.
     expect(screen.getByRole("button", { name: "Stop: Walk" })).toBeOnTheScreen();
     expect(screen.queryByLabelText(en("time.whatDoing"))).toBeNull();
-    expect(screen.queryByRole("button", { name: "Chores" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Chores" })).toBeOnTheScreen();
     const more = screen.getByRole("button", { name: en("time.startOther") });
     expect(more).toBeCollapsed();
     await fireEvent.press(more);
-    expect(barButtons()).toEqual(BUTTONS.map((name) => (name === "Rest" ? "Rest, running" : name)));
+    expect(barButtons()).toEqual(BUTTONS.map((name) => (name === "Misc" ? "Misc, running" : name)));
     expect(screen.getByLabelText(en("time.whatDoing"))).toBeOnTheScreen();
     expect(screen.getByRole("button", { name: en("time.startOther") })).toBeExpanded();
   });
@@ -140,14 +170,27 @@ describe("TimeBar", () => {
     );
     await renderScreen(<TimeBar />, runtime);
     await fireEvent.press(screen.getByRole("button", { name: "Stop: Walk" }));
-    await fireEvent.press(await screen.findByRole("button", { name: "Rest" }));
-    await fireEvent.press(within(await picker("Rest")).getByRole("button", { name: "Workout" }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Misc" }));
+    await fireEvent.press(within(await picker("Misc")).getByRole("button", { name: "Workout" }));
     await waitFor(() => {
       expect(running(runtime)).toHaveLength(1);
     });
     // Nothing folds under the finger: the field and the buttons are still there.
     expect(screen.getByLabelText(en("time.whatDoing"))).toBeOnTheScreen();
     expect(screen.getByRole("button", { name: "Chores" })).toBeOnTheScreen();
+  });
+
+  it("sets «Start something else» on the card's edge with no gap around it (design review 2 N3)", async () => {
+    const runtime = await createTestRuntime();
+    await startBoth(runtime);
+    await renderScreen(<TimeBar />, runtime);
+    const more = screen.getByRole("button", { name: en("time.startOther") });
+    // Indented to the list's row inset it stood at x = 44 beside a card and tiles at 12.
+    expect(classesOf(more)).not.toContain("mx-gutter");
+    expect(classesOf(more)).not.toContain("px-row-x");
+    // Its own target's air is the gap: the bar's 8 px above and below it left ~34 px of nothing.
+    const bar = screen.getByLabelText(en("time.bar"));
+    expect(classesOf(bar)).not.toContain("gap-2");
   });
 
   it("keeps the typed text when the bar folds and unfolds", async () => {
@@ -166,11 +209,70 @@ describe("TimeBar", () => {
     expect(screen.getByLabelText(en("time.whatDoing"))).toHaveDisplayValue("Reading");
   });
 
-  it("opens Rest's picker on a tap: six ways to rest; a pick starts it, a tap again offers Stop", async () => {
+  describe("under the region budget (spec §5.1, design review B2)", () => {
+    it("keeps what runs alongside as a compact row inside the one card, never a second card", async () => {
+      const runtime = await createTestRuntime();
+      await startBoth(runtime);
+      await renderScreen(<TimeBar />, runtime);
+      expect(screen.getAllByTestId("running-card")).toHaveLength(1);
+      const row = screen.getByTestId("running-alongside");
+      expect(within(row).getByText("Workout")).toBeOnTheScreen();
+      expect(within(row).getByRole("button", { name: "Stop: Workout" })).toBeOnTheScreen();
+      expect(within(row).queryByTestId("ink-line")).toBeNull();
+    });
+
+    it("never scrolls inside the bar", async () => {
+      const runtime = await createTestRuntime();
+      await startBoth(runtime);
+      await renderScreen(<TimeBar />, runtime);
+      expect(screen.queryByTestId("time-bar-scroll")).toBeNull();
+    });
+
+    it("folds the field once the bar would pass 40 %, but not one the person unfolded", async () => {
+      const runtime = await createTestRuntime();
+      await renderScreen(<TimeBar />, runtime);
+      await fireEvent.press(screen.getByRole("button", { name: "Chores" }));
+      await fireEvent.press(await screen.findByRole("button", { name: "Commute" }));
+      await waitFor(() => {
+        expect(running(runtime)).toEqual(["Commute"]);
+      });
+      // Started from the bar: the field stays under the finger while it fits.
+      expect(screen.getByLabelText(en("time.whatDoing"))).toBeOnTheScreen();
+      jest.useFakeTimers();
+      try {
+        await layOut(500);
+        await act(async () => {
+          await jest.advanceTimersByTimeAsync(6000);
+        });
+        expect(screen.queryByLabelText(en("time.whatDoing"))).toBeNull();
+        // Opened by hand, it stays open over the budget: the person asked for it.
+        await fireEvent.press(screen.getByRole("button", { name: en("time.startOther") }));
+        await layOut(560);
+        await act(async () => {
+          await jest.advanceTimersByTimeAsync(6000);
+        });
+        expect(screen.getByLabelText(en("time.whatDoing"))).toBeOnTheScreen();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it("opens the typed line's proposal as a sheet on a phone, so the tiles never cover it", async () => {
+      const runtime = await createTestRuntime({ routes: { "POST /api/parse": () => CSS_READ } });
+      await renderScreen(<TimeBar />, runtime);
+      const field = screen.getByLabelText("What are you doing?");
+      await fireEvent.changeText(field, "Пошел в ЦСС, 20мин");
+      await fireEvent(field, "submitEditing");
+      const proposal = await screen.findByText("Start: ЦСС");
+      expect(within(screen.getByTestId("sheet-frame")).getByText("Start: ЦСС")).toBe(proposal);
+    });
+  });
+
+  it("opens Misc's picker on a tap: six ways to rest; a pick starts it, a tap again offers Stop", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(<TimeBar />, runtime);
-    await fireEvent.press(screen.getByRole("button", { name: "Rest" }));
-    expect(await choicesIn("Rest")).toEqual([
+    await fireEvent.press(screen.getByRole("button", { name: "Misc" }));
+    expect(await choicesIn("Misc")).toEqual([
       "Short break",
       "Rest",
       "Walk",
@@ -181,21 +283,21 @@ describe("TimeBar", () => {
     // Nothing starts on the tap itself, and nothing runs, so there is nothing to stop.
     expect(running(runtime)).toEqual([]);
     expect(screen.queryByRole("button", { name: en("time.stop") })).toBeNull();
-    await fireEvent.press(within(await picker("Rest")).getByRole("button", { name: "Workout" }));
+    await fireEvent.press(within(await picker("Misc")).getByRole("button", { name: "Workout" }));
     await waitFor(() => {
       expect(activities(runtime)).toEqual([
-        expect.objectContaining({ category: "sport", expectMinutes: 60, label: "Workout" }),
+        expect.objectContaining({ category: "sport", expectMinutes: 180, label: "Workout" }),
       ]);
     });
-    expect(listsNamed("Rest")).toHaveLength(0);
+    expect(listsNamed("Misc")).toHaveLength(0);
 
-    const on = screen.getByRole("button", { name: en("time.buttonRunning", { label: "Rest" }) });
+    const on = screen.getByRole("button", { name: en("time.buttonRunning", { label: "Misc" }) });
     await fireEvent.press(on);
     await fireEvent.press(await screen.findByRole("button", { name: en("time.stop") }));
     await waitFor(() => {
       expect(running(runtime)).toEqual([]);
     });
-    expect(listsNamed("Rest")).toHaveLength(0);
+    expect(listsNamed("Misc")).toHaveLength(0);
   });
 
   it("picks a chore from Chores' picker, which has no nap any more", async () => {
@@ -272,7 +374,7 @@ describe("TimeBar", () => {
     await waitFor(() => {
       expect(running(runtime)).toEqual(["Commute"]);
     });
-    await fireEvent.press(screen.getByRole("button", { name: "Rest" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Misc" }));
     await fireEvent.press(await screen.findByLabelText("Alongside what is running"));
     await fireEvent.press(screen.getByRole("button", { name: "Workout" }));
     await waitFor(() => {
@@ -290,7 +392,7 @@ describe("TimeBar", () => {
   it.each([
     { button: "Calendar", choice: "Seminar", list: en("time.calendarToday") },
     { button: "Chores", choice: "Getting ready", list: "Chores" },
-    { button: "Rest", choice: "Walk", list: "Rest" },
+    { button: "Misc", choice: "Walk", list: "Misc" },
     { button: "Task", choice: "Algebra HW 6", list: "Task" },
   ])(
     "marks the running choice in $button's picker, and only closes it when that is picked again",
@@ -349,20 +451,20 @@ describe("TimeBar", () => {
       const read = deferred<"granted">();
       jest.spyOn(phoneCalendar, "calendarAccess").mockReturnValueOnce(read.promise);
       await fireEvent.press(button);
-      await fireEvent.press(screen.getByRole("button", { name: "Rest" }));
-      await picker("Rest");
+      await fireEvent.press(screen.getByRole("button", { name: "Misc" }));
+      await picker("Misc");
       calendar.state.status = "granted";
       read.resolve("granted");
       // The late answer has landed once the button reads it (access, nothing near)...
       await waitFor(() => {
         expect(button.props["accessibilityHint"]).toBe(en("time.calendar.nothingNear"));
       });
-      // ...and the Rest picker stays: Calendar's late answer opens nothing over it.
-      expect(listsNamed("Rest")).toHaveLength(1);
+      // ...and the Misc picker stays: Calendar's late answer opens nothing over it.
+      expect(listsNamed("Misc")).toHaveLength(1);
       expect(screen.queryByRole("button", { name: en("time.calendarStartUntitled") })).toBeNull();
       expect(
         screen.getAllByRole("header").map((header): unknown => header.props["children"]),
-      ).toEqual(["Rest"]);
+      ).toEqual(["Misc"]);
     });
 
     it("keeps the picker as it was while a pick is written: no Stop flashes in before it closes", async () => {
@@ -375,19 +477,19 @@ describe("TimeBar", () => {
         await release.promise;
         return result;
       });
-      await fireEvent.press(screen.getByRole("button", { name: "Rest" }));
-      await fireEvent.press(within(await picker("Rest")).getByRole("button", { name: "Walk" }));
+      await fireEvent.press(screen.getByRole("button", { name: "Misc" }));
+      await fireEvent.press(within(await picker("Misc")).getByRole("button", { name: "Walk" }));
       // Written: the bar shows it on, but the picker, still closing, is the one that was tapped.
       await waitFor(() => {
         expect(
-          screen.getByRole("button", { name: en("time.buttonRunning", { label: "Rest" }) }),
+          screen.getByRole("button", { name: en("time.buttonRunning", { label: "Misc" }) }),
         ).toBeOnTheScreen();
       });
-      expect(listsNamed("Rest")).toHaveLength(1);
+      expect(listsNamed("Misc")).toHaveLength(1);
       expect(screen.queryByRole("button", { name: en("time.stop") })).toBeNull();
       release.resolve(undefined);
       await waitFor(() => {
-        expect(listsNamed("Rest")).toHaveLength(0);
+        expect(listsNamed("Misc")).toHaveLength(0);
       });
     });
 
@@ -397,13 +499,13 @@ describe("TimeBar", () => {
       jest
         .spyOn(runtime.actions, "startChoice")
         .mockResolvedValue({ error: "action/nothing-to-do", ok: false });
-      await fireEvent.press(screen.getByRole("button", { name: "Rest" }));
-      await fireEvent.press(within(await picker("Rest")).getByRole("button", { name: "Walk" }));
+      await fireEvent.press(screen.getByRole("button", { name: "Misc" }));
+      await fireEvent.press(within(await picker("Misc")).getByRole("button", { name: "Walk" }));
       // Refused: the picker stays open for another pick, and the next one goes through.
       expect(await screen.findByText(en("actionError.action/nothing-to-do"))).toBeOnTheScreen();
-      expect(listsNamed("Rest")).toHaveLength(1);
+      expect(listsNamed("Misc")).toHaveLength(1);
       jest.restoreAllMocks();
-      await fireEvent.press(within(await picker("Rest")).getByRole("button", { name: "Nap" }));
+      await fireEvent.press(within(await picker("Misc")).getByRole("button", { name: "Nap" }));
       await waitFor(() => {
         expect(running(runtime)).toEqual(["Nap"]);
       });
@@ -412,8 +514,8 @@ describe("TimeBar", () => {
 
   it("offers no alongside switch when nothing else runs", async () => {
     await renderScreen(<TimeBar />, await createTestRuntime());
-    await fireEvent.press(screen.getByRole("button", { name: "Rest" }));
-    await picker("Rest");
+    await fireEvent.press(screen.getByRole("button", { name: "Misc" }));
+    await picker("Misc");
     expect(screen.queryByLabelText("Alongside what is running")).toBeNull();
   });
 
@@ -438,7 +540,8 @@ describe("TimeBar", () => {
         expect.objectContaining({ category: "sport", expectMinutes: 20, label: "ЦСС" }),
       ]);
     });
-    expect(field).toHaveDisplayValue("");
+    // The bar re-lays itself once something runs: ask for the field again.
+    expect(screen.getByLabelText("What are you doing?")).toHaveDisplayValue("");
   });
 
   it("answers the assistant's question about an activity with one tap", async () => {
@@ -621,7 +724,7 @@ describe("TimeBar", () => {
     await renderScreen(<TimeBar />, runtime);
     await fireEvent.changeText(screen.getByLabelText("What are you doing?"), "ем");
     await fireEvent.press(screen.getByRole("button", { name: "Review assistant actions" }));
-    expect(await screen.findByText(en("assistant.rulesUsed"))).toBeOnTheScreen();
+    expect(await screen.findByText(en("assistant.rulesUsed.unreachable"))).toBeOnTheScreen();
     expect(activities(runtime)).toEqual([]);
     await fireEvent.press(screen.getByRole("button", { name: "Approve" }));
     await waitFor(() => {
@@ -750,7 +853,7 @@ describe("TimeBar", () => {
   it("asks at twice the Expect whether it still goes on; yes moves the next ask on and keeps the Expect", async () => {
     const runtime = await createTestRuntime();
     await runtime.actions.startActivity(
-      { category: "rest", expectMinutes: 30, label: "Rest" },
+      { category: "rest", expectMinutes: 30, label: "Misc" },
       { at: addMinutesIso(NOW, -70) },
     );
     await renderScreen(<TimeBar />, runtime);

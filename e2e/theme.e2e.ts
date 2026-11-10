@@ -132,7 +132,7 @@ for (const [preference, system] of [
     await addTask(page, `Dim ${preference}`);
     await nowTasks(page).getByText(`Dim ${preference}`).click();
     expect(await pageState(page)).toEqual(settled(preference));
-    await page.getByRole("button", { name: "Edit details" }).click();
+    await page.getByRole("button", { exact: true, name: "Edit" }).click();
     await expect(page.locator('[data-pace-surface="sheet"]')).toBeVisible();
     await expect.poll(async () => await pageState(page)).toEqual({ ...settled(preference, true) });
     // The ground itself stays: only the status bar dims with the backdrop.

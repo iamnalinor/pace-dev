@@ -1,5 +1,9 @@
 import { defineConfig } from "vitest/config";
 
+// A host-zone assumption must fail everywhere, not only on some machines: the suite runs in a
+// zone that is neither UTC nor the owner's (bug-lessons class 135).
+process.env["TZ"] = "America/Los_Angeles";
+
 export default defineConfig({
   test: {
     coverage: {

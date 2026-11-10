@@ -1,4 +1,5 @@
-import { CalendarClock, CalendarDays, Play } from "lucide-react-native";
+import type { RefObject } from "react";
+
 import { Text, View } from "react-native";
 
 import { useSettings, useT } from "#app/app-state.tsx";
@@ -7,7 +8,11 @@ import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
 import { Calendar } from "#app/ui/calendar.tsx";
 import { Chip } from "#app/ui/chip.tsx";
+import { useRevealOnShow } from "#app/ui/overlay-reveal.ts";
+import { TimeCheckScope, useCheckedSubmit, useTimeChecks } from "#app/ui/time-check.tsx";
 import { TimeInput } from "#app/ui/time-input.tsx";
+
+import { useOutsidePress } from "./use-outside-press.ts";
 
 /** A time a person sets, with the zone it was set in; `null` when not set. */
 export type Zoned = null | { readonly at: string; readonly tz: string };
@@ -39,7 +44,7 @@ const emptyDateLabel = (
 };
 
 /** A start plays from then; a due and a final deadline are dates on the calendar. */
-const DATE_ICONS = { due: CalendarDays, final: CalendarClock, start: Play } as const;
+const DATE_ICONS = { due: "calendar-days", final: "calendar-clock", start: "play" } as const;
 
 /** The date's chip: its exact date and time ("Oct 13 23:59"), or what an unset one means. */
 export const DateChip = ({
@@ -57,16 +62,40 @@ export const DateChip = ({
   const viewer = useViewer();
   const unset = t(emptyDateLabel(kind));
   const text = value === null ? unset : zonedText({ ...value, mode: "due" }, viewer);
-  const Icon = DATE_ICONS[kind];
+
   return (
     <Chip
+      expanded={isOpen}
+      icon={DATE_ICONS[kind]}
+      isWhole
       label={`${t(dateLabel(kind))}: ${text}`}
-      leading={(color) => <Icon color={color} size={14} strokeWidth={1.75} />}
       onPress={onToggle}
-      selected={isOpen}
     >
       {kind === "start" && value !== null ? `${t("edit.start")} ${text}` : text}
     </Chip>
+  );
+};
+
+/** Clear (for a date that is set) and Done. */
+const PanelButtons = ({
+  onClear,
+  onDone,
+}: {
+  readonly onClear: (() => void) | null;
+  readonly onDone: () => void;
+}) => {
+  const t = useT();
+  return (
+    <View className="flex-row justify-end gap-2">
+      {onClear === null ? null : (
+        <Button onPress={onClear} variant="plain">
+          {t("composer.clear")}
+        </Button>
+      )}
+      <Button onPress={onDone} variant="secondary">
+        {t("common.done")}
+      </Button>
+    </View>
   );
 };
 
@@ -78,12 +107,18 @@ export const DatePanel = ({
   kind,
   onChange,
   onClose,
+  region,
   value: due,
 }: {
   readonly kind: DateKind;
   readonly value: Zoned;
   readonly onChange: (value: Zoned) => void;
   readonly onClose: () => void;
+  /**
+  The chip and the panel: a pointer anywhere else (on the web) closes it as Done does, so a time
+  it cannot read keeps it open and says so, and the Save the pointer went to finds it (R28-01).
+  */
+  readonly region: RefObject<null | View>;
 }) => {
   const t = useT();
   const viewer = useViewer();
@@ -92,6 +127,13 @@ export const DatePanel = ({
   const today = wallClock(viewer.now, tz).date;
   const shown = due === null ? { date: null, time: DEFAULT_TIME[kind] } : wallClock(due.at, tz);
   const { time } = shown;
+  const times = useTimeChecks();
+  // Done keeps the panel open on a time it cannot read, and says so (R27-02); a time handed over
+  // by the press closes it in one press (review I3).
+  const done = useCheckedSubmit(times, onClose);
+  useOutsidePress(region, true, done);
+  // Unfolded in a sheet, the panel scrolls whole into view above the pinned Save (R27-06).
+  const panelRef = useRevealOnShow("date-panel");
   const set = (date: string, at: string): void => {
     const instant = fromWallClock({ date, time: at, tz });
     if (instant !== null) {
@@ -99,7 +141,7 @@ export const DatePanel = ({
     }
   };
   return (
-    <View className="gap-3 rounded-xl border border-separator bg-app p-3">
+    <View className="gap-3 rounded-xl border border-separator bg-app p-3" ref={panelRef}>
       <Calendar
         labels={{ next: t("calendar.nextMonth"), previous: t("calendar.previousMonth") }}
         language={viewer.language}
@@ -114,36 +156,33 @@ export const DatePanel = ({
         <Text className="font-sans text-footnote text-label-secondary">
           {t(kind === "final" ? "form.finalTime" : "composer.dueTime")}
         </Text>
-        <TimeInput
-          className="w-24"
-          key={time}
-          label={t(kind === "final" ? "form.finalTime" : "composer.dueTime")}
-          onTime={(next) => {
-            set(shown.date ?? today, next);
-          }}
-          value={time}
-        />
+        <TimeCheckScope checks={times}>
+          <TimeInput
+            className="w-24"
+            isDraft
+            label={t(kind === "final" ? "form.finalTime" : "composer.dueTime")}
+            onTime={(next) => {
+              set(shown.date ?? today, next);
+            }}
+            value={time}
+          />
+        </TimeCheckScope>
         {tz === viewer.deviceTz ? null : (
           <Text className="font-sans text-caption font-normal tabular-nums text-label-tertiary">
             {t("add.dueZone", { tz })}
           </Text>
         )}
       </View>
-      <View className="flex-row justify-end gap-2">
-        {due === null ? null : (
-          <Button
-            onPress={() => {
-              onChange(null);
-            }}
-            variant="ghost"
-          >
-            {t("composer.clear")}
-          </Button>
-        )}
-        <Button onPress={onClose} variant="secondary">
-          {t("common.done")}
-        </Button>
-      </View>
+      <PanelButtons
+        onClear={
+          due === null
+            ? null
+            : () => {
+                onChange(null);
+              }
+        }
+        onDone={done}
+      />
     </View>
   );
 };

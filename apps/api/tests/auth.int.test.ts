@@ -8,7 +8,7 @@ import { bindNonce } from "../src/auth/nonce.ts";
 import { upsertTelegramUser } from "../src/auth/users.ts";
 import { hmacSha256Hex, sha256Hex } from "../src/shared/crypto.ts";
 import { d1 } from "../src/shared/db/d1.ts";
-import { call, json, loginAsDev, readJson } from "./helpers.ts";
+import { answerOf, call, json, loginAsDev, readJson } from "./helpers.ts";
 
 const nowSeconds = (): number => Math.floor(Date.now() / 1000);
 
@@ -86,6 +86,14 @@ describe("bearer sessions", () => {
     const token = await loginAsDev("1001");
     expect(await json("/api/auth/logout", { method: "POST", token })).toEqual({ ok: true });
     expect((await call("/api/me", { token })).status).toBe(401);
+  });
+
+  it("a repeated logout answers 401 auth/unauthorized: the client's retry reads it as already ended (R22-02)", async () => {
+    const token = await loginAsDev("1001");
+    expect(await json("/api/auth/logout", { method: "POST", token })).toEqual({ ok: true });
+    const again = await call("/api/auth/logout", { method: "POST", token });
+    expect(again.status).toBe(401);
+    expect(await again.json()).toEqual({ code: "auth/unauthorized", message: "Unauthorized" });
   });
 });
 
@@ -282,6 +290,40 @@ describe("sessions record their kind, a readable name and where they signed in f
     expect(await nonceSessionOf(nonce)).toBe(session?.id);
   });
 
+  it("lists the device an app named and the one a browser's User-Agent tells", async () => {
+    const { nonce } = await json<{ nonce: string }>("/api/auth/nonce?from=app", {
+      body: {
+        deviceBrand: "samsung",
+        deviceId: "dev-2",
+        deviceModel: "Galaxy S23",
+        deviceName: "Galaxy S23",
+        osVersion: "14",
+      },
+      ...from("5.6.7.8", OKHTTP),
+    });
+    const appToken = await finishBotLogin(nonce);
+    const body = await widgetPayload({ auth_date: nowSeconds(), first_name: "Ada", id: 1001 });
+    const web = await json<{ token: string }>("/api/auth/telegram", {
+      body,
+      ...from("1.2.3.4", CHROME_MAC),
+    });
+    const { sessions } = await answerOf(endpoints.sessions.list, "/api/sessions", {
+      token: web.token,
+    });
+    expect(sessions.find((row) => row.kind === "app")?.device).toEqual({
+      brand: "samsung",
+      model: "Galaxy S23",
+      os: "Android",
+      osVersion: "14",
+    });
+    expect(sessions.find((row) => row.current)?.device).toMatchObject({
+      browser: "Chrome",
+      formFactor: "desktop",
+      os: "macOS",
+    });
+    expect(appToken).not.toBe("");
+  });
+
   it("a deep-link login from the web is a browser session named after the browser that asked", async () => {
     const { nonce } = await json<{ nonce: string }>("/api/auth/nonce?from=web", {
       method: "POST",
@@ -319,17 +361,53 @@ describe("sessions record their kind, a readable name and where they signed in f
     expect(row?.user_agent).toBe("x".repeat(512));
   });
 
-  it("refuses a nonce request body with fields it does not know", async () => {
+  it("ignores fields it does not know, so a newer app's body still opens a login", async () => {
     const response = await call("/api/auth/nonce?from=app", { body: { extra: 1 } });
-    expect(response.status).toBe(422);
-    expect(await response.json()).toMatchObject({ code: "validation" });
+    expect(response.status).toBe(200);
   });
 
-  it.each([{ deviceName: "" }, { deviceId: "x".repeat(65) }, { deviceName: "x".repeat(81) }])(
-    "refuses an out-of-range device in the nonce request (%o)",
-    async (body) => {
-      expect((await call("/api/auth/nonce?from=app", { body })).status).toBe(422);
-    },
-  );
+  it.each([
+    { deviceName: "" },
+    { deviceName: " ".repeat(3) },
+    { deviceName: "x".repeat(81) },
+    { deviceBrand: "x".repeat(41) },
+    { deviceModel: "x".repeat(200) },
+    { osVersion: "1".repeat(21) },
+    { deviceModel: 5 },
+    { deviceId: "x".repeat(65) },
+  ])("drops an invalid optional device field instead of refusing the login (%o)", async (body) => {
+    const response = await call("/api/auth/nonce?from=app", { body });
+    expect(response.status).toBe(200);
+    const { nonce } = await readJson<{ nonce: string }>(response);
+    const token = await finishBotLogin(nonce);
+    const session = await sessionOf(token);
+    expect(session).toMatchObject({ kind: "app", name: "Android" });
+    expect(session?.device_id).toBeNull();
+    const { sessions } = await answerOf(endpoints.sessions.list, "/api/sessions", { token });
+    expect(sessions.find((row) => row.current)?.device).toBeUndefined();
+  });
+
+  it("keeps the valid fields when another one of the body is dropped", async () => {
+    const { nonce } = await json<{ nonce: string }>("/api/auth/nonce?from=app", {
+      body: { deviceModel: "x".repeat(200), deviceName: "Pixel 9a", osVersion: "15" },
+      ...from("5.6.7.8", OKHTTP),
+    });
+    const token = await finishBotLogin(nonce);
+    expect(await sessionOf(token)).toMatchObject({ name: "Pixel 9a" });
+    const { sessions } = await answerOf(endpoints.sessions.list, "/api/sessions", { token });
+    expect(sessions.find((row) => row.current)?.device).toEqual({ os: "Android", osVersion: "15" });
+  });
+
+  it("an app that sends none of the new fields lists no device for its row", async () => {
+    const { nonce } = await json<{ nonce: string }>("/api/auth/nonce?from=app", {
+      body: { deviceId: "dev-old", deviceName: "Pixel 9a" },
+      ...from("5.6.7.8", OKHTTP),
+    });
+    const token = await finishBotLogin(nonce);
+    const { sessions } = await answerOf(endpoints.sessions.list, "/api/sessions", { token });
+    const row = sessions.find((entry) => entry.current);
+    expect(row?.name).toBe("Pixel 9a");
+    expect(row).not.toHaveProperty("device");
+  });
 });
 /* eslint-enable sonarjs/no-hardcoded-ip -- the fixtures above end here */

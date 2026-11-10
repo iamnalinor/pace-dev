@@ -7,6 +7,7 @@ import { requestNewTask } from "#app/shared/new-task-request.ts";
 import { classLinePx, classPx } from "#app/test/class-px.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { withWindowWidth } from "#app/test/window.ts";
 import { FAKE_STORE_ID, fakeUser } from "@pace/client/testing";
 import { HW_ID, WORK_ID } from "@pace/core/testing";
 
@@ -108,6 +109,12 @@ describe("Composer", () => {
     expect(line().props["onContentSizeChange"]).toBe(before);
   });
 
+  it("is one line of text plus its own padding when empty: the placeholder is never cut (2026-11-09 shots)", async () => {
+    await renderComposer(await createTestRuntime());
+    const empty = (line().props as { style: { height: number } }).style.height;
+    expect(empty).toBe(classLinePx(line()) + 2 * classPx(line(), "py"));
+  });
+
   it("grows the line with its text up to eight lines of its type, then scrolls inside (bug-lessons 11, mirrors)", async () => {
     await renderComposer(await createTestRuntime());
     await fireEvent.changeText(line(), "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten");
@@ -122,13 +129,16 @@ describe("Composer", () => {
     await renderComposer(await createTestRuntime());
     await fireEvent.press(button("nav.newTask"));
     await fireEvent.press(screen.getByRole("radio", { name: "Homework" }));
-    await fireEvent.press(screen.getByRole("radio", { name: /^Estimate: /u }));
-    expect(screen.getByRole("radio", { name: "Estimate: Default (1h)" })).toBeChecked();
+    await fireEvent.press(screen.getByRole("button", { name: /^Estimate: /u }));
+    const chip = screen.getByRole("button", { name: "Estimate: Default (1h)" });
+    expect(chip).toBeExpanded();
+    // The chip shows the value, never cut: «По умолчанию (3…» lost the number (design review H3).
+    expect(chip).toHaveTextContent("~1h");
     expect(screen.queryByRole("radio", { name: "Default (1h)" })).toBeNull();
     expect(screen.queryByRole("radio", { name: "1h" })).toBeNull();
     await fireEvent.press(screen.getByRole("radio", { name: "30m" }));
-    expect(screen.getByRole("radio", { name: "Estimate: 30m" })).toBeOnTheScreen();
-    await fireEvent.press(screen.getByRole("radio", { name: /^Estimate: /u }));
+    expect(screen.getByRole("button", { name: "Estimate: 30m" })).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: /^Estimate: /u }));
     expect(screen.queryByRole("radio", { name: "Default (1h)" })).toBeNull();
     expect(screen.getByRole("radio", { name: "1h" })).toBeOnTheScreen();
   });
@@ -136,17 +146,17 @@ describe("Composer", () => {
   it("closes the due calendar after picking a day", async () => {
     await renderComposer(await createTestRuntime());
     await fireEvent.press(button("nav.newTask"));
-    await fireEvent.press(screen.getByRole("radio", { name: /Due: No deadline/u }));
+    await fireEvent.press(screen.getByRole("button", { name: /Due: No deadline/u }));
     expect(screen.getByRole("button", { name: /October 7/u })).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("button", { name: /October 7/u }));
     expect(screen.queryByRole("button", { name: /October 7/u })).toBeNull();
-    expect(screen.getByRole("radio", { name: "Due: tomorrow 23:59" })).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Due: tomorrow 23:59" })).toBeOnTheScreen();
   });
 
   it("closes the due calendar when another form field is touched", async () => {
     await renderComposer(await createTestRuntime());
     await fireEvent.press(button("nav.newTask"));
-    await fireEvent.press(screen.getByRole("radio", { name: /Due: No deadline/u }));
+    await fireEvent.press(screen.getByRole("button", { name: /Due: No deadline/u }));
     expect(screen.getByRole("button", { name: /October 7/u })).toBeOnTheScreen();
     await fireEvent(screen.getByLabelText(en("edit.description")), "touchStart");
     expect(screen.queryByRole("button", { name: /October 7/u })).toBeNull();
@@ -576,7 +586,7 @@ describe("Composer", () => {
     await fireEvent.changeText(line(), "синк по дашборду");
     await fireEvent.changeText(line(), "синк по дашборду завтра 15:00 1ч");
     await enter();
-    expect(await screen.findByText(en("assistant.rulesUsed"))).toBeOnTheScreen();
+    expect(await screen.findByText(en("assistant.rulesUsed.unreachable"))).toBeOnTheScreen();
     expect(screen.getByText(/синк по дашборду/u)).toBeOnTheScreen();
     expect(created(runtime, "синк по дашборду")).toBeUndefined();
     await fireEvent.press(screen.getByRole("button", { name: en("assistant.approve") }));
@@ -611,10 +621,10 @@ describe("Composer", () => {
     await renderComposer(runtime);
     await fireEvent.changeText(line(), "оплатить связь");
     await enter();
-    expect(await screen.findByText(en("assistant.rulesUsed"))).toBeOnTheScreen();
+    expect(await screen.findByText(en("assistant.rulesUsed.unreachable"))).toBeOnTheScreen();
     await fireEvent.press(button("composer.aiLater"));
     expect(await screen.findByText(en("composer.aiQueuedSoon"))).toBeOnTheScreen();
-    expect(screen.queryByText(en("assistant.rulesUsed"))).toBeNull();
+    expect(screen.queryByText(en("assistant.rulesUsed.unreachable"))).toBeNull();
     expect(line()).toHaveDisplayValue("");
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 300));
@@ -666,10 +676,26 @@ describe("Composer", () => {
     await renderComposer(runtime);
     await fireEvent.changeText(line(), "оплатить связь");
     await enter();
-    expect(await screen.findByText(en("assistant.rulesUsedUnreadable"))).toBeOnTheScreen();
+    expect(await screen.findByText(en("assistant.rulesUsed.unreadable"))).toBeOnTheScreen();
     expect(screen.queryByRole("button", { name: en("composer.aiLater") })).toBeNull();
     expect(calls).toBe(1);
   });
+
+  it.each([
+    ["limited", "assistant.rulesUsed.limited"],
+    ["off", "assistant.rulesUsed.off"],
+  ] as const)(
+    "names the reason on the rules' preview card: %s (QA round 21 L7)",
+    async (reason, key) => {
+      const runtime = await createTestRuntime({
+        routes: { "POST /api/parse": () => unavailable(reason) },
+      });
+      await renderComposer(runtime);
+      await fireEvent.changeText(line(), "оплатить связь");
+      await enter();
+      expect(await screen.findByText(en(key))).toBeOnTheScreen();
+    },
+  );
 
   it("says why when the server could not keep the line after all, and does not offer it again", async () => {
     const bodies: unknown[] = [];
@@ -699,6 +725,22 @@ describe("Composer", () => {
     await fireEvent.changeText(title(), "x");
     await fireEvent.changeText(title(), "");
     expect(screen.getByText(en("edit.titleRequired"))).toBeOnTheScreen();
+  });
+
+  it("says what is missing when Create is pressed, or Enter given, with no title (QA round 24 R24-06)", async () => {
+    const runtime = await createTestRuntime();
+    await renderComposer(runtime);
+    const taskCount = Object.keys(runtime.state.store.getState().tasks.byId).length;
+    await fireEvent.press(screen.getByRole("button", { name: en("nav.newTask") }));
+    const create = screen.getByRole("button", { name: en("form.create") });
+    expect(create).toBeEnabled();
+    await fireEvent.press(create);
+    expect(await screen.findByRole("alert")).toHaveTextContent(en("edit.titleRequired"));
+    // The form stays, nothing is made.
+    expect(title()).toBeOnTheScreen();
+    expect(Object.keys(runtime.state.store.getState().tasks.byId)).toHaveLength(taskCount);
+    await fireEvent.changeText(title(), "Renew the passport");
+    expect(screen.queryByText(en("edit.titleRequired"))).toBeNull();
   });
 
   it("expands to the form by hand: the line moves into the title, a category brings its importance", async () => {
@@ -739,8 +781,9 @@ describe("Composer", () => {
     const runtime = await createTestRuntime();
     await renderComposer(runtime);
     await fireEvent.press(screen.getByRole("button", { name: en("nav.newTask") }));
-    // Nothing to create yet.
-    expect(screen.getByRole("button", { name: en("form.create") })).toBeDisabled();
+    // Nothing to create yet: Create asks for a title instead (R24-06), as Projects' does.
+    await fireEvent.press(screen.getByRole("button", { name: en("form.create") }));
+    expect(screen.getByText(en("edit.titleRequired"))).toBeOnTheScreen();
     await fireEvent.changeText(title(), "pay the rent");
     await fireEvent.press(screen.getByRole("button", { name: en("form.create") }));
     await waitFor(() => {
@@ -776,7 +819,7 @@ describe("Composer", () => {
     await renderComposer(await createTestRuntime());
     await fireEvent.press(button("nav.newTask"));
     await fireEvent.changeText(title(), "Leftover");
-    await fireEvent.press(screen.getByRole("radio", { name: /Due: No deadline/u }));
+    await fireEvent.press(screen.getByRole("button", { name: /Due: No deadline/u }));
     await fireEvent.press(screen.getByRole("button", { name: /October 7/u }));
     await fireEvent.press(screen.getByRole("radio", { name: en("form.repeat.daily") }));
     await fireEvent.press(button("form.addSubtask"));
@@ -788,12 +831,13 @@ describe("Composer", () => {
     expect(line()).toHaveDisplayValue("");
     await fireEvent.press(button("nav.newTask"));
     expect(title()).toHaveDisplayValue("");
-    expect(screen.getByRole("radio", { name: /Due: No deadline/u })).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: /Due: No deadline/u })).toBeOnTheScreen();
     expect(
       screen.getByRole("radio", { checked: true, name: en("form.repeat.none") }),
     ).toBeOnTheScreen();
     expect(screen.queryByDisplayValue("half typed")).toBeNull();
-    expect(button("form.create")).toBeDisabled();
+    // A fresh form again: it does not open blaming the empty title.
+    expect(screen.queryByText(en("edit.titleRequired"))).toBeNull();
   });
 
   it("keeps the line's own text on close but not the form's changes to it", async () => {
@@ -841,6 +885,18 @@ describe("Composer", () => {
     expect(await screen.findByText(en("composer.toInboxDone"))).toBeOnTheScreen();
   });
 
+  it("offers Undo on the to-Inbox toast: the note leaves the Inbox and the line comes back (design review M10)", async () => {
+    const runtime = await createTestRuntime();
+    await renderComposer(runtime, "think about the trip");
+    await fireEvent.press(screen.getByRole("button", { name: en("composer.toInbox") }));
+    await fireEvent.press(await screen.findByRole("button", { name: en("common.undo") }));
+    await waitFor(() => {
+      const titles = Object.values(runtime.state.store.getState().tasks.byId).map((t) => t.title);
+      expect(titles).not.toContain("think about the trip");
+    });
+    expect(screen.getByDisplayValue("think about the trip")).toBeOnTheScreen();
+  });
+
   it("parses a pasted homework at once and writes nothing until Approve", async () => {
     const homework =
       "№№ 290, 292, 293 — решить методом выделения линейных множителей. № 365 (определитель)";
@@ -886,5 +942,21 @@ describe("Composer", () => {
         ),
       ).toHaveLength(1);
     });
+  });
+});
+
+describe("the line on a computer (design review 2 N5)", () => {
+  withWindowWidth(1440);
+
+  it("keeps the + slot while the line is empty, so the field does not move when + comes", async () => {
+    await renderComposer(await createTestRuntime());
+    // F-CMP-18: no + at rest (the sidebar's New task is the entry), but its place is kept: the field
+    // jumped 42 px sideways the moment text came.
+    expect(screen.queryByRole("button", { name: en("nav.newTask") })).toBeNull();
+    const slot = screen.getByTestId("line-plus-slot", { includeHiddenElements: true });
+    expect(slot).toHaveProp("aria-hidden", true);
+    await fireEvent.changeText(line(), "Buy milk");
+    expect(screen.getByRole("button", { name: en("nav.newTask") })).toBeOnTheScreen();
+    expect(screen.queryByTestId("line-plus-slot", { includeHiddenElements: true })).toBeNull();
   });
 });

@@ -1,14 +1,35 @@
+import type { ReactNode } from "react";
+
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { Linking } from "react-native";
+
+import type { PopoverProps } from "#app/ui/popover.tsx";
 
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { withWindowWidth } from "#app/test/window.ts";
 import { HW_ID, HW_VIEW_NOW, RENT_ID, rentSeriesEvents, TRK_ID, TRK_NOW } from "@pace/core/testing";
 
 import { TaskScreen } from "./task-screen.tsx";
 
 beforeEach(() => {
   jest.clearAllMocks();
+});
+
+/** Each `open` the kit popover is drawn with (the wide ⋯ menu's). */
+const mockPopoverOpen = jest.fn<undefined, [boolean]>();
+jest.mock("#app/ui/popover.tsx", (): unknown => {
+  const actual = jest.requireActual<{ readonly Popover: (props: PopoverProps) => ReactNode }>(
+    "#app/ui/popover.tsx",
+  );
+  return {
+    ...actual,
+    Popover: (props: PopoverProps) => {
+      mockPopoverOpen(props.open);
+      return actual.Popover(props);
+    },
+  };
 });
 
 // jest renders the phone, where Space is no key; the web's handler is the one under test here.
@@ -47,29 +68,31 @@ describe("TaskScreen — homework", () => {
     expect(screen.getByText("1h 43m")).toBeOnTheScreen();
     expect(screen.getByText(en("task.start"))).toBeOnTheScreen();
     expect(screen.queryByText(/of window gone/u)).toBeNull();
-    expect(screen.getByText(en("task.subtasksSummary", { sent: 2, solved: 4 }))).toBeOnTheScreen();
-    expect(screen.getByRole("checkbox", { name: "Kronecker–Capelli" })).toBeOnTheScreen();
-    expect(screen.getByRole("checkbox", { name: "Matrix rank" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Submit 3 and 4" })).toBeOnTheScreen();
+    expect(screen.getByText(en("task.subtasksSummary", { done: 4, total: 7 }))).toBeOnTheScreen();
+    expect(screen.getByRole("checkbox", { name: "Kronecker–Capelli" })).not.toBeChecked();
+    // Solved, then sent in the old log: one mark, done, at the earlier time (feedback 5).
+    expect(screen.getByRole("checkbox", { name: "Matrix rank" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Matrix rank" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: en("task.done") })).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: /^Submit/u })).toBeNull();
   });
 
-  it("marks a subtask solved on Space, and leaves a sent one as it is (a disabled control gets no action)", async () => {
+  it("marks a subtask done on Space and takes a done one back, sent in the old log or not", async () => {
     const runtime = await hwScreen();
-    const solved = () => screen.getByText(en("task.subtasksSummary", { sent: 2, solved: 4 }));
-    expect(solved()).toBeOnTheScreen();
-    // Control: Space on a pending subtask is a press.
+    const summary = (done: number) =>
+      screen.getByText(en("task.subtasksSummary", { done, total: 7 }));
+    expect(summary(4)).toBeOnTheScreen();
     await pressSpace(screen.getByRole("checkbox", { name: "Kronecker–Capelli" }));
     await waitFor(() => {
-      expect(
-        screen.getByText(en("task.subtasksSummary", { sent: 2, solved: 5 })),
-      ).toBeOnTheScreen();
+      expect(summary(5)).toBeOnTheScreen();
     });
-    // A sent subtask is disabled: Space must not revoke its mark.
-    const unmark = jest.spyOn(runtime.actions, "unmarkSolved");
-    const mark = jest.spyOn(runtime.actions, "markSolved");
+    // One mark, done: a subtask the old log also sent is a checkbox like any other (feedback 5).
+    const unmark = jest.spyOn(runtime.actions, "unmarkDone");
     await pressSpace(screen.getByRole("checkbox", { name: "Matrix rank" }));
-    expect(unmark).not.toHaveBeenCalled();
-    expect(mark).not.toHaveBeenCalled();
+    expect(unmark).toHaveBeenCalledWith(HW_ID, "s1");
+    await waitFor(() => {
+      expect(summary(4)).toBeOnTheScreen();
+    });
   });
 
   it("focuses on the task from the footer and stops again", async () => {
@@ -104,7 +127,7 @@ describe("TaskScreen — homework", () => {
     expect(screen.queryByRole("button", { name: "Focusing" })).toBeNull();
   });
 
-  it("toggles a subtask solved and back", async () => {
+  it("toggles a subtask done, shows when, and takes it back; Done stays the one action", async () => {
     const runtime = await hwScreen();
     const subtask = screen.getByRole("checkbox", { name: "Kronecker–Capelli" });
     expect(subtask).not.toBeChecked();
@@ -112,13 +135,32 @@ describe("TaskScreen — homework", () => {
     await waitFor(() => {
       expect(screen.getByRole("checkbox", { name: "Kronecker–Capelli" })).toBeChecked();
     });
-    expect(screen.getByRole("button", { name: "Submit 3, 4 and 5" })).toBeOnTheScreen();
+    // Marked now (the test clock): its day, named as the fields name it (R24-07), and time beside
+    // it, and no "Submit N" anywhere.
+    expect(screen.getByText(en("task.subtaskDoneAt", { when: "today 12:50" }))).toBeOnTheScreen();
+    expect(screen.queryByText(/^Submit/u)).toBeNull();
+    expect(screen.getByRole("button", { name: en("task.done") })).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("checkbox", { name: "Kronecker–Capelli" }));
     await waitFor(() => {
       expect(screen.getByRole("checkbox", { name: "Kronecker–Capelli" })).not.toBeChecked();
     });
     const task = runtime.state.store.getState().tasks.byId[HW_ID];
-    expect(task?.subtasks.find((item) => item.id === "s5")?.solvedAt).toBeNull();
+    expect(task?.subtasks.find((item) => item.id === "s5")?.doneAt).toBeNull();
+  });
+
+  it("keeps a closed task's checklist read-only: no mark taken back, nothing reopened", async () => {
+    const runtime = await createTestRuntime({ now: HW_VIEW_NOW });
+    await runtime.actions.closeTask({ taskId: HW_ID, outcome: "done" });
+    await renderScreen(<TaskScreen id={HW_ID} />, runtime);
+    const done = screen.getByRole("checkbox", { name: "Matrix rank" });
+    expect(done).toBeChecked();
+    expect(done).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "Kronecker–Capelli" })).toBeDisabled();
+    await fireEvent.press(done);
+    await pressSpace(done);
+    const task = runtime.state.store.getState().tasks.byId[HW_ID];
+    expect(task?.closed).not.toBeNull();
+    expect(task?.subtasks.find((item) => item.id === "s1")?.doneAt).not.toBeNull();
   });
 
   it("goes back, and moves the task to another project from the header chip", async () => {
@@ -130,6 +172,14 @@ describe("TaskScreen — homework", () => {
     });
     await fireEvent.press(screen.getByRole("button", { name: "Back" }));
     expect(router.back).toHaveBeenCalled();
+  });
+
+  it("goes to Now when there is nothing to go back to (opened by its link, or Now's `?task=` handed over at a phone's width)", async () => {
+    await hwScreen();
+    router.canGoBack.mockReturnValueOnce(false);
+    await fireEvent.press(screen.getByRole("button", { name: "Back" }));
+    expect(router.back).not.toHaveBeenCalled();
+    expect(router.replace).toHaveBeenCalledWith("/");
   });
 });
 
@@ -223,12 +273,13 @@ describe("TaskScreen — editing subtasks", () => {
     });
   });
 
-  it("takes an unsent subtask off in the editor; a sent one has no remove", async () => {
+  it("takes a subtask off in the editor, a done one too (History brings it back)", async () => {
     const runtime = await hwScreen();
     await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
+    // A done one says so beside its remove (feedback 5: no "sent" record keeps it on).
     expect(
-      screen.queryByRole("button", { name: en("form.removeSubtask", { label: "Matrix rank" }) }),
-    ).toBeNull();
+      screen.getByRole("button", { name: en("form.removeSubtask", { label: "Matrix rank" }) }),
+    ).toBeOnTheScreen();
     await fireEvent.press(
       screen.getByRole("button", {
         name: en("form.removeSubtask", { label: "Kronecker–Capelli" }),
@@ -243,15 +294,46 @@ describe("TaskScreen — editing subtasks", () => {
   });
 });
 
+const openMenu = async (): Promise<void> => {
+  await fireEvent.press(screen.getByRole("button", { name: en("task.menu") }));
+};
+/** Escape on the web, the system Back on Android: the modal's own close request. */
+const requestClose = async (): Promise<void> => {
+  await act(() => {
+    const modal = screen.getByTestId("overlay-modal", { includeHiddenElements: true });
+    (modal.props as { onRequestClose: () => void }).onRequestClose();
+  });
+};
+
+/** A node's horizontal margin and padding classes. */
+const inset = (node: null | { readonly props: Record<string, unknown> }): readonly string[] => {
+  const name = node?.props["className"];
+  return (typeof name === "string" ? name : "")
+    .split(" ")
+    .filter((each) => /^(?:lg:)?[mp]x-/u.test(each));
+};
+
 describe("TaskScreen — work", () => {
   it("shows its link and description, and no ranking card", async () => {
     await trkScreen();
-    expect(screen.getByText("https://tracker.example.com/browse/TRK-231 ↗")).toBeOnTheScreen();
+    expect(
+      screen.getByRole("link", { name: "https://tracker.example.com/browse/TRK-231 ↗" }),
+    ).toBeOnTheScreen();
     expect(
       screen.getByText("p99 check fails ~1 in 5 runs on the shared runner."),
     ).toBeOnTheScreen();
     expect(screen.queryByRole("button", { name: /^Why it's/u })).toBeNull();
     expect(screen.queryByRole("button", { name: "Waiting" })).toBeNull();
+  });
+
+  it("starts the description where the title starts, not a row inset short of it (design review 2 N6)", async () => {
+    await trkScreen();
+    const title = screen.getByRole("header", { name: /flaky/iu });
+    const words = screen.getByText("p99 check fails ~1 in 5 runs on the shared runner.");
+    // The description sat at x = 264 on a computer, the title at 280.
+    const block = screen.getByTestId("task-description");
+    expect(inset(block)).toEqual(inset(title.parent));
+    expect(block).toContainElement(words);
   });
 
   it("edits the description directly on the task page", async () => {
@@ -269,6 +351,60 @@ describe("TaskScreen — work", () => {
     expect(screen.getByText("Investigation notes pasted here")).toBeOnTheScreen();
   });
 
+  it("opens a link in the description without starting to edit; a tap on its words still edits (feedback 5 item 8)", async () => {
+    const runtime = await createTestRuntime({ deviceTz: "UTC", now: TRK_NOW });
+    await runtime.actions.updateTask(TRK_ID, {
+      description: "Logs: https://ci.example.com/run/42 and www.example.org/a, see them.",
+    });
+    const open = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+    await renderScreen(<TaskScreen id={TRK_ID} />, runtime);
+    const link = screen.getByRole("link", { name: "https://ci.example.com/run/42" });
+    await fireEvent.press(link);
+    expect(open).toHaveBeenCalledWith("https://ci.example.com/run/42");
+    expect(screen.queryByLabelText(en("edit.description"))).toBeNull();
+    await fireEvent.press(screen.getByRole("link", { name: "www.example.org/a" }));
+    expect(open).toHaveBeenCalledWith("https://www.example.org/a");
+    expect(screen.queryByLabelText(en("edit.description"))).toBeNull();
+    // The words are the person's, unchanged; a tap on them opens the editor with all of it.
+    await fireEvent.press(screen.getByText(/, see them\./u));
+    expect(screen.getByLabelText(en("edit.description")).props["value"]).toBe(
+      "Logs: https://ci.example.com/run/42 and www.example.org/a, see them.",
+    );
+    // No link sits inside a button (bug-lessons 14, 132).
+    expect(screen.queryByRole("button", { name: en("task.editDescription") })).toBeNull();
+    open.mockRestore();
+  });
+
+  it("shows an address once: the one in the description is not repeated above the facts (QA round 24 R24-08)", async () => {
+    const runtime = await createTestRuntime({ now: HW_VIEW_NOW });
+    await runtime.actions.updateTask(HW_ID, { description: "See https://example.com/a first." });
+    await renderScreen(<TaskScreen id={HW_ID} />, runtime);
+    expect(screen.getAllByRole("link", { name: /example\.com\/a/u })).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "https://example.com/a" })).toBeOnTheScreen();
+    // While the description is a text field its links are not links: the header shows it then.
+    await fireEvent.press(screen.getByText(/^See /u));
+    expect(screen.getByLabelText(en("edit.description"))).toBeOnTheScreen();
+    expect(screen.getAllByRole("link", { name: /example\.com\/a/u })).toHaveLength(1);
+  });
+
+  it("keeps a description being edited through a reload, and drops it on Cancel (feedback 5 item 7)", async () => {
+    const runtime = await createTestRuntime({ deviceTz: "UTC", now: TRK_NOW });
+    jest.spyOn(runtime.api, "currentSessionToken").mockReturnValue("session-1");
+    const page = await renderScreen(<TaskScreen id={TRK_ID} />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("task.editDescription") }));
+    await fireEvent.changeText(screen.getByLabelText(en("edit.description")), "Half-written");
+    await page.unmount();
+    const again = await renderScreen(<TaskScreen id={TRK_ID} />, runtime);
+    expect(screen.getByLabelText(en("edit.description")).props["value"]).toBe("Half-written");
+    await fireEvent.press(screen.getByRole("button", { name: en("common.cancel") }));
+    await again.unmount();
+    await renderScreen(<TaskScreen id={TRK_ID} />, runtime);
+    expect(screen.queryByLabelText(en("edit.description"))).toBeNull();
+    expect(
+      screen.getByText("p99 check fails ~1 in 5 runs on the shared runner."),
+    ).toBeOnTheScreen();
+  });
+
   it("offers to add a description on a task with none", async () => {
     await hwScreen();
     await fireEvent.press(screen.getByRole("button", { name: en("task.addDescription") }));
@@ -277,9 +413,27 @@ describe("TaskScreen — work", () => {
     expect(screen.getByRole("button", { name: en("task.addDescription") })).toBeOnTheScreen();
   });
 
+  it("saves the description on ⌘/Ctrl+Enter in its editor, and leaves the task open (QA round 26 R26-02)", async () => {
+    const runtime = await hwScreen();
+    await fireEvent.press(screen.getByRole("button", { name: en("task.addDescription") }));
+    const editor = screen.getByLabelText(en("edit.description"));
+    await fireEvent.changeText(editor, "Chapter 3 only");
+    await fireEvent(editor, "keyPress", {
+      nativeEvent: { ctrlKey: true, key: "Enter" },
+      preventDefault: jest.fn(),
+    });
+    await waitFor(() => {
+      expect(screen.queryByLabelText(en("edit.description"))).toBeNull();
+    });
+    const task = Object.values(runtime.state.store.getState().tasks.byId).find(
+      (item) => item.description === "Chapter 3 only",
+    );
+    expect(task?.closed).toBeNull();
+  });
+
   it("moves the progress slider in percent, the work left following at once", async () => {
     const runtime = await trkScreen();
-    expect(screen.getByText("40%")).toBeOnTheScreen();
+    expect(screen.getByText("40\u{A0}%")).toBeOnTheScreen();
     const workLeft = (): string => {
       const value = screen.getByLabelText(en("task.workLeft")).props["accessibilityValue"] as
         | undefined
@@ -295,17 +449,18 @@ describe("TaskScreen — work", () => {
       },
     );
     // Shown before the store answers: the thumb never jumps back to where it was.
-    expect(screen.getByText("50%")).toBeOnTheScreen();
+    expect(screen.getByText("50\u{A0}%")).toBeOnTheScreen();
     expect(workLeft()).not.toBe(before);
     await waitFor(() => {
       expect(runtime.state.store.getState().tasks.byId[TRK_ID]?.slider).toBe(5);
     });
-    expect(screen.getByText("50%")).toBeOnTheScreen();
-    await fireEvent.press(screen.getByRole("button", { name: en("task.pause") }));
-    await waitFor(() => {
-      expect(runtime.state.store.getState().tasks.byId[TRK_ID]?.status).toBe("paused");
-    });
-    expect(screen.getByRole("button", { name: en("task.resume") })).toBeOnTheScreen();
+    expect(screen.getByText("50\u{A0}%")).toBeOnTheScreen();
+    // The readout a screen reader hears is the percent, not the step (F-A11Y-16).
+    expect(
+      screen.getByRole("adjustable", { name: en("task.progressAria") }).props["accessibilityValue"],
+    ).toMatchObject({ text: "50\u{A0}%" });
+    // No Pause in the header (Q4): the status is not a header control.
+    expect(screen.queryByRole("button", { name: /^Pause$/u })).toBeNull();
   });
 
   it("edits the title from the header's pencil", async () => {
@@ -322,9 +477,9 @@ describe("TaskScreen — work", () => {
   it("edits everything from the pencil: clears the due and sets an estimate", async () => {
     const runtime = await trkScreen();
     await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
-    await fireEvent.press(screen.getByRole("radio", { name: /^Due: /u }));
+    await fireEvent.press(screen.getByRole("button", { name: /^Due: /u }));
     await fireEvent.press(screen.getByRole("button", { name: en("composer.clear") }));
-    await fireEvent.press(screen.getByRole("radio", { name: /^Estimate: /u }));
+    await fireEvent.press(screen.getByRole("button", { name: /^Estimate: /u }));
     await fireEvent.press(screen.getByRole("radio", { name: "1h 30m" }));
     await fireEvent.press(screen.getByRole("radio", { name: en("importance.asap") }));
     await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
@@ -334,6 +489,17 @@ describe("TaskScreen — work", () => {
         estimateMinutes: 90,
         importance: "asap",
       });
+    });
+  });
+
+  it("saves a typed estimate when Save is tapped without Enter (review of the QA 26 wave, I1's TypedEstimate)", async () => {
+    const runtime = await trkScreen();
+    await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
+    await fireEvent.press(screen.getByRole("button", { name: /^Estimate: /u }));
+    await fireEvent.changeText(screen.getByLabelText(en("form.estimateTyped")), "45");
+    await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
+    await waitFor(() => {
+      expect(runtime.state.store.getState().tasks.byId[TRK_ID]?.estimateMinutes).toBe(45);
     });
   });
 
@@ -368,7 +534,7 @@ describe("TaskScreen — work", () => {
     await renderScreen(<TaskScreen id={TRK_ID} />, runtime);
     await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
     expect(screen.getByRole("button", { name: en("common.save") })).toBeEnabled();
-    await fireEvent.press(screen.getByRole("radio", { name: /^Due: /u }));
+    await fireEvent.press(screen.getByRole("button", { name: /^Due: /u }));
     await fireEvent.press(screen.getByRole("button", { name: en("composer.clear") }));
     expect(screen.getByRole("button", { name: en("common.save") })).toBeDisabled();
   });
@@ -426,6 +592,130 @@ describe("TaskScreen — work", () => {
     expect(screen.getByRole("button", { name: en("common.save") })).toBeEnabled();
   });
 
+  it("keeps a time typed in the due panel when Done is tapped without leaving the field (review I1)", async () => {
+    const runtime = await createTestRuntime({ deviceTz: "UTC", now: TRK_NOW });
+    const result = await runtime.actions.createTask({
+      dueAt: "2026-10-16T18:00:00.000Z",
+      presetId: "personal",
+      title: "Typed due time",
+    });
+    const created = result.ok ? result.value[0] : undefined;
+    const taskId = created?.type === "task.created" ? created.payload.taskId : "";
+    await renderScreen(<TaskScreen id={taskId} />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
+    await fireEvent.press(screen.getByRole("button", { name: /^Due: /u }));
+    // On Android the tap on Done blurs nothing: no blur reaches the field before it goes.
+    await fireEvent.changeText(screen.getByLabelText(en("composer.dueTime")), "2130");
+    await fireEvent.press(screen.getByRole("button", { name: en("common.done") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
+    await waitFor(() => {
+      expect(runtime.state.store.getState().tasks.byId[taskId]?.dueAt).toBe(
+        "2026-10-16T21:30:00.000Z",
+      );
+    });
+  });
+
+  it("takes an hour typed alone in the due panel with one press of Done, then of Save (QA 27 review I3)", async () => {
+    const runtime = await createTestRuntime({ deviceTz: "UTC", now: TRK_NOW });
+    const result = await runtime.actions.createTask({
+      dueAt: "2026-10-16T18:00:00.000Z",
+      presetId: "personal",
+      title: "Bare hour",
+    });
+    const created = result.ok ? result.value[0] : undefined;
+    const taskId = created?.type === "task.created" ? created.payload.taskId : "";
+    await renderScreen(<TaskScreen id={taskId} />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
+    await fireEvent.press(screen.getByRole("button", { name: /^Due: /u }));
+    await fireEvent.changeText(screen.getByLabelText(en("composer.dueTime")), "7");
+    await fireEvent.press(screen.getByRole("button", { name: en("common.done") }));
+    await waitFor(() => {
+      expect(screen.queryByLabelText(en("composer.dueTime"))).toBeNull();
+    });
+    await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
+    await waitFor(() => {
+      expect(runtime.state.store.getState().tasks.byId[taskId]?.dueAt).toBe(
+        "2026-10-16T07:00:00.000Z",
+      );
+    });
+  });
+
+  it("saves an hour typed alone in the due panel with one press of Save, the panel still open (QA 27 review I3)", async () => {
+    const runtime = await createTestRuntime({ deviceTz: "UTC", now: TRK_NOW });
+    const result = await runtime.actions.createTask({
+      dueAt: "2026-10-16T18:00:00.000Z",
+      presetId: "personal",
+      title: "Bare hour, Save",
+    });
+    const created = result.ok ? result.value[0] : undefined;
+    const taskId = created?.type === "task.created" ? created.payload.taskId : "";
+    await renderScreen(<TaskScreen id={taskId} />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
+    await fireEvent.press(screen.getByRole("button", { name: /^Due: /u }));
+    await fireEvent.changeText(screen.getByLabelText(en("composer.dueTime")), "7");
+    await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
+    await waitFor(() => {
+      expect(runtime.state.store.getState().tasks.byId[taskId]?.dueAt).toBe(
+        "2026-10-16T07:00:00.000Z",
+      );
+    });
+  });
+
+  it("keeps the due panel open on a touch elsewhere while its time cannot be read (QA round 28 R28-01)", async () => {
+    const runtime = await createTestRuntime({ deviceTz: "UTC", now: TRK_NOW });
+    const result = await runtime.actions.createTask({
+      dueAt: "2026-10-16T18:00:00.000Z",
+      presetId: "personal",
+      title: "Touch elsewhere",
+    });
+    const created = result.ok ? result.value[0] : undefined;
+    const taskId = created?.type === "task.created" ? created.payload.taskId : "";
+    await renderScreen(<TaskScreen id={taskId} />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
+    await fireEvent.press(screen.getByRole("button", { name: /^Due: /u }));
+    await fireEvent.changeText(screen.getByLabelText(en("composer.dueTime")), "2500");
+    // A touch on another field of the form (Android dismisses an open panel that way).
+    await fireEvent(screen.getByLabelText(en("edit.taskTitle")), "touchStart");
+    expect(screen.getByLabelText(en("composer.dueTime"))).toBeOnTheScreen();
+    expect(screen.getByRole("alert")).toHaveTextContent(en("day.badTime"));
+    // A time read whole is handed over, and the panel goes.
+    await fireEvent.changeText(screen.getByLabelText(en("composer.dueTime")), "7");
+    await fireEvent(screen.getByLabelText(en("edit.taskTitle")), "touchStart");
+    await waitFor(() => {
+      expect(screen.queryByLabelText(en("composer.dueTime"))).toBeNull();
+    });
+    await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
+    await waitFor(() => {
+      expect(runtime.state.store.getState().tasks.byId[taskId]?.dueAt).toBe(
+        "2026-10-16T07:00:00.000Z",
+      );
+    });
+  });
+
+  it("refuses Done and Save while the typed due time cannot be read, and says so (R27-02)", async () => {
+    const runtime = await createTestRuntime({ deviceTz: "UTC", now: TRK_NOW });
+    const result = await runtime.actions.createTask({
+      dueAt: "2026-10-16T18:00:00.000Z",
+      presetId: "personal",
+      title: "Unreadable due time",
+    });
+    const created = result.ok ? result.value[0] : undefined;
+    const taskId = created?.type === "task.created" ? created.payload.taskId : "";
+    await renderScreen(<TaskScreen id={taskId} />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
+    await fireEvent.press(screen.getByRole("button", { name: /^Due: /u }));
+    await fireEvent.changeText(screen.getByLabelText(en("composer.dueTime")), "2500");
+    await fireEvent.press(screen.getByRole("button", { name: en("common.done") }));
+    // The panel stays open on it, and says why.
+    expect(screen.getByLabelText(en("composer.dueTime"))).toBeOnTheScreen();
+    expect(screen.getByRole("alert")).toHaveTextContent(en("day.badTime"));
+    await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
+    expect(screen.getByText(en("edit.title"))).toBeOnTheScreen();
+    expect(runtime.state.store.getState().tasks.byId[taskId]?.dueAt).toBe(
+      "2026-10-16T18:00:00.000Z",
+    );
+  });
+
   it("opens the final date's calendar under its label, and keeps quiet while it is open (QA 13 L8)", async () => {
     await trkScreen();
     await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
@@ -436,7 +726,7 @@ describe("TaskScreen — work", () => {
     expect(screen.queryByRole("alert")).toBeNull();
     // Closed without a date: now the form says what is missing, with the main due date it knows
     // (QA 14 L4), and announces it.
-    await fireEvent.press(screen.getByRole("radio", { name: /^Final deadline: /u }));
+    await fireEvent.press(screen.getByRole("button", { name: /^Final deadline: /u }));
     expect(screen.getByRole("alert")).toHaveTextContent(
       en("form.finalAfterDue", { due: "tomorrow 18:00" }),
     );
@@ -506,22 +796,42 @@ describe("TaskScreen — work", () => {
     expect(stat(en("task.finalDue"))).toBeOnTheScreen();
   });
 
-  it("gives up from the header's ⊘: the close sheet opens on Cancelled · Skipped", async () => {
+  it("closes otherwise from the ⋯ menu: the close sheet opens on Cancelled · Skipped", async () => {
     await trkScreen();
-    await fireEvent.press(screen.getByRole("button", { name: en("task.giveUp") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("task.menu") }));
+    await fireEvent.press(await screen.findByRole("button", { name: en("task.closeAs") }));
     expect(screen.getByRole("radio", { name: en("close.skipped") })).toBeOnTheScreen();
   });
 
-  it("deletes from the header's trash at once, goes back, and Undo brings it back", async () => {
-    const runtime = await trkScreen();
-    await fireEvent.press(screen.getByRole("button", { name: en("task.delete") }));
-    await waitFor(() => {
-      expect(runtime.state.store.getState().tasks.byId[TRK_ID]).toBeUndefined();
-    });
-    expect(router.back).toHaveBeenCalled();
-    await fireEvent.press(await screen.findByRole("button", { name: en("common.undo") }));
-    await waitFor(() => {
+  describe("deleting", () => {
+    it("asks first, in place; Escape cancels the question and keeps the menu (F-A11Y-02)", async () => {
+      const runtime = await trkScreen();
+      await openMenu();
+      await fireEvent.press(await screen.findByRole("button", { name: en("task.delete") }));
+      expect(screen.getByText(en("task.deleteAsk"))).toBeOnTheScreen();
       expect(runtime.state.store.getState().tasks.byId[TRK_ID]).toBeDefined();
+      await requestClose();
+      expect(screen.queryByText(en("task.deleteAsk"))).toBeNull();
+      expect(screen.getByRole("button", { name: en("task.delete") })).toBeOnTheScreen();
+      expect(runtime.state.store.getState().tasks.byId[TRK_ID]).toBeDefined();
+    });
+
+    it("Cancel keeps the task; Delete removes it, goes back, and Undo brings it back", async () => {
+      const runtime = await trkScreen();
+      await openMenu();
+      await fireEvent.press(await screen.findByRole("button", { name: en("task.delete") }));
+      await fireEvent.press(screen.getByRole("button", { name: en("common.cancel") }));
+      expect(runtime.state.store.getState().tasks.byId[TRK_ID]).toBeDefined();
+      await fireEvent.press(screen.getByRole("button", { name: en("task.delete") }));
+      await fireEvent.press(screen.getByRole("button", { name: en("common.delete") }));
+      await waitFor(() => {
+        expect(runtime.state.store.getState().tasks.byId[TRK_ID]).toBeUndefined();
+      });
+      expect(router.back).toHaveBeenCalled();
+      await fireEvent.press(await screen.findByRole("button", { name: en("common.undo") }));
+      await waitFor(() => {
+        expect(runtime.state.store.getState().tasks.byId[TRK_ID]).toBeDefined();
+      });
     });
   });
 
@@ -567,5 +877,48 @@ describe("TaskScreen — work", () => {
     expect(screen.getByText(en("task.notFound"))).toBeOnTheScreen();
     // No project picker over a task that is not there (QA 17 L11).
     expect(screen.queryByText(en("task.noProject"))).toBeNull();
+  });
+});
+
+/** Every host element in the tree that says it is a menu (accessible or not). */
+const menus = () =>
+  screen.root?.queryAll(
+    (node) =>
+      typeof node.type === "string" &&
+      (node.props["role"] === "menu" || node.props["accessibilityRole"] === "menu"),
+  ) ?? [];
+
+/** Opens the ⋯ menu and its delete confirm, and finds no menu role anywhere. */
+const checkRoles = async (): Promise<void> => {
+  await trkScreen();
+  await openMenu();
+  // Its rows are plain buttons in a dialog: a menu would promise arrow keys and menuitems.
+  expect(await screen.findByRole("button", { name: en("task.delete") })).toBeOnTheScreen();
+  expect(menus()).toHaveLength(0);
+  await fireEvent.press(screen.getByRole("button", { name: en("task.delete") }));
+  expect(screen.getByText(en("task.deleteAsk"))).toBeOnTheScreen();
+  expect(menus()).toHaveLength(0);
+};
+
+describe("TaskScreen — the ⋯ menu's roles (UI review I2: no nested menu, no confirm inside one)", () => {
+  it("on a phone: the sheet holds buttons, never a menu", async () => {
+    await checkRoles();
+  });
+
+  describe("on a computer", () => {
+    withWindowWidth(1440);
+
+    it("the popover is a dialog named by the menu's label, its rows buttons", async () => {
+      await checkRoles();
+    });
+
+    it("keeps the popover mounted as it closes, so it plays its exit (UI review minor)", async () => {
+      await trkScreen();
+      await openMenu();
+      expect(mockPopoverOpen).toHaveBeenLastCalledWith(true);
+      await requestClose();
+      // Told to close, not taken away: it fades and scales out before it lets go.
+      expect(mockPopoverOpen).toHaveBeenLastCalledWith(false);
+    });
   });
 });

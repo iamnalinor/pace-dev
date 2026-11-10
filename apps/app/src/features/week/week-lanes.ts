@@ -20,6 +20,12 @@ round 7 review 11).
 */
 const PHONE_LANES_AT_TARGET = 6;
 
+/**
+Most lanes a day column draws side by side: a run needing more folds into one «+N» block that opens
+its list (spec §5.6; the PR #48 follow-up: no lane under 44 px past six on a phone).
+*/
+export const MAX_LANES = PHONE_LANES_AT_TARGET;
+
 /** The widest a phone's day column gets, whatever the lanes. */
 export const PHONE_COLUMN_MAX_PX =
   Math.ceil(LANE_TARGET_PX / (1 / PHONE_LANES_AT_TARGET - LANE_GAP_PERCENT / 100)) +
@@ -49,3 +55,25 @@ export const laneStyle = ({
   left: `${(lane / lanes) * 100}%`,
   width: `${Math.max(100 / lanes - LANE_GAP_PERCENT, 100 / lanes / 2)}%`,
 });
+
+/**
+How many lanes a column of `columnPx` draws at a thumb's width each (a computer's columns share the
+window and never widen): a run needing more folds into «+N» (spec §5.6 ruling: the 44 px target
+wins). Unmeasured (0), the cap.
+*/
+export const lanesThatFit = (columnPx: number): number => {
+  if (columnPx <= 0) {
+    return MAX_LANES;
+  }
+  let lanes = MAX_LANES;
+  while (
+    lanes > 1 &&
+    (columnPx - COLUMN_INSET_PX) * (1 / lanes - LANE_GAP_PERCENT / 100) < LANE_TARGET_PX
+  ) {
+    lanes -= 1;
+  }
+  return lanes;
+};
+
+/** Minutes of a day's column as pixels at `hourPx` an hour. */
+export const px = (minutes: number, hourPx: number): number => (minutes / 60) * hourPx;

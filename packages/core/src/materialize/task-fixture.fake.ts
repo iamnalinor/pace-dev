@@ -26,8 +26,7 @@ export const subtask = (id: string, label: string, number: null | number = null)
   id,
   label,
   number,
-  solvedAt: null,
-  submittedAt: null,
+  doneAt: null,
 });
 
 /** Algebra HW 6 from the artboard: issued Monday 10:00 Moscow, due Wednesday 23:59. */

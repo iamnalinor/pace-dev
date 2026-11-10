@@ -1,10 +1,12 @@
 import * as SecureStore from "expo-secure-store";
 
-import type { SessionStore } from "@pace/client";
+import type { PaceClientOptions, SessionStore } from "@pace/client";
 
 import { API_BASE_URL } from "./api-base.ts";
+import { serially } from "./serially.ts";
 
 const SESSION_KEY = "pace.session";
+const ENDED_KEY = "pace.ended-sessions";
 
 type StoredSession = { readonly origin: string; readonly token: string };
 
@@ -56,4 +58,62 @@ export const createSecureSessionStore = (origin: string): SessionStore => ({
 /** Forgets the stored token whichever server it was for (a server switch). */
 export const clearStoredSession = async (): Promise<void> => {
   await SecureStore.deleteItemAsync(SESSION_KEY);
+};
+
+type EndedSessionStore = NonNullable<PaceClientOptions["endedSessions"]>;
+type EndedByServer = Readonly<Record<string, readonly string[]>>;
+
+const readEnded = async (): Promise<EndedByServer> => {
+  const raw = await SecureStore.getItemAsync(ENDED_KEY);
+  if (raw === null) {
+    return {};
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      return {};
+    }
+    return Object.fromEntries(
+      Object.entries(parsed).map(([origin, tokens]): [string, readonly string[]] => [
+        origin,
+        Array.isArray(tokens)
+          ? tokens.filter((token): token is string => typeof token === "string")
+          : [],
+      ]),
+    );
+  } catch {
+    return {};
+  }
+};
+
+/**
+The sessions signed out of here that a server has not ended yet (a Log out with no network,
+QA round 22 R22-02), in the same secure store, each kept with the server it belongs to: a token is
+only ever sent to its own server, and only to end itself.
+*/
+export const createSecureEndedSessionStore = (origin: string): EndedSessionStore => {
+  const write = async (change: (tokens: readonly string[]) => readonly string[]): Promise<void> => {
+    // One key holds every server's list: changes run in turn, or overlapping ones drop each other's.
+    await serially(ENDED_KEY, async () => {
+      const all = await readEnded();
+      const next = change(all[origin] ?? []);
+      const { [origin]: _mine, ...others } = all;
+      const kept = next.length === 0 ? others : { ...others, [origin]: next };
+      await (Object.keys(kept).length === 0
+        ? SecureStore.deleteItemAsync(ENDED_KEY)
+        : SecureStore.setItemAsync(ENDED_KEY, JSON.stringify(kept)));
+    });
+  };
+  return {
+    add: async (token) => {
+      await write((tokens) => (tokens.includes(token) ? tokens : [...tokens, token]));
+    },
+    list: async () => {
+      const all = await readEnded();
+      return all[origin] ?? [];
+    },
+    remove: async (token) => {
+      await write((tokens) => tokens.filter((kept) => kept !== token));
+    },
+  };
 };

@@ -198,14 +198,13 @@ export const signInNotification = (data: GalleryData): null | PoolNotification =
         resolvedAt: null,
       };
 
-/** The task screen's model: the first task with the set's subtasks, every solved one to be sent. */
+/** The task screen's model: the first task with the set's subtasks and their done marks. */
 export const taskModel = (data: GalleryData): null | TaskViewModel => {
   const task = data.tasks[0];
   if (task === undefined) {
     return null;
   }
   const project = data.projects.find((candidate) => candidate.id === task.projectId) ?? null;
-  const solved = data.subtasks.filter((subtask) => subtask.isSolved);
   return {
     category: { color: colorOf(data, null), id: "personal", name: "Personal" },
     closed: null,
@@ -226,10 +225,7 @@ export const taskModel = (data: GalleryData): null | TaskViewModel => {
       presetName: "Personal",
       presets: [{ builtIn: true, id: "personal", name: "Personal" }],
     },
-    primaryAction:
-      solved.length === 0
-        ? { kind: "done" }
-        : { kind: "submit", subtaskIds: solved.map((subtask) => subtask.id) },
+    primaryAction: { kind: "done" },
     progress: { mode: "subtasks", slider: null, value: 0 },
     project: project === null ? null : { color: project.color, id: project.id, name: project.name },
     quickTimes: [],
@@ -252,9 +248,8 @@ export const taskModel = (data: GalleryData): null | TaskViewModel => {
       id: subtask.id,
       label: subtask.label,
       number: subtask.number,
-      solvedAt: subtask.isSolved ? instant(1, 0) : null,
-      state: subtask.isSolved ? "solved" : "pending",
-      submittedAt: null,
+      doneAt: subtask.isDone ? instant(1, 0) : null,
+      state: subtask.isDone ? "done" : "pending",
     })),
     tags: [{ importance: task.importance, kind: "importance" }],
     title: task.title,

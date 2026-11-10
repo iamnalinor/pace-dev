@@ -14,11 +14,9 @@ export const formByHand = (page: Page) =>
   page.getByRole("button", { exact: true, name: "New task" }).last();
 
 /**
-Now's task rows: one list while the tasks are all dated or all undated, else the two groups
-"With a deadline" and "No deadline".
+Now's task rows: one list; a hairline separates the tasks with a deadline from those without.
 */
-export const nowTasks = (page: Page) =>
-  page.getByRole("list", { name: /^(?:Tasks|With a deadline|No deadline)$/u });
+export const nowTasks = (page: Page) => page.getByRole("list", { exact: true, name: "Tasks" });
 
 /**
 Whether every box that clips `element` shows all of it, unscrolled: a card that is still unfolding
@@ -46,6 +44,8 @@ export const approve = async (scope: Locator | Page): Promise<void> => {
   const button = scope.getByRole("button", { name: "Approve" });
   await expect(button).toBeVisible();
   await expect.poll(async () => await isUnclipped(button)).toBe(true);
+  // The time bar's cards scroll inside their budget (40 % of the window): bring it into view.
+  await button.scrollIntoViewIfNeeded();
   // Unfolded, it may still be scrolling into place: the press waits for its box to hold still.
   await clickWhenSettled(button);
 };
@@ -62,7 +62,7 @@ export const addTask = async (page: Page, text: string): Promise<void> => {
   await line.press("Enter");
   await expect(page.getByText(/^The assistant will create /u)).toBeVisible();
   await approve(page);
-  await expect(page.getByRole("button", { name: "Edit details" })).toBeVisible();
+  await expect(page.getByRole("button", { exact: true, name: "Edit" })).toBeVisible();
   // On a computer the line stays beside the task and empties: no reload needed (each one costs
   // a whole start, which under parallel load pushed a journey past its time limit).
   if (await line.isVisible()) {
@@ -84,4 +84,14 @@ export const settledLine = async (page: Page): Promise<Locator> => {
   ).toHaveCount(0);
   await expect(line).toBeEditable();
   return line;
+};
+
+/**
+Deletes the task that is open: the ⋯ menu's «Delete the task», then its confirm in place
+(the task page has no direct Delete button any more).
+*/
+export const deleteOpenTask = async (page: Page): Promise<void> => {
+  await page.getByRole("button", { exact: true, name: "More actions" }).click();
+  await page.getByRole("button", { name: "Delete the task" }).click();
+  await page.getByRole("button", { exact: true, name: "Delete" }).click();
 };

@@ -89,7 +89,7 @@ const IdentityStep = ({
         <Text className="text-center font-sans text-footnote text-label-secondary">
           {t("oauth.widgetMissing")}
         </Text>
-        <Button onPress={onSignIn} variant="ghost" width="fill">
+        <Button onPress={onSignIn} variant="plain" width="fill">
           {t("oauth.signInFirst")}
         </Button>
       </View>

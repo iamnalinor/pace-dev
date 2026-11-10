@@ -1,40 +1,38 @@
-import { Moon } from "lucide-react-native";
+import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { ScrollView, View } from "react-native";
 
 import { useIsAccountUnknown, usePace, useSettings, useT } from "#app/app-state.tsx";
-import { BackToToday } from "#app/shared/back-to-today.tsx";
 import { useBack } from "#app/shared/use-back.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
+import { useSearchParam, useZonedDateParam } from "#app/shared/use-search-param.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { WeekArrows } from "#app/shared/week-arrows.tsx";
+import { WeekPeriod } from "#app/shared/week-period.tsx";
+import { Button } from "#app/ui/button.tsx";
 import { cx } from "#app/ui/cx.ts";
-import { FirstSyncBody } from "#app/ui/empty-state.tsx";
+import { EmptyState, FirstSyncBody } from "#app/ui/empty-state.tsx";
+import { Icon } from "#app/ui/icon.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
+import { OverlayPresence } from "#app/ui/overlay-presence.tsx";
+import { Pressable } from "#app/ui/pressable.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
-import { spacePress } from "#app/ui/space-press.ts";
-import { SplitPane } from "#app/ui/split-pane.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
+import { Shell } from "#app/ui/shell.tsx";
+import { Text } from "#app/ui/text.tsx";
 import { Tooltip } from "#app/ui/tooltip.tsx";
 import { fitHourPx, gridFromHour, type WeekModel } from "@pace/client";
 import { useCalendarRange, useUsage } from "@pace/client/react";
-import { addDaysIn, type Language } from "@pace/core";
+import { formatWeekRange } from "@pace/core";
 
 import { PickedPane, PickedSheet } from "./picked-details.tsx";
-import { BOTTOM_PX, LABELS_PX, type Picked, pickedKey, WeekGrid } from "./week-grid.tsx";
+import { BOTTOM_PX, LABELS_PX, WeekGrid } from "./week-grid.tsx";
+import { type Picked, pickedKey } from "./week-picked.ts";
 
 /** An hour is never drawn shorter than this; a day that would need less scrolls instead. */
 const HOUR_FLOOR_PX = 18;
 
 /** On a phone a day column keeps this width at least, and the week scrolls sideways. */
 const PHONE_COLUMN_PX = 72;
-
-/** "5 Oct", "5 окт." */
-const monthDay = (date: string, zone: string, language: Language): string =>
-  new Intl.DateTimeFormat(language, { day: "numeric", month: "short", timeZone: zone }).format(
-    new Date(date),
-  );
 
 /**
 The moon: the night hours (00–07) on the grid, or not; the same switch as in Settings, so the same
@@ -46,58 +44,73 @@ const NightHoursToggle = () => {
   const { actions } = usePace();
   const { nightHours } = useSettings();
   const run = useRunAction();
-  const { palette } = useTheme();
   // Until a sync of this session succeeded, a failed first pull included (round 7 review 12).
   const isUnknown = useIsAccountUnknown();
   if (isUnknown) {
     return <View className="h-hit-web w-hit-web" />;
   }
   const label = t("week.nightHours");
-  const toggle = (): void => {
-    void run(actions.setNightHours(!nightHours));
-  };
   return (
     <Tooltip label={label}>
       <Pressable
-        accessibilityLabel={label}
-        accessibilityRole="switch"
-        aria-checked={nightHours}
+        checked={nightHours}
         className={cx(
-          "h-hit-web w-hit-web items-center justify-center rounded-md active:opacity-80",
-          nightHours && "bg-accent-quiet",
+          "h-hit-web flex-row items-center justify-center gap-1 rounded-pill px-3",
+          nightHours && "bg-fill-3",
         )}
-        onPress={toggle}
-        {...spacePress(toggle)}
+        label={label}
+        onPress={() => {
+          void run(actions.setNightHours(!nightHours));
+        }}
+        role="switch"
       >
-        <Moon
-          color={nightHours ? palette["accent.text"] : palette["label.secondary"]}
-          size={18}
-          strokeWidth={1.75}
-        />
+        <Icon name="moon" tone={nightHours ? "accent" : "secondary"} />
+        {/* In words: a bare moon read as a dark-mode switch (design review M13). */}
+        <Text role="footnote" tone={nightHours ? "primary" : "secondary"}>
+          {label}
+        </Text>
       </Pressable>
     </Tooltip>
   );
 };
 
-/** [moon] [Back to today] [‹] [›]: Back to today only on a week that is not this one. */
-const WeekNav = ({
-  onWeek,
-  week,
-}: {
-  readonly week: WeekModel;
-  readonly onWeek: (weekOf: null | string) => void;
-}) => (
-  <View className="flex-row items-center gap-1">
-    <NightHoursToggle />
-    <BackToToday
-      isAway={!week.isCurrent}
-      onPress={() => {
-        onWeek(null);
-      }}
+/** The calendar layer could not be read: a line under the day strip's header, with a way to retry. */
+const CalendarFailed = ({ onRetry }: { readonly onRetry: () => void }) => {
+  const t = useT();
+  return (
+    <View className="flex-row items-center gap-2 px-gutter" role="alert">
+      <Text className="flex-1" role="footnote" tone="secondary">
+        {t("week.calendarFailed")}
+      </Text>
+      <Button onPress={onRetry} size="small" variant="plain">
+        {t("common.retry")}
+      </Button>
+    </View>
+  );
+};
+
+/** A week with nothing in it: what lands here, and the way to Now. */
+const EmptyWeek = () => {
+  const t = useT();
+  const router = useRouter();
+  return (
+    <EmptyState
+      action={
+        <Button
+          onPress={() => {
+            router.navigate("/");
+          }}
+          size="small"
+          variant="secondary"
+        >
+          {t("week.openNow")}
+        </Button>
+      }
+      body={t("week.emptyBody")}
+      title={t("week.empty")}
     />
-    <WeekArrows next={week.next} onWeek={onWeek} previous={week.previous} />
-  </View>
-);
+  );
+};
 
 type GridArgs = Omit<Parameters<typeof WeekGrid>[0], "hourPx" | "minColumnPx">;
 
@@ -128,7 +141,7 @@ const FittedGrid = (props: GridArgs) => {
       </ScrollView>
       {isWide ? null : (
         <View className="h-6 items-end justify-center pr-3">
-          <Text className="font-sans text-caption2 font-normal text-label-tertiary">
+          <Text role="caption" tone="tertiary">
             {t("week.scrollHint")}
           </Text>
         </View>
@@ -152,9 +165,13 @@ const WeekPage = ({
   const t = useT();
   const { api } = usePace();
   const { language, now } = useViewer();
-  const calendar = useCalendarRange(api, week.weekStart, week.weekEnd);
+  const calendarRead = useCalendarRange(api, week.weekStart, week.weekEnd);
+  const calendar = calendarRead.rows;
   const usage = useUsage(api, week.weekStart, week.weekEnd);
-  const lastDay = addDaysIn(week.weekStart, 6, week.zone);
+  const isEmpty =
+    week.days.every((day) => day.blocks.length === 0) &&
+    calendar.length === 0 &&
+    usage.length === 0;
   // A phone opens Week from More: the chevron goes back there; beside the sidebar there is none.
   const back = useBack();
   return (
@@ -163,13 +180,25 @@ const WeekPage = ({
       header={
         <ScreenHeader
           {...(back !== undefined && { backLabel: t("common.back"), onBack: back })}
-          eyebrow={`${monthDay(week.weekStart, week.zone, language)} – ${monthDay(lastDay, week.zone, language)}`}
-          right={<WeekNav onWeek={onWeek} week={week} />}
+          actions={<NightHoursToggle />}
+          period={
+            <WeekPeriod
+              isAway={!week.isCurrent}
+              // Insights' form: one range, one format, and short enough for the pill in RU (N2).
+              label={formatWeekRange(week.weekStart, week.zone, language)}
+              next={week.next}
+              onWeek={onWeek}
+              previous={week.previous}
+            />
+          }
           title={t("nav.week")}
+          variant="top"
         />
       }
     >
       <FirstSyncBody>
+        {calendarRead.isFailed ? <CalendarFailed onRetry={calendarRead.retry} /> : null}
+        {isEmpty && !calendarRead.isFailed ? <EmptyWeek /> : null}
         <FittedGrid
           calendar={calendar}
           language={language}
@@ -185,6 +214,38 @@ const WeekPage = ({
 };
 
 /**
+What the grid has picked: a tracked block from the address (`?block=<id>`), so a reload opens
+it again; a calendar event or a folded run stays on the screen only (the phone's calendar is read
+again after a reload, so what it held may be gone). A block the week does not hold is no pick, and
+nothing is written back.
+*/
+const usePicked = (week: WeekModel): readonly [null | Picked, (next: null | Picked) => void] => {
+  const [blockId, setBlockId] = useSearchParam("block");
+  // An event or a run belongs to the week it was picked on: browser Back or Forward changes the
+  // week in the address and keeps the screen mounted, so another week reads as no pick, derived
+  // and not written back (review of round 24, I1; bug-lessons 201).
+  const [kept, setKept] = useState<null | { readonly picked: Picked; readonly weekStart: string }>(
+    null,
+  );
+  const other = kept?.weekStart === week.weekStart ? kept.picked : null;
+  const block =
+    blockId === null
+      ? undefined
+      : week.days.flatMap((day) => day.blocks).find((item) => item.id === blockId);
+  const picked: null | Picked = block === undefined ? other : { block, kind: "block" };
+  const pick = (next: null | Picked): void => {
+    setKept(
+      next === null || next.kind === "block" ? null : { picked: next, weekStart: week.weekStart },
+    );
+    const nextBlock = next?.kind === "block" ? next.block.id : null;
+    if (nextBlock !== blockId) {
+      setBlockId(nextBlock);
+    }
+  };
+  return [picked, pick];
+};
+
+/**
 The week as lived: Monday to Sunday on one hour grid that fits the screen, tracked time filled
 in its color, the calendar's events outlined, a thin strip where some device was in use. A tap
 tells more: beside the grid on a wide window, in a sheet on a phone.
@@ -193,9 +254,10 @@ export const WeekScreen = () => {
   const t = useT();
   const { hooks } = usePace();
   const isWide = useIsWide();
-  const [weekOf, setWeekOf] = useState<null | string>(null);
-  const [picked, setPicked] = useState<null | Picked>(null);
+  // The week and a picked block are in the address (`?week=`, `?block=`; feedback 5 item 6).
+  const [weekOf, setWeekOf] = useZonedDateParam("week");
   const week = hooks.useWeek(weekOf);
+  const [picked, setPicked] = usePicked(week);
   const close = (): void => {
     setPicked(null);
   };
@@ -212,18 +274,27 @@ export const WeekScreen = () => {
     />
   );
   if (isWide) {
+    // The inspector opens with a pick and closes without one: the grid keeps the width (F-LAY-03).
     return (
-      <SplitPane
-        main={grid}
-        side={<PickedPane onClose={close} picked={picked} week={week} />}
-        sideLabel={t("week.details")}
+      <Shell
+        content={grid}
+        inspector={
+          picked === null ? undefined : (
+            <PickedPane onClose={close} onPick={setPicked} picked={picked} week={week} />
+          )
+        }
+        inspectorLabel={t("week.details")}
+        inspectorOpen={picked !== null}
+        onInspectorClose={close}
       />
     );
   }
   return (
     <>
       {grid}
-      {picked === null ? null : <PickedSheet onClose={close} picked={picked} week={week} />}
+      <OverlayPresence value={picked}>
+        {(kept) => <PickedSheet onClose={close} onPick={setPicked} picked={kept} week={week} />}
+      </OverlayPresence>
     </>
   );
 };

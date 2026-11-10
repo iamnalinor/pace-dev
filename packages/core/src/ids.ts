@@ -38,9 +38,18 @@ export const instanceId = (presetId: string, isoWeek: string): string =>
 
 export type AutoOutcomeKind = "missed" | "skipped";
 
-/** Automatic outcomes are system-generated once per task and kind. */
+/**
+Automatic outcomes are system-generated once per task and kind. Only `skipped` is still made;
+`missed` names the automatic `cancelled_missed` of old logs (dropped in feedback 5).
+*/
 export const autoOutcomeId = (taskId: string, kind: AutoOutcomeKind): string =>
   `auto:${taskId}:${kind}`;
+
+/**
+The server's revoke of an automatic `cancelled_missed` an older client pushed (feedback 5: no task
+closes by itself any more): one per miss, so a miss pushed again revokes nothing twice.
+*/
+export const retiredId = (missId: string): string => `${missId}:retired`;
 
 /** Digits of a read-later event's place: a reading writes far fewer than a million events. */
 const READ_PART_DIGITS = 6;

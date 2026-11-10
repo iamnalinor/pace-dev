@@ -136,6 +136,8 @@ export type TokensV2 = {
       readonly move: Bezier;
     };
     readonly exit: Readonly<Record<MotionStep, number>>;
+    /** How long a created row carries its one-time highlight, fading (spec §6 "proposal accepted"). */
+    readonly highlight: number;
     readonly reduced: { readonly fade: number };
     readonly spring: {
       readonly sheet: {
@@ -150,6 +152,8 @@ export type TokensV2 = {
   readonly size: {
     /** The sign-in and consent cards' width (login, app link, OAuth). */
     readonly authCard: number;
+    /** The time bar's four tiles' height (spec §5.1: 56, never under 52). */
+    readonly barTile: number;
     readonly chip: { readonly max: number };
     readonly hit: number;
     readonly hitWeb: number;

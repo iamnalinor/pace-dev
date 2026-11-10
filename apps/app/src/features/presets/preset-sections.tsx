@@ -8,7 +8,6 @@ import {
   type PresetFields,
   type ProgressMode,
   ProjectColorSchema,
-  type Submission,
 } from "@pace/core";
 
 import { DeadlineRow } from "./deadline-row.tsx";
@@ -16,7 +15,6 @@ import { RecurrenceRow } from "./recurrence-row.tsx";
 import { ChoiceRow, EstimateRow, FieldToggleRow, type SectionProps } from "./rows.tsx";
 
 const IMPORTANCES: readonly Importance[] = ["asap", "prioritized", "normal", "nice_to_have"];
-const SUBMISSIONS: readonly Submission[] = ["per_subtask", "whole"];
 const PROGRESS_MODES: readonly ProgressMode[] = ["subtasks", "slider", "none"];
 const FIELD_KEYS: readonly (keyof PresetFields)[] = ["description", "link", "startAt", "submitVia"];
 
@@ -52,13 +50,6 @@ export const PresetSections = (section: SectionProps) => {
         <DeadlineRow {...section} />
       </Section>
       <Section title={t("presets.section.work")}>
-        <ChoiceRow
-          {...section}
-          field="submission"
-          label={t("presets.field.submission")}
-          labelOf={(value) => t(`submission.${value}`)}
-          values={SUBMISSIONS}
-        />
         <ChoiceRow
           {...section}
           field="progressMode"

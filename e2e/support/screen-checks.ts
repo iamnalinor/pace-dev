@@ -282,6 +282,10 @@ const measureTextBoxes = async (page: Page): Promise<readonly TextBox[]> =>
         );
     // eslint-disable-next-line unicorn/consistent-function-scoping -- runs in the page (page.evaluate), where the module's scope is out of reach
     const isOutsideControl = (element: Element): boolean => {
+      // A count badge hangs off its icon's corner by design (`BadgeAnchor`, F-DAT-10).
+      if (element.closest("[data-pace-hangs]") !== null) {
+        return false;
+      }
       const control = element.parentElement?.closest('button, [role="button"], a, [role="link"]');
       const frame = control?.getBoundingClientRect();
       const box = element.getBoundingClientRect();
@@ -353,9 +357,16 @@ export const axeFaults = async (
   page: Page,
   { isColourOnly }: { readonly isColourOnly: boolean },
 ): Promise<readonly string[]> => {
-  // What the person sees once things settle, not a toast halfway through fading in.
+  // What the person sees once things settle, not a toast halfway through fading in. A loop (a
+  // skeleton's breathing) never ends: only the animations that do are waited for.
   await page.waitForFunction(() =>
-    globalThis.document.getAnimations().every((animation) => animation.playState !== "running"),
+    globalThis.document
+      .getAnimations()
+      .every(
+        (animation) =>
+          animation.playState !== "running" ||
+          animation.effect?.getComputedTiming().iterations === Infinity,
+      ),
   );
   const builder = new AxeBuilder({ page });
   const results = await (isColourOnly

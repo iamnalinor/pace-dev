@@ -194,18 +194,27 @@ describe("validateEventInput: subtasks and submissions", () => {
     expect(errorOf(submitted(21, AT, { subtaskIds: ["s3", "nope"] }))).toBe("subtask/unknown");
   });
 
-  it("rejects a submission with nothing to submit", () => {
+  it("rejects an older client's submission of subtasks not done", () => {
     expect(errorOf(submitted(20, AT, { subtaskIds: ["s5"] }))).toBe("retro/nothing-to-submit");
     expect(errorOf(submitted(21, AT, { subtaskIds: ["s3", "s5"] }))).toBe(
       "retro/nothing-to-submit",
     );
-    expect(errorOf(submitted(22, AT, { subtaskIds: ["s1"] }))).toBe("retro/nothing-to-submit");
+    // Sent again: it changes nothing (done stays at its first mark), so it is let through.
+    expect(errorOf(submitted(22, AT, { subtaskIds: ["s1"] }))).toBe("ok");
     expect(errorOf(submitted(23, AT, { subtaskIds: ["s3", "s4"], closes: true }))).toBe("ok");
   });
 
-  it("requires a solved subtask for a whole submission of a per-subtask task", () => {
+  it("lets a done subtask be taken off (there is no sent mark to keep it)", () => {
+    const removed = at(24, AT, {
+      type: "task.subtask.removed",
+      payload: { taskId: HW_ID, subtaskId: "s1" },
+    });
+    expect(errorOf(removed)).toBe("ok");
+  });
+
+  it("lets an older client's whole submission through, done subtasks or not (no submission mode)", () => {
     const fresh = stateOf([algebraHw6Events()[0] ?? solved(0, T(0), "s1")]);
-    expect(errorOf(submitted(20, AT, {}), fresh)).toBe("retro/nothing-to-submit");
+    expect(errorOf(submitted(20, AT, {}), fresh)).toBe("ok");
     expect(errorOf(submitted(21, AT, {}))).toBe("ok");
     expect(errorOf(submitted(22, AT, { closes: true, taskId: TRK_ID }))).toBe("ok");
   });

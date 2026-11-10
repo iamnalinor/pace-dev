@@ -74,6 +74,15 @@ jest.mock("./platform/shared-in.ts", (): unknown => ({
   },
 }));
 
+/** Every time the fields' drafts are forgotten (a sign-out, feedback 5 item 7). */
+const mockForgetDrafts = jest.fn();
+jest.mock("./ui/use-draft.ts", (): unknown => ({
+  ...jest.requireActual<object>("./ui/use-draft.ts"),
+  forgetDrafts: () => {
+    mockForgetDrafts();
+  },
+}));
+
 /** The browser window's focus coming back, as the web stand-in hears it. */
 const mockWindowFocus = { listeners: new Set<() => void>() };
 jest.mock("./platform/window-focus.ts", (): unknown => ({
@@ -256,8 +265,9 @@ describe("PaceProvider", () => {
   });
 
   it("writes no time zone while the first pull fails, and only the account's answer decides it (QA round 23 R23-01)", async () => {
-    const accountZone = "Europe/Moscow";
-    expect(accountZone).not.toBe((await setup()).runtime.clock.deviceTz);
+    // Any zone but this device's own, so the test holds on a machine in Moscow too.
+    const { deviceTz } = (await setup()).runtime.clock;
+    const accountZone = deviceTz === "Europe/Moscow" ? "Asia/Tokyo" : "Europe/Moscow";
     let isUp = false;
     const { eventStore, runtime } = await setup({
       "GET /api/sync/pull": () =>
@@ -430,6 +440,39 @@ describe("PaceProvider", () => {
     expect(api.pathsCalled("/api/sync/pull").length).toBeGreaterThan(before);
   });
 
+  it("sends a Log out the server did not hear again when the app returns, signed out (R22-02)", async () => {
+    const { runtime } = await setup();
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    const retry = jest.spyOn(runtime.auth, "retryEndedSessions");
+    await act(async () => {
+      for (const [type, listener] of addEventListener.mock.calls) {
+        if (type !== "change") {
+          continue;
+        }
+
+        listener("background");
+        listener("active");
+      }
+      await Promise.resolve();
+    });
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it("forgets the fields' drafts when it starts signed out (a token that expired while away)", async () => {
+    const { runtime } = await setup();
+    mockForgetDrafts.mockClear();
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    expect(mockForgetDrafts).toHaveBeenCalledTimes(1);
+  });
+
   it("clears local data on logout", async () => {
     const { runtime } = await setup();
     await runtime.auth.loginWithDev("1");
@@ -446,6 +489,7 @@ describe("PaceProvider", () => {
       });
     });
     expect(screen.getByTestId("title")).toHaveTextContent("Сейчас");
+    mockForgetDrafts.mockClear();
     await act(async () => {
       await runtime.auth.logout();
     });
@@ -455,6 +499,8 @@ describe("PaceProvider", () => {
     expect(screen.getByTestId("auth")).toHaveTextContent("signed-out:-");
     // The half-typed line goes with the account: a share after the next sign-in is only the share.
     expect(mockForgetLineDraft).toHaveBeenCalledTimes(1);
+    // So do the drafts in its fields (class 103).
+    expect(mockForgetDrafts).toHaveBeenCalledTimes(1);
   });
 
   it("after Log out the network goes quiet: only the logout names the session, nothing goes without one (QA round 22 R22-02)", async () => {

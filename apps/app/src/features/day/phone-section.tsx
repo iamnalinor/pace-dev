@@ -11,6 +11,7 @@ import { isAttendableNow } from "#app/shared/tracking/calendar-today.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
+import { Text as KitText } from "#app/ui/text.tsx";
 import { toastQuote, useToast } from "#app/ui/toast.tsx";
 import { type DayEntry, type DayRow, isCalendarRun } from "@pace/client";
 import { formatDuration } from "@pace/core";
@@ -28,7 +29,7 @@ What sits under a block (its task, apps, prompts) starts at the block's words: a
 the time column and the row's gap, so the indent follows the scale on every platform.
 */
 export const UnderBlock = ({ children }: { readonly children: ReactNode }) => (
-  <View className="flex-row gap-3">
+  <View className="flex-row gap-row-gap px-row-x">
     <View className={TIME_WIDTH} />
     <View className="min-w-0 flex-1">{children}</View>
   </View>
@@ -47,9 +48,9 @@ export const UsageLine = ({ apps }: { readonly apps: readonly NamedApp[] }) => {
     .map((app) => `${app.name} ${formatDuration(app.minutes, language)}`)
     .join(", ");
   return (
-    <Text className="pb-2 font-sans text-caption font-normal text-label-tertiary" numberOfLines={2}>
+    <KitText className="pb-2 font-normal" lines={2} policy="clamp" role="caption" tone="tertiary">
       {t("phone.usage", { apps: named, duration: formatDuration(total, language) })}
-    </Text>
+    </KitText>
   );
 };
 
@@ -78,7 +79,7 @@ export const EndedAtPrompt = ({
         onPress={() => {
           void run(actions.stopActivity({ at: pickupAt }));
         }}
-        variant="ghost"
+        variant="plain"
       >
         {t("phone.endedAt", { time })}
       </Button>
@@ -91,7 +92,7 @@ export const UsageAccessHint = () => {
   const t = useT();
   return (
     <View className="mx-5 mb-3">
-      <Button onPress={openUsageAccessSettings} variant="ghost">
+      <Button onPress={openUsageAccessSettings} variant="plain">
         {t("phone.usageAsk")}
       </Button>
     </View>
@@ -146,12 +147,9 @@ const CalendarRow = ({
       <Text className="w-20 font-sans text-caption font-normal tabular-nums text-label-tertiary">
         {`${clockTime(event.startAt, zone)}–${clockTime(event.endAt, zone)}`}
       </Text>
-      <Text
-        className="flex-1 font-sans text-subhead font-normal text-label-primary"
-        numberOfLines={2}
-      >
+      <KitText className="flex-1 font-normal" lines={2} policy="clamp" role="subhead">
         {event.title}
-      </Text>
+      </KitText>
       {isStarted ||
       phone.calendar.isAttendedElsewhere(event) ||
       isCalendarLogged(entries, event) ? (
@@ -175,7 +173,7 @@ const CalendarRow = ({
                       },
                 );
               }}
-              variant="ghost"
+              variant="plain"
             >
               {t("day.attended")}
             </Button>
@@ -193,7 +191,7 @@ const CalendarRow = ({
                 }
               })();
             }}
-            variant="ghost"
+            variant="plain"
           >
             {t("phone.skip")}
           </Button>

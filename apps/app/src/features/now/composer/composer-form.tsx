@@ -1,17 +1,17 @@
-import { ChevronUp, X } from "lucide-react-native";
-import { type ReactNode, useMemo } from "react";
-import { Pressable, Text, View } from "react-native";
+import { type ReactNode, useMemo, useState } from "react";
+import { View } from "react-native";
 
 import { useAppState, useT } from "#app/app-state.tsx";
 import { isDeadlineChoiceValid } from "#app/shared/task-fields/deadline-choice.ts";
 import { SubtaskList } from "#app/shared/task-fields/subtask-list.tsx";
 import { TaskFields, type TaskFormValues } from "#app/shared/task-fields/task-fields.tsx";
-import { Button } from "#app/ui/button.tsx";
-import { cx } from "#app/ui/cx.ts";
+import { Button, KeyHintRoomContext } from "#app/ui/button.tsx";
 import { HOTKEYS, labelWithHotkey } from "#app/ui/hotkeys.ts";
+import { IconButton } from "#app/ui/icon-button.tsx";
 import { RadioChips } from "#app/ui/radio-chips.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
+import { Text } from "#app/ui/text.tsx";
+import { TimeCheckScope, useCheckedSubmit, useTimeChecks } from "#app/ui/time-check.tsx";
 import { Tooltip } from "#app/ui/tooltip.tsx";
 import { HotkeyLayer, KEYBOARD, useHotkey } from "#app/ui/use-hotkey.tsx";
 import { type ComposerEdits, type ComposerModel, taskFormOptions } from "@pace/client";
@@ -104,41 +104,41 @@ const FormHeader = ({
   readonly variant: FormVariant;
 }) => {
   const t = useT();
-  const { palette } = useTheme();
   useHotkey(HOTKEYS.escape, onClose);
   // The second Enter, wherever the focus is outside a field or a button; ⌘↵ from anywhere.
   useHotkey(HOTKEYS.enter, onAdd);
   useHotkey(HOTKEYS.primary, onAdd);
-  const CloseIcon = variant === "pane" ? X : ChevronUp;
+  const closeIcon = variant === "pane" ? "x" : "chevron-up";
+  const keyName = labelWithHotkey(actionLabel, HOTKEYS.primary, KEYBOARD);
+  const create = (hint: string | undefined) => (
+    <Button
+      disabled={!canAdd}
+      {...(hint !== undefined && { hint })}
+      onPress={onAdd}
+      shortcut={HOTKEYS.primary}
+      shortcutMode="hint"
+    >
+      {actionLabel}
+    </Button>
+  );
   return (
     <View className="flex-row items-center gap-2">
-      <Text
-        accessibilityRole="header"
-        className={cx(
-          "flex-1 font-sans text-label-primary",
-          variant === "pane" ? "text-title2" : "pl-1 text-callout font-semibold",
-        )}
-      >
+      <Text className="flex-1" level={2} role={variant === "pane" ? "title2" : "headline"}>
         {title}
       </Text>
       <View className="shrink">
-        <Button disabled={!canAdd} hotkey={HOTKEYS.enter} hotkeyMode="hint" onPress={onAdd}>
-          {actionLabel}
-        </Button>
+        {/* In the 400 px pane the header has no room for the shortcut (the activity pane's title
+        wrapped beside it, design review 2 N11); the shortcut still works. */}
+        <KeyHintRoomContext value={variant !== "pane"}>
+          {variant === "pane" ? (
+            // With no room for it, its tooltip and hint name the key (R27-08, R28-07).
+            <Tooltip label={keyName}>{create(keyName)}</Tooltip>
+          ) : (
+            create(undefined)
+          )}
+        </KeyHintRoomContext>
       </View>
-      <Tooltip
-        label={labelWithHotkey(t("common.close"), HOTKEYS.escape, KEYBOARD)}
-        showsOnTap={false}
-      >
-        <Pressable
-          accessibilityLabel={t("common.close")}
-          accessibilityRole="button"
-          className="h-hit-web w-hit-web items-center justify-center rounded-md active:opacity-70"
-          onPress={onClose}
-        >
-          <CloseIcon color={palette["label.secondary"]} size={20} strokeWidth={1.75} />
-        </Pressable>
-      </Tooltip>
+      <IconButton icon={closeIcon} label={t("common.close")} onPress={onClose} />
     </View>
   );
 };
@@ -152,9 +152,11 @@ const FormFields = ({
   model,
   onAdd,
   onEdit,
+  submitTries,
   subtaskDraft,
 }: {
   readonly isTitleFocused: boolean;
+  readonly submitTries: number;
   readonly model: ComposerModel;
   readonly subtaskDraft: SubtaskDraft;
   readonly onEdit: (edits: ComposerEdits) => void;
@@ -188,6 +190,7 @@ const FormFields = ({
           options={options}
           repeatProblem={model.repeatProblem}
           showDeadlineIssue={model.isDeadlineOwn}
+          submitTries={submitTries}
           values={values}
         />
       )}
@@ -236,6 +239,19 @@ export const ComposerForm = ({
   readonly onClose: () => void;
 }) => {
   const t = useT();
+  const [submitTries, setSubmitTries] = useState(0);
+  const times = useTimeChecks();
+  const isTitleMissing = model.target.kind !== "instance" && model.title.trim() === "";
+  // With no title, Create (and its keys) says what is missing instead of doing nothing (R24-06).
+  // A time typed and not readable refuses Create, said under its field (R27-02); one handed over
+  // by the press is created with (review I3).
+  const add = useCheckedSubmit(times, () => {
+    if (isTitleMissing) {
+      setSubmitTries((tries) => tries + 1);
+      return;
+    }
+    onAdd();
+  });
   return (
     <HotkeyLayer>
       <View
@@ -250,22 +266,25 @@ export const ComposerForm = ({
               : t("form.create")
           }
           canAdd={
-            model.canAdd &&
+            (model.canAdd || isTitleMissing) &&
             (!model.isDeadlineOwn || isDeadlineChoiceValid(model.deadlinePolicy, model.due))
           }
-          onAdd={onAdd}
+          onAdd={add}
           onClose={onClose}
           title={title}
           variant={variant}
         />
         {status}
-        <FormFields
-          isTitleFocused={isTitleFocused}
-          model={model}
-          onAdd={onAdd}
-          onEdit={onEdit}
-          subtaskDraft={subtaskDraft}
-        />
+        <TimeCheckScope checks={times}>
+          <FormFields
+            isTitleFocused={isTitleFocused}
+            model={model}
+            onAdd={add}
+            onEdit={onEdit}
+            submitTries={submitTries}
+            subtaskDraft={subtaskDraft}
+          />
+        </TimeCheckScope>
       </View>
     </HotkeyLayer>
   );

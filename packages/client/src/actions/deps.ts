@@ -8,12 +8,10 @@ import {
   type ActionError as PlannedActionError,
   type PresetError,
   type PresetValidationError,
-  type ResolvedPreset,
   type Result,
   type RetroError,
   type Task,
   taskById,
-  taskPreset,
   validateEventInput,
 } from "@pace/core";
 
@@ -88,6 +86,7 @@ export const stamp = (deps: ActionDeps, body: Body, when: When = {}): EventInput
 });
 
 const STORE_ERRORS = [
+  "action/nothing-to-do",
   "event/duplicate",
   "event/not-found",
   "persist_failed",
@@ -101,25 +100,28 @@ const isStoreError = (code: string): code is StoreError =>
 
 const storeError = (code: string): ActionError => (isStoreError(code) ? code : `dispatch/${code}`);
 
+/** A batch the store wrote (several revocations) as an action result. */
+export const fromStoreAll = (
+  result: Result<readonly Event[], string>,
+): Result<readonly Event[], ActionError> => (result.ok ? result : err(storeError(result.error)));
+
 /** A single store answer (dispatch, revoke, undo) as an action result. */
 export const fromStore = (result: Result<Event, string>): Result<readonly Event[], ActionError> =>
   result.ok ? ok([result.value]) : err(storeError(result.error));
 
-const stageAll = async (deps: ActionDeps, inputs: readonly EventInput[]): Promise<StagedResult> => {
-  const staged = await deps.state.stage(inputs);
-  return staged.ok ? ok(staged.value) : err(storeError(staged.error));
-};
-
 /**
 The one path to the log: every input is checked by the core's retro rules against the
 current state before any is shown, so a rejected batch leaves no trace; the batch is then
-shown at once and written in one go. Answers as soon as the state shows it.
+shown at once and written in one go. Answers as soon as the state shows it. The rules run in
+the store's write queue, on the state every earlier write left, so two taps in one tick cannot
+both pass them (check, then act; review I4).
 */
 export const stageEmit = async (
   deps: ActionDeps,
   inputs: readonly EventInput[],
+  /** The action's own check of the state, run in the queue too (`action/nothing-to-do`, class 222). */
+  check?: () => ActionError | null,
 ): Promise<StagedResult> => {
-  const snapshot = deps.state.store.getState();
   const now = deps.clock.now();
   const malformed = inputs
     .map((input) =>
@@ -134,15 +136,30 @@ export const stageEmit = async (
   if (malformed !== undefined) {
     return err(storeError(malformed.error));
   }
-  const rejected = inputs
-    .map((input) => validateEventInput(snapshot, input, now))
-    .find((checked) => !checked.ok);
-  return rejected === undefined ? await stageAll(deps, inputs) : err(rejected.error);
+  // What the rules said, kept apart from the store's own refusals (those go behind `dispatch/`).
+  const verdict: { rejected: ActionError | null } = { rejected: null };
+  const staged = await deps.state.stage(inputs, () => {
+    const own = check?.() ?? null;
+    if (own !== null) {
+      verdict.rejected = own;
+      return own;
+    }
+    const snapshot = deps.state.store.getState();
+    const refusal = inputs
+      .map((input) => validateEventInput(snapshot, input, now))
+      .find((checked) => !checked.ok);
+    verdict.rejected = refusal?.error ?? null;
+    return verdict.rejected;
+  });
+  return staged.ok ? ok(staged.value) : err(verdict.rejected ?? storeError(staged.error));
 };
 
 /** `stageEmit`, answering once the write landed (`persist_failed` when the store refused it). */
-export const emit = async (deps: ActionDeps, inputs: readonly EventInput[]): ActionResult =>
-  await settle(await stageEmit(deps, inputs));
+export const emit = async (
+  deps: ActionDeps,
+  inputs: readonly EventInput[],
+  check?: () => ActionError | null,
+): ActionResult => await settle(await stageEmit(deps, inputs, check));
 
 /** Per client: the last check-then-show still running. */
 const queues = new WeakMap<ActionDeps, Promise<unknown>>();
@@ -173,7 +190,3 @@ export const taskOf = (deps: ActionDeps, taskId: string): Result<Task, "task/unk
   const task = taskById(deps.state.store.getState().tasks, taskId);
   return task === undefined ? err("task/unknown") : ok(task);
 };
-
-/** The task's preset chain with its own overrides on top, shaped by its subtasks. */
-export const presetOf = (deps: ActionDeps, task: Task): Result<ResolvedPreset, PresetError> =>
-  taskPreset(deps.state.store.getState().presets, task);

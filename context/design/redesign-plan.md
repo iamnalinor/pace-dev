@@ -574,6 +574,7 @@ onPress>` (fills on press-in, `haptic="confirm"`, 48 dp target without negative 
       tags; `CountBadge` 120 → "99+".
 - [ ] Bug-lessons: F-COL-09 (off switch knob, new class "contrast asserted for text only"), F-DAT-10
       (class 6). Commit.
+- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): `ListRow` `toggle` (the whole row flips its Switch) and `select` (a radio with a trailing check) variants.
 
 ### Task 3.10: Sidebar and TabBar
 
@@ -588,9 +589,11 @@ toast/overlay layer.
       over the tab bar (bug-lessons 10).
 - [ ] PR #48 follow-up: the sidebar highlights Settings while New preset is open (see "PR #48 follow-ups (triage)").
       QA round 23 R23-14 is the same finding on Presets and New preset.
+- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): sidebar rows on `ListRow`/`NavItem` with the same 4 px selected bar as `ListRow`; rail haptics; the header scroll-edge fill (F-LAY-13: `bg.app` + a `separator` hairline once content scrolls under `ScreenHeader`), which no task owned.
 - [ ] Commit.
 
 ---
+
 
 ## Batch 4 — Shared rows and screens (PR "Design overhaul 3/7: screens")
 
@@ -606,10 +609,13 @@ due as one formatted string).
 **Interfaces:** `TaskRow` = `ListRow` with `CheckCircle` leading, title `clamp(2)`, meta line
 (project `Tag`, importance word, due/left in `numeric`), trailing repeat icon; `TaskList` virtualised
 (`FlatList` with `getItemLayout` from fixed row heights per density, windowing) and section headers.
-- [ ] Failing tests: view-model — Normal importance yields no meta part; app — 1 284 rows render
+- [x] Failing tests: view-model — Normal importance yields no meta part; app — 1 284 rows render
       ≤ 40 row components initially; e2e — expanding a 1 050-row fold renders in < 500 ms and p95
       frame < 32 ms at 390 (F-DAT-03).
-- [ ] Commit.
+- [x] Commit.
+- [x] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): `SectionHeader collapsible` (a `Disclosure` trigger), TaskRow on `ListRow`, the task folds on `Disclosure`.
+
+Deferred (2026-11-06): `TaskList` is paged (30 rows and a «Show 30 more» row, spec 4.3.1 Scale), not a `FlatList`: the lists live inside the screens' own scroll, where a nested `FlatList` does not window. `SectionHeader collapsible` and the folds' hairline stay on `FoldedSection` → `Disclosure` (no new SectionHeader prop). Due and "left" stay two meta parts, joined into one line by `MetaLine`. The e2e for the 1 050-row fold is `e2e/scale.e2e.ts` (not run locally).
 
 ### Task 4.2: Running card, time bar, pickers
 
@@ -620,140 +626,184 @@ bar: four fixed tiles Calendar / Task / Chores / Rest (neutral at rest; running 
 category stroke), typed field with a dashed-outline draft while parsing; phone (Q12 default): the
 tiles stay visible while something runs, only the typed field folds under «Начать другое», and the
 whole bar folds only past the 40 % region budget (§3.3).
-- [ ] Failing tests: tiles keep identical size and position with any label length (RU); the running
+- [x] Failing tests: tiles keep identical size and position with any label length (RU); the running
       name is not a tag; a long name truncates before Stop (F-DAT-02); region budget — with two
       proposals open the list keeps ≥ 50 % height (Review Focus 2, e2e in `overlays.e2e.ts`);
       start/stop calls `haptic("tick")`; the running row is not a live region and announces only
       start, stop and "past expected" once (F-A11Y-10, new bug-lessons class "Live region around a
       ticking value").
-- [ ] Commit.
+- [x] Commit.
+- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): the time bar's fold (`time-bar-fold.tsx`) merges in on the kit `Disclosure`/`Presence`.
+
+Deferred (2026-11-06): the typed start's Approve (in `ActionCards`, Task 4.3's) plays no `tick`; Stop and picks do. The region budget is a scroll cap of 40 % of the window less the tiles on the bar's cards and the field, not a one-line card variant (the compact running card, IconButton Stop, and the desktop shell indicator are Task 4.x's shell work). e2e budget case in `overlays.e2e.ts` runs with a running activity (two proposals need the assistant's fake). The Disclosure trigger keeps its own `mx-gutter`.
 
 ### Task 4.3: Now
 
 **Files:** `src/features/now/**` (composer, quick line, form, proposals, calendar offer, filters,
 now-screen) (+ tests).
-- [ ] Spec §5 Now: one-line composer, Enter → proposal, + opens the form in place (title from the
+- [x] Spec §5 Now: one-line composer, Enter → proposal, + opens the form in place (title from the
       line), the form's primary action on the right with its shortcut; filters as a chip
       `radiogroup` that scrolls with a visible cue and wheel support on desktop (F-DAT-02/05-006);
       inspector collapsed when nothing is selected (F-LAY-03); one New task entry on desktop
       (F-CMP-18).
-- [ ] Failing tests: every composer entry path submits (bug-lessons 2; `docs/qa.md` table rows);
+- [x] Failing tests: every composer entry path submits (bug-lessons 2; `docs/qa.md` table rows);
       empty form opened by hand has no error before interaction; filter chips reachable by wheel
       (e2e). Commit.
-- [ ] PR #48 follow-up: QA21 M2, a direct load of `/add` (the manifest's share and shortcut URL)
+- [x] PR #48 follow-up: QA21 M2, a direct load of `/add` (the manifest's share and shortcut URL)
       focuses the New task form's field on a touch phone too (see "PR #48 follow-ups (triage)").
       QA round 23 R23-12 found it on a computer too (bare `/add` at 1440: focus on `BODY`).
+- [x] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): Now's split becomes the Shell inspector (collapsed with nothing picked; the medium inspector as a sheet); the left-anchored content x = 280 and the 720 list column; "Show all" toggles on `Disclosure`; the composer's animated height without a clipped frame (the reviewer's design: grow the card ~160 ms on `easing.enter` with the new content laid out at opacity 0, fade it in ~120 ms from the grow's completion, the preview's Presence after it; reverse: fade 110, then shrink 160; `expectDescendantsStayInside` then counts only boxes with an effective opacity above 0). See spec §6 "composer unfold".
+
+Deferred (2026-11-06): the medium window still pushes a picked task as a screen (the Week-style sheet for Now's medium inspector is not built; only `expanded` has the inspector). The form's close stays an `IconButton` without the Escape hint in its tooltip (the kit button names only itself). The composer's Send/To Inbox/+ buttons keep their own 44 px round `LineButton` (accent circle) on the kit `Pressable`; no kit `IconButton` variant carries the filled accent. The proposal card (`ActionCards`) is unchanged (spec "facts as ListRows" is Task 4.x of the assistant card); the preview Presence is unchanged, it follows the unfold naturally. The filter cue is a chevron at each end that has more (no gradient). The e2e (`e2e/filters.e2e.ts`, `/add` focus in `composer.e2e.ts`, geometry sampler counting only opacity > 0) were not run locally.
 
 ### Task 4.4: Day (structure; the line signature is Task 7.1)
 
 **Files:** `src/features/day/**` (+ tests).
-- [ ] Spec §5 Day: page template, `PeriodStepper` ‹ date › with Today only away from today
+- [x] Spec §5 Day: page template, `PeriodStepper` ‹ date › with Today only away from today
       (F-CMP-05), the inspector on desktop when a block or gap is selected (collapsed otherwise), grouped rows with one divider rule, gaps as rows with Log, Log past as a row action,
       screen-time section in the same list system.
-- [ ] Failing tests: Today button absent on today, present on another day; day switch replaces
+- [x] Failing tests: Today button absent on today, present on another day; day switch replaces
       content with no crossfade (F-MOT-07). Commit.
-- [ ] PR #48 follow-up: QA21 L3, the activity sheet offers no end on the next day (see "PR #48 follow-ups (triage)").
+- [x] PR #48 follow-up: QA21 L3, the activity sheet offers no end on the next day (see "PR #48 follow-ups (triage)").
+- [x] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): `PeriodStepper` in the `ScreenHeader` `period` slot (DayNav sits there for now).
+
+Deferred (2026-11-06): `PeriodStepper` (`shared/period-stepper.tsx`) is built and used by Day only; Week, History and Insights keep `WeekArrows`/`BackToToday` until their tasks (4.6, 4.10, 4.11), and the 320 short label form is not done (the label is the long `formatEyebrow`). The summary cell (stacked 24 h bar, legend) is not built: `Totals` stays a line of tags on the kit `Tag`. The phone's calendar and usage-access sections keep their own look. The sleep suggestion card is untouched. e2e: the day-line separators check in `week.e2e.ts`, the "Today" label in `latency.e2e.ts`; not run locally.
+
 
 ### Task 4.5: Task detail (screen and inspector)
 
 **Files:** `src/features/task/**` (header, footer, subtasks, progress, description, original
 message, edit sheet, close sheet) (+ tests); `packages/client/src/view-models/task.ts` (submit
 label).
-- [ ] Spec §5 task: header actions as labelled controls (Edit, Close as…, Delete; no Pause — Q4),
+- [x] Spec §5 task: header actions as labelled controls (Edit, Close as…, Delete; no Pause — Q4),
       Focus and Done equal width with shortcuts, submit label «Сдать N» / "Submit N" (F-DAT-01),
       progress slider in % with live value, delete with inline confirm then Undo in place 10 s
       (Q5, F-A11Y-02), project picker as a field, not a pill.
-- [ ] Main's "Other time…" button (`task.doneOther`, QA 20 L3) is a third footer control beside
+- [x] Main's "Other time…" button (`task.doneOther`, QA 20 L3) is a third footer control beside
       Focus and Done (a labelled button on the desktop pane, an icon button on a phone). At 320 with
       a keyboard, Submit's label and its hotkey no longer fit: the F-DAT-01 REALISTIC entry in
       `e2e/worst-case.e2e.ts` (added by the rebase) goes when the footer fits at 320.
-- [ ] PR #48 follow-ups, close sheet (with Task 5.3 for the motion): QA21 L8 copy, L10 one way per
+- [x] PR #48 follow-ups, close sheet (with Task 5.3 for the motion): QA21 L8 copy, L10 one way per
       job, QA20 L5 pickers, the cosmetic tight rule; L2 (its height animates) is Task 5.3's
       (see "PR #48 follow-ups (triage)").
-- [ ] Failing tests: view-model `submitLabel(37 solved) === "Сдать 37"`; delete focus moves to the
+- [x] Failing tests: view-model `submitLabel(37 solved) === "Сдать 37"`; delete focus moves to the
       next row and Escape cancels the confirm (bug-lessons 5, 21); slider `aria-valuetext` "30 %"
       (F-A11Y-16). Bug-lessons F-DAT-01 (new class "Text from data placed in chrome without a length
       policy") and F-A11Y-02. Commit.
 
+Deferred: Undo stays the toast (10 s at most, pauses on hover/focus) instead of "Task deleted · Restore" in
+the next row's place, and focus after a delete is not moved to the next row (the screen leaves; the opener
+owns focus); the ⋯ menu has «Close as…» and «Delete» (no separate «Cancel the task»: it is the same sheet,
+class L10); Save in the description editor has no ⌘↵ hint (Done's global ⌘↵ would clash); stats are 2×2 on
+every width (no 4×1 on the 720 page); the repeat is in the stats group, not the meta line; the
+link is end-and-middle cut by `middleCut`; the list of 100 subtasks is not virtualised; the project is
+still picked from its own sheet (a control in the header, not a field in the page); the footer's «Other
+time…» stays on `Button`/`IconButton` and the 320 check is for the e2e run.
+
+
 ### Task 4.6: Week
 
 **Files:** `src/features/week/**` (+ tests).
-- [ ] Spec §5 Week: proportional grid where geometry and lanes come from one function (F-DAT-05,
+- [x] Spec §5 Week: proportional grid where geometry and lanes come from one function (F-DAT-05,
       bug-lessons 1), labels ≥ 11 px, day strip snaps on phone, detail in inspector/sheet, night
       hours option, blocks announce day and time (F-A11Y-09).
-- [ ] Failing tests: `layoutWeek()` (client view-model) — 5 overlapping 20-minute blocks get 5 lanes
+- [x] Failing tests: `layoutWeek()` (client view-model) — 5 overlapping 20-minute blocks get 5 lanes
       and drawn heights equal their lane geometry; a11y labels include the weekday. Commit.
-- [ ] The day's-end block (found by the rebase, bug-lessons log 2026-11-02): an item that ends at
+- [x] The day's-end block (found by the rebase, bug-lessons log 2026-11-02): an item that ends at
       midnight with less than `MIN_TARGET_PX` of time is drawn at the minimum and hangs past the
       column, which the sideways scroller clips (half its target misses). Lifting it into the column
       covers the item before it (axe target-size), so decide the drawing here (e.g. room under the
       last hour, or a joined target), with a test that places a 3-minute item at 23:56 and asserts
       its whole target is inside the scroller and covers no neighbour.
-- [ ] PR #48 follow-up: lanes below 44 px past six on a phone (see "PR #48 follow-ups (triage)").
+- [x] PR #48 follow-up: lanes below 44 px past six on a phone (see "PR #48 follow-ups (triage)").
+- [x] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): `PeriodStepper` in the `ScreenHeader` `period` slot (WeekNav sits there for now).
+
+Deferred: the day strip is not sticky (the headers scroll with the grid, which scrolls only below the 18 px
+hour floor); the edge fade replacing the scroll hint and the overscroll containment are not built (the hint
+text stays); runs fold past six lanes, not past three as the spec says, because the phone column widens for six
+lanes at 44 px; the empty-week `EmptyState`, the loading line and the calendar error line are not built;
+History's period slot is left to its task (Insights took the same `WeekPeriod`).
+
 
 ### Task 4.7: Inbox, Review, Decisions
 
 **Files:** `src/features/inbox/**`, `review/**`, `decisions/**` (+ tests).
-- [ ] Inbox cards clamp text to 4 lines with "Show all" (F-DAT-06), Accept primary / Delete plain
+- [x] Inbox cards clamp text to 4 lines with "Show all" (F-DAT-06), Accept primary / Delete plain
       (F-CMP-15), virtualised; empty states teach (F-CMP-09); empty list renders no `list` role
       (F-A11Y-18). Commit.
-- [ ] PR #48 follow-up: QA21 L7, the rules preview says why the assistant is unavailable, per reason
+- [x] PR #48 follow-up: QA21 L7, the rules preview says why the assistant is unavailable, per reason
       (see "PR #48 follow-ups (triage)").
+- [x] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): Inbox's inspector on the Shell (and its medium sheet); Inbox's "Show all" toggles on `Disclosure`.
+
+Deferred (2026-11-06): the details sheet is the kit `Sheet` (no medium detent exists; the web/phone sheet opens at its content height). Accept is the tonal small button of spec §5.3 (not filled: N captures must not be N accent bars; the brief's word "primary" read as «the row's main action»), Delete stays a visible plain button, not the ⋯ menu / swipe + inline Undo (the toast's Undo carries it, rule 4.1.4). ↑↓ row selection and ⌘⌫ (delete the selection) are not bound; ⌘↵ accepts through the details' Accept. «Open the line» goes to Now without focusing the composer. The Review row has no separate `review` feature folder (its row lives in `features/inbox`; `/review` still redirects). Decisions: the search sits pinned in the header; «Back to Notifications» is `useBack`. Assistant-correction input onto `TextField` (Task 3.8 deferral) stays with the `ActionCards` rewrite, which no task of the batch builds.
 
 ### Task 4.8: Projects, project page, presets
 
 **Files:** `src/features/projects/**`, `presets/**` (+ tests).
-- [ ] Projects as a grouped list with hue dot + name + "3 tasks" (plural i18n), no hero strip
+- [x] Projects as a grouped list with hue dot + name + "3 tasks" (plural i18n), no hero strip
       (F-CMP-16); project page = the Now task list grouped Open / In future / Done (F-LAY-07);
       presets as grouped rows; New project button hugs (F-CMP-06). Commit.
-- [ ] PR #48 follow-up (cosmetic): the Presets "Start from" chips say what they do (a verb) (see "PR #48 follow-ups (triage)").
-- [ ] QA round 23 R23-05: the preset form's name error is shown on the Name field (marked and
+- [x] PR #48 follow-up (cosmetic): the Presets "Start from" chips say what they do (a verb) (see "PR #48 follow-ups (triage)").
+- [x] QA round 23 R23-05: the preset form's name error is shown on the Name field (marked and
       focused, as the Day sheet does), not a screen below; it clears once the name is changed to a
       free one (with Task 3.8's `showErrorWhen`). (c) the URL losing `?from=` after a refused save
       did not reproduce on the rebased tree and is pinned by `round6-minors.e2e.ts`; (d) is QA21 M1.
 
+Deferred (2026-11-06): Projects has no «Archive · n» Disclosure (the view model lists active projects only) and no skeleton rows; the project edit form stays inline on the page (the spec's `Sheet` would need a sheet name and e2e opener); no «Add task» in the project's empty state; presets: no ▲▼ → drag handle, no ⌥↑/⌥↓, the preset page keeps its Save at the foot (not in the header), the parent picker is the chip row of the form; the form's other card-in-card groups are Task 4.11's look. R23-05 done on the Name field (`error` + cursor back; clears on edit).
+
 ### Task 4.9: Insights
 
 **Files:** `src/features/insights/**` (+ tests).
-- [ ] Tiles use `numeric.stat` + a label that wraps words (no mid-word breaks in RU; F-TYP-04),
+- [x] Tiles use `numeric.stat` + a label that wraps words (no mid-word breaks in RU; F-TYP-04),
       bars share one value column (F-LAY-14), period control as Day (F-CMP-05), charts use the hue
       family. Failing test: RU tile labels at 390 have no hyphenless word split (e2e text-metrics
       check). Commit.
+- [x] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): `PeriodStepper` in the `ScreenHeader` `period` slot (WeekNav sits there for now).
+
+Deferred (2026-11-06): sections are `SectionHeader` over one padded cell (not a `Group` of rows) for charts; no two-column grid at 1440 and no 960 column; the tile falls back to a label/value `ListRow` nowhere (tiles stay 2-up with `min-w-32`); no `EmptyState` action «Start tracking» and no code-split skeletons; the value column is measured (one layout pass after the first), not computed; RU decimals not re-checked; e2e `insights.e2e.ts` (RU tile words, one value column) written, not run.
 
 ### Task 4.10: History and Notifications
 
 **Files:** `src/features/history/**`, `notifications/**` (+ tests).
-- [ ] History rows as `ListRow` with a single trailing "Undo" only on the latest undoable event of a
+- [x] History rows as `ListRow` with a single trailing "Undo" only on the latest undoable event of a
       group (F-CMP-14), snapshot rows not checkbox-like; Notifications feed grouped by day,
       virtualised. Commit.
+- [x] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): Notifications as a top-level `ScreenHeader` destination on desktop; History's `PeriodStepper` in the `period` slot.
+
+Deferred (2026-11-06): a "group" for the single Undo is a task (an event of no task stands alone); any other undoable row is itself a button that opens the same confirm (no long-press, swipe or hover ⋯ menu); ⌫ on a focused event and ←/→/T are not bound. Snapshot rows lead with the kit's 8 px dot (spec says 6, no token). Notifications' unread «new» dot stays for the visit by remembering the ids unread when first shown. Skeleton rows show without the 300 ms wait spec §5.16 names beyond the kit's own delay.
 
 ### Task 4.11: Settings
 
 **Files:** `src/features/settings/**`, `sessions/**`, `devices/**`, `server/**` (+ tests).
-- [ ] Inset grouped sections in the order of spec §5 Settings; notifications as per-channel rows or
+- [x] Inset grouped sections in the order of spec §5 Settings; notifications as per-channel rows or
       the compact matrix with named groups (F-LAY-09); time fields sized to content; sessions list
       with inline revoke confirm (focus to successor); danger zone with `Button destructive`
       (F-CMP-07); shortcuts listed under Settings › Keyboard (no switch: there are no single-key shortcuts any more; Q6); server line middle-ellipsizes the host
       (F-DAT-11).
-- [ ] Failing tests: `deadControls()` at phone width; revoke confirm Escape returns focus. Commit.
-- [ ] PR #48 follow-up (cosmetic): Devices' Revoke sits 8 px off its row (see "PR #48 follow-ups (triage)").
+- [x] Failing tests: `deadControls()` at phone width; revoke confirm Escape returns focus. Commit.
+- [x] PR #48 follow-up (cosmetic): Devices' Revoke sits 8 px off its row (see "PR #48 follow-ups (triage)").
+
+Deferred (batch 8): phone per-kind notification rows with a channel sheet (the compact matrix stays at every width); time-zone, estimates and Devices rows keep their own blocks inside a cell (not one ListRow per value); «Выйти» as a centred row; Escape-on-confirm is the Button shortcut (web, e2e); the Keyboard row lists today's single-key N and F (Alt+N/Alt+F of Q6 is not built).
 
 ### Task 4.12: More and the signed-out screens
 
 **Files:** `app/(tabs)/more.tsx`, `src/screens/login-screen*.tsx`, `app/oauth/authorize.tsx`,
 `app/onboarding.tsx`, `app/permissions.tsx`, `app/+not-found.tsx` (+ tests).
-- [ ] More as a grouped list; pushed destinations keep the tab bar (F-AND-03 residue); login with a
+- [x] More as a grouped list; pushed destinations keep the tab bar (F-AND-03 residue; built in
+      `tabbar-stack`: the `app/(tabs)/(more)/` stack, same addresses); login with a
       graceful Telegram-widget failure state (F-CMP-17); onboarding/permissions in the template;
       not-found with a way home. Commit.
+
+Deferred (batch 8): `app/oauth/authorize.tsx` and the login card were not restyled (the widget's failure state already exists: `login.widgetFailed`); onboarding's per-permission cards keep their layout.
 
 ### Task 4.13: Copy fixes and the glossary test
 
 **Files:** `packages/core/src/i18n/{en,ru}/*.ts`, `packages/core/src/i18n/glossary.test.ts` (new).
-- [ ] Failing test `glossary.test.ts`: banned phrases absent ("We changed a few things", "Settings →
+- [x] Failing test `glossary.test.ts`: banned phrases absent ("We changed a few things", "Settings →
       Devices"); pinned owner copy present (update banner, Calendar hint); one word per action per
       language (`common.undo` ≠ `task.giveUp` in RU; `assistant.approved` ≠ `task.done` in both;
       Revoke/End, Sign in/Log in unified) — F-CPY-01/02/03/05.
-- [ ] Implement the catalog changes; PASS. Bug-lessons: new class "Owner-corrected copy with no test
+- [x] Implement the catalog changes; PASS. Bug-lessons: new class "Owner-corrected copy with no test
       pinning it" (F-CPY-01) and extend class 45's guard. Commit.
 
 ---
@@ -795,6 +845,7 @@ generated constants), presets `fadeIn/Out`, `riseIn/Out`, `sheetIn/Out`, `dialog
       scale ≥ 0.95; route push on web has ≥ 3 intermediate frames. Commit.
 - [ ] PR #48 follow-up: QA21 L2, the close sheet's height animates when its outcome changes
       (see "PR #48 follow-ups (triage)").
+- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): the §6 rows the kit built get their motion review here: "row → inspector" (built in fix round 1 as a `Presence slide` in the Shell; check the pane width does not animate when already open) and the disclosure close easing (`exit`, amended in §6).
 
 ### Task 5.6: Render budget — every latency case inside 100 ms
 
@@ -837,6 +888,7 @@ session so the first paint uses it), `ui/shell.web.tsx` (main, skip link).
       a big RU account's first screenshot after load contains no English UI string (F-DAT-04,
       bug-lessons 22); one `main` landmark and a skip link.
 - [ ] Commit.
+- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): the phone web's `main` landmark and skip link (the Shell gives them only beside a navigation region today; an `isRoot` prop).
 
 ### Task 6.2: Mobile-web baseline in `global.css`
 
@@ -849,6 +901,7 @@ session so the first paint uses it), `ui/shell.web.tsx` (main, skip link).
       touch hold); with a reduced visual viewport the focused time-bar field is inside it.
 - [ ] Bug-lessons: new classes "Browser default gesture left on" (F-WEB-06) and "A reload path that
       drops unsaved drafts" (Task 6.3). Commit.
+- [ ] From the kit batch (2026-11-03, review of Tasks 3.3–3.5): `ui/screen.web.tsx`, the window scrolls on desktop (Task 3.4's brief): `body` no longer `overflow: hidden` in the generated `index.html`, the stack scenes and the fixed footer moved with it; the browser's scroll restoration, Space/PageDown from `body`, find-in-page, and `overscroll-behavior` on `html`. Until then the content region's scroller spans the region (`layout.e2e.ts` checks the wheel over the gutter).
 
 ### Task 6.3: Update banner, manifest, icons, favicons
 
@@ -888,30 +941,41 @@ Only what spec §2 names for the chosen direction (A · Тетрадь).
 (rail geometry).
 **Interfaces:** `dayRail(blocks, gaps, now, zone): { items: { from; to; hue; kind: "block" | "gap" |
 "parallel"; open }[]; nowAt }` (proportional, long gaps capped at 3 h with a scale break).
-- [ ] Spec §2 A signature: a faint dot grid (`grid` token, 16 px pitch, only behind the timeline)
+- [x] Spec §2 A signature: a faint dot grid (`grid` token, 16 px pitch, only behind the timeline)
       under a proportional rail beside the editable rows; each block a tinted band with a 1 px
       "pen" line in its category stroke at its leading edge; a gap a dashed band with Log; a parallel
       activity a narrower band beside the main one; overlaps hatched, not red; **now = the red margin
       line** (`status.danger`, 1 px, with a dot and the time in `caption`).
-- [ ] Failing tests: view-model — a 2 h gap is twice a 1 h block's length, a 15 h gap is capped at 3 h
+- [x] Failing tests: view-model — a 2 h gap is twice a 1 h block's length, a 15 h gap is capped at 3 h
       with `scaleBreak: true`; overlapping blocks yield `parallel`; app — the rail is
       `accessibilityElementsHidden` (the rows carry the semantics). Commit.
+
+Deferred (2026-11-06): the rail is an index drawn beside the list and scaled to the list's own height (percent positions from `dayRail`), not row-aligned: the rows keep their natural heights, so a band and its row line up in order, not in y. The rail's geometry lives in `view-models/day-rail.ts` (exported from `@pace/client`), not in `day.ts`; `dayRail` takes `(blocks, gaps, now)` — no zone, the entries are already the day's. Dot grid on the rail only (the rows are opaque cells). The branch for a parallel block is a narrower band beside the main one; the "+1" for a third is not drawn. Overlap hatching is on the parallel band's overlapping stretch only.
+
+Built (2026-11-09, owner: align the rail with the rows): the rail is no longer an index. `dayRail(entries, now)` (`view-models/day-rail.ts`) gives one bar per row under the row's key (`block` / `gap` / `parallel`, the hue, running) and `now` as the row that holds the present and how far into it; the Day timeline measures each row (`onLayout`, frames in the list's coordinates, reset per date) and `DayRail` draws each bar at its row's top and height, `NowMargin` at `top + height × at`. A bar for a row not measured yet is not drawn; a bar of a row that slides in slides with it (`ROW_LAYOUT`). The proportional clock, the 3 h gap cap with its scale break and the overlap hatching are gone with the index.
+
 
 ### Task 7.2: The running activity's ink line and the Week day strip
 
 **Files:** `shared/tracking/running-card.tsx`, `src/features/week/day-strip.tsx`.
-- [ ] Spec §2 A: under the running activity, a 2 px ink line (`accent`) from start to now with a red
+- [x] Spec §2 A: under the running activity, a 2 px ink line (`accent`) from start to now with a red
       1 px mark at the expected length; past 2× the line turns `status.warn` with "Ещё занимаетесь?"
       (no continuous animation: it moves with the minute tick). Week's phone day strip uses the same
       ink/now vocabulary. Failing test: the mark sits at expected / max(expected × 2, elapsed) of the
       width; the line's colour switches at 2×. Commit.
 
+Week's day strip half is done in Task 4.6 (`day-strip.tsx`: a 4 px line of the day's tracked time in category strokes,
+a red 1 px now mark on today); the running card's half was done with Task 4.2.
+
+
 ### Task 7.3: Proposal highlight and the logo
 
 **Files:** `shared/assistant/*` (proposal accepted highlight), `ui/logo.tsx`, `scripts/generate-icons.ts`.
-- [ ] Spec §6 last row: accepted proposal → created row with a one-time `accent.quiet` highlight
+- [x] Spec §6 last row: accepted proposal → created row with a one-time `accent.quiet` highlight
       fading over 600 ms; logo chevrons in the current lime on both themes (owner, round 2; feedback-2/4).
-- [ ] Commit.
+- [x] Commit.
+
+Done (2026-11-06): `motion.highlight` = 600 token; the created task's row (`TaskRow`) carries the wash. An activity created by a typed start is not highlighted (its row is the running card). The logo's SVGs and PNG icons were regenerated with `bun scripts/generate-icons.ts` (lime `#C8F03C` dark / `#5E8C00` light from the `logo` role).
 
 ---
 
@@ -1077,6 +1141,12 @@ once review, QA and CI are green.
 
 ## Lint baseline
 
+Feedback 5 item 10 (2026-11-08): `DESIGN_VALUE_WARNINGS` 23 (from 24): the subtask checklist's `opacity-50` for a sent subtask went with the sent mark.
+
+Tasks 4.8 + 4.9 (2026-11-06): `DESIGN_VALUE_WARNINGS` 26 (from 29), `BARE_PRESSABLE_WARNINGS` 7 (from 8): Projects, Presets list and Insights moved to the kit.
+
+Tasks 4.7 + 4.10 + 7.3 (2026-11-06): `DESIGN_VALUE_WARNINGS` 29 (from 32), `BARE_PRESSABLE_WARNINGS` 8 (from 9): the Inbox, Decisions, History and Notifications rows moved to the kit (`active:opacity-*` and a bare `Pressable` went). `KIT_PRIMITIVE_WARNINGS` unchanged.
+
 Task 1.3 (2026-11-01, after fix round 1 and the interval ruling): 437 warnings of `pace/no-raw-design-values` at introduction, by message id: `arbitraryClass` 424, `rawDuration` 12 (6 `.duration()` builders, 1 `duration:`, 1 `setTimeout`, 4 `*_MS`/`*DURATION` constants in files that import reanimated: `BREATH_MS`, `DISSOLVE_MS`, `DURATION_MS`, `SLIDE_MS`), `rawColor` 1 (a CSS colour name), `rawRadius` 0, `rawFontMetric` 0, `offScaleClass` not active yet (needs `GENERATED_CLASSES`, Task 2.2). Poll/debounce/timeout interval constants outside reanimated files are behaviour and are not counted. The count is an exact ratchet: `scripts/eslint-all.ts` fails the app part when the count is above `DESIGN_VALUE_WARNINGS` and when it is below it (lower the constant to the new number); never raise it, except by a dated line here.
 
 Task 2.2 (2026-11-02, tokens v2 everywhere; `offScaleClass` on with `GENERATED_CLASSES`): **69** warnings, by message id: `arbitraryClass` 0 (was 424: every arbitrary class mapped to a token class), `offScaleClass` 56 (42 `active:opacity-*` press feedback and 11 `opacity-*` disabled/dimmed states, both replaced by the `Pressable` state layer and the disabled treatment in Tasks 3.1/3.9; 2 `shadow-lg` on the sheet and the toast, Task 3.6; 1 `scale-110` on the slider thumb, Task 3.9), `rawDuration` 12 (unchanged, motion tokens), `rawColor` 1 (unchanged), `rawRadius` 0, `rawFontMetric` 0. `DESIGN_VALUE_WARNINGS` = 69.
@@ -1084,3 +1154,24 @@ Task 2.2 (2026-11-02, tokens v2 everywhere; `offScaleClass` on with `GENERATED_C
 Task 2.2 fix round 1 (the rule also reads class lists outside a className: constants, maps, `cx()` arguments): **70** warnings, by message id: `arbitraryClass` 0, `offScaleClass` 57 (43 `active:opacity-*`: the one new is `ROW` in `day-screen.tsx`, a constant the rule could not see before; 11 `opacity-*` disabled/dimmed: the week blocks' `opacity-90` went, but it sat in a `box:` map value the rule could not see before, so it never counted; 2 `shadow-lg`; 1 `scale-110`), `rawDuration` 12, `rawColor` 1, `rawRadius` 0, `rawFontMetric` 0. `DESIGN_VALUE_WARNINGS` = 70 (up from 69 because coverage widened, by ruling).
 
 Rebase onto main (2026-11-02, PR #48 Phase C): **74** warnings. Every v1 class and raw value main added was migrated by the job (Task 2.2's codemod re-run on main's files, the `TODO-*` outputs decided by hand: separator/outline, `fill-3`, `bg-elevated`, `status.warn`, `label.quaternary` for main's placeholder rows, `max-w-toast-max` / `max-w-content`). Four new warnings have no token to migrate to yet, the same kinds as the backlog: `active:opacity-70` on main's new link target in `task-summary.tsx` and on the offline pill's Retry in `sync-frame.tsx`, `active:opacity-80` on main's `ActionChip` (`chip.tsx`), all Task 3.1's `Pressable` state layer; `shadow-lg` on the offline pill (`sync-frame.tsx`), Task 3.6's elevation. `offScaleClass` 61 (46 `active:opacity-*`, 11 `opacity-*`, 3 `shadow-lg`, 1 `scale-110`), `rawDuration` 12, `rawColor` 1. `DESIGN_VALUE_WARNINGS` = 74 (up from 70, by this line).
+
+Task 3.1 (2026-11-03, the `Pressable` state layer): **74** warnings of `pace/no-raw-design-values`, unchanged in number. The rule gained `pressedClass`: an `active:` class outside `ui/pressable.tsx` is reported as that instead of `offScaleClass`, so the 46 `active:opacity-*` move from one message id to the other: `offScaleClass` 15 (11 `opacity-*`, 3 `shadow-lg`, 1 `scale-110`), `pressedClass` 46, `rawDuration` 12, `rawColor` 1. No caller was migrated in this task (Button, IconButton, Chip and the rows move in their own tasks and lower the number). A second exact ratchet joins it in the app part: **`BARE_PRESSABLE_WARNINGS` = 33**, warnings of `no-restricted-imports` for React Native's `Pressable`/`Touchable*` imported in `src/features/**` and `src/shared/**` (bug-lessons class 122, F-CMP-01), the same rules as above: lower it with every migrated file, never raise it; at 0 the rule becomes an error. `scripts/eslint-ratchet.ts` now takes a list of ratchets per part.
+
+Task 3.2 (2026-11-03, the kit's `Text`, `Icon` and `Link`): **72** warnings of `pace/no-raw-design-values` (down from 74): the sidebar's destinations (now kit `Link`s) and its New task button (now the kit `Pressable`) lost their `active:opacity-*`. `pressedClass` 44, `offScaleClass` 15, `rawDuration` 12, `rawColor` 1. `DESIGN_VALUE_WARNINGS` = 72; `BARE_PRESSABLE_WARNINGS` stays 33 (the sidebar is in `src/ui`, outside that ban). A third exact ratchet joins them: **`KIT_PRIMITIVE_WARNINGS` = 71**, warnings of `pace/kit-primitives` (bug-lessons class 109, spec §4.1.2 rule 9): `rawIcon` 48 (a `lucide-react-native` import outside `ui/icon.tsx`: every screen, shared row and kit file not migrated yet, type imports of `LucideIcon` included) and `rawLineLimit` 23 (`numberOfLines` on React Native's `Text` outside `ui/text.tsx`). The rule covers all of `apps/app` (tests and fakes aside); the screen and kit tasks migrate their files to `Icon` / `Text` and lower it; at 0 it becomes an error. The codemod the task names ("every lucide import site") was held back by the run's ruling (callers migrate in their own tasks); the sidebar and the tab bar moved, the rest are counted here.
+
+Task 3.2 fix round 1 (2026-11-03, the codemod ruled in): **`KIT_PRIMITIVE_WARNINGS` = 10** (down from 71). `rawIcon` 0: every lucide import moved to the kit's `Icon` (Button, IconButton, BackHeader and Chip take an `IconName`; Chip's and RadioChips' `leading` render prop became `icon`); sizes snapped to 16/20/24 and strokes to 1.75 by ruling. The rule now also reports re-exports, deep paths and dynamic imports of lucide, and `RN.Text` through a namespace or default import. `rawLineLimit` 10 (from 23): 13 mechanical sites moved to the kit's `Text` with a `policy`; the 10 left need a role, tone or semantics the kit `Text` does not take yet (a link text, a colour from a look map, the tab label, `ColorTag`, the time-bar tile, the task row, the week block, the preset preview, the OS picker, the task header) and move in their screen tasks. `DESIGN_VALUE_WARNINGS` stays 72, `BARE_PRESSABLE_WARNINGS` 33.
+
+Task 3.1 fix round 1 (2026-11-03): numbers unchanged (design values 72, bare pressables 33, kit primitives 71). The bare-pressable ratchet now counts only warnings carrying the ban's own message (`BARE_PRESSABLE_MARKER`), not every `no-restricted-imports`; the ban also covers `react-native-gesture-handler`'s pressables (none in features/shared) and, as ESLint does with `importNames`, `import * as RN from "react-native"` (none either).
+
+Task 3.4 (2026-11-03, `ScreenHeader` and the shell): **70** warnings of `pace/no-raw-design-values` (down from 72): the old `ScreenHeader`'s and the deleted `BackHeader`'s `active:opacity-70` back buttons are the kit `Pressable` now. `DESIGN_VALUE_WARNINGS` = 70; bare pressables 33 and kit primitives 10 unchanged.
+
+Task 3.5 (2026-11-03, `Presence` and `Disclosure`): **68** warnings of `pace/no-raw-design-values` (down from 70): `animated-height.tsx`'s `DURATION_MS` (a `rawDuration`) went with the file, and `FoldedSection`'s `active:opacity-70` with its raw Pressable (now the kit `Disclosure`). **`BARE_PRESSABLE_WARNINGS` = 32** (down from 33: `shared/task-list.tsx` no longer imports React Native's `Pressable`). Kit primitives 10 unchanged.
+
+Task 3.7 (2026-11-03, Toast placement and Tooltip): **66** warnings of `pace/no-raw-design-values` (down from 68): the toast's action and the offline pill's Retry (`active:opacity-70` on raw Pressables) are the kit `Pressable` now. `DESIGN_VALUE_WARNINGS` = 66; bare pressables 32 and kit primitives 10 unchanged by this task (Tasks 3.6/3.8/3.9 run in parallel and lower their own; the controller sums them on merge).
+
+Task 3.10 (2026-11-03, Sidebar and TabBar): **`KIT_PRIMITIVE_WARNINGS` = 9** (down from 10): the tab label is the kit `Text` (`caption`, `chrome`, wrapping) instead of React Native's with `numberOfLines`. Design values 66 and bare pressables 32 unchanged by this task.
+
+Task 3.6 (2026-11-03, `Sheet`, `Dialog`, `Popover`): **67** warnings of `pace/no-raw-design-values` (down from 68): the sheet's `shadow-lg` became the `shadow.overlay` token (`shadow(scheme, "overlay")`). `DESIGN_VALUE_WARNINGS` = 67; bare pressables 32 and kit primitives 10 unchanged.
+
+
+S0 (2026-11-06, green-up of PR B after the import from Hentrixz/pace-dev): **`DESIGN_VALUE_WARNINGS` = 50** (down from 65: the merged tree measured 53, and dropping the three unused `*_ENTER` motion constants took 3 more), **`KIT_PRIMITIVE_WARNINGS` = 7** (down from 9), **`BARE_PRESSABLE_WARNINGS` = 28** (unchanged).

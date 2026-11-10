@@ -154,6 +154,78 @@ describe("time actions", () => {
     });
   });
 
+  it("splits a logged block a new past one lies inside, in one batch that one Undo takes back (owner, R27-05)", async () => {
+    const world = await setupActions([]);
+    const [lecture] = unwrap(
+      await world.actions.logPast({
+        category: "study",
+        endAt: later(-60),
+        label: "Lecture",
+        startAt: later(-180),
+      }),
+    );
+    const lectureId = lecture?.type === "activity.logged" ? lecture.payload.activityId : "";
+    const written = unwrap(
+      await world.actions.logPast({
+        category: "chores",
+        endAt: later(-120),
+        label: "Call",
+        startAt: later(-150),
+      }),
+    );
+    const blocks = () =>
+      Object.values(world.state.store.getState().time.activities)
+        .map((item) => [item.label, item.startAt, item.endAt])
+        .toSorted((a, b) => String(a[1]).localeCompare(String(b[1])));
+    expect(blocks()).toEqual([
+      ["Lecture", later(-180), later(-150)],
+      ["Call", later(-150), later(-120)],
+      ["Lecture", later(-120), later(-60)],
+    ]);
+    // One write: every event of it recorded together, so History shows it as one row.
+    expect(new Set(written.map((event) => event.recordedAt)).size).toBe(1);
+    unwrap(await world.actions.revokeAll(written.map((event) => event.id)));
+    expect(blocks()).toEqual([["Lecture", later(-180), later(-60)]]);
+    expect(world.state.store.getState().time.activities[lectureId]).toBeDefined();
+  });
+
+  it("removes a logged block a new past one covers whole, and moves the edges it lands on (owner, R27-05)", async () => {
+    const world = await setupActions([]);
+    for (const [label, from, to] of [
+      ["Before", -200, -150],
+      ["Tea", -140, -130],
+      ["After", -110, -60],
+    ] as const) {
+      unwrap(
+        await world.actions.logPast({
+          category: "rest",
+          endAt: later(to),
+          label,
+          startAt: later(from),
+        }),
+      );
+    }
+    const written = unwrap(
+      await world.actions.logPast({
+        category: "study",
+        endAt: later(-100),
+        label: "Seminar",
+        startAt: later(-160),
+      }),
+    );
+    expect(
+      Object.values(world.state.store.getState().time.activities)
+        .map((item) => [item.label, item.startAt, item.endAt])
+        .toSorted((a, b) => String(a[1]).localeCompare(String(b[1]))),
+    ).toEqual([
+      ["Before", later(-200), later(-160)],
+      ["Seminar", later(-160), later(-100)],
+      ["After", later(-100), later(-60)],
+    ]);
+    unwrap(await world.actions.revokeAll(written.map((event) => event.id)));
+    expect(Object.values(world.state.store.getState().time.activities)).toHaveLength(3);
+  });
+
   it("logs a past block with a long title cut to the stored label length", async () => {
     const world = await setupActions();
     const title = `Seminar ${"x".repeat(100)}`;
@@ -463,6 +535,18 @@ describe("time actions", () => {
     const running = timeBarModel(world.state.store.getState(), ctx(later(1))).running;
     expect(running?.label.length).toBeLessThanOrEqual(80);
     expect(running?.expectMinutes).toBe(24 * 60);
+  });
+
+  it("writes one stop when Stop is pressed twice in one tick (review I4 sweep)", async () => {
+    const world = await setupActions();
+    unwrap(await world.actions.startTyped("Reading"));
+    world.setNow(later(5));
+    const results = await Promise.all([world.actions.stopActivity(), world.actions.stopActivity()]);
+    expect(results.map((result) => result.ok)).toEqual([true, false]);
+    const stops = world.state.store
+      .getState()
+      .log.filter((event) => event.type === "activity.stopped");
+    expect(stops).toHaveLength(1);
   });
 
   it("stops at a past instant, and the assistant's reading relabels the running one", async () => {

@@ -5,10 +5,14 @@ import type { Language, MessageKey, ThemeName } from "@pace/core";
 
 import { LanguageOverrideContext, useT } from "#app/app-state.tsx";
 import { Chip } from "#app/ui/chip.tsx";
+import { RadioGroup } from "#app/ui/radio-group.tsx";
 import { Screen } from "#app/ui/screen.tsx";
 import { ThemeProvider } from "#app/ui/theme-provider.tsx";
 import { GALLERY_SETS, galleryData, type GallerySet } from "@pace/core/testing";
 
+import { ControlSections } from "./gallery-controls.tsx";
+import { KitSections } from "./gallery-kit.tsx";
+import { HeaderSections, ListSections, MotionSections } from "./gallery-lists.tsx";
 import { ChromeSections, TaskSections, TextSections, TimeSections } from "./gallery-sections.tsx";
 
 const SET_LABEL: Readonly<Record<GallerySet, MessageKey>> = {
@@ -38,23 +42,23 @@ const Choice = <T extends string>({
   const t = useT();
   const router = useRouter();
   return (
-    <View
-      accessibilityLabel={t(label)}
-      className="flex-row flex-wrap items-center gap-2"
-      role="radiogroup"
-    >
+    <View className="flex-row flex-wrap items-center gap-x-2">
       <Text className="font-sans text-subhead font-normal text-label-secondary">{t(label)}</Text>
-      {choices.map((choice) => (
-        <Chip
-          key={choice}
-          onPress={() => {
-            router.setParams({ [param]: choice });
-          }}
-          selected={choice === selected}
-        >
-          {labelOf(choice)}
-        </Chip>
-      ))}
+      <RadioGroup
+        className="min-w-0 shrink flex-row flex-wrap gap-x-2"
+        label={t(label)}
+        onChange={(choice: T) => {
+          router.setParams({ [param]: choice });
+        }}
+        value={selected}
+        values={choices}
+      >
+        {choices.map((choice) => (
+          <Chip key={choice} value={choice}>
+            {labelOf(choice)}
+          </Chip>
+        ))}
+      </RadioGroup>
     </View>
   );
 };
@@ -106,10 +110,15 @@ const GalleryBody = ({
             selected={theme}
           />
         </View>
+        <KitSections data={data} />
+        <ListSections data={data} />
+        <HeaderSections data={data} />
+        <MotionSections data={data} />
         <TextSections data={data} />
         <TimeSections data={data} />
         <ChromeSections data={data} />
         <TaskSections data={data} />
+        <ControlSections data={data} />
       </View>
     </Screen>
   );

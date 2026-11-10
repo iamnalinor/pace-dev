@@ -1,8 +1,9 @@
 import type { CoreState } from "../materialize/core-state.ts";
 import type { Importance } from "../model/preset.ts";
 
+import { sliceWhole } from "../format/cut-text.ts";
 import { extractLink } from "../links.ts";
-import { resolvePreset } from "../presets/resolve-preset.ts";
+import { isHomeworkPreset, resolvePreset } from "../presets/resolve-preset.ts";
 import { accountTz, type QueryContext } from "../queries/context.ts";
 import { suggestFor } from "../queries/suggest.ts";
 import { findDate } from "./quick-date.ts";
@@ -62,7 +63,7 @@ const capTitle = (title: string): string => {
   if (title.length <= MAX_TITLE) {
     return title;
   }
-  const cut = title.slice(0, MAX_TITLE - 1);
+  const cut = sliceWhole(title, MAX_TITLE - 1);
   const lastSpace = cut.lastIndexOf(" ");
   return `${(lastSpace > MAX_TITLE / 2 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
 };
@@ -118,8 +119,8 @@ export const parseQuickInput = (text: string, state: CoreState, ctx: QueryContex
   const words = mask(dated.rest, [...estimate.spans, ...named.spans]);
   const suggestion = suggestFor(state, words, ctx);
   const preset = resolvePreset(state.presets, suggestion.presetId);
-  // Numbered problems belong to homework-like presets, where each one is submitted.
-  const hasProblems = preset.ok && preset.value.submission === "per_subtask";
+  // Numbered problems belong to homework and the courses built on it.
+  const hasProblems = isHomeworkPreset(state.presets, suggestion.presetId);
   const problems = hasProblems ? problemsOf(words) : { spans: [], subtasks: [] };
   const spans = inOrder(linkSpans, [
     ...dated.spans,

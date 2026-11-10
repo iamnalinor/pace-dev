@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
 import { isFocusLost, moveFocus } from "#app/platform/move-focus.ts";
@@ -7,31 +7,33 @@ import { useFeed } from "#app/shared/notifications/use-feed.ts";
 import { Button } from "#app/ui/button.tsx";
 import { useConfirmFocus } from "#app/ui/confirm-focus.ts";
 import { HOTKEYS } from "#app/ui/hotkeys.ts";
+import { Text } from "#app/ui/text.tsx";
 import { type Answer, ANSWERS, type PoolNotification } from "@pace/core";
 
-/** One line of a notice, in the text colour or the quiet one. */
+/** One line of a notice, in the text colour or the quiet one; the heading line of an unread notice is bold. */
 export const Line = ({
   children,
+  isStrong = false,
   tone = "fg",
 }: {
   readonly children: string;
+  readonly isStrong?: boolean;
   readonly tone?: "fg" | "muted";
-}) => (
-  <Text
-    className={
-      tone === "fg"
-        ? "font-sans text-callout text-label-primary"
-        : "font-sans text-footnote text-label-secondary"
-    }
-  >
-    {children}
-  </Text>
-);
+}) =>
+  tone === "fg" ? (
+    <Text role="callout" {...(isStrong && { className: "font-semibold" })}>
+      {children}
+    </Text>
+  ) : (
+    <Text role="footnote" tone="secondary">
+      {children}
+    </Text>
+  );
 
 /** Not me ends a session for good: the warning look, never the accent; else the first leads. */
-const answerVariant = (answer: Answer, index: number): "danger" | "primary" | "secondary" => {
+const answerVariant = (answer: Answer, index: number): "destructive" | "primary" | "secondary" => {
   if (answer === "revoked") {
-    return "danger";
+    return "destructive";
   }
   return index === 0 ? "primary" : "secondary";
 };
@@ -55,24 +57,20 @@ const NotMeConfirm = ({
   const question = t("notifications.notMeConfirm");
   return (
     <View aria-label={question} className="gap-2" role="group">
-      <Text
-        accessibilityLiveRegion="polite"
-        className="font-sans text-subhead font-normal text-label-primary"
-        role="status"
-      >
+      <Text accessibilityLiveRegion="polite" role="subhead">
         {question}
       </Text>
       <View className="flex-row flex-wrap gap-2">
         <Button
           disabled={isBusy}
-          hotkey={HOTKEYS.escape}
           onPress={onCancel}
           ref={cancelRef}
+          shortcut={HOTKEYS.escape}
           variant="secondary"
         >
           {t("common.cancel")}
         </Button>
-        <Button busy={isBusy} onPress={onEnd} variant="danger">
+        <Button busy={isBusy} onPress={onEnd} variant="destructive">
           {t("notifications.notMeEnd")}
         </Button>
       </View>

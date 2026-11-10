@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { err, ok, type TaskView, taskView } from "@pace/core";
+import { clipText, err, ok, type Task, type TaskView, taskView } from "@pace/core";
 
 import { defineTool } from "../registry.ts";
 import { describeRow, type TaskRow, taskRow, TaskRowSchema } from "../rows.ts";
@@ -10,8 +10,12 @@ const SubtaskSchema = z.object({
   id: z.string(),
   label: z.string(),
   number: z.int().nullable(),
-  solvedAt: z.string().nullable(),
-  submittedAt: z.string().nullable(),
+  doneAt: z
+    .string()
+    .nullable()
+    .describe(
+      "When it was done (its one mark); null while open. Old solved/sent marks read as done at the earlier one.",
+    ),
 });
 
 const ClosedSchema = z.object({
@@ -23,39 +27,109 @@ const ClosedSchema = z.object({
   source: z.string(),
 });
 
-const SubmitPreviewSchema = z.object({
-  canClose: z.boolean().optional(),
-  kind: z
+/**
+Every field of the task projection that the row does not already carry (feedback 5: the answer
+is the whole task, not a subset). Typed against `Task`, so a field added to the projection fails
+the type check until it is answered here too. The task's own importance is `ownImportance`: the
+row's `importance` is the effective one.
+*/
+const TASK_FIELDS = {
+  createdEventId: z.string().describe("The task.created event; revoking it deletes the task."),
+  seriesId: z.string().nullable().describe("The repeat series it belongs to, if any."),
+  seriesRevision: z.int().nullable(),
+  userModified: z.boolean().describe("A series instance the person edited keeps its own fields."),
+  ownImportance: z
     .string()
-    .describe("per_subtask: submit sends the solved problems; whole: submit closes the task."),
-  subtaskIds: z.array(z.string()).optional(),
-});
+    .nullable()
+    .describe("The importance set on the task; null = the preset default."),
+  importanceSetAt: z.string().nullable(),
+  startTz: z.string().nullable(),
+  subtasks: z.array(SubtaskSchema),
+  slider: z.int().nullable().describe("Progress slider 0..10; null when never moved."),
+  description: z.string().nullable(),
+  sourceText: z.string().nullable(),
+  sources: z.array(z.object({ at: z.string(), text: z.string(), url: z.string().nullable() })),
+  fields: z.object({ link: z.string().nullable(), submitVia: z.string().nullable() }),
+  overrides: z.record(z.string(), z.unknown()).nullable(),
+  statusSince: z.string(),
+  touched: z.boolean().describe("Work was done on it at some point."),
+  createdAt: z.string(),
+  submittedAt: z.string().nullable().describe("A whole-task submission an older version recorded."),
+  closed: ClosedSchema.nullable(),
+  reopenedAt: z.string().nullable(),
+  lastEventAt: z.string(),
+} satisfies Record<"ownImportance" | Exclude<keyof Task, "importance" | keyof TaskRow>, z.ZodType>;
 
-/** The task screen as structured data, with the row the list tools answer on top. */
+/** " done <instant>" after a done subtask's line; nothing while it is open. */
+const doneNote = (doneAt: null | string): string => (doneAt === null ? "" : ` done ${doneAt}`);
+
+/** "№3 " before a numbered subtask's label (the number mark_subtasks takes). */
+const numberNote = (number: null | number): string =>
+  number === null ? "" : `№${String(number)} `;
+
+/** How much of one text field the text answer shows; the structured content has it whole. */
+const TEXT_FIELD_CHARS = 200;
+
+/**
+A text cut to `TEXT_FIELD_CHARS` characters with an ellipsis, between two characters (never
+inside an emoji: `clipText` counts graphemes).
+*/
+const cutText = (text: string): string => clipText(text, TEXT_FIELD_CHARS + 1);
+
+/** The closure as a line, with what its JSON would have said: the event to revoke, the reason. */
+const closedLine = (closed: NonNullable<Task["closed"]>): string =>
+  [
+    `Closed: ${closed.outcome} at ${closed.at} by ${closed.source}`,
+    closed.confirmed ? ", confirmed" : "",
+    `; event ${closed.eventId}`,
+    closed.reason === null ? "" : `; reason: ${cutText(closed.reason)}`,
+    ".",
+  ].join("");
+
+/** Strings cut short (`cutText`); other values as they are, nested ones too. */
+const cut = (value: unknown): unknown => {
+  if (typeof value === "string") {
+    return cutText(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => cut(item));
+  }
+  return typeof value === "object" && value !== null
+    ? Object.fromEntries(Object.entries(value).map(([key, item]) => [key, cut(item)]))
+    : value;
+};
+
+/**
+The fields as the text answer carries them (session review minor 8): the subtasks and the closure
+are already lines above, and long text (description, source text, sources) is cut short, so a
+client that reads both answers does not pay for the task twice.
+*/
+const textFields = (structured: Readonly<Record<string, unknown>>): string => {
+  const { closed: _closed, subtasks: _subtasks, ...rest } = structured;
+  return JSON.stringify(cut(rest));
+};
+
+/** The task screen as structured data: the whole projection, with the row the list tools answer. */
 const render = (view: TaskView, row: TaskRow): Rendered => {
-  const { task } = view;
+  const { importance: ownImportance, ...task } = view.task;
+  const structured = {
+    ...task,
+    ...row,
+    ownImportance,
+    workLeftMinutes: view.workLeftMinutes,
+  };
   return {
-    structured: {
-      ...row,
-      closed: task.closed,
-      createdAt: task.createdAt,
-      description: task.description,
-      overrides: task.overrides,
-      slider: task.slider,
-      sourceText: task.sourceText,
-      startTz: task.startTz,
-      submitPreview: view.submitPreview,
-      subtasks: task.subtasks,
-      workLeftMinutes: view.workLeftMinutes,
-    },
+    structured,
     summary: [
       describeRow(row),
       `Status ${task.status}; progress ${Math.round(row.progress * 100)}%.`,
-      ...(task.closed === null ? [] : [`Closed: ${task.closed.outcome} at ${task.closed.at}.`]),
+      ...(task.closed === null ? [] : [closedLine(task.closed)]),
       ...task.subtasks.map(
         (item) =>
-          `- ${item.solvedAt === null ? "[ ]" : "[x]"} ${item.label} (${item.id})${item.submittedAt === null ? "" : " submitted"}`,
+          `- ${item.doneAt === null ? "[ ]" : "[x]"} ${numberNote(item.number)}${item.label} (${item.id})${doneNote(item.doneAt)}`,
       ),
+      // Every other field as data: a client that shows only the text still sees each one.
+      `Fields (long text cut; the structured content has it whole): ${textFields(structured)}`,
     ].join("\n"),
   };
 };
@@ -63,7 +137,7 @@ const render = (view: TaskView, row: TaskRow): Rendered => {
 export const taskTool = defineTool({
   annotations: { destructiveHint: false, idempotentHint: true, readOnlyHint: true },
   description:
-    "Everything about one task: its fields, subtasks with solved/submitted marks, the closure and derived outcome, progress, the work left and what submit would do next. Use it before mark_subtasks (to learn subtask ids and numbers), before submit, or to answer questions about a task's deadline.",
+    "Everything about one task: every field the store keeps (start and its zone, estimate, own and effective importance, description, link, sources, series, status history), its subtasks with their done marks, the closure and derived outcome, progress and the work left. The text answer carries the same fields as JSON, long text cut short (the structured content has it whole). Use it before mark_subtasks (to learn subtask ids and numbers) or to answer questions about a task.",
   handler: async (args, ctx) =>
     await runRead(ctx, (scope) => {
       const view = taskView(scope.state, args.id, scope.qctx);
@@ -77,15 +151,7 @@ export const taskTool = defineTool({
   name: "get_task",
   output: {
     ...TaskRowSchema.shape,
-    closed: ClosedSchema.nullable(),
-    createdAt: z.string(),
-    description: z.string().nullable(),
-    overrides: z.record(z.string(), z.unknown()).nullable(),
-    slider: z.int().nullable(),
-    sourceText: z.string().nullable(),
-    startTz: z.string().nullable(),
-    submitPreview: SubmitPreviewSchema,
-    subtasks: z.array(SubtaskSchema),
+    ...TASK_FIELDS,
     workLeftMinutes: z.int(),
   },
   scope: "tasks:read",

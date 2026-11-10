@@ -1,345 +1,319 @@
-import { Pencil, Plus } from "lucide-react-native";
-import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { View } from "react-native";
 import Animated from "react-native-reanimated";
 
-import type { DayEntry, DayRowProps } from "@pace/client";
-
 import { usePace, useT } from "#app/app-state.tsx";
-import { clockTime } from "#app/format/time.ts";
 import { IS_PHONE } from "#app/platform/device.ts";
 import { ScreenTimeSection } from "#app/shared/activity-usage.tsx";
-import { useOpenTask } from "#app/shared/task-opener.tsx";
+import { useSearchParam, useZonedDateParam } from "#app/shared/use-search-param.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { useWhereSat } from "#app/shared/use-where-sat.ts";
-import { WhereSatLine } from "#app/shared/where-sat-line.tsx";
-import { ColorTag } from "#app/ui/color.tsx";
-import { cx } from "#app/ui/cx.ts";
 import { EmptyText, FirstSyncBody } from "#app/ui/empty-state.tsx";
+import { Group } from "#app/ui/group.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
 import { ROW_ENTER, ROW_EXIT, ROW_LAYOUT } from "#app/ui/motion.ts";
-import { RowList } from "#app/ui/row-list.tsx";
+import { OverlayPresence } from "#app/ui/overlay-presence.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
+import { Shell } from "#app/ui/shell.tsx";
+import { type DayEntry, type DayModel, dayRail } from "@pace/client";
 import { useUsageRead } from "@pace/client/react";
-import {
-  addDaysIn,
-  formatDuration,
-  formatEyebrow,
-  type Gap,
-  type Language,
-  type SatRow,
-} from "@pace/core";
+import { addDaysIn, formatEyebrow } from "@pace/core";
 
+import { ActivityPane } from "./activity-pane.tsx";
 import { ActivitySheet, type SheetTarget } from "./activity-sheet.tsx";
 import { DayNav } from "./day-nav.tsx";
+import { DayRail, NowMargin, type RowFrame, type RowFrames } from "./day-rail.tsx";
+import { EntryRow, LogPastRow, type SatOf } from "./day-rows.tsx";
 import { Totals } from "./day-totals.tsx";
 import * as Phone from "./phone-section.tsx";
 import { type DayPhone, useDayPhone } from "./use-day-phone.ts";
 
-/** "of ~30m", when the block has an Expect. */
-const targetText = (
-  row: DayRowProps["row"],
-  t: ReturnType<typeof useT>,
-  language: Language,
-): null | string =>
-  row.expectMinutes === null
-    ? null
-    : t("time.expectOf", { duration: formatDuration(row.expectMinutes, language) });
-
 /**
-One line of the day's rhythm: the same height and the same time column for a block, a gap and
-"Log past activity", so the list reads as one timeline.
+The rows only animate for what changes within a day (a block logged, a gap closed): a new day
+replaces the old in place, with no crossfade (F-MOT-07). The keys a date opened with never
+animate; one that appears later does.
 */
-const ROW = "min-h-row flex-row items-center gap-3 py-2 active:opacity-70";
-const TIME_COLUMN = cx(Phone.TIME_WIDTH, "font-sans text-caption font-normal tabular-nums");
-const LINE = "font-sans text-subhead font-normal";
-
-/** "14:06 – 14:40". */
-const rangeText = (startAt: string, end: string, zone: string): string =>
-  `${clockTime(startAt, zone)} – ${end}`;
-
-/**
-A block of the day: "14:06 – 14:40" (or "– now" while it runs), the category tag and the
-label when it says more than the tag, then the duration against its Expect or Limit and a
-pencil. The whole row opens the edit sheet; its task is linked on the line under it.
-*/
-export const ActivityRow = ({
-  onEdit,
-  row,
-  satRows,
-  zone,
-}: DayRowProps & { readonly satRows: readonly SatRow[] }) => {
-  const t = useT();
-  const { language } = useViewer();
-  const { palette } = useTheme();
-  const isWide = useIsWide();
-  const range = rangeText(
-    row.startAt,
-    row.isRunning ? t("day.now") : clockTime(row.endAt, zone),
-    zone,
-  );
-  const target = targetText(row, t, language);
-  return (
-    <Pressable
-      accessibilityHint={t("day.edit", { label: row.label })}
-      accessibilityRole="button"
-      className={ROW}
-      onPress={onEdit}
-    >
-      <Text className={cx(TIME_COLUMN, "text-label-secondary")}>{range}</Text>
-      <View className="flex-1 gap-1">
-        <View className="flex-row flex-wrap items-center gap-2">
-          <ColorTag color={row.color}>{t(`category.${row.category}`)}</ColorTag>
-          {row.showsLabel ? (
-            <Text className="font-sans text-subhead text-label-primary" numberOfLines={1}>
-              {row.label}
-            </Text>
-          ) : null}
-          {isWide ? <WhereSatLine compact rows={satRows} /> : null}
-        </View>
-      </View>
-      <View className="items-end">
-        <Text
-          className={cx(
-            "font-sans text-footnote tabular-nums",
-            row.isRunning ? "text-accent-text" : "text-label-primary",
-          )}
-        >
-          {formatDuration(row.minutes, language)}
-        </Text>
-        {target === null ? null : (
-          <Text className="font-sans text-caption2 font-normal text-label-tertiary">{target}</Text>
-        )}
-      </View>
-      <Pencil color={palette["label.secondary"]} size={16} strokeWidth={1.75} />
-    </Pressable>
-  );
-};
-
-/**
-The block's task, a link on its own line under the row, lined up with the block's words: inside
-the row's button it would be a control within a control, which screen readers skip. Its words
-come from the view-model ("Open task" under a block already named after the task).
-*/
-const TaskLine = ({ row }: { readonly row: DayRowProps["row"] }) => {
-  const t = useT();
-  const openTask = useOpenTask();
-  const link = row.taskLink;
-  if (link === null) {
-    return null;
+const useOpeningKeys = (date: string, entries: readonly DayEntry[]): ReadonlySet<string> => {
+  const [opening, setOpening] = useState(() => ({
+    date,
+    keys: new Set(entries.map((entry) => entry.key)),
+  }));
+  if (opening.date !== date) {
+    setOpening({ date, keys: new Set(entries.map((entry) => entry.key)) });
   }
-  // Named after the task for a screen reader: a list of "Open task" links says nothing about
-  // where each goes. Under a block named after the task, its label is that title (as stored).
-  const title = "title" in link.text ? link.text.title : row.label;
-  return (
-    <View className="flex-row pb-2">
-      <Text
-        accessibilityLabel={t("day.openTaskNamed", { title })}
-        accessibilityRole="link"
-        className="min-h-6 shrink py-1 font-sans text-caption font-normal text-label-secondary underline"
-        numberOfLines={1}
-        onPress={() => {
-          openTask(link.id);
-        }}
-      >
-        {"title" in link.text ? link.text.title : t(link.text.key)}
-      </Text>
-    </View>
-  );
+  return opening.date === date ? opening.keys : new Set(entries.map((entry) => entry.key));
 };
 
-/**
-Time with nothing logged: a quiet row in the same rhythm, "11:00 – 13:00 · 2h not logged", and
-Log where a block has its duration. The whole row opens the sheet to log it.
-*/
-const GapRow = ({
-  gap,
-  onLog,
-  zone,
-}: {
-  readonly gap: Gap;
-  readonly onLog: () => void;
-  readonly zone: string;
-}) => {
-  const t = useT();
-  const { language } = useViewer();
-  return (
-    <Pressable accessibilityRole="button" className={ROW} onPress={onLog}>
-      <Text className={cx(TIME_COLUMN, "text-label-secondary")}>
-        {rangeText(gap.startAt, clockTime(gap.endAt, zone), zone)}
-      </Text>
-      <Text className="flex-1 font-sans text-footnote text-label-secondary">
-        {t("day.gap", { duration: formatDuration(gap.minutes, language) })}
-      </Text>
-      <Text className="font-sans text-footnote font-medium text-accent-text">
-        {t("day.logGap")}
-      </Text>
-    </Pressable>
-  );
-};
-
-/** The timeline's last row: a quiet "+ Log past activity" in the same rhythm. */
-const LogPastRow = ({
-  hasDivider,
-  onPress,
-}: {
-  readonly hasDivider: boolean;
-  readonly onPress: () => void;
-}) => {
-  const t = useT();
-  const { palette } = useTheme();
-  return (
-    <View className="px-5">
-      <Pressable
-        accessibilityRole="button"
-        className={cx(ROW, hasDivider && "border-t border-separator")}
-        onPress={onPress}
-      >
-        <Plus color={palette["label.secondary"]} size={16} strokeWidth={1.75} />
-        <Text className={cx(LINE, "text-label-secondary")}>{t("day.logPast")}</Text>
-      </Pressable>
-    </View>
-  );
-};
-
-/** Where a block's time went on the other devices. */
-type SatOf = (startAt: string, endAt: string) => readonly SatRow[];
-
-/** One line of the day; a tap opens its sheet (edit the block, or log the gap). */
-const EntryRow = ({
-  entry,
-  onOpen,
-  phone,
-  sat,
-  zone,
-}: {
-  readonly entry: DayEntry;
+type RowsProps = {
+  readonly entries: readonly DayEntry[];
+  /** The keys the day opened with: they never animate in. */
+  readonly openingKeys: ReadonlySet<string>;
   readonly zone: string;
   readonly phone: DayPhone;
   readonly sat: SatOf;
+  readonly selected: null | SheetTarget;
   readonly onOpen: (target: SheetTarget) => void;
-}) => {
-  const isWide = useIsWide();
-  const open = (): void => {
-    onOpen(entry.target);
-  };
-  if (entry.kind === "gap") {
-    return <GapRow gap={entry.gap} onLog={open} zone={zone} />;
-  }
-  return (
-    <>
-      <ActivityRow
-        onEdit={open}
-        row={entry.row}
-        satRows={sat(entry.row.startAt, entry.row.endAt)}
+  /** Each row says where it was laid out, for its rail bar to stand beside it. */
+  readonly onFrame: (key: string, frame: RowFrame) => void;
+};
+
+/** One keyed row per entry, for the `Group` to put its one divider rule between. */
+const entryRows = ({
+  entries,
+  onFrame,
+  onOpen,
+  openingKeys,
+  phone,
+  sat,
+  selected,
+  zone,
+}: RowsProps) =>
+  entries.map((entry) => (
+    <Animated.View
+      key={entry.key}
+      {...(!openingKeys.has(entry.key) && {
+        entering: ROW_ENTER,
+        exiting: ROW_EXIT,
+        layout: ROW_LAYOUT,
+      })}
+      onLayout={(event) => {
+        const { height, y } = event.nativeEvent.layout;
+        onFrame(entry.key, { height, top: y });
+      }}
+      testID="day-entry"
+    >
+      <EntryRow
+        entry={entry}
+        onOpen={onOpen}
+        phone={phone}
+        sat={sat}
+        selected={selected}
         zone={zone}
       />
-      <Phone.UnderBlock>
-        <TaskLine row={entry.row} />
-        <Phone.UsageLine apps={phone.usageIn(entry.row.startAt, entry.row.endAt)} />
-        {isWide ? null : <WhereSatLine rows={sat(entry.row.startAt, entry.row.endAt)} />}
-        <Phone.EndedAtPrompt phone={phone} row={entry.row} zone={zone} />
-      </Phone.UnderBlock>
-    </>
+    </Animated.View>
+  ));
+
+/** The rows' measured frames by key: one source of geometry for the rail and the now line. */
+const useRowFrames = () => {
+  const [frames, setFrames] = useState<RowFrames>({});
+  const onFrame = (key: string, frame: RowFrame): void => {
+    setFrames((known) => {
+      const was = known[key];
+      return was?.top === frame.top && was.height === frame.height
+        ? known
+        : { ...known, [key]: frame };
+    });
+  };
+  return { frames, onFrame };
+};
+
+/**
+The timeline on the notebook page: the rail beside one list of rows (blocks, gaps and, last, "Log
+past activity"), each bar at its own row's measured frame, and the red margin line across them
+where now is. Rows report their frames in the list's coordinates, which are the rail's: the list
+starts at the timeline's top.
+*/
+const Timeline = ({
+  logPast,
+  now,
+  ...rows
+}: Omit<RowsProps, "onFrame"> & {
+  readonly logPast: () => void;
+  readonly now: string;
+}) => {
+  const { frames, onFrame } = useRowFrames();
+  const rail = dayRail(rows.entries, now);
+  return (
+    <View className="relative mx-gutter" testID="day-timeline">
+      <DayRail frames={frames} rail={rail} still={rows.openingKeys} />
+      <View className="ml-10">
+        <Group inset={false}>
+          {entryRows({ ...rows, onFrame })}
+          <LogPastRow key="log-past" onPress={logPast} />
+        </Group>
+      </View>
+      <NowMargin frames={frames} now={now} rail={rail} zone={rows.zone} />
+    </View>
   );
 };
 
-/** The day's blocks and the gaps between them, in time order, a hairline between every two. */
-const Entries = ({
-  entries,
-  onOpen,
-  phone,
-  sat,
-  zone,
+/** The day's header: the title and the period control; another day clears the open editor. */
+const DayHeader = ({
+  day,
+  onDate,
 }: {
-  readonly entries: readonly DayEntry[];
-  readonly zone: string;
-  readonly phone: DayPhone;
-  readonly sat: SatOf;
+  readonly day: DayModel;
+  readonly onDate: (date: null | string) => void;
+}) => {
+  const t = useT();
+  const { language } = useViewer();
+  return (
+    <ScreenHeader
+      period={
+        <DayNav day={day} label={formatEyebrow(day.date, day.zone, language)} onDate={onDate} />
+      }
+      title={t("day.title")}
+      variant="top"
+    />
+  );
+};
+
+/** The day's page: totals, the timeline, the phone's and the devices' sections. */
+const DayPage = ({
+  day,
+  onOpen,
+  selected,
+}: {
+  readonly day: DayModel;
   readonly onOpen: (target: SheetTarget) => void;
-}) => (
-  <RowList className="px-5">
-    {entries.map((entry, index) => (
-      <Animated.View entering={ROW_ENTER} exiting={ROW_EXIT} key={entry.key} layout={ROW_LAYOUT}>
-        {/* The hairline on a plain view: the web drops class names on animated ones. */}
-        <View className={cx(index > 0 && "border-t border-separator")} testID="day-entry">
-          <EntryRow entry={entry} onOpen={onOpen} phone={phone} sat={sat} zone={zone} />
-        </View>
-      </Animated.View>
-    ))}
-  </RowList>
-);
+  readonly selected: null | SheetTarget;
+}) => {
+  const t = useT();
+  const { api, hooks } = usePace();
+  const { now } = hooks.useClock();
+  const phone = useDayPhone(day, now);
+  const openingKeys = useOpeningKeys(day.date, day.entries);
+  // One read of the day's usage for every part that shows it (QA round 21 L5).
+  const usageRead = useUsageRead(api, day.date, addDaysIn(day.date, 1, day.zone));
+  const sat = useWhereSat(usageRead.rows);
+  return (
+    <FirstSyncBody>
+      <Totals day={day} />
+      {IS_PHONE && !phone.hasUsageAccess ? <Phone.UsageAccessHint /> : null}
+      {day.entries.length === 0 ? (
+        <EmptyText className="px-row-x py-6">{t("day.empty")}</EmptyText>
+      ) : null}
+      <Timeline
+        entries={day.entries}
+        // A new day starts with no frames: a row's old place is never another day's.
+        key={`timeline-${day.date}`}
+        logPast={() => {
+          onOpen(day.logTarget);
+        }}
+        now={now}
+        onOpen={onOpen}
+        openingKeys={openingKeys}
+        phone={phone}
+        sat={sat}
+        selected={selected}
+        zone={day.zone}
+      />
+      {IS_PHONE ? (
+        <Phone.CalendarSection entries={day.entries} phone={phone} zone={day.zone} />
+      ) : null}
+      <ScreenTimeSection
+        date={day.date}
+        key={day.date}
+        onRetry={usageRead.isFailed ? usageRead.retry : null}
+        usage={usageRead.rows}
+        zone={day.zone}
+      />
+    </FirstSyncBody>
+  );
+};
 
 /**
-One day of the time ledger: totals per category, the timeline with its gaps, edits. Today it
-has the time bar at its foot, where the thumb rests; another day is only looked back on.
+A block named in the address (`?block=<its key>`, Week's «Edit in Day»; review M3, R26-04) opens
+in the editor once, as if picked; the param is then taken off in place, so closing the editor or
+coming back later does not open it again. It waits for the device's copy to be read; a block
+the day does not hold (deleted elsewhere) opens nothing and the param still goes.
+*/
+const useOpenedBlock = (
+  day: { readonly entries: readonly { readonly key: string; readonly target: SheetTarget }[] },
+  open: (target: SheetTarget) => void,
+): void => {
+  const [block, , forgetBlock] = useSearchParam("block");
+  const [handled, setHandled] = useState<null | string>(null);
+  // On a cold load the day has no blocks until the device's copy is read: wait for it (M10).
+  const isRead = usePace().hooks.useAppState((state) => state.status === "ready");
+  if (block === null && handled !== null) {
+    setHandled(null);
+  }
+  if (isRead && block !== null && block !== handled) {
+    setHandled(block);
+    const entry = day.entries.find((candidate) => candidate.key === block);
+    if (entry !== undefined) {
+      open(entry.target);
+    }
+  }
+  useEffect(() => {
+    if (block !== null && block === handled) {
+      forgetBlock();
+    }
+  }, [block, forgetBlock, handled]);
+};
+
+/**
+One day of the time ledger: totals per category, the timeline on its notebook page with its gaps,
+edits. On a computer the editor opens in the inspector beside the day; on a phone, in a sheet.
 */
 export const DayScreen = () => {
   const t = useT();
-  const { api, hooks } = usePace();
-  const { language } = useViewer();
-  const [date, setDate] = useState<null | string>(null);
-  const [sheet, setSheet] = useState<null | SheetTarget>(null);
+  const { hooks } = usePace();
+  const isWide = useIsWide();
+  // The day is in the address (`?date=`, feedback 5 item 6): a reload shows the same day.
+  const [date, setDate] = useZonedDateParam("date");
   const day = hooks.useDay(date);
-  const { now } = hooks.useClock();
-  const phone = useDayPhone(day, now);
-  // One read of the day's usage for every part that shows it (QA round 21 L5).
-  const usageRead = useUsageRead(api, day.date, addDaysIn(day.date, 1, day.zone));
-  const usage = usageRead.rows;
-  const sat = useWhereSat(usage);
-  const header = (
-    <ScreenHeader
-      eyebrow={formatEyebrow(day.date, day.zone, language)}
-      right={<DayNav day={day} onDate={setDate} />}
-      title={t("day.title")}
-    />
-  );
-  return (
-    <Screen header={header}>
-      <FirstSyncBody>
-        <Totals day={day} />
-        {IS_PHONE && !phone.hasUsageAccess ? <Phone.UsageAccessHint /> : null}
-        {day.entries.length === 0 ? (
-          <EmptyText className={cx(LINE, "px-5 py-6 text-label-secondary")}>
-            {t("day.empty")}
-          </EmptyText>
-        ) : (
-          <Entries
-            entries={day.entries}
-            onOpen={setSheet}
-            phone={phone}
-            sat={sat}
-            zone={day.zone}
-          />
-        )}
-        <LogPastRow
-          hasDivider={day.entries.length > 0}
-          onPress={() => {
-            setSheet(day.logTarget);
-          }}
-        />
-        {IS_PHONE ? (
-          <Phone.CalendarSection entries={day.entries} phone={phone} zone={day.zone} />
-        ) : null}
-        <ScreenTimeSection
-          date={day.date}
-          key={day.date}
-          onRetry={usageRead.isFailed ? usageRead.retry : null}
-          usage={usage}
-          zone={day.zone}
-        />
-      </FirstSyncBody>
-      {sheet === null ? null : (
-        <ActivitySheet
-          onClose={() => {
+  // The block picked belongs to the day it was picked on: browser Back or Forward changes the
+  // day in the address and keeps the screen mounted, so another day reads as no pick, derived and
+  // not written back (review of round 24, I1; bug-lessons 201).
+  const [picked, setPicked] = useState<null | {
+    readonly date: string;
+    readonly target: SheetTarget;
+  }>(null);
+  const sheet = picked?.date === day.date ? picked.target : null;
+  const setSheet = (target: null | SheetTarget): void => {
+    setPicked(target === null ? null : { date: day.date, target });
+  };
+  useOpenedBlock(day, setSheet);
+  const closeSheet = (): void => {
+    setSheet(null);
+  };
+  const screen = (
+    <Screen
+      anchor="wide"
+      header={
+        <DayHeader
+          day={day}
+          onDate={(next) => {
+            // A block of the day left behind is not the next day's selection.
             setSheet(null);
+            setDate(next);
           }}
-          target={sheet}
-          zone={day.zone}
         />
-      )}
+      }
+    >
+      <DayPage day={day} onOpen={setSheet} selected={sheet} />
     </Screen>
+  );
+  if (!isWide) {
+    return (
+      <>
+        {screen}
+        <OverlayPresence value={sheet}>
+          {(kept) => <ActivitySheet onClose={closeSheet} target={kept} zone={day.zone} />}
+        </OverlayPresence>
+      </>
+    );
+  }
+  // The editor opens beside the day, collapsed while nothing is picked (F-LAY-03).
+  const pane =
+    sheet === null ? undefined : (
+      <ActivityPane
+        key={`${sheet.kind}-${sheet.startAt}`}
+        onClose={closeSheet}
+        target={sheet}
+        zone={day.zone}
+      />
+    );
+  return (
+    <Shell
+      content={screen}
+      inspector={pane}
+      inspectorLabel={t("day.details")}
+      inspectorOpen={sheet !== null}
+      onInspectorClose={closeSheet}
+    />
   );
 };

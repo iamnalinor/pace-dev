@@ -35,7 +35,6 @@ export const BASE_PRESETS: Readonly<Record<BasePresetId, BasePreset>> = {
   hw: basePreset("hw", "Homework", {
     defaultImportance: "normal",
     deadlinePolicy: { kind: "hard" },
-    submission: "per_subtask",
     progressMode: "subtasks",
     recurrence: null,
     fields: { ...NO_FIELDS, description: true },
@@ -46,7 +45,6 @@ export const BASE_PRESETS: Readonly<Record<BasePresetId, BasePreset>> = {
   work: basePreset("work", "Work", {
     defaultImportance: "normal",
     deadlinePolicy: { kind: "hard" },
-    submission: "whole",
     progressMode: "slider",
     recurrence: null,
     fields: { ...NO_FIELDS, link: true, description: true, startAt: true },
@@ -56,7 +54,6 @@ export const BASE_PRESETS: Readonly<Record<BasePresetId, BasePreset>> = {
   personal: basePreset("personal", "Personal", {
     defaultImportance: "normal",
     deadlinePolicy: { kind: "hard" },
-    submission: "whole",
     progressMode: "subtasks",
     recurrence: null,
     fields: NO_FIELDS,
@@ -66,7 +63,6 @@ export const BASE_PRESETS: Readonly<Record<BasePresetId, BasePreset>> = {
   deferred: basePreset("deferred", "Deferred", {
     defaultImportance: "nice_to_have",
     deadlinePolicy: { kind: "hard" },
-    submission: "whole",
     progressMode: "none",
     recurrence: null,
     fields: { ...NO_FIELDS, startAt: true },
@@ -76,7 +72,6 @@ export const BASE_PRESETS: Readonly<Record<BasePresetId, BasePreset>> = {
   inbox: basePreset("inbox", "Inbox", {
     defaultImportance: "nice_to_have",
     deadlinePolicy: { kind: "hard" },
-    submission: "whole",
     progressMode: "none",
     recurrence: null,
     fields: NO_FIELDS,

@@ -7,6 +7,7 @@ import { ru } from "./support/catalog.ts";
 import { expect, test } from "./support/fixtures.ts";
 import { loginViaApi } from "./support/login.ts";
 import { type LivedIn, seedLivedIn } from "./support/seed.ts";
+import { typedField } from "./support/time-bar.ts";
 
 /**
 Every sheet of the app takes the keyboard to its first field (QA 18 M1), keeps Shift+Tab inside
@@ -29,9 +30,10 @@ const registeredSheets = (): readonly string[] => {
     .toArray();
 };
 
-// A phone's sheet has no cross (the dim and the system's back close it); a dialog has one.
+// A dialog has a cross, and so has a phone's sheet on the web (spec §4.2.21: a phone's browser
+// has no Back to rely on); Android's sheet has none (its handle, the dim and Back close it).
 const SIZES = [
-  { closeStops: 0, height: 844, name: "phone", width: 390 },
+  { closeStops: 1, height: 844, name: "phone", width: 390 },
   { closeStops: 1, height: 900, name: "desktop", width: 1280 },
 ] as const;
 
@@ -53,6 +55,10 @@ const named = (key: keyof typeof ru): RegExp =>
     "u",
   );
 
+const DAY_PICK_TEXT = ru["day.pick"].replaceAll(/[$()*+.?[\\\]^{|}]/gu, String.raw`\$&`);
+// eslint-disable-next-line security/detect-non-literal-regexp -- the catalog's own text, escaped
+const dayPick = new RegExp(`${DAY_PICK_TEXT}$`, "u");
+
 type Opener = {
   readonly sheet: string;
   /** What opens it, for the report (one sheet may have several ways in). */
@@ -64,17 +70,18 @@ type Opener = {
   readonly open: (page: Page, seeded: LivedIn) => Promise<void>;
 };
 
-/** One of the time bar's buttons on Now; with something running, behind "Start another". */
+/** One of the time bar's four fixed tiles on Now (they never fold; only the typed field does). */
+/** History's one visible Undo (its name is «Вернуть: <the row>», QA round 25 R25-05). */
+const historyUndo = (page: Page) =>
+  page
+    .getByRole("button", { name: /^Вернуть: / })
+    .filter({ hasText: ru["common.undo"] })
+    .first();
+
 const timeBarButton = async (page: Page, key: keyof typeof ru): Promise<void> => {
   await page.goto("/");
   const bar = page.getByRole("region", { name: ru["time.bar"] });
-  const button = bar.getByRole("button", { exact: true, name: ru[key] });
-  const another = bar.getByRole("button", { name: ru["time.startOther"] });
-  await expect(button.or(another)).toBeVisible();
-  if (await another.isVisible()) {
-    await another.click();
-  }
-  await button.click();
+  await bar.getByRole("button", { exact: true, name: ru[key] }).click();
 };
 
 /** Every way into every sheet the test knows; the registry must not hold one it lacks. */
@@ -85,9 +92,26 @@ const OPENERS: readonly Opener[] = [
     open: async (page: Page) => {
       await timeBarButton(page, key);
     },
+    // A computer's pickers are popovers under their tile, not sheets.
     sheet: "time-choices",
+    sizes: ["phone"] as const,
     via: `the time bar's ${key}`,
   })),
+  {
+    open: async (page) => {
+      await page.goto("/");
+      const field = await typedField(page.getByRole("region", { name: ru["time.bar"] }), {
+        field: ru["time.whatDoing"],
+        unfold: ru["time.startOther"],
+      });
+      await field.fill("Пошёл в ЦСС, 20 мин");
+      await field.press("Enter");
+    },
+    // A computer shows the proposal in the bar, above the field (design review B2).
+    sheet: "time-proposal",
+    sizes: ["phone"],
+    via: "the time bar's typed line",
+  },
   {
     field: ru["edit.taskTitle"],
     open: async (page, seeded) => {
@@ -96,6 +120,16 @@ const OPENERS: readonly Opener[] = [
     },
     sheet: "task-edit",
     via: "the task's Edit",
+  },
+  {
+    open: async (page, seeded) => {
+      await page.goto(`/task/${seeded.openTaskId}`);
+      await page.getByRole("button", { name: named("task.menu") }).click();
+    },
+    // A popover under the button on a computer.
+    sheet: "task-menu",
+    sizes: ["phone"],
+    via: "the task's ⋯ menu",
   },
   {
     open: async (page, seeded) => {
@@ -120,21 +154,27 @@ const OPENERS: readonly Opener[] = [
       await page.getByRole("button", { name: named("day.logPast") }).click();
     },
     sheet: "activity",
+    // A computer edits it in the inspector beside the day (Task 4.4), not in a sheet.
+    sizes: ["phone"],
     via: "Day's Log past activity",
   },
   {
     open: async (page) => {
       await page.goto("/day");
-      await page.getByRole("button", { name: named("day.pick") }).click();
+      // The date's button is named "<the day>. <Pick a day>".
+      await page.getByRole("button", { name: dayPick }).click();
     },
+    // A popover under the date on a computer.
     sheet: "day-picker",
+    sizes: ["phone"] as const,
     via: "Day's date",
   },
   {
     open: async (page) => {
       await page.goto("/week");
       await page
-        .getByRole("button", { name: /, \d{2}:\d{2}–\d{2}:\d{2}$/u })
+        // A block is named "<day>, <from>–<to>, <name>" (F-A11Y-09).
+        .getByRole("button", { name: /, \d{2}:\d{2}–\d{2}:\d{2}, /u })
         .first()
         .click();
     },
@@ -144,8 +184,23 @@ const OPENERS: readonly Opener[] = [
   },
   {
     open: async (page) => {
+      // The lived-in account has nothing to sort: one line goes to the Inbox first.
+      await page.goto("/");
+      const line = page.getByRole("textbox", { name: ru["composer.label"] });
+      await line.pressSequentially("Спросить про счёт");
+      await page.getByRole("button", { name: ru["composer.toInbox"] }).click();
+      await expect(line).toHaveValue("");
+      await page.goto("/inbox");
+      await page.getByTestId("inbox-capture").first().click();
+    },
+    sheet: "inbox-detail",
+    sizes: ["phone"],
+    via: "a capture on the Inbox",
+  },
+  {
+    open: async (page) => {
       await page.goto("/history");
-      await page.getByRole("button", { exact: true, name: ru["common.undo"] }).first().click();
+      await historyUndo(page).click();
     },
     sheet: "history-undo",
     via: "History's Undo",
@@ -205,6 +260,10 @@ const checkSheet = async (page: Page, opener: Opener, seeded: LivedIn) => {
   // The modal moves focus after it mounts: given a moment.
   await expect.poll(async () => (await focus(page)).isInSheet, { message: opener.via }).toBe(true);
   const landed = await focus(page);
+  // The header's close joins the tab order as the sheet settles (it can still be entering): polled.
+  await expect
+    .poll(async () => await closeTabStops(page), { message: opener.via })
+    .toBeGreaterThan(0);
   const closeStops = await closeTabStops(page);
   // Shift+Tab wraps inside the sheet, never onto the full-screen dim (QA 19 L1).
   await page.keyboard.press("Shift+Tab");
@@ -271,3 +330,59 @@ for (const size of SIZES) {
     });
   });
 }
+
+/** Whether the focused element shows its ring (`:focus-visible`, never on a mouse click). */
+const hasFocusRing = async (page: Page): Promise<boolean> =>
+  await page.locator(":focus").evaluate((element) => element.matches(":focus-visible"));
+
+test.describe("keyboard only: a sheet opened from a list row (Review Focus 5)", () => {
+  test.use({ viewport: { height: 900, width: 1280 } });
+
+  test("focus starts on its first control, Escape closes it, focus goes back to the row with its ring", async ({
+    page,
+  }) => {
+    const { token } = await loginViaApi(page);
+    await seedLivedIn(token);
+    await page.goto("/history");
+    const undo = historyUndo(page);
+    await expect(undo).toBeVisible();
+    // From the keyboard: onto the row's control (a Shift+Tab and a Tab come back onto it, so the
+    // browser knows the keyboard moved it), then Enter opens the sheet.
+    await undo.focus();
+    await page.keyboard.press("Shift+Tab");
+    await page.keyboard.press("Tab");
+    await expect(undo).toBeFocused();
+    expect(await hasFocusRing(page)).toBe(true);
+    await page.keyboard.press("Enter");
+    await expect(page.locator(SURFACE)).toBeVisible();
+    await expect.poll(async () => (await focus(page)).isInSheet).toBe(true);
+    // The first control (Cancel), never the dim or the cross; its ring shows.
+    expect((await focus(page)).name).not.toBe(CLOSE);
+    expect(await hasFocusRing(page)).toBe(true);
+    await page.keyboard.press("Escape");
+    await expect(page.locator(SURFACE)).toHaveCount(0);
+    await expect(undo).toBeFocused();
+    expect(await hasFocusRing(page)).toBe(true);
+  });
+});
+
+test("each time-bar picker gives focus back to its tile on Escape, Task's with its search field included (QA round 24 R24-05)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 900, width: 1280 });
+  await loginViaApi(page);
+  await page.goto("/");
+  await expect(page.getByRole("textbox", { name: "New task" })).toBeVisible();
+  // The Task picker's search has the keyboard while it is open.
+  await page.getByRole("button", { exact: true, name: "Task" }).click();
+  await expect(page.getByRole("searchbox", { name: "Find a task" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  for (const name of ["Calendar", "Task", "Chores", "Misc"]) {
+    const tile = page.getByRole("button", { exact: true, name });
+    await tile.click();
+    await expect(page.getByTestId("popover-surface")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("popover-surface")).toHaveCount(0);
+    await expect(tile).toBeFocused();
+  }
+});

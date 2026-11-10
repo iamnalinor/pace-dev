@@ -6,7 +6,6 @@ import { useNewTaskRequest } from "#app/shared/new-task-request.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
-import { fakeMe } from "@pace/client/testing";
 
 import { Sidebar } from "./sidebar.tsx";
 
@@ -60,6 +59,13 @@ describe("Sidebar", () => {
     ]);
   });
 
+  it("hands each destination's address to its link (navigate, not push, is the kit Link's: link.test; the web's `<a href>`: link.web.test, e2e/link)", async () => {
+    await renderScreen(<Sidebar />, await createTestRuntime({ world: "empty" }));
+    await fireEvent.press(screen.getByRole("link", { name: en("nav.week") }));
+    expect(router.navigate).toHaveBeenCalledWith("/week");
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
   it("counts what waits in the Inbox on its row, the captures and the decisions together", async () => {
     await renderScreen(<Sidebar />, await createTestRuntime());
     const inbox = screen.getByRole("link", { name: en("nav.inboxWaiting", { count: 4 }) });
@@ -73,26 +79,11 @@ describe("Sidebar", () => {
     expect(screen.getByRole("link", { name: en("nav.inbox") })).toBeTruthy();
   });
 
-  it("shows the owner's first name beside the app's name", async () => {
+  it("shows no profile name: who is signed in is said in Settings only (owner 2026-11-08)", async () => {
     const runtime = await createTestRuntime({ world: "empty" });
     await runtime.auth.me();
     await renderScreen(<Sidebar />, runtime);
     expect(screen.getByText(en("app.name"))).toBeOnTheScreen();
-    expect(screen.getByText("Ann")).toBeOnTheScreen();
-  });
-
-  it("falls back to the first word of the full name for a session that predates the first name", async () => {
-    const runtime = await createTestRuntime({
-      routes: { "GET /api/me": () => ({ ...fakeMe, firstName: null, name: "Ann Lee" }) },
-      world: "empty",
-    });
-    await runtime.auth.me();
-    await renderScreen(<Sidebar />, runtime);
-    expect(screen.getByText("Ann")).toBeOnTheScreen();
-  });
-
-  it("leaves the name out until the server has told it", async () => {
-    await renderScreen(<Sidebar />, await createTestRuntime({ world: "empty" }));
     expect(screen.queryByText("Ann")).toBeNull();
   });
 });

@@ -83,16 +83,52 @@ const pushRoutes = () => {
   };
 };
 
+/** A node's NativeWind classes, as one string. */
+const classesOf = (node: { readonly props: Record<string, unknown> }): string => {
+  const name = node.props["className"];
+  return typeof name === "string" ? name : "";
+};
+
+/** Whether the text, or a box around it, carries the rows' text inset. */
+const insetOf = (text: string): string | undefined => {
+  let node: null | ReturnType<typeof screen.getByText> = screen.getByText(text);
+  while (node !== null && !/\bpx-row-x\b/u.test(classesOf(node))) {
+    node = node.parent;
+  }
+  return node === null ? undefined : "px-row-x";
+};
+
 describe("SettingsScreen", () => {
-  it("saves digest times as they are typed, adds and removes one", async () => {
+  it("says who is signed in by the account's actions, the one place the name is shown (owner 2026-11-08)", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    await runtime.auth.me();
+    await renderScreen(<SettingsScreen />, runtime);
+    expect(screen.getByText(en("nav.signedInAs", { name: "Ann" }))).toBeOnTheScreen();
+  });
+
+  it("starts the account's own text and buttons at the section headers' text inset (design review 2 N6)", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    await runtime.auth.me();
+    await renderScreen(<SettingsScreen />, runtime);
+    // «Вы вошли как…», Export/Log out and «Опасные действия» stood at the group's edge (264 / 16)
+    // while every section header's text starts a row inset in (280 / 32).
+    expect(insetOf(en("nav.signedInAs", { name: "Ann" }))).toBe("px-row-x");
+    expect(insetOf(en("settings.danger"))).toBe("px-row-x");
+    expect(insetOf(en("settings.logout"))).toBe("px-row-x");
+  });
+
+  it("saves a digest time when the field is left, adds and removes one", async () => {
     const runtime = await createTestRuntime({ world: "empty" });
     await renderScreen(<SettingsScreen />, runtime);
     const settings = () => runtime.state.store.getState().settings;
     const first = screen.getByLabelText(en("settings.digestWindows.time", { index: 1 }));
-    await fireEvent.changeText(first, "8");
-    // Half a time is never stored.
+    await fireEvent.changeText(first, "08:3");
+    await fireEvent(first, "blur");
+    // Half a time is never stored: the field says so instead.
     expect(settings().digestWindows[0]).toBe("09:00");
+    expect(screen.getByText(en("day.badTime"))).toBeOnTheScreen();
     await fireEvent.changeText(first, "0830");
+    await fireEvent(first, "blur");
     await waitFor(() => {
       expect(settings().digestWindows[0]).toBe("08:30");
     });
@@ -108,16 +144,102 @@ describe("SettingsScreen", () => {
     });
   });
 
+  it("shows the next digest time in a row whose time was removed (review I5)", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    await renderScreen(<SettingsScreen />, runtime);
+    const settings = () => runtime.state.store.getState().settings;
+    const [first = "", second = ""] = settings().digestWindows;
+    await fireEvent.press(
+      screen.getByRole("button", { name: en("settings.digestWindows.remove", { time: first }) }),
+    );
+    await waitFor(() => {
+      expect(settings().digestWindows[0]).toBe(second);
+    });
+    expect(
+      screen.getByLabelText(en("settings.digestWindows.time", { index: 1 })).props["value"],
+    ).toBe(second);
+  });
+
+  it("keeps a digest row removed while its field held a typed time (QA 27 wave review I1)", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    await renderScreen(<SettingsScreen />, runtime);
+    const settings = () => runtime.state.store.getState().settings;
+    const before = settings().digestWindows;
+    const last = before.at(-1) ?? "";
+    // Typed, and the row's ✕ pressed without leaving the field (Android): the field unmounts.
+    await fireEvent.changeText(
+      screen.getByLabelText(en("settings.digestWindows.time", { index: before.length })),
+      "2000",
+    );
+    await fireEvent.press(
+      screen.getByRole("button", { name: en("settings.digestWindows.remove", { time: last }) }),
+    );
+    await waitFor(() => {
+      expect(settings().digestWindows).toEqual(before.slice(0, -1));
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(settings().digestWindows).toEqual(before.slice(0, -1));
+  });
+
+  it("keeps a later digest row's typed time when an earlier row is removed (review I1)", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    await renderScreen(<SettingsScreen />, runtime);
+    const settings = () => runtime.state.store.getState().settings;
+    const before = settings().digestWindows;
+    const [first = ""] = before;
+    const lastField = () =>
+      screen.getByLabelText(en("settings.digestWindows.time", { index: before.length }));
+    await fireEvent.changeText(lastField(), "2000");
+    await fireEvent.press(
+      screen.getByRole("button", { name: en("settings.digestWindows.remove", { time: first }) }),
+    );
+    await waitFor(() => {
+      expect(settings().digestWindows).toEqual(before.slice(1));
+    });
+    // The typed row moved up one place and still holds what was typed; leaving it saves it there.
+    const moved = screen.getByLabelText(
+      en("settings.digestWindows.time", { index: before.length - 1 }),
+    );
+    expect(moved.props["value"]).toBe("20:00");
+    await fireEvent(moved, "blur");
+    await waitFor(() => {
+      expect(settings().digestWindows).toEqual([...before.slice(1, -1), "20:00"]);
+    });
+  });
+
   it("saves the quiet hours and opens the pages behind the links", async () => {
     const runtime = await createTestRuntime({ world: "empty" });
     await renderScreen(<SettingsScreen />, runtime);
-    await fireEvent.changeText(screen.getByLabelText(en("settings.quietHours.from")), "2230");
+    const from = screen.getByLabelText(en("settings.quietHours.from"));
+    await fireEvent.changeText(from, "2230");
+    await fireEvent(from, "blur");
     await waitFor(() => {
       expect(runtime.state.store.getState().settings.quietHours.from).toBe("22:30");
     });
     const presetsLink = `${en("settings.presets")} ${en("settings.presets.hint")}`;
     await fireEvent.press(screen.getByRole("link", { name: presetsLink }));
-    expect(router.push).toHaveBeenCalledWith("/presets");
+    expect(router.navigate).toHaveBeenCalledWith("/presets");
+  });
+
+  it("writes no quiet-hours event while the hour is retyped inside a filled value (QA-25 review I1)", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    await renderScreen(<SettingsScreen />, runtime);
+    const quietHours = () => runtime.state.store.getState().settings.quietHours;
+    const before = quietHours();
+    const from = screen.getByLabelText(en("settings.quietHours.from"));
+    // «23:00», the caret after the 3, Backspace, then «1»: 21:00, never 02:00 on the way.
+    await fireEvent(from, "focus");
+    await fireEvent.changeText(from, "2:00");
+    expect(quietHours()).toEqual(before);
+    expect(from.props["value"]).toBe("2:00");
+    await fireEvent.changeText(from, "21:00");
+    expect(quietHours()).toEqual(before);
+    await fireEvent(from, "blur");
+    await waitFor(() => {
+      expect(quietHours().from).toBe("21:00");
+    });
   });
 
   it("turns Week's night hours on and off", async () => {
@@ -432,7 +554,7 @@ describe("SettingsScreen", () => {
       await Promise.resolve();
     });
     expect(
-      await screen.findByText("1 change has not synced yet: logging out now loses it."),
+      await screen.findByText("1 change has not synced yet: signing out now loses it."),
     ).toBeOnTheScreen();
     expect(logout).not.toHaveBeenCalled();
   });
@@ -466,7 +588,7 @@ describe("SettingsScreen", () => {
     await fireEvent.press(screen.getByRole("button", { name: en("settings.logout") }));
     // Nothing is discarded yet: the question names how many, and offers to wait.
     expect(
-      await screen.findByText("2 changes have not synced yet: logging out now loses them."),
+      await screen.findByText("2 changes have not synced yet: signing out now loses them."),
     ).toBeOnTheScreen();
     expect(logout).not.toHaveBeenCalled();
     await fireEvent.press(screen.getByRole("button", { name: en("settings.logout.wait") }));
@@ -481,6 +603,30 @@ describe("SettingsScreen", () => {
       expect(logout).toHaveBeenCalledTimes(1);
     });
     expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it("on a phone puts Wait over Sign out anyway, each the column's width, so neither label wraps (bug class 191)", async () => {
+    const runtime = await createTestRuntime({
+      routes: { "POST /api/sync/push": () => problem(503, "offline") },
+      world: "empty",
+    });
+    await runtime.actions.setNightHours(true);
+    await runtime.actions.setLanguage("en");
+    await renderScreen(<SettingsScreen />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.logout") }));
+    // Side by side at the text inset (design review 2 N6) each half was 159 px at 390, and
+    // «Sign out anyway» / «Всё равно выйти» ran two lines (60 px). Stacked as the danger zone's.
+    const anyway = await screen.findByRole("button", { name: en("settings.logout.anyway") });
+    let node: null | typeof anyway = anyway;
+    const rows: string[] = [];
+    while (node !== null && node.props["role"] !== "group") {
+      if (/\bflex-row\b/u.test(classesOf(node))) {
+        rows.push(classesOf(node));
+      }
+      node = node.parent;
+    }
+    expect(node).not.toBeNull();
+    expect(rows).toEqual([]);
   });
 
   it("waits for Telegram before deleting and can poll after the session disappears", async () => {
@@ -520,11 +666,16 @@ describe("SettingsScreen", () => {
     await fireEvent.press(screen.getByRole("button", { name: en("settings.deleteAccount") }));
     const remove = screen.getByRole("button", { name: en("settings.deleteAccount.confirm") });
     expect(en("settings.deleteAccount.confirm")).toMatch(/Telegram/u);
-    expect(String(remove.props["className"])).toMatch(/border-danger/u);
+    // Both on the destructive look, alike (spec §4.2.3, F-CMP-07): the quiet danger fill.
+    expect(String(within(remove).getByTestId("pressable-visual").props["className"])).toMatch(
+      /border-danger/u,
+    );
     await fireEvent.press(screen.getByRole("button", { name: en("common.cancel") }));
     await fireEvent.press(screen.getByRole("button", { name: en("settings.wipe") }));
     const wipe = screen.getByRole("button", { name: en("settings.wipe.confirm") });
-    expect(String(wipe.props["className"])).toMatch(/border-danger/u);
+    expect(String(within(wipe).getByTestId("pressable-visual").props["className"])).toMatch(
+      /border-danger/u,
+    );
   });
 
   it("keeps focus through Wipe's and Delete's first confirm: onto Cancel and back to the opener (bug class 5)", async () => {
@@ -622,5 +773,24 @@ describe("SettingsScreen", () => {
     await fireEvent.press(screen.getByRole("button", { name: en("common.cancel") }));
     expect(screen.getByText(en("settings.confirmation.waiting"))).toBeOnTheScreen();
     expect(mockPendingConfirmation.current?.request.id).toBe(id);
+  });
+});
+
+describe("Settings sections (spec §5.17)", () => {
+  it("groups the settings under headings, destructive actions last in the danger style", async () => {
+    await renderScreen(<SettingsScreen />, await createTestRuntime({ world: "empty" }));
+    for (const key of ["settings.account", "settings.notifications", "settings.tasks"] as const) {
+      expect(screen.getByRole("header", { name: en(key) })).toBeOnTheScreen();
+    }
+    expect(screen.getAllByTestId("group-separator").length).toBeGreaterThan(0);
+  });
+
+  it("shows the server read-only with its host on a phone", async () => {
+    await renderScreen(<SettingsScreen />, await createTestRuntime({ world: "empty" }));
+    expect(screen.getByText(en("settings.server.hint"))).toBeOnTheScreen();
+  });
+
+  it("runs in a zone that is not UTC, so a host-zone assumption fails here (bug-lessons class 135)", () => {
+    expect(new Date(2026, 0, 1).getTimezoneOffset()).not.toBe(0);
   });
 });

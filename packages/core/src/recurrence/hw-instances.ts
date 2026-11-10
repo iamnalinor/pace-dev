@@ -159,8 +159,9 @@ const aheadAt = ({ slot, source }: Expected, now: string): string => {
 };
 
 /**
-The creation of one instance. It is numbered after every instance of the preset so far,
-closed ones included, and inherits the estimate of the most recent one: the student
+The creation of one instance. It is numbered `firstNumber` (1 when unset) plus the number of
+instances of the preset in the store, closed ones included (one made and taken back is not
+counted), so the numbers count up from the first in issue order; it inherits the estimate of the most recent one: the student
 knows better than the preset how long a sheet takes.
 */
 const instanceEvent = (item: Expected, tasks: TasksState, now: string): EventInput => {
@@ -175,7 +176,7 @@ const instanceEvent = (item: Expected, tasks: TasksState, now: string): EventInp
     source: "system",
     payload: {
       taskId: id,
-      title: `${source.preset.name} ${existing.length + 1}`,
+      title: `${source.preset.name} ${(source.recurrence.firstNumber ?? 1) + existing.length}`,
       presetId: slot.presetId,
       dueAt: slot.dueAt,
       dueTz: slot.dueTz,

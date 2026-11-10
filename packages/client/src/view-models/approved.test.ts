@@ -61,7 +61,7 @@ describe("the approval toast's words (fix round 1 of QA 22)", () => {
     expect(approvalText([unworded], world, toast)).toBe("The assistant will update the…");
   });
 
-  it("says Done when there is nothing to name", () => {
-    expect(approvalText([], world, toast)).toBe("Done");
+  it("says Approved when there is nothing to name", () => {
+    expect(approvalText([], world, toast)).toBe("Approved");
   });
 });

@@ -24,7 +24,6 @@ const WRITE_TOOLS = [
   "seed_example_presets",
   "set_importance",
   "set_status",
-  "submit",
   "update_preset",
   "update_task",
 ].toSorted(byText);
@@ -92,7 +91,45 @@ const createTask = async (token: string, args: Record<string, unknown>): Promise
   return String(result["taskId"]);
 };
 
+/**
+The automatic miss an older version wrote at the deadline (none is made since feedback 5), already
+in the log: written in-process, since one an older client pushes now is revoked at once.
+*/
+const pushOldMiss = async (taskId: string): Promise<void> => {
+  // The deadline of the overdue tasks below.
+  const at = "2026-09-10T10:00:00.000Z";
+  const me = await json<{ id: string }>("/api/me", { token: await loginAsDev("1001") });
+  await env.USER_STORE.get(env.USER_STORE.idFromName(me.id)).append(
+    [
+      {
+        deviceId: "server",
+        id: `auto:${taskId}:missed`,
+        occurredAt: at,
+        payload: { outcome: "cancelled_missed", taskId },
+        precision: "exact",
+        recordedAt: at,
+        source: "system",
+        type: "task.closed",
+      },
+    ],
+    { now: new Date().toISOString() },
+  );
+};
+
 describe("MCP tools catalogue", () => {
+  it("tells an agent core's lateness rule in close_task (owner, 2026-11-09; bug-lessons 187)", async () => {
+    const token = await readWriteToken();
+    const { tools } = await mcpResult<{ tools: { name: string; description?: string }[] }>(
+      token,
+      "tools/list",
+    );
+    const description = tools.find((tool) => tool.name === "close_task")?.description ?? "";
+    expect(description).not.toContain("when it is past the deadline");
+    // `doneLateness`: every subtask done → the latest done instant; otherwise the closing instant.
+    expect(description).toMatch(/every subtask is done.*latest done instant/u);
+    expect(description).toMatch(/otherwise by the closing instant/u);
+  });
+
   it("lists every tool with annotations, a title and an LLM-facing description", async () => {
     type Listed = {
       name: string;
@@ -120,7 +157,6 @@ describe("MCP tools catalogue", () => {
         "create_task",
         "capture_inbox",
         "mark_subtasks",
-        "submit",
         "close_task",
         "reopen",
         "update_task",
@@ -189,7 +225,7 @@ describe("create_task", () => {
       dueTz: "Europe/Moscow",
       id: taskId,
       presetId: "hw",
-      solved: 0,
+      done: 0,
       total: 3,
     });
     expect(typeof now["inboxCount"]).toBe("number");
@@ -276,7 +312,7 @@ describe("inbox", () => {
 });
 
 describe("progress and closing", () => {
-  it("marks subtasks by number and submitting the last unsubmitted one closes the task", async () => {
+  it("marks subtasks done by number, at the call's instant, and closes the task as done", async () => {
     const token = await readWriteToken();
     const taskId = await createTask(token, {
       presetId: "hw",
@@ -284,28 +320,34 @@ describe("progress and closing", () => {
       title: "Sheet",
     });
     const marked = await okTool(token, "mark_subtasks", { numbers: [1, 2], taskId });
-    expect(rows(marked["solved"])).toHaveLength(2);
-    expect(marked["task"]).toMatchObject({ solved: 2, status: "in_progress", total: 3 });
+    expect(rows(marked["done"])).toHaveLength(2);
+    expect(rows(marked["alreadyDone"])).toHaveLength(0);
+    expect(marked["task"]).toMatchObject({ done: 2, status: "in_progress", total: 3 });
+    const again = await okTool(token, "mark_subtasks", { numbers: [2, 3], taskId });
+    expect(again).toMatchObject({ alreadyDone: [expect.any(String)], done: [expect.any(String)] });
 
-    const partial = await okTool(token, "submit", { taskId });
-    expect(partial).toMatchObject({ closed: false });
-    expect(rows(partial["submittedSubtaskIds"])).toHaveLength(2);
-
-    await okTool(token, "mark_subtasks", { numbers: [3], taskId });
-    const final = await okTool(token, "submit", { taskId });
-    expect(final).toMatchObject({ closed: true, task: { status: "in_progress", submitted: 3 } });
     const view = await okTool(token, "get_task", { id: taskId });
-    expect(view).toMatchObject({ closed: { outcome: "done" }, outcome: "done" });
-    expect(rows(view["subtasks"]).every((row) => row["submittedAt"] !== null)).toBe(true);
+    const subtasks = rows(view["subtasks"]);
+    expect(subtasks.every((row) => typeof row["doneAt"] === "string")).toBe(true);
+    expect(subtasks.every((row) => !("solvedAt" in row) && !("submittedAt" in row))).toBe(true);
+    expect(await okTool(token, "close_task", { outcome: "done", taskId })).toMatchObject({
+      outcome: "done",
+    });
+    expect(await okTool(token, "get_task", { id: taskId })).toMatchObject({
+      closed: { outcome: "done" },
+      outcome: "done",
+    });
     expect(await errorText(token, "mark_subtasks", { numbers: [1], taskId })).toContain(
       "retro/task-closed",
     );
   });
 
-  it("submits a whole-submission task as done, reopens and closes it as cancelled", async () => {
+  it("closes a task as done, reopens and closes it as cancelled", async () => {
     const token = await readWriteToken();
     const taskId = await createTask(token, { presetId: "work", title: "Ticket" });
-    expect(await okTool(token, "submit", { taskId })).toMatchObject({ closed: true });
+    expect(await okTool(token, "close_task", { outcome: "done", taskId })).toMatchObject({
+      outcome: "done",
+    });
     expect(await okTool(token, "reopen", { taskId })).toMatchObject({
       task: { status: "not_started" },
     });
@@ -322,14 +364,94 @@ describe("progress and closing", () => {
     });
   });
 
-  it("refuses to submit when nothing is solved, with the Result code", async () => {
+  it("refuses unknown subtasks and tasks with the Result code", async () => {
     const token = await readWriteToken();
     const taskId = await createTask(token, { presetId: "hw", subtasks: ["1"], title: "Sheet" });
-    expect(await errorText(token, "submit", { taskId })).toContain("retro/nothing-to-submit");
     expect(await errorText(token, "mark_subtasks", { subtaskIds: ["ghost"], taskId })).toContain(
       "subtask/unknown",
     );
     expect(await errorText(token, "get_task", { id: "ghost" })).toContain("task/unknown");
+  });
+
+  it("answers get_task with every field of the task, in the text a client reads too (feedback 5)", async () => {
+    const token = await readWriteToken();
+    const startAt = "2026-12-20T07:00:00.000Z";
+    const taskId = await createTask(token, {
+      dueAt: "2026-12-24T20:59:00.000Z",
+      dueTz: "Europe/Moscow",
+      estimateMinutes: 90,
+      presetId: "hw",
+      startAt,
+      subtasks: ["1"],
+      title: "Full",
+    });
+    const result = await callTool(token, "get_task", { id: taskId });
+    const structured = result.structuredContent ?? {};
+    expect(structured).toMatchObject({
+      estimateMinutes: 90,
+      ownImportance: null,
+      startAt,
+    });
+    expect(typeof structured["startTz"]).toBe("string");
+    expect(Object.keys(structured)).toEqual(
+      expect.arrayContaining([
+        "createdEventId",
+        "seriesId",
+        "seriesRevision",
+        "userModified",
+        "importanceSetAt",
+        "sources",
+        "fields",
+        "statusSince",
+        "touched",
+        "submittedAt",
+        "reopenedAt",
+        "lastEventAt",
+      ]),
+    );
+    const text = result.content[0]?.text ?? "";
+    expect(text).toContain(startAt);
+    expect(text).toContain("estimateMinutes");
+  });
+});
+
+describe("get_task's text answer (session review minor 8)", () => {
+  it("does not repeat long fields: the text cuts them short, the structured content keeps them whole", async () => {
+    const token = await readWriteToken();
+    const description = `${"Long description. ".repeat(100)}END-OF-DESCRIPTION`;
+    const sourceText = `${"Pasted source. ".repeat(100)}END-OF-SOURCE`;
+    const taskId = await createTask(token, {
+      description,
+      presetId: "hw",
+      sourceText,
+      subtasks: ["Problem with a distinctive label"],
+      title: "Long",
+    });
+    const result = await callTool(token, "get_task", { id: taskId });
+    expect(result.structuredContent).toMatchObject({ description, sourceText });
+    const text = result.content[0]?.text ?? "";
+    expect(text).not.toContain("END-OF-DESCRIPTION");
+    expect(text).not.toContain("END-OF-SOURCE");
+    // The subtasks are listed once, as lines, not again inside the fields.
+    expect(text.split("Problem with a distinctive label")).toHaveLength(2);
+    expect(text.length).toBeLessThan(description.length);
+    expect(text).toContain("Long description.");
+  });
+
+  it("cuts by characters, never inside one (an emoji at the cut), and cuts the closure's reason too", async () => {
+    const token = await readWriteToken();
+    // 199 letters, then emoji (two UTF-16 units each): character 200 is the first emoji.
+    const description = `${"a".repeat(199)}${"😀".repeat(50)}`;
+    const reason = `${"Long reason. ".repeat(40)}END-OF-REASON`;
+    const taskId = await createTask(token, { description, presetId: "work", title: "Emoji" });
+    await okTool(token, "close_task", { outcome: "cancelled", reason, taskId });
+    const result = await callTool(token, "get_task", { id: taskId });
+    const text = result.content[0]?.text ?? "";
+    expect(text).toContain(`${"a".repeat(199)}😀…`);
+    // No half of a surrogate pair is left anywhere in the answer.
+    expect(text.isWellFormed()).toBe(true);
+    expect(text).not.toContain("END-OF-REASON");
+    expect(text).toContain("reason: Long reason.");
   });
 });
 
@@ -362,7 +484,7 @@ describe("at and precision", () => {
     expect(
       await errorText(token, "mark_subtasks", { at: hoursFromNow(24), numbers: [2], taskId }),
     ).toContain("retro/future");
-    expect(await okTool(token, "get_task", { id: taskId })).toMatchObject({ solved: 1 });
+    expect(await okTool(token, "get_task", { id: taskId })).toMatchObject({ done: 1 });
   });
 });
 
@@ -433,6 +555,25 @@ describe("editing", () => {
       "event/not-found",
     );
   });
+
+  it("refuses to revoke an event revoked already, writing nothing (review I3)", async () => {
+    const token = await readWriteToken();
+    const taskId = await createTask(token, { presetId: "hw", subtasks: ["1"], title: "Sheet" });
+    const marked = await okTool(token, "mark_subtasks", { numbers: [1], taskId });
+    const solveId = String(rows(marked["events"])[0]?.["id"]);
+    const first = await okTool(token, "revoke_event", { eventId: solveId });
+    const revocationId = String(rows(first["events"])[0]?.["id"]);
+    const repeated = await errorText(token, "revoke_event", { eventId: solveId });
+    expect(repeated).toContain("action/nothing-to-do");
+    // Said as a harmless repeat, not the bare code twice (QA 27 wave review M1).
+    expect(repeated).toContain("revoked already; nothing was written");
+    // No second revocation stands behind the first: undoing the undo brings the mark back, and
+    // then the mark can be revoked again.
+    await okTool(token, "revoke_event", { eventId: revocationId });
+    expect(await okTool(token, "get_task", { id: taskId })).toMatchObject({ progress: 1 });
+    await okTool(token, "revoke_event", { eventId: solveId });
+    expect(await okTool(token, "get_task", { id: taskId })).toMatchObject({ progress: 0 });
+  });
 });
 
 describe("review", () => {
@@ -444,13 +585,18 @@ describe("review", () => {
       dueTz: "UTC",
       title: "Old",
     });
-    const review = await okTool(token, "list_review");
-    const items = rows(review["items"]);
-    expect(
-      items.some((item) => item["kind"] === "confirm-auto-outcome" && item["taskId"] === taskId),
-    ).toBe(true);
+    // Past its deadline the task stays open and asks what became of it (feedback 5).
+    const open = rows((await okTool(token, "list_review"))["items"]);
+    expect(open.find((entry) => entry["taskId"] === taskId)).toMatchObject({
+      actions: ["mark-done", "cancel", "skip", "keep-open"],
+      kind: "deadline-passed",
+    });
+    expect(await okTool(token, "get_task", { id: taskId })).toMatchObject({ closed: null });
+    // An automatic miss an older version wrote still asks to be confirmed or undone.
+    await pushOldMiss(taskId);
+    const items = rows((await okTool(token, "list_review"))["items"]);
     const item = items.find((entry) => entry["taskId"] === taskId);
-    expect(item?.["actions"]).toEqual(["confirm", "undo"]);
+    expect(item).toMatchObject({ actions: ["confirm", "undo"], kind: "confirm-auto-outcome" });
     const done = await okTool(token, "review_action", { key: "undo", taskId });
     expect(rows(done["events"]).map((event) => event["type"])).toEqual(["event.revoked"]);
     expect(await okTool(token, "get_task", { id: taskId })).toMatchObject({ closed: null });
@@ -481,8 +627,9 @@ describe("presets", () => {
     expect(algebra).toMatchObject({
       builtIn: false,
       extends: "hw",
-      resolved: { submission: "per_subtask" },
+      resolved: { deadlinePolicy: { kind: "resubmission" } },
     });
+    expect(algebra?.["resolved"]).not.toHaveProperty("submission");
     expect(listed.find((preset) => preset["id"] === "hw")).toMatchObject({ builtIn: true });
 
     await okTool(token, "create_preset", {
@@ -526,6 +673,73 @@ describe("presets", () => {
       name: "Operations",
     });
     expect(await errorText(token, "archive_preset", { id: "inbox" })).toContain("preset/built-in");
+  });
+
+  it("takes an old client's submission mode and writes nothing of it (2026-11-09)", async () => {
+    const token = await readWriteToken();
+    await okTool(token, "create_preset", {
+      definition: { defaultEstimateMinutes: 20, submission: "whole" },
+      extends: "hw",
+      id: "hw.old",
+      name: "Old client",
+    });
+    const created = (await pull()).events.find(
+      (event) => event.type === "preset.created" && event.payload["id"] === "hw.old",
+    );
+    expect(created?.payload["definition"]).toEqual({ defaultEstimateMinutes: 20 });
+    const listed = rows((await okTool(token, "list_presets"))["presets"]);
+    const old = listed.find((preset) => preset["id"] === "hw.old");
+    expect(old?.["resolved"]).not.toHaveProperty("submission");
+    expect(old?.["definition"]).not.toHaveProperty("submission");
+  });
+
+  it("reads weekday names, stores their numbers, numbers from firstNumber and says what is wrong (feedback 5)", async () => {
+    const token = await readWriteToken();
+    const refused = await errorText(token, "create_preset", {
+      definition: {
+        recurrence: {
+          due: { time: "23:59", weekday: "someday" },
+          issued: { time: "10:00", weekday: 1 },
+          tz: "UTC",
+        },
+        bogus: 1,
+      },
+      extends: "hw",
+      id: "hw.fb5",
+      name: "FB5 HW",
+    });
+    expect(refused).toMatch(/^preset\/invalid-definition: /u);
+    expect(refused).toContain("recurrence.due.weekday");
+    expect(refused).toContain("1 = Monday");
+    expect(refused).toContain("bogus");
+
+    await okTool(token, "create_preset", {
+      definition: {
+        recurrence: {
+          due: { time: "23:59", weekday: "Sunday" },
+          firstNumber: 9,
+          issued: { time: "00:00", weekday: "mon" },
+          tz: "UTC",
+        },
+      },
+      extends: "hw",
+      id: "hw.fb5",
+      name: "FB5 HW",
+    });
+    const created = (await pull()).events.find(
+      (event) => event.type === "preset.created" && event.payload["id"] === "hw.fb5",
+    );
+    expect(created?.payload["definition"]).toEqual({
+      recurrence: {
+        due: { time: "23:59", weekday: 7 },
+        firstNumber: 9,
+        issued: { time: "00:00", weekday: 1 },
+        tz: "UTC",
+      },
+    });
+    // Monday 00:00 of this week has passed: this week's instance is issued at once, as number 9.
+    const found = rows((await okTool(token, "search", { query: "FB5 HW" }))["results"]);
+    expect(found.map((row) => row["title"])).toContain("FB5 HW 9");
   });
 
   it("edits a preset that shares its name with another, and seeds around a taken name (review I1, M6)", async () => {
@@ -605,11 +819,11 @@ describe("search and fetch", () => {
 
 /** What the contract tests act on: one task per situation a write tool needs. */
 type Fixture = {
-  /** An open homework task: problem 1 solved, problem 2 open. */
+  /** An open homework task: problem 1 done, problem 2 open. */
   readonly taskId: string;
-  /** The event that solved problem 1. */
+  /** The event that marked problem 1 done. */
   readonly solveId: string;
-  /** A task whose deadline passed: closed as missed, with a review item to confirm. */
+  /** A task whose deadline passed, closed as missed by an older version: a review item to confirm. */
   readonly missedId: string;
   /** A user preset. */
   readonly presetId: string;
@@ -628,6 +842,8 @@ const writeFixture = async (token: string): Promise<Fixture> => {
     dueTz: "UTC",
     title: "Contract missed",
   });
+  // Nothing closes an overdue task any more (feedback 5): the miss an older version wrote.
+  await pushOldMiss(missedId);
   const presetId = `work.c${newId().toLowerCase()}`;
   await okTool(token, "create_preset", {
     definition: {},
@@ -659,7 +875,6 @@ const writeArgs = (fixture: Fixture): Record<string, Record<string, unknown>> =>
   seed_example_presets: {},
   set_importance: { importance: "asap", taskId: fixture.taskId },
   set_status: { status: "paused", taskId: fixture.taskId },
-  submit: { taskId: fixture.taskId },
   update_preset: { id: fixture.presetId, name: "Renamed" },
   update_task: { taskId: fixture.taskId, title: "Renamed" },
 });
@@ -685,7 +900,6 @@ const refusals = (
   revoke_event: [{ eventId: "ghost" }, "event/not-found"],
   set_importance: [{ importance: "asap", taskId: "ghost" }, "task/unknown"],
   set_status: [{ status: "paused", taskId: fixture.missedId }, "retro/task-closed"],
-  submit: [{ taskId: fixture.missedId }, "retro/task-closed"],
   update_preset: [{ id: "nope", name: "x" }, "preset/unknown"],
   update_task: [
     { at: "2020-01-01T00:00:00.000Z", taskId: fixture.taskId, title: "x" },

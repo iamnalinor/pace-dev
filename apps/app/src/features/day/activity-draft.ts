@@ -1,7 +1,12 @@
-import type { ActivityForm, ActivityRange, ActivityTarget } from "@pace/client";
-
 import { clockTime, fromWallClock, wallClock } from "#app/format/time.ts";
-import { addDaysIn, type MessageKey, type TimeState } from "@pace/core";
+import {
+  type ActivityForm,
+  type ActivityRange,
+  type ActivityTarget,
+  readTime,
+  typeTime,
+} from "@pace/client";
+import { addDaysIn, type MessageKey } from "@pace/core";
 
 /** What the Day sheet checks before a block is saved, each fault under its own field. */
 type Draft = ActivityForm;
@@ -169,12 +174,20 @@ type Times = {
   readonly endAt: null | string | undefined;
 };
 
+/** «7» or «14» alone as 07:00 or 14:00; any other text as it is. */
+const sharp = (text: string): string => {
+  const read = readTime(text);
+  return read.isComplete && !typeTime(text).isComplete ? read.text : text;
+};
+
 /**
 The sheet's typed times as instants. A field left as it opened gives back the very instant it
 showed (its seconds, a repeated summer-time hour, a day or more of length); a retyped start is
 read on the day chosen for it, else the block's own day, a retyped end as `endFrom` says.
 */
-const typedTimes = (draft: Draft, target: SheetTarget, zone: string): Times => {
+const typedTimes = (typedDraft: Draft, target: SheetTarget, zone: string): Times => {
+  // An hour typed alone is that hour sharp, as when the field is left (R27-04).
+  const draft = { ...typedDraft, from: sharp(typedDraft.from), to: sharp(typedDraft.to) };
   const date = draft.fromDay ?? wallClock(target.startAt, zone).date;
   const startAt =
     keptOn({ atIso: target.startAt, day: date }, draft.from, zone) ??
@@ -202,13 +215,15 @@ const datesThrough = (first: string, last: string): readonly string[] => {
 
 /**
 The days the sheet offers each time to be put on: the start any day the block touched, the end
-any day from the start's to the day after it ended (a running block's end has none). A Fri 20:00 –
+any day from the start's to the day after it ended, but never one that has not begun (a block is
+what already happened: tomorrow's chip was always refused, QA21 L3); a running block's end has none. A Fri 20:00 –
 Sun 07:00 block left running is cut back to Friday by choosing Friday, which the clock rules alone
 never reach (round 6).
 */
 export const dayChoicesOf = (
   target: SheetTarget,
   zone: string,
+  now: string,
 ): { readonly from: readonly string[]; readonly to: readonly string[] } => {
   const startDate = wallClock(target.startAt, zone).date;
   if (target.endAt === null) {
@@ -218,7 +233,11 @@ export const dayChoicesOf = (
   const dayAfter = new Date(Date.parse(`${endDate}T00:00:00.000Z`) + DAY_MS)
     .toISOString()
     .slice(0, 10);
-  return { from: datesThrough(startDate, endDate), to: datesThrough(startDate, dayAfter) };
+  const today = wallClock(now, zone).date;
+  return {
+    from: datesThrough(startDate, endDate),
+    to: datesThrough(startDate, dayAfter).filter((date) => date <= today),
+  };
 };
 
 /** A block whose start and end fall on different days (an end at midnight is still the day before). */
@@ -244,55 +263,50 @@ export const readDraft = (
   };
 };
 
-type Read = { readonly range: ActivityRange | null; readonly faults: Faults };
+export type Read = { readonly range: ActivityRange | null; readonly faults: Faults };
+
+/**
+An end ahead only because it was read past midnight: the same clock reading on the start's day,
+already past, comes before the start. «13» to «1» is an end before the start, not tomorrow's
+01:00 still to come (QA round 28 R28-04).
+*/
+const isReversedPair = (range: ActivityRange, { now, zone }: Clock): boolean => {
+  if (range.endAt === null) {
+    return false;
+  }
+  const start = wallClock(range.startAt, zone);
+  const end = wallClock(range.endAt, zone);
+  const sameDayEnd = fromWallClock({ date: start.date, time: end.time, tz: zone });
+  return (
+    end.date !== start.date &&
+    sameDayEnd !== null &&
+    Date.parse(sameDayEnd) <= Date.parse(range.startAt) &&
+    Date.parse(sameDayEnd) <= Date.parse(now)
+  );
+};
+
+type Clock = { readonly now: string; readonly zone: string };
 
 /** A block is what already happened: a start or an end after now is said under its field. */
-export const notAhead = (read: Read, now: string): Read => {
+export const notAhead = (read: Read, { now, zone }: Clock): Read => {
   const { range } = read;
   if (range === null) {
     return read;
   }
   const isStartAhead = Date.parse(range.startAt) > Date.parse(now);
   const isEndAhead = range.endAt !== null && Date.parse(range.endAt) > Date.parse(now);
-  return isStartAhead || isEndAhead
-    ? {
-        faults: {
-          ...read.faults,
-          ...(isStartAhead && { from: "day.ahead" }),
-          ...(isEndAhead && { to: "day.ahead" }),
-        },
-        range: null,
-      }
-    : read;
-};
-
-/**
-A moved end may not run into the next live activity: the timeline would clip it back without
-a word. `nextStart` is that activity's start (none for a new block or the last one).
-*/
-export const notIntoNext = (read: Read, nextStart: null | string): Read => {
-  const endAt = read.range?.endAt ?? null;
-  return nextStart === null || endAt === null || Date.parse(endAt) <= Date.parse(nextStart)
-    ? read
-    : { faults: { ...read.faults, to: "day.overlapsNext" }, range: null };
-};
-
-/** The start of the live main activity after this block, if any. */
-export const nextStartOf = (time: TimeState, target: SheetTarget): null | string => {
-  if (target.kind !== "edit") {
-    return null;
+  if (!isStartAhead && !isEndAhead) {
+    return read;
   }
-  const later = Object.values(time.activities)
-    .filter(
-      (activity) =>
-        activity.id !== target.activityId &&
-        !activity.isAlongside &&
-        !activity.isLogged &&
-        Date.parse(activity.startAt) > Date.parse(target.startAt),
-    )
-    .map((activity) => activity.startAt)
-    .toSorted((a, b) => Date.parse(a) - Date.parse(b));
-  return later[0] ?? null;
+  const endFault = isReversedPair(range, { now, zone }) ? "day.badRange" : "day.ahead";
+  return {
+    faults: {
+      ...read.faults,
+      ...(isStartAhead && { from: "day.ahead" }),
+      ...(isEndAhead && { to: endFault }),
+    },
+    range: null,
+  };
 };
 
 export const hasFault = (faults: Faults): boolean =>

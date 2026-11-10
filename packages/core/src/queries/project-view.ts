@@ -5,7 +5,6 @@ import { isOpen, type Task } from "../model/task.ts";
 import { type Outcome, taskOutcome } from "../outcomes/outcome.ts";
 import { err, ok, type Result } from "../result.ts";
 import { weeklyProjectMinutes } from "../tracking/insights.ts";
-import { presetOf } from "./classify.ts";
 import { accountTz, type QueryContext } from "./context.ts";
 import {
   compareFutureItems,
@@ -67,10 +66,9 @@ const latestFirst = (a: DoneItem, b: DoneItem): number => {
   return byClosure === 0 ? a.item.task.id.localeCompare(b.item.task.id) : byClosure;
 };
 
-/** A closed task with its derived outcome; one whose preset is broken has no outcome to show. */
+/** A closed task with its derived outcome; one whose preset is broken has no row to show. */
 const doneItem = (state: CoreState, task: Task, ctx: QueryContext): readonly DoneItem[] => {
-  const preset = presetOf(state, task);
-  const outcome = preset.ok ? taskOutcome(task, preset.value) : null;
+  const outcome = taskOutcome(task);
   const item = nowItem(state, task, ctx);
   return outcome === null || !item.ok ? [] : [{ item: item.value, outcome }];
 };

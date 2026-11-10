@@ -1,7 +1,13 @@
 import type { Request } from "@playwright/test";
 
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
-import { DEV_TELEGRAM_ID, freshTelegramId, loginViaApi, resetAccount } from "./support/login.ts";
+import {
+  API_URL,
+  DEV_TELEGRAM_ID,
+  freshTelegramId,
+  loginViaApi,
+  resetAccount,
+} from "./support/login.ts";
 import { outboxSent } from "./support/outbox.ts";
 import { pushAsClient, seedLivedIn, ulid } from "./support/seed.ts";
 import { documentGround, rgb } from "./support/theme-colors.ts";
@@ -110,7 +116,7 @@ test("after Log out the network goes quiet: no request names the session, nothin
   // The start has had its answers (sync, calendar, notifications) and the socket is open.
   await expect.poll(() => pending.size).toBe(0);
   expect(sockets.length).toBeGreaterThan(0);
-  const logOut = page.getByRole("button", { name: "Log out" });
+  const logOut = page.getByRole("button", { name: "Sign out" });
   await logOut.evaluate((button) => {
     button.addEventListener(
       "pointerdown",
@@ -179,7 +185,7 @@ test("a slow log-out answer leaves the login form as the person is filling it in
   // The start's own write (the time zone) sent, so Log out has nothing to ask about.
   await outboxSent(page);
   const answered = page.waitForResponse("**/api/auth/logout");
-  await page.getByRole("button", { exact: true, name: "Log out" }).click();
+  await page.getByRole("button", { exact: true, name: "Sign out" }).click();
   // Signed out on the device at once: the login screen is there before the server answers.
   await expect(page).toHaveURL(/\/login$/u);
   const field = page.getByLabel("Telegram id");
@@ -193,6 +199,40 @@ test("a slow log-out answer leaves the login form as the person is filling it in
   await expect(page.getByRole("button", { name: "Sign in as dev" })).toBeEnabled();
   await page.getByRole("button", { name: "Sign in as dev" }).click();
   await expect(page.getByRole("heading", { name: "Now" })).toBeVisible();
+});
+
+test("a Sign out with no network ends the session on the server once it is back, then goes quiet (R22-02)", async ({
+  context,
+  page,
+}) => {
+  const { token } = await loginViaApi(page);
+  const logouts: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname === "/api/auth/logout") {
+      logouts.push(request.headers()["authorization"] ?? "");
+    }
+  });
+  await page.goto("/settings");
+  await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
+  await outboxSent(page);
+  await context.setOffline(true);
+  await page.getByRole("button", { exact: true, name: "Sign out" }).click();
+  await expect(page).toHaveURL(/\/login$/u);
+  // The server did not hear it: the session is still alive there.
+  const me = async (): Promise<number> =>
+    (await fetch(`${API_URL}/api/me`, { headers: { Authorization: `Bearer ${token}` } })).status;
+  expect(await me()).toBe(200);
+  // Back online: the kept log-out goes again, with the ended token and nothing else.
+  await context.setOffline(false);
+  await expect.poll(me).toBe(401);
+  const sent = logouts.length;
+  expect(logouts.every((header) => header === `Bearer ${token}`)).toBe(true);
+  // Settled: no request repeats for that token (another reload starts nothing either).
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Sign in to Pace" })).toBeVisible();
+  // eslint-disable-next-line playwright/no-wait-for-timeout, sonarjs/no-fixed-wait-in-tests -- a quiet network is the absence of requests over a window; no DOM condition marks it
+  await page.waitForTimeout(1500);
+  expect(logouts).toHaveLength(sent);
 });
 
 test("the theme choice is kept per device and paints the page", async ({ page }) => {
@@ -291,7 +331,7 @@ test("a phone has Now, Day, Inbox and More; More leads to Week and the rest and 
   await page.setViewportSize({ height: 844, width: 390 });
   await loginViaApi(page);
   await page.goto("/");
-  const tabs = page.getByRole("tablist", { name: "Main" }).getByRole("tab");
+  const tabs = page.getByRole("navigation", { name: "Main" }).getByRole("link");
   await expect(tabs).toHaveText(["Now", "Day", "Inbox", "More"]);
   await tabs.getByText("More").click();
   await expect(page.getByRole("heading", { level: 1, name: "More" })).toBeVisible();
@@ -328,12 +368,12 @@ test("a server older than the app holds a signed-in person at the versions scree
   // The web has no other server to sign in on: its owner updates it (QA 17 L1).
   await expect(page.getByText("Ask whoever runs it to update it.", { exact: false })).toBeVisible();
   await expect(page.getByText(/sign in on another/u)).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Refresh" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Refresh page" })).toHaveCount(0);
   // Nothing of the app around it: no navigation, no Change server, one way out.
   await expect(page.getByRole("navigation")).toHaveCount(0);
   await expect(page.getByText(/Change/u)).toHaveCount(0);
   await expectNoA11yViolations(page);
-  await page.getByRole("button", { name: "Log out" }).click();
+  await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/login$/u);
   await expect(page.getByRole("heading", { name: "Sign in to Pace" })).toBeVisible();
 });
@@ -364,6 +404,6 @@ test("a page older than its server offers Refresh, and a refresh with a fitting 
   await expect(page.getByText("Refresh it to load the new one.", { exact: false })).toBeVisible();
   await expectNoA11yViolations(page);
   instance.isTooNew = false;
-  await page.getByRole("button", { name: "Refresh" }).click();
+  await page.getByRole("button", { name: "Refresh page" }).click();
   await expect(page.getByRole("heading", { name: "Now" })).toBeVisible();
 });

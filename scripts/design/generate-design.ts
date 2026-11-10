@@ -70,6 +70,7 @@ const CONTAINER_SIZES = [80, 96, 128];
 
 const SIZE_TOKENS: Readonly<Record<string, number>> = {
   "auth-card": size.authCard,
+  "bar-tile": size.barTile,
   "chip-max": size.chip.max,
   content: layout.contentMax,
   "content-wide": layout.contentMaxWide,
@@ -101,6 +102,31 @@ const SIZE_TOKENS: Readonly<Record<string, number>> = {
   "switch-w": size.switch.track.width,
   "toast-max": size.toast.max,
   "tooltip-max": size.tooltip.max,
+};
+
+/**
+The layout roles of spec §3.3 as named spacing keys (`px-row-x`, `py-row-y lg:py-row-y-lg`,
+`pt-header-top lg:pt-header-top-lg`): a role reads as its job, and the desktop values that sit off
+the 4-pt scale (row padding 10, header top 28, section gap 28) exist only as these roles.
+*/
+export const LAYOUT_SPACING: Readonly<Record<string, number>> = {
+  "cell-gap": layout.cellGap.phone,
+  gutter: layout.gutter.phone,
+  "gutter-lg": layout.gutter.desktop,
+  "gutter-pane": layout.gutterPane,
+  "header-bottom": layout.headerBottom.phone,
+  "header-bottom-lg": layout.headerBottom.desktop,
+  "header-top": layout.headerTop.phone,
+  "header-top-lg": layout.headerTop.desktop,
+  "row-gap": layout.rowGap.phone,
+  "row-x": layout.rowPadX.phone,
+  "row-x-lg": layout.rowPadX.desktop,
+  "row-y": layout.rowPadY.phone,
+  "row-y-lg": layout.rowPadY.desktop,
+  section: layout.sectionGap.phone,
+  "section-lg": layout.sectionGap.desktop,
+  "sheet-pad": layout.sheetPad.phone,
+  "sheet-pad-lg": layout.sheetPad.desktop,
 };
 
 const WEIGHT_NAMES: Readonly<Record<number, string>> = {
@@ -194,7 +220,10 @@ export const tailwindTheme = (): TailwindTheme => ({
   ),
   screens: { lg: px(layout.breakpoint.expanded), md: px(layout.breakpoint.medium) },
   size: sizeScale(),
-  spacing: Object.fromEntries(Object.values(space).map((value) => [spaceKey(value), px(value)])),
+  spacing: record([
+    ...Object.values(space).map((value): Pair => [spaceKey(value), px(value)]),
+    ...Object.entries(LAYOUT_SPACING).map(([name, value]): Pair => [name, px(value)]),
+  ]),
   typeDesktop: Object.fromEntries(
     TYPE_ROLES.map((role) => [typeClassName(role), desktopType(typeRole(role, "desktop"))]),
   ),

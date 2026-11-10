@@ -154,6 +154,10 @@ trace and a screenshot; CI uploads `playwright-report/`.
 
 - Browser: `bunx playwright install --with-deps chromium`, or set
   `PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium` to use an installed one (sandboxes).
+  CI runs Playwright's own headless shell (`chromium_headless_shell-*`), which is slower and
+  differs from full Chrome (a Ctrl-click does not always open a tab; a wheel's scroll lands
+  later). Before calling a run green, run it without `PLAYWRIGHT_CHROMIUM_EXECUTABLE` when the
+  headless shell is installed (bug-lessons class 120).
 - `E2E_BASE_URL=https://pace.nalinor.dev bun test:e2e` runs the suite against a deployed
   stack without starting anything.
 - Locally the servers are reused if already running (`reuseExistingServer`); the accounts

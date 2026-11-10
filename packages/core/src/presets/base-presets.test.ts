@@ -32,7 +32,7 @@ describe("BASE_PRESETS", () => {
     }
   });
 
-  it("hw: per-subtask homework with a weekly rhythm slot left open", () => {
+  it("hw: homework with subtasks and a weekly rhythm slot left open", () => {
     expect(BASE_PRESETS.hw.definition).toEqual({
       color: "yellow",
       deadlinePolicy: { kind: "hard" },
@@ -41,7 +41,6 @@ describe("BASE_PRESETS", () => {
       fields: { ...NO_FIELDS, description: true },
       progressMode: "subtasks",
       recurrence: null,
-      submission: "per_subtask",
     });
   });
 
@@ -54,7 +53,6 @@ describe("BASE_PRESETS", () => {
       fields: { ...NO_FIELDS, description: true, startAt: true, link: true },
       progressMode: "slider",
       recurrence: null,
-      submission: "whole",
     });
   });
 
@@ -67,7 +65,6 @@ describe("BASE_PRESETS", () => {
       fields: NO_FIELDS,
       progressMode: "subtasks",
       recurrence: null,
-      submission: "whole",
     });
   });
 
@@ -80,7 +77,6 @@ describe("BASE_PRESETS", () => {
       fields: { ...NO_FIELDS, startAt: true },
       progressMode: "none",
       recurrence: null,
-      submission: "whole",
     });
   });
 
@@ -93,7 +89,6 @@ describe("BASE_PRESETS", () => {
       fields: NO_FIELDS,
       progressMode: "none",
       recurrence: null,
-      submission: "whole",
     });
   });
 });

@@ -125,7 +125,7 @@ describe("categories and buttons", () => {
       // The id Rest had as a single button: logs and the assistant's callers keep it.
       ["rest", "time.choice.rest", "rest", 30],
       ["rest:walk", "time.choice.walk", "rest", 30],
-      ["rest:workout", "time.choice.workout", "sport", 60],
+      ["rest:workout", "time.choice.workout", "sport", 180],
       ["rest:nap", "time.choice.nap", "sleep", 30],
       ["rest:sleep", "time.choice.sleep", "sleep", 480],
     ]);
@@ -134,7 +134,7 @@ describe("categories and buttons", () => {
   it("finds a choice and its button by the choice's id; a retired one is gone", () => {
     expect(choiceById("rest:workout")).toMatchObject({
       button: { id: "rest" },
-      choice: { category: "sport", expectMinutes: 60 },
+      choice: { category: "sport", expectMinutes: 180 },
     });
     expect(choiceById("sport:60")).toBeNull();
     expect(choiceById("chores:nap")).toBeNull();
@@ -157,6 +157,19 @@ describe("timeline", () => {
     expect(day.totals).toEqual({ food: 40, work: 120 });
     expect(day.running?.activityId).toBe("a2");
     expect(day.gaps).toEqual([{ endAt: T("08:00"), minutes: 480, startAt: T("00:00") }]);
+  });
+
+  it("counts minutes as the clocks read, so rows that share a boundary with seconds add up (QA round 26 R26-09)", () => {
+    const at = "2026-10-07T10:30:40.000Z";
+    const time = timeOf([
+      start("08:00", { activityId: "a1", label: "Work" }),
+      { ...start("10:30", { activityId: "a2", label: "Walk" }), occurredAt: at },
+      act("10:50", { payload: { activityId: "a2" }, type: "activity.stopped" }),
+    ]);
+    const day = timeline(time, { ...DAY, now: T("11:00") });
+    // 08:00 – 10:30 and 10:30 – 10:50 as shown: 150 and 20, not 151 and 19.
+    expect(day.segments.map((segment) => segment.minutes)).toEqual([150, 20]);
+    expect(day.trackedMinutes).toBe(170);
   });
 
   it("lets a logged block win over the live time it covers, splitting it", () => {

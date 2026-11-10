@@ -243,11 +243,17 @@ export const poolPass = (inputs: PoolInputs): PoolPass => {
     events: [...memory.events, ...events.handled].filter(
       (key) => key.slice(0, key.indexOf("@")) > addMinutesIso(now, -KEEP_EVENT_MINUTES),
     ),
-    // Only tasks still open, at the deadline reported, matter: a closed one is never listed again.
+    // Only tasks still open, at the deadline reported and still ahead, matter: a closed one, or
+    // one past its deadline (it stays open now, overdue: feedback 5), is never listed again.
     reported: [...memory.reported, ...digest.reported].filter((key) => {
       const [taskId = "", dueAt = ""] = key.split("@", 2);
       const task = inputs.state.tasks.byId[taskId];
-      return task !== undefined && isOpen(task) && task.dueAt === dueAt;
+      return (
+        task !== undefined &&
+        isOpen(task) &&
+        task.dueAt === dueAt &&
+        Date.parse(dueAt) > Date.parse(now)
+      );
     }),
   };
   const stillOpen = inputs.open.filter((open) => settled.every((done) => done.id !== open.id));

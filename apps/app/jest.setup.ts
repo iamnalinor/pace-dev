@@ -1,9 +1,11 @@
 import type * as ExpoCrypto from "expo-crypto";
 import type * as NodeCrypto from "node:crypto";
+import type * as ReactNative from "react-native";
 
 import type * as RouterFake from "./src/test/router.ts";
 import type * as BackgroundFake from "./src/testing/background-task.fake.ts";
 import type * as CalendarFake from "./src/testing/calendar.fake.ts";
+import type * as KvStoreFake from "./src/testing/kv-store.fake.ts";
 import type * as NotificationsFake from "./src/testing/notifications.fake.ts";
 import type * as SecureStoreFake from "./src/testing/secure-store.fake.ts";
 
@@ -25,6 +27,17 @@ jest.mock("expo-secure-store", () =>
     .requireActual<typeof SecureStoreFake>("./src/testing/secure-store.fake.ts")
     .createFakeSecureStore(),
 );
+// The drafts' key-value store (feedback 5 item 7): in memory, emptied before every test.
+jest.mock("expo-sqlite/kv-store", () =>
+  jest.requireActual<typeof KvStoreFake>("./src/testing/kv-store.fake.ts").createFakeKvStore(),
+);
+beforeEach(() => {
+  jest
+    .requireMock<{ readonly default: { readonly values: Map<string, string> } }>(
+      "expo-sqlite/kv-store",
+    )
+    .default.values.clear();
+});
 jest.mock("expo-calendar", () =>
   jest.requireActual<typeof CalendarFake>("./src/testing/calendar.fake.ts").createFakeCalendar(),
 );
@@ -55,3 +68,17 @@ jest.mock("expo-task-manager", () =>
 jest.mock("expo-router", () =>
   jest.requireActual<typeof RouterFake>("./src/test/router.ts").routerModule(),
 );
+// Every test starts on an address without search params.
+beforeEach(() => {
+  const fake = jest.requireActual<typeof RouterFake>("./src/test/router.ts");
+  fake.setSearchParams({});
+  fake.paramsSet.mockClear();
+  fake.navigatorState.current = undefined;
+});
+
+// A phone's window (390 × 844, the design's phone) unless a test says otherwise: React Native's
+// own Jest default, 750 wide, is a `medium` window (spec §3.3), with the rail instead of the tabs.
+jest.requireActual<typeof ReactNative>("react-native").Dimensions.set({
+  screen: { fontScale: 1, height: 844, scale: 3, width: 390 },
+  window: { fontScale: 1, height: 844, scale: 3, width: 390 },
+});

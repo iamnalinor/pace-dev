@@ -34,7 +34,7 @@ const DEFAULT_PRESET = "personal";
 export const taskCreation = defineTool({
   annotations: WRITE,
   description:
-    "Creates a task. presetId picks the behaviour (hw: numbered problems submitted per problem; work: progress slider and a link; personal (default); deferred: someday) — see list_presets for the user's own course presets. A project is attached by id or by name (a new name creates the project). Subtasks are labels ('3', '4', 'read chapter 2') or { label, number }; a bare number label becomes the problem number. dueAt needs its zone (dueTz, default the account zone). Returns the task as it appears on Now. Set dryRun to preview.",
+    "Creates a task. presetId picks the behaviour (hw: numbered problems, each marked done on its own (mark_subtasks); work: progress slider and a link; personal (default); deferred: someday) — see list_presets for the user's own course presets. A project is attached by id or by name (a new name creates the project). Subtasks are labels ('3', '4', 'read chapter 2') or { label, number }; a bare number label becomes the problem number. dueAt needs its zone (dueTz, default the account zone). Returns the task as it appears on Now. Set dryRun to preview.",
   handler: async (args, ctx) => {
     const taskId = newId();
     return await runWrite(ctx, args, {
@@ -199,7 +199,7 @@ const settingEvents = (
 export const updateTask = defineTool({
   annotations: { destructiveHint: false, idempotentHint: true, readOnlyHint: false },
   description:
-    "Changes a task's title, description (null clears it), deadline, start, estimate (null clears it), preset or project (by id, or by name — created when new). Only the fields given change; subtasks are kept across a preset switch. Use set_importance, set_status and set_rank for those; mark_subtasks, submit and close_task for progress.",
+    "Changes a task's title, description (null clears it), deadline, start, estimate (null clears it), preset or project (by id, or by name — created when new). Only the fields given change; subtasks are kept across a preset switch. Use set_importance, set_status and set_rank for those; mark_subtasks and close_task for progress.",
   handler: async (args, ctx) =>
     await runWrite(ctx, args, {
       build: forTask(args.taskId, (scope, when, task) => {

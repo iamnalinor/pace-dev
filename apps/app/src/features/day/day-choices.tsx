@@ -6,7 +6,8 @@ import type { ActivityForm, ActivityRange, ActivityTarget, FormPartProps } from 
 import { useLanguage, useT } from "#app/app-state.tsx";
 import { fromWallClock, wallClock } from "#app/format/time.ts";
 import { moveFocus } from "#app/platform/move-focus.ts";
-import { ActionChip } from "#app/ui/chip.tsx";
+import { useViewer } from "#app/shared/use-viewer.ts";
+import { Chip } from "#app/ui/chip.tsx";
 import { RadioChips } from "#app/ui/radio-chips.tsx";
 import { formatShortDay } from "@pace/core";
 
@@ -81,21 +82,23 @@ export const DayChoices = ({
       moveFocus(checkedEndRef.current);
     }
   }, [hasOpened]);
-  const days = dayChoicesOf(target, zone);
-  if (days.to.length === 0) {
+  const { now } = useViewer();
+  const days = dayChoicesOf(target, zone, now);
+  // A single day to put either time on is no choice.
+  if (days.to.length < 2 && days.from.length < 2) {
     return null;
   }
   if (!isOpen) {
     return (
       <View className="flex-row">
-        <ActionChip
+        <Chip
           onPress={() => {
             setIsOpen(true);
             setHasOpened(true);
           }}
         >
           {t("day.otherDays")}
-        </ActionChip>
+        </Chip>
       </View>
     );
   }

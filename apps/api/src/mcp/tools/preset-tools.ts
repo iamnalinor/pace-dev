@@ -6,6 +6,7 @@ import {
   exampleCoursePresetEvents,
   isExampleToSeed,
   ok,
+  parsePresetDefinition,
   type Preset,
   presetById,
   type PresetValidationError,
@@ -28,15 +29,32 @@ import {
   WRITE_OUTPUT,
 } from "../tool-kit.ts";
 
+/** How a weekly recurrence reads, written for the tool descriptions (feedback 5). */
+const RECURRENCE_RULES =
+  "Recurrence: weekday is 1-7 (1 = Monday, 2 = Tuesday, 3 = Wednesday, 4 = Thursday, 5 = Friday, 6 = Saturday, 7 = Sunday) or an English name ('wed' or 'Wednesday', any case; stored as the number); time is HH:MM in tz (IANA zone). The due slot falls in the issue's week when it is later in that week, else in the next week. Each instance is a task titled '<preset name> <n>': n = firstNumber (a whole number, default 1) plus the number of instances of this preset already in the store, closed ones included (one made and then revoked is not counted), so instances count up from firstNumber in issue order; changing firstNumber later moves the numbers of the instances still to come. An instance is issued at its week's issue moment; a preset created (or given its recurrence) after this week's issue moment issues this week's instance at once, unless its deadline had already passed, and then next week's instance waits ahead under 'In future'. An unknown key or a bad value is refused as preset/invalid-definition with the key path and the reason.";
+
 const PRESET_ID = z.string().min(1).describe("Lowercase slug, e.g. hw.algebra or work.ops.");
 
 const DEFINITION = z
   .record(z.string(), z.unknown())
   .describe(
-    "Only the keys to change: urgencyPolicy (age|lag|pace|resubmission), defaultImportance, deadlinePolicy ({kind:'hard'} or {kind:'resubmission', softDays, finalAt, finalTz}), submission (whole|per_subtask), progressMode (subtasks|slider|none), recurrence ({issued:{weekday,time}, due:{weekday,time}, tz} or null), fields ({link,description,startAt,submitVia}), defaultEstimateMinutes, color.",
+    "Only the keys to change: urgencyPolicy (age|lag|pace|resubmission), defaultImportance, deadlinePolicy ({kind:'hard'} or {kind:'resubmission', softDays, finalAt, finalTz}), progressMode (subtasks|slider|none), recurrence ({issued:{weekday,time}, due:{weekday,time}, tz, firstNumber?} or null; see the tool description), fields ({link,description,startAt,submitVia}), defaultEstimateMinutes, color.",
   );
 
-const presetFailure = (code: PresetValidationError) => err({ code, message: describeCode(code) });
+/** A refusal; an invalid definition says which key and why (`recurrence.due.weekday: …`). */
+const presetFailure = (code: PresetValidationError, definition?: unknown) => {
+  const parsed = code === "preset/invalid-definition" ? parsePresetDefinition(definition) : null;
+  const reason = parsed === null || parsed.ok ? "" : ` ${parsed.error}`;
+  return err({ code, message: `${describeCode(code)}${reason}` });
+};
+
+/** The definition as stored: weekday names become their numbers (old clients read numbers). */
+const storedDefinition = (
+  definition: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, unknown>> => {
+  const parsed = parsePresetDefinition(definition);
+  return parsed.ok ? parsed.value : definition;
+};
 
 const existingPreset = (scope: Scope, id: string): Result<Preset, ToolFailure> => {
   const preset = presetById(scope.state.presets, id);
@@ -93,8 +111,7 @@ export const seedExamplePresets = defineTool({
 
 export const presetCreation = defineTool({
   annotations: { destructiveHint: false, idempotentHint: false, readOnlyHint: false },
-  description:
-    "Creates a user preset that extends a built-in (hw, work, personal, deferred) or another user preset; the definition holds only what it changes (a course: a recurrence and maybe a resubmission deadline policy). Validated: unknown keys, cycles and built-in ids are refused with the code.",
+  description: `Creates a user preset that extends a built-in (hw, work, personal, deferred) or another user preset; the definition holds only what it changes (a course: a recurrence and maybe a resubmission deadline policy). Validated: unknown keys, cycles and built-in ids are refused with the code. ${RECURRENCE_RULES}`,
   handler: async (args, ctx) =>
     await runWrite(ctx, args, {
       build: (scope, when) => {
@@ -107,7 +124,7 @@ export const presetCreation = defineTool({
           ? ok([
               stamp(when, {
                 payload: {
-                  definition: args.definition,
+                  definition: storedDefinition(args.definition),
                   extends: args.extends,
                   id: args.id,
                   name: args.name,
@@ -115,7 +132,7 @@ export const presetCreation = defineTool({
                 type: "preset.created",
               }),
             ])
-          : presetFailure(checked.error);
+          : presetFailure(checked.error, args.definition);
       },
       render: () => ({
         structured: { presetId: args.id },
@@ -137,15 +154,15 @@ export const presetCreation = defineTool({
 
 export const updatePreset = defineTool({
   annotations: { destructiveHint: false, idempotentHint: true, readOnlyHint: false },
-  description:
-    "Changes a preset's name, parent or definition (a definition replaces the stored one entirely: pass every key the preset should keep). The default presets (hw, work, personal, deferred, inbox) can be edited too, but keep no parent: their definition is read on top of their shipped values.",
+  description: `Changes a preset's name, parent or definition (a definition replaces the stored one entirely: pass every key the preset should keep). The default presets (hw, work, personal, deferred, inbox) can be edited too, but keep no parent: their definition is read on top of their shipped values. ${RECURRENCE_RULES}`,
   handler: async (args, ctx) =>
     await runWrite(ctx, args, {
       build: forPreset(args.id, (scope, when, current) => {
+        const definition = args.definition ?? current.definition;
         const checked = validatePresetInput(
           scope.state.presets,
           {
-            definition: args.definition ?? current.definition,
+            definition,
             extends: args.extends ?? current.extends,
             id: args.id,
             name: args.name ?? current.name,
@@ -156,7 +173,8 @@ export const updatePreset = defineTool({
           ? ok([
               stamp(when, {
                 payload: {
-                  definition: args.definition,
+                  definition:
+                    args.definition === undefined ? undefined : storedDefinition(args.definition),
                   extends: args.extends,
                   id: args.id,
                   name: args.name === undefined ? undefined : storedPresetName(args.id, args.name),
@@ -164,7 +182,7 @@ export const updatePreset = defineTool({
                 type: "preset.updated",
               }),
             ])
-          : presetFailure(checked.error);
+          : presetFailure(checked.error, definition);
       }),
       render: () => ({ structured: { presetId: args.id }, summary: `Updated preset ${args.id}.` }),
     }),

@@ -10,6 +10,7 @@ import {
 } from "@pace/core";
 import {
   ALGEBRA_ID,
+  artboardEvents,
   CALC_HW5_ID,
   CALC_W41_ID,
   ctx,
@@ -19,6 +20,7 @@ import {
   MOSCOW,
   NOW,
   RFC_ID,
+  submitted,
   TRK_ID,
   WORK_ID,
 } from "@pace/core/testing";
@@ -437,30 +439,73 @@ describe("deleteTask", () => {
 });
 
 describe("subtasks", () => {
-  it("marks a subtask solved at the given instant and unmarks it by revoking", async () => {
+  it("marks a subtask done at the given instant and unmarks it by revoking", async () => {
     const world = await setupActions();
     const [solved] = unwrap(
-      await world.actions.markSolved(HW_ID, "s5", { at: HOUR_AGO, precision: "approx" }),
+      await world.actions.markDone(HW_ID, "s5", { at: HOUR_AGO, precision: "approx" }),
     );
+    // The one done mark is the `task.subtask.solved` event, at the instant given (feedback 5).
+    expect(solved?.type).toBe("task.subtask.solved");
     expect(solved !== undefined && envelope(solved)).toEqual({
       occurredAt: HOUR_AGO,
       precision: "approx",
       source: "web",
     });
-    expect(taskOf(world, HW_ID)?.subtasks.find((item) => item.id === "s5")?.solvedAt).toBe(
-      HOUR_AGO,
-    );
-    const [revoked] = unwrap(await world.actions.unmarkSolved(HW_ID, "s5"));
+    expect(taskOf(world, HW_ID)?.subtasks.find((item) => item.id === "s5")?.doneAt).toBe(HOUR_AGO);
+    const [revoked] = unwrap(await world.actions.unmarkDone(HW_ID, "s5"));
     expect(revoked?.type === "event.revoked" && revoked.payload.targetId).toBe(solved?.id);
-    expect(taskOf(world, HW_ID)?.subtasks.find((item) => item.id === "s5")?.solvedAt).toBeNull();
-    await expect(world.actions.unmarkSolved(HW_ID, "s5")).resolves.toEqual({
+    expect(taskOf(world, HW_ID)?.subtasks.find((item) => item.id === "s5")?.doneAt).toBeNull();
+    await expect(world.actions.unmarkDone(HW_ID, "s5")).resolves.toEqual({
       error: "action/nothing-to-do",
       ok: false,
     });
-    await expect(world.actions.markSolved(HW_ID, "s9")).resolves.toEqual({
+    await expect(world.actions.markDone(HW_ID, "s9")).resolves.toEqual({
       error: "subtask/unknown",
       ok: false,
     });
+  });
+
+  it("unmarks a subtask an old log also sent: its solve revoked, the send amended to leave it out", async () => {
+    const world = await setupActions();
+    const doneAt = (id: string) =>
+      taskOf(world, HW_ID)?.subtasks.find((item) => item.id === id)?.doneAt ?? null;
+    // The fixture's old log: s1 and s2 solved, then sent together in one `task.submitted`.
+    expect(doneAt("s1")).not.toBeNull();
+    expect(doneAt("s2")).not.toBeNull();
+    const written = unwrap(await world.actions.unmarkDone(HW_ID, "s1"));
+    expect(written.map((event) => event.type)).toEqual(
+      expect.arrayContaining(["event.amended", "event.revoked"]),
+    );
+    expect(written).toHaveLength(2);
+    expect(doneAt("s1")).toBeNull();
+    // The other subtask of the same send stays done.
+    expect(doneAt("s2")).not.toBeNull();
+    // Its only send left: that send is revoked as well.
+    unwrap(await world.actions.unmarkDone(HW_ID, "s2"));
+    expect(doneAt("s2")).toBeNull();
+    await expect(world.actions.unmarkDone(HW_ID, "s2")).resolves.toEqual({
+      error: "action/nothing-to-do",
+      ok: false,
+    });
+  });
+
+  it("refuses to take a mark back on a closed task: an old closing send would reopen it", async () => {
+    // An old client's last per-subtask send closed the task (`closes: true`): revoking it to
+    // untick the subtask would silently reopen the task (session review #3).
+    const closingSend = submitted(990, "2026-10-06T10:00:00.000Z", {
+      subtaskIds: ["s5"],
+      closes: true,
+    });
+    const world = await setupActions([...artboardEvents(), closingSend]);
+    expect(taskOf(world, HW_ID)?.closed).not.toBeNull();
+    const before = world.state.store.getState().log.length;
+    await expect(world.actions.unmarkDone(HW_ID, "s5")).resolves.toEqual({
+      error: "retro/task-closed",
+      ok: false,
+    });
+    expect(world.state.store.getState().log).toHaveLength(before);
+    expect(taskOf(world, HW_ID)?.closed).not.toBeNull();
+    expect(taskOf(world, HW_ID)?.subtasks.find((item) => item.id === "s5")?.doneAt).not.toBeNull();
   });
 
   it("adds subtasks with fresh ids", async () => {
@@ -481,7 +526,7 @@ describe("subtasks", () => {
 });
 
 describe("removing a subtask", () => {
-  it("takes an unsent subtask off the task; a sent or unknown one stays", async () => {
+  it("takes a subtask off the task, a done one too; an unknown one is refused", async () => {
     const world = await setupActions();
     const [removed] = unwrap(await world.actions.removeSubtask(HW_ID, "s7"));
     expect(removed?.type).toBe("task.subtask.removed");
@@ -490,70 +535,19 @@ describe("removing a subtask", () => {
       error: "subtask/unknown",
       ok: false,
     });
-    await expect(world.actions.removeSubtask(HW_ID, "s1")).resolves.toEqual({
-      error: "subtask/submitted",
-      ok: false,
-    });
-  });
-});
-
-describe("submit", () => {
-  it("sends the solved subtasks by default and closes with the last ones", async () => {
-    const world = await setupActions();
-    const [partial] = unwrap(await world.actions.submit({ taskId: HW_ID }));
-    expect(partial?.type === "task.submitted" && partial.payload).toEqual({
-      subtaskIds: ["s3", "s4"],
-      taskId: HW_ID,
-    });
-    expect(taskOf(world, HW_ID)?.closed).toBeNull();
-    for (const id of ["s5", "s6", "s7"]) {
-      unwrap(await world.actions.markSolved(HW_ID, id));
-    }
-    const [last] = unwrap(await world.actions.submit({ at: HOUR_AGO, taskId: HW_ID }));
-    expect(last?.type === "task.submitted" && last.payload).toEqual({
-      closes: true,
-      subtaskIds: ["s5", "s6", "s7"],
-      taskId: HW_ID,
-    });
-    expect(taskOf(world, HW_ID)?.closed).toMatchObject({ at: HOUR_AGO, outcome: "done" });
-  });
-
-  it("submits a whole task without ids and closes it", async () => {
-    const world = await setupActions();
-    const [sent] = unwrap(await world.actions.submit({ taskId: TRK_ID }));
-    expect(sent?.type === "task.submitted" && sent.payload).toEqual({
-      closes: true,
-      taskId: TRK_ID,
-    });
-    expect(taskOf(world, TRK_ID)?.closed?.outcome).toBe("done");
-  });
-
-  it("refuses when there is nothing to send", async () => {
-    const world = await setupActions();
-    await expect(world.actions.submit({ subtaskIds: ["s1"], taskId: HW_ID })).resolves.toEqual({
-      error: "retro/nothing-to-submit",
-      ok: false,
-    });
-    await expect(world.actions.submit({ taskId: CALC_HW5_ID })).resolves.toEqual({
-      error: "action/nothing-to-do",
-      ok: false,
-    });
+    unwrap(await world.actions.removeSubtask(HW_ID, "s1"));
+    expect(taskOf(world, HW_ID)?.subtasks.map((item) => item.id)).not.toContain("s1");
   });
 });
 
 describe("closing and reopening", () => {
-  it("closes or submits once when tapped twice at the same moment", async () => {
+  it("closes once when tapped twice at the same moment", async () => {
     const world = await setupActions();
     const closes = await Promise.all([
       world.actions.closeTask({ outcome: "done", taskId: TRK_ID }),
       world.actions.closeTask({ outcome: "done", taskId: TRK_ID }),
     ]);
     expect(closes.map((result) => result.ok)).toEqual([true, false]);
-    const sends = await Promise.all([
-      world.actions.submit({ taskId: HW_ID }),
-      world.actions.submit({ taskId: HW_ID }),
-    ]);
-    expect(sends.map((result) => result.ok)).toEqual([true, false]);
   });
 
   it("closes with an outcome and a reason, then reopens", async () => {
@@ -566,7 +560,7 @@ describe("closing and reopening", () => {
       reason: "moved",
       taskId: RFC_ID,
     });
-    await expect(world.actions.markSolved(RFC_ID, "x")).resolves.toEqual({
+    await expect(world.actions.markDone(RFC_ID, "x")).resolves.toEqual({
       error: "retro/task-closed",
       ok: false,
     });
@@ -688,6 +682,82 @@ describe("presets", () => {
       error: "action/nothing-to-do",
       ok: false,
     });
+    // Restore revokes the archive (QA round 25 R25-02): a correction, the archive stays in the log.
+    const restored = unwrap(await world.actions.restorePreset("hw.physics"));
+    expect(restored.map((event) => event.type)).toEqual(["event.revoked"]);
+    expect(world.state.store.getState().presets.byId["hw.physics"]?.archived).toBe(false);
+    await expect(world.actions.restorePreset("hw.physics")).resolves.toEqual({
+      error: "action/nothing-to-do",
+      ok: false,
+    });
+    await expect(world.actions.restorePreset("nope")).resolves.toEqual({
+      error: "preset/unknown",
+      ok: false,
+    });
+    // Deleted again and restored again: the newest archive is the one revoked.
+    unwrap(await world.actions.archivePreset("hw.physics"));
+    unwrap(await world.actions.restorePreset("hw.physics"));
+    expect(world.state.store.getState().presets.byId["hw.physics"]?.archived).toBe(false);
+  });
+
+  it("restores a preset two devices archived offline in one press, one batch (review M1)", async () => {
+    const world = await setupActions();
+    const [archive] = unwrap(await world.actions.archivePreset("hw.algebra"));
+    if (archive === undefined) {
+      throw new Error("archived");
+    }
+    // The other device's archive of the same preset, synced in.
+    await world.state.ingest([{ ...archive, deviceId: "phone", id: "01KOTHERDEVICEARCHIVE00000" }]);
+    const restored = unwrap(await world.actions.restorePreset("hw.algebra"));
+    expect(restored.map((event) => event.type)).toEqual(["event.revoked", "event.revoked"]);
+    // One action: the revocations share their instants.
+    expect(new Set(restored.map((event) => `${event.occurredAt}${event.recordedAt}`)).size).toBe(1);
+    expect(world.state.store.getState().presets.byId["hw.algebra"]?.archived).toBe(false);
+  });
+
+  it("refuses to revoke an event revoked already, and revokes a set all or none (review M2)", async () => {
+    const world = await setupActions();
+    const [archive] = unwrap(await world.actions.archivePreset("hw.algebra"));
+    const [moved] = unwrap(await world.actions.archivePreset("work"));
+    if (archive === undefined || moved === undefined) {
+      throw new Error("archived");
+    }
+    unwrap(await world.actions.revoke(archive.id));
+    const logLength = world.state.store.getState().log.length;
+    await expect(world.actions.revoke(archive.id)).resolves.toEqual({
+      error: "action/nothing-to-do",
+      ok: false,
+    });
+    // One of the set revoked already: nothing of it is written.
+    await expect(world.actions.revokeAll([moved.id, archive.id])).resolves.toEqual({
+      error: "action/nothing-to-do",
+      ok: false,
+    });
+    expect(world.state.store.getState().log).toHaveLength(logLength);
+    expect(world.state.store.getState().presets.byId["work"]?.archived).toBe(true);
+  });
+
+  it("writes one revocation when two revokes of the same event run at once (review I4)", async () => {
+    const world = await setupActions();
+    const [archive] = unwrap(await world.actions.archivePreset("hw.algebra"));
+    const [moved] = unwrap(await world.actions.archivePreset("work"));
+    if (archive === undefined || moved === undefined) {
+      throw new Error("archived");
+    }
+    // A double press on History's Undo, or a toast's Undo racing History's: both in one tick.
+    const results = await Promise.all([
+      world.actions.revoke(archive.id),
+      world.actions.revoke(archive.id),
+      world.actions.revokeAll([moved.id, archive.id]),
+    ]);
+    expect(results.map((result) => result.ok)).toEqual([true, false, false]);
+    const revocations = world.state.store
+      .getState()
+      .log.filter((event) => event.type === "event.revoked");
+    expect(revocations.map((event) => event.payload.targetId)).toEqual([archive.id]);
+    // So one Undo of the Undo puts the archive back in force.
+    unwrap(await world.actions.revoke(revocations[0]?.id ?? ""));
+    expect(world.state.store.getState().presets.byId["hw.algebra"]?.archived).toBe(true);
   });
 
   it("returns the preset validation errors", async () => {
@@ -787,6 +857,31 @@ describe("presets", () => {
   });
 });
 
+describe("a state check inside the write queue (class 222 sweep)", () => {
+  it("writes one event for two presses at once: preset delete, reopen, project archive", async () => {
+    const world = await setupActions([]);
+    const archives = await Promise.all([
+      world.actions.archivePreset("deferred"),
+      world.actions.archivePreset("deferred"),
+    ]);
+    expect(archives.map((result) => result.ok)).toEqual([true, false]);
+    const [created] = unwrap(
+      await world.actions.createTask({ presetId: "personal", title: "Twice" }),
+    );
+    const taskId = created?.type === "task.created" ? created.payload.taskId : "";
+    unwrap(await world.actions.closeTask({ outcome: "done", taskId }));
+    const reopens = await Promise.all([world.actions.reopen(taskId), world.actions.reopen(taskId)]);
+    expect(reopens.map((result) => result.ok)).toEqual([true, false]);
+    const [project] = unwrap(await world.actions.createProject({ color: "blue", name: "Infra" }));
+    const projectId = project?.type === "project.created" ? project.payload.projectId : "";
+    const projectArchives = await Promise.all([
+      world.actions.updateProject(projectId, { archived: true }),
+      world.actions.updateProject(projectId, { archived: true }),
+    ]);
+    expect(projectArchives.map((result) => result.ok)).toEqual([true, false]);
+  });
+});
+
 describe("projects", () => {
   it("creates a project with a trimmed name and edits, archives and restores it", async () => {
     const world = await setupActions([]);
@@ -813,6 +908,35 @@ describe("projects", () => {
     expect(world.state.store.getState().projects.byId[projectId]?.archived).toBe(true);
   });
 
+  it("undoes an archive only while it is the archive in effect (QA round 28 R28-02)", async () => {
+    const world = await setupActions([]);
+    const [created] = unwrap(await world.actions.createProject({ color: "blue", name: "Infra" }));
+    const projectId = created?.type === "project.created" ? created.payload.projectId : "";
+    const [archived] = unwrap(await world.actions.updateProject(projectId, { archived: true }));
+    const archiveId = archived?.id ?? "";
+    const logLength = () => world.state.store.getState().log.length;
+    // Restored from its page: the toast's Undo writes nothing.
+    unwrap(await world.actions.updateProject(projectId, { archived: false }));
+    const before = logLength();
+    await expect(world.actions.undoArchive(projectId, archiveId)).resolves.toEqual({
+      error: "action/nothing-to-do",
+      ok: false,
+    });
+    expect(logLength()).toBe(before);
+    // Archived again: the old toast's Undo is not this archive's.
+    const [again] = unwrap(await world.actions.updateProject(projectId, { archived: true }));
+    await expect(world.actions.undoArchive(projectId, archiveId)).resolves.toMatchObject({
+      ok: false,
+    });
+    // Its own Undo, pressed twice at once, writes one revocation.
+    const results = await Promise.all([
+      world.actions.undoArchive(projectId, again?.id ?? ""),
+      world.actions.undoArchive(projectId, again?.id ?? ""),
+    ]);
+    expect(results.map((result) => result.ok)).toEqual([true, false]);
+    expect(world.state.store.getState().projects.byId[projectId]?.archived).toBe(false);
+  });
+
   it("refuses an empty name and one another active project carries", async () => {
     const world = await setupActions([]);
     const [created] = unwrap(await world.actions.createProject({ color: "blue", name: "Infra" }));
@@ -836,23 +960,23 @@ describe("projects", () => {
 describe("ensureInstances", () => {
   it("adds the missing instances and automatic outcomes as system events, once", async () => {
     const world = await setupActions();
-    await expect(world.actions.ensureInstances()).resolves.toBe(1);
+    // Past its final deadline, Calculus HW 5 stays open and overdue: nothing closes it (feedback 5).
+    await expect(world.actions.ensureInstances()).resolves.toBe(0);
     const missed = world.state.store
       .getState()
       .log.find((event) => event.id === autoOutcomeId(CALC_HW5_ID, "missed"));
-    expect(missed).toMatchObject({ source: "system", deviceId: "dev-1" });
-    expect(taskOf(world, CALC_HW5_ID)?.closed?.outcome).toBe("cancelled_missed");
-    await expect(world.actions.ensureInstances()).resolves.toBe(0);
+    expect(missed).toBeUndefined();
+    expect(taskOf(world, CALC_HW5_ID)?.closed).toBeNull();
 
     world.setNow("2026-10-13T12:00:00.000Z");
-    // Week 42's two issued instances, the outcomes, and History's next one ahead.
-    await expect(world.actions.ensureInstances()).resolves.toBe(6);
+    // Week 42's two issued instances, History's next one ahead, the skip of its empty week 40.
+    await expect(world.actions.ensureInstances()).resolves.toBe(4);
     const log = world.state.store.getState().log;
     for (const id of ["hw:hw.algebra:2026-W42", "hw:hw.calculus:2026-W42"]) {
       expect(log.find((event) => event.id === id)).toMatchObject({ source: "system" });
     }
     expect(taskOf(world, "hw:hw.algebra:2026-W42")?.title).toBe("Algebra HW 2");
-    expect(taskOf(world, TRK_ID)?.closed?.outcome).toBe("cancelled_missed");
+    expect(taskOf(world, TRK_ID)?.closed).toBeNull();
     await expect(world.actions.ensureInstances()).resolves.toBe(0);
   });
 
@@ -861,10 +985,10 @@ describe("ensureInstances", () => {
     // System-made instances share their id with their creation event.
     unwrap(await world.actions.revoke(CALC_W41_ID));
     expect(taskOf(world, CALC_W41_ID)).toBeUndefined();
-    // The automatic outcome as before, and the course's next week put ahead instead.
-    await expect(world.actions.ensureInstances()).resolves.toBe(2);
+    // Nothing: the overdue HW 5 is still open, so the next week is not put ahead (feedback 5).
+    await expect(world.actions.ensureInstances()).resolves.toBe(0);
     expect(taskOf(world, CALC_W41_ID)).toBeUndefined();
-    expect(taskOf(world, "hw:hw.calculus:2026-W42")?.closed).toBeNull();
+    expect(taskOf(world, CALC_HW5_ID)?.closed).toBeNull();
   });
 });
 
@@ -897,7 +1021,19 @@ describe("review", () => {
 
   it("shows a correction without a second rebuild and confirms or undoes automatic outcomes", async () => {
     const store = createMemoryEventStore();
-    const world = await setupActions(undefined, store);
+    // An automatic miss an older version wrote: none is made any more (feedback 5).
+    const at = new Date(Date.parse(NOW) - 60 * 60 * 1000).toISOString();
+    const oldMiss: Event = {
+      deviceId: "server",
+      id: autoOutcomeId(CALC_HW5_ID, "missed"),
+      occurredAt: at,
+      payload: { outcome: "cancelled_missed", taskId: CALC_HW5_ID },
+      precision: "exact",
+      recordedAt: at,
+      source: "system",
+      type: "task.closed",
+    };
+    const world = await setupActions([...artboardEvents(), oldMiss], store);
     await world.actions.ensureInstances();
     const item = reviewItems(world.state.store.getState(), ctx()).find(
       (entry) => entry.kind === "confirm-auto-outcome",
@@ -972,6 +1108,39 @@ describe("settings", () => {
     });
   });
 
+  it("writes one digest time by its row, on the list as it is when the write runs (review I1)", async () => {
+    const world = await setupActions([]);
+    unwrap(await world.actions.setDigestWindows(["09:00", "14:00", "21:00"]));
+    const digest = () => world.state.store.getState().settings.digestWindows;
+    // The third row removed, then its field's late save of «20:00»: the row stays removed.
+    const [removed, late] = await Promise.all([
+      world.actions.removeDigestTime(2, "21:00"),
+      world.actions.setDigestTime(2, "20:00"),
+    ]);
+    expect(unwrap(removed)).toHaveLength(1);
+    expect(unwrap(late)).toEqual([]);
+    expect(digest()).toEqual(["09:00", "14:00"]);
+    // An earlier row removed while a later one is saved: the later one lands on its new place.
+    await Promise.all([
+      world.actions.removeDigestTime(0, "09:00"),
+      world.actions.setDigestTime(0, "15:00"),
+    ]);
+    expect(digest()).toEqual(["15:00"]);
+  });
+
+  it("removes a digest time once for two presses of its ✕ (class 222)", async () => {
+    const world = await setupActions([]);
+    unwrap(await world.actions.setDigestWindows(["09:00", "14:00", "21:00"]));
+    const results = await Promise.all([
+      world.actions.removeDigestTime(1, "14:00"),
+      world.actions.removeDigestTime(1, "14:00"),
+    ]);
+    expect(results.map((result) => unwrap(result).length)).toEqual([1, 0]);
+    expect(world.state.store.getState().settings.digestWindows).toEqual(["09:00", "21:00"]);
+    // A time the row already holds writes nothing.
+    expect(unwrap(await world.actions.setDigestTime(0, "09:00"))).toEqual([]);
+  });
+
   it("stores a manual category estimate as an event and uses it after a specific estimate", async () => {
     const world = await setupActions([]);
     const [setting] = unwrap(await world.actions.setCategoryEstimate("hygiene", 22));
@@ -992,7 +1161,7 @@ describe("settings", () => {
 describe("undo", () => {
   it("revokes by id and undoes the latest own event", async () => {
     const world = await setupActions();
-    const [solved] = unwrap(await world.actions.markSolved(HW_ID, "s5"));
+    const [solved] = unwrap(await world.actions.markDone(HW_ID, "s5"));
     const [undone] = unwrap(await world.actions.undoLast());
     expect(undone?.type === "event.revoked" && undone.payload.targetId).toBe(solved?.id);
     await expect(world.actions.revoke("missing")).resolves.toEqual({
