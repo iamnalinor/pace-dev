@@ -2,7 +2,7 @@ import { render } from "@testing-library/react-native";
 
 import { FormAlert } from "#app/shared/task-fields/form-alert.tsx";
 
-import { RevealContext, revealIn } from "./overlay-reveal.ts";
+import { firstOfTick, RevealContext, revealIn } from "./overlay-reveal.ts";
 import { TextField } from "./text-field.tsx";
 import { ThemeProvider } from "./theme-provider.tsx";
 
@@ -59,5 +59,35 @@ describe("the messages that ask to be revealed", () => {
     );
     expect(reveal).toHaveBeenCalledTimes(2);
     expect(reveal.mock.calls.every(([node]) => node !== null)).toBe(true);
+  });
+});
+
+describe("several messages at once, and a message that changes (review M1, M2)", () => {
+  it("reveals the first message of one render (the top one), not the last", async () => {
+    const reveal = jest.fn();
+    const coalesced = firstOfTick(reveal);
+    coalesced("From's error");
+    coalesced("To's error");
+    expect(reveal).not.toHaveBeenCalled();
+    await Promise.resolve();
+    expect(reveal).toHaveBeenCalledTimes(1);
+    expect(reveal).toHaveBeenCalledWith("From's error");
+    coalesced("later");
+    await Promise.resolve();
+    expect(reveal).toHaveBeenLastCalledWith("later");
+  });
+
+  it("does not scroll again when a shown message only changes its text while typing", async () => {
+    const reveal = jest.fn();
+    const ui = (error: string) => (
+      <ThemeProvider forced="light">
+        <RevealContext value={reveal}>
+          <TextField error={error} label="To" value="9" />
+        </RevealContext>
+      </ThemeProvider>
+    );
+    const { rerender } = await render(ui("Type a time like 09:30."));
+    await rerender(ui("This runs into the next activity."));
+    expect(reveal).toHaveBeenCalledTimes(1);
   });
 });

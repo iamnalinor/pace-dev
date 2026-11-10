@@ -2496,3 +2496,9 @@ New bugs go here with their class; a new class gets its own section above.
 - **Missed because.** The test built exactly that state and asserted only the number of rows.
 - **Class.** An aggregate whose displayed state is one member's while its action covers all members.
 - **Sweep and guard.** `groupBatches` splits a batch by state: the members in effect make one row (its Undo revokes only them), the ones revoked already another that says so. The other aggregates with an action: an Undo toast names every event it undoes and goes once any is revoked (213); Restore revokes the archives in effect only. Guard: `history.test.ts` (a batch partly taken back: the row in effect holds the member in effect, its Undo goes through, nothing is left to undo).
+
+### 224. A reveal that each message runs on its own, against a viewport none of them moved yet
+- **Bug.** When Save showed several errors at once (From and To), each `ErrorMessage` asked the sheet's body to scroll to it from the same stale offset, so the last in tree order won and the top one could end up off-screen; and every change of an error's text while typing (badTime → overlapsPrevious) scrolled the body again, possibly away from the focused field (review of the QA 26 wave, M1, M2).
+- **Missed because.** The R26-01 tests revealed one message once.
+- **Class.** Independent side effects that each act on shared, not-yet-updated state (one scroll position), and an effect keyed on content where it means presence.
+- **Sweep and guard.** `OverlayBody` coalesces the reveals of one render (`firstOfTick`): the first message, the top one, is revealed once the render's effects are done; `useRevealOnShow` runs when a message appears, not when its text changes. Every message that reveals goes through these two (`ErrorMessage`, `FormAlert`). Guards: `overlay-reveal.test.tsx` (two at once: the first; a changed text: no second scroll).

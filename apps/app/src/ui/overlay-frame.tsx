@@ -14,7 +14,7 @@ import { cx } from "./cx.ts";
 import { IconButton } from "./icon-button.tsx";
 import { EASING } from "./motion-presets.ts";
 import { type OverlayKind, overlayTiming } from "./overlay-motion.ts";
-import { RevealContext, revealIn, type Viewport } from "./overlay-reveal.ts";
+import { firstOfTick, RevealContext, revealIn, type Viewport } from "./overlay-reveal.ts";
 import { SheetSubmitScope } from "./sheet-submit.tsx";
 import { HotkeyLayer } from "./use-hotkey.tsx";
 import { useIsMotionReduced } from "./use-reduced-motion.ts";
@@ -121,8 +121,13 @@ export const OverlayBody = ({
   const [isScrolled, setIsScrolled] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const viewportRef = useRef<Viewport>({ height: 0, offset: 0 });
+  // The reveals of one render become one, the first's (review M1).
+  const coalescedRef = useRef<((node: Parameters<typeof revealIn>[1]) => void) | null>(null);
   const reveal = useCallback((node: Parameters<typeof revealIn>[1]) => {
-    revealIn(scrollRef.current, node, viewportRef.current);
+    coalescedRef.current ??= firstOfTick((first: Parameters<typeof revealIn>[1]) => {
+      revealIn(scrollRef.current, first, viewportRef.current);
+    });
+    coalescedRef.current(node);
   }, []);
   return (
     <RevealContext value={reveal}>

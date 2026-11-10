@@ -72,16 +72,42 @@ const hasBox = (frame: unknown): frame is { readonly getBoundingClientRect: () =
 export const RevealContext = createContext<((node: null | Revealed) => void) | null>(null);
 
 /**
+Several messages that appear in one render (Save refusing From and To) each ask to be revealed,
+in tree order, against the same viewport: only the first, the top one, is revealed, once the
+render's effects are done, so a later one never scrolls the first out of view (review M1).
+*/
+export const firstOfTick = <Node>(reveal: (node: Node) => void): ((node: Node) => void) => {
+  let first: null | { readonly node: Node } = null;
+  return (node) => {
+    if (first !== null) {
+      return;
+    }
+    first = { node };
+    queueMicrotask(() => {
+      const asked = first;
+      first = null;
+      if (asked !== null) {
+        reveal(asked.node);
+      }
+    });
+  };
+};
+
+/**
 A ref for a message that must be seen when it appears (a field's error, a form's alert): inside a
 sheet or a dialog its body scrolls it into view, so an error under the last field never sits
-below the fold behind the pinned Save (QA round 26 R26-01). It runs when the message appears and
-when its text changes.
+below the fold behind the pinned Save (QA round 26 R26-01). It runs when the message appears,
+not when its text changes as the person types, so the body never pulls away from the field
+being typed in (review M2).
 */
 export const useRevealOnShow = <Node extends Revealed = View>(text: string) => {
   const reveal = use(RevealContext);
   const ref = useRef<Node>(null);
+  const isShown = text !== "";
   useEffect(() => {
-    reveal?.(ref.current);
-  }, [reveal, text]);
+    if (isShown) {
+      reveal?.(ref.current);
+    }
+  }, [reveal, isShown]);
   return ref;
 };
