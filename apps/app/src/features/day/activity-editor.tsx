@@ -1,4 +1,4 @@
-import { type ReactNode, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { type TextInput, View } from "react-native";
 
 import { useAppState, useLanguage, usePace, useT } from "#app/app-state.tsx";
@@ -266,14 +266,11 @@ export const useActivityEditor = ({ onClose, target, zone }: ActivitySheetProps)
 
 /** The editor's fields, day choices, the apps used meanwhile and Delete, in a sheet or the inspector. */
 export const ActivityEditorBody = ({
-  actions,
   editor,
   onClose,
   target,
   zone,
 }: ActivitySheetProps & {
-  /** Between the apps and Delete: the sheet's Save. */
-  readonly actions?: ReactNode;
   readonly editor: ReturnType<typeof useActivityEditor>;
 }) => (
   <>
@@ -294,7 +291,6 @@ export const ActivityEditorBody = ({
     {target.kind === "edit" ? (
       <ActivityApps endAt={target.endAt} startAt={target.startAt} zone={zone} />
     ) : null}
-    {actions}
     {target.kind === "edit" ? (
       <DeleteBlock activityId={target.activityId} onDeleted={onClose} />
     ) : null}

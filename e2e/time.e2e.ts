@@ -414,3 +414,18 @@ test.describe("the calendar's Attend or skip on Now, phone (390px)", () => {
     await expect(timeBar(page).getByText("Colloquium")).toBeVisible();
   });
 });
+
+test("the phone's activity sheet keeps Save in view without a scroll, Delete below the fields (QA round 25 R25-10)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 844, width: 390 });
+  await loginViaApi(page);
+  await page.goto("/day");
+  await page.getByRole("button", { name: "Log past activity" }).click();
+  await page.getByLabel("What", { exact: true }).fill("Commute");
+  await page.getByRole("button", { exact: true, name: "Save" }).click();
+  await page.getByRole("button", { name: /Commute/u }).click();
+  const save = page.getByRole("button", { exact: true, name: "Save" });
+  await expect(save).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole("button", { name: "Delete activity" })).toBeAttached();
+});

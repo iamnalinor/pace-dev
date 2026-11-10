@@ -17,24 +17,23 @@ export const ActivitySheet = (props: ActivitySheetProps) => {
   return (
     <Sheet
       closeLabel={t("common.close")}
+      // Save pinned at the sheet's edge, as the task's sheets have it: on a phone the fields,
+      // the apps and Delete ran it below the fold (QA round 25 R25-10).
+      footer={
+        <SheetActions
+          onPrimary={() => {
+            void editor.save();
+          }}
+          primaryLabel={t("common.save")}
+        />
+      }
       name="activity"
       onClose={onClose}
       open
       subtitle={editor.subtitle}
       title={t(target.kind === "edit" ? "day.editTitle" : "day.logPast")}
     >
-      <ActivityEditorBody
-        {...props}
-        actions={
-          <SheetActions
-            onPrimary={() => {
-              void editor.save();
-            }}
-            primaryLabel={t("common.save")}
-          />
-        }
-        editor={editor}
-      />
+      <ActivityEditorBody {...props} editor={editor} />
     </Sheet>
   );
 };
