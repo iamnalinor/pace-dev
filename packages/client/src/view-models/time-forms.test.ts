@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { activityFormOf, typeTime } from "./time-forms.ts";
+import { activityFormOf, readTime, typeTime } from "./time-forms.ts";
 
 /** `HH:mm` of a UTC instant, standing in for a platform's time input. */
 const clock = (iso: string): string => iso.slice(11, 16);
@@ -104,5 +104,32 @@ describe("typeTime", () => {
     for (const raw of ["9:30 PM", "9:30pm", "12:345", "140512", "1:2:3"]) {
       expect(typeTime(raw).isComplete).toBe(false);
     }
+  });
+
+  it("never takes a second separator typed key by key (QA round 27 R27-04)", () => {
+    expect(typeTime("09:9:", "09:9")).toEqual({ isComplete: false, text: "09:9" });
+    expect(typeTime("09:30:", "09:30")).toEqual({ isComplete: true, text: "09:30" });
+    let text = "";
+    for (const key of "99:99") {
+      text = typeTime(`${text}${key}`, text).text;
+      expect(text.split(":").length).toBeLessThanOrEqual(2);
+    }
+  });
+});
+
+describe("readTime: a field read whole when it is left or saved", () => {
+  it("reads an hour typed alone as that hour sharp (QA round 27 R27-04)", () => {
+    for (const [raw, text] of [
+      ["7", "07:00"],
+      ["07", "07:00"],
+      ["7:", "07:00"],
+      ["14", "14:00"],
+      ["0", "00:00"],
+    ] as const) {
+      expect(readTime(raw)).toEqual({ isComplete: true, text });
+    }
+    expect(readTime("24").isComplete).toBe(false);
+    expect(readTime("1430")).toEqual({ isComplete: true, text: "14:30" });
+    expect(readTime("14:3").isComplete).toBe(false);
   });
 });

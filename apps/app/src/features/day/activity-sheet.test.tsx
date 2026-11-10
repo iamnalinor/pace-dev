@@ -184,6 +184,26 @@ describe("the log-past sheet's times", () => {
     expect(nap?.startAt).toBe("2026-10-06T06:30:00.000Z");
   });
 
+  it("reads an hour alone as that hour sharp, and says a wrong time once the field is left (R27-04)", async () => {
+    const { onClose, runtime } = await logSheet();
+    await fireEvent.changeText(screen.getByLabelText("From"), "7");
+    await fireEvent(screen.getByLabelText("From"), "blur");
+    expect(screen.getByLabelText("From").props["value"]).toBe("07:00");
+    // Before any Save, as every other time field does.
+    await fireEvent.changeText(screen.getByLabelText("To"), "25");
+    await fireEvent(screen.getByLabelText("To"), "blur");
+    expect(screen.getByText("Type a time like 09:30.")).toBeOnTheScreen();
+    // An hour alone in To, saved without leaving the field, is that hour too.
+    await fireEvent.changeText(screen.getByLabelText("To"), "8");
+    await fireEvent.press(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalled();
+    });
+    const [nap] = Object.values(runtime.state.store.getState().time.activities);
+    expect(nap?.startAt).toBe("2026-10-06T04:00:00.000Z");
+    expect(nap?.endAt).toBe("2026-10-06T05:00:00.000Z");
+  });
+
   it("refuses an end at or well before the start instead of a day-long block", async () => {
     const { onClose } = await logSheet();
     await fireEvent.changeText(screen.getByLabelText("From"), "1000");

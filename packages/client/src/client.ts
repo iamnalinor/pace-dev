@@ -277,6 +277,7 @@ export {
   type DayRowProps,
   type FormPartProps,
   hasEnd,
+  readTime,
   type TypedTime,
   typeTime,
 } from "./view-models/time-forms.ts";

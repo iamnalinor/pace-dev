@@ -139,6 +139,10 @@ wrong 00:30 (QA-25 review I1); one key typed in front of «:30» leaves «1:30»
 comes. Without `previous` the text is read whole, the way a field reads it when it is left or saved.
 */
 export const typeTime = (raw: string, previous?: string): TypedTime => {
+  if (previous !== undefined && isSecondSeparator(raw, previous)) {
+    // «09:9» and then «:»: one separator is all a time has (QA round 27 R27-04).
+    return typeTime(previous);
+  }
   const text = raw.trim();
   const inserted = previous === undefined ? text.length : insertedLength(previous, raw);
   const separated = SEPARATED.exec(text);
@@ -147,4 +151,25 @@ export const typeTime = (raw: string, previous?: string): TypedTime => {
     return readSeparated(hours, minutes, inserted > 1 || (inserted === 1 && minutes === ""));
   }
   return DIGITS.test(text) ? readDigits(text, inserted > 0) : asTyped(raw);
+};
+
+/** A separator typed into a text that has one already. */
+const isSecondSeparator = (raw: string, previous: string): boolean =>
+  raw.length > previous.length && separatorsIn(raw) > 1 && separatorsIn(previous) === 1;
+
+const separatorsIn = (text: string): number => text.match(/[:.,hч]/giu)?.length ?? 0;
+
+const HOUR_ONLY = /^(\d{1,2}):?$/u;
+
+/**
+A field's text read whole, the way it is read when the field is left or its form saved: as
+`typeTime` reads it, and an hour typed alone («7», «14», «7:») is that hour sharp (QA round 27
+R27-04, offered in round 26).
+*/
+export const readTime = (text: string): TypedTime => {
+  const whole = typeTime(text);
+  const hour = HOUR_ONLY.exec(text.trim())?.[1];
+  return hour === undefined || whole.isComplete || Number(hour) > MAX_HOUR
+    ? whole
+    : { isComplete: true, text: `${hour.padStart(2, "0")}:00` };
 };
