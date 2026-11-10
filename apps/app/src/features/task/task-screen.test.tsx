@@ -413,6 +413,24 @@ describe("TaskScreen — work", () => {
     expect(screen.getByRole("button", { name: en("task.addDescription") })).toBeOnTheScreen();
   });
 
+  it("saves the description on ⌘/Ctrl+Enter in its editor, and leaves the task open (QA round 26 R26-02)", async () => {
+    const runtime = await hwScreen();
+    await fireEvent.press(screen.getByRole("button", { name: en("task.addDescription") }));
+    const editor = screen.getByLabelText(en("edit.description"));
+    await fireEvent.changeText(editor, "Chapter 3 only");
+    await fireEvent(editor, "keyPress", {
+      nativeEvent: { ctrlKey: true, key: "Enter" },
+      preventDefault: jest.fn(),
+    });
+    await waitFor(() => {
+      expect(screen.queryByLabelText(en("edit.description"))).toBeNull();
+    });
+    const task = Object.values(runtime.state.store.getState().tasks.byId).find(
+      (item) => item.description === "Chapter 3 only",
+    );
+    expect(task?.closed).toBeNull();
+  });
+
   it("moves the progress slider in percent, the work left following at once", async () => {
     const runtime = await trkScreen();
     expect(screen.getByText("40\u{A0}%")).toBeOnTheScreen();

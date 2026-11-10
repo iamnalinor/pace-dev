@@ -70,7 +70,7 @@ A field that handles Escape itself (a subtask being typed closes on it, `use-hot
 field that only keeps its typing keys ("own": a time field, the composer) does not: Escape there
 still closes the sheet around it.
 */
-const FIELD_OWNS_ESCAPE = '[data-pace-keys="escape"]';
+const FIELD_OWNS_ESCAPE = '[data-pace-keys="escape"], [data-pace-keys="edit"]';
 
 const onKeyDown = (event: EscapeKey & { readonly target: EventTarget | null }): void => {
   if (!isBareEscape(event) || didTakeEscape(event)) {

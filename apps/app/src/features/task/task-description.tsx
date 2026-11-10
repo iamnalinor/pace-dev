@@ -4,7 +4,7 @@ import { View } from "react-native";
 import type { TaskViewModel } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
-import { escapeFieldProps } from "#app/platform/enter-key.ts";
+import { editFieldProps } from "#app/platform/enter-key.ts";
 import { focusPlace } from "#app/platform/focus-place.ts";
 import { useIsInPane } from "#app/shared/task-opener.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
@@ -18,6 +18,16 @@ import { useDiscardDraft, useDraft } from "#app/ui/use-draft.ts";
 import { splitLinks, type TextPart } from "@pace/core";
 
 import { titleInset } from "./task-summary.tsx";
+
+/** ⌘↵ or Ctrl+↵, as a computer's browser reports the key press. */
+const isModEnter = (pressed: object): boolean => {
+  const { ctrlKey, key, metaKey } = pressed as {
+    readonly key?: string;
+    readonly ctrlKey?: boolean;
+    readonly metaKey?: boolean;
+  };
+  return key === "Enter" && (ctrlKey === true || metaKey === true);
+};
 
 /** Lines of the description before «Show all». */
 const DESCRIPTION_LINES = 6;
@@ -40,7 +50,7 @@ const DescriptionEditor = ({
   return (
     <View className="mx-gutter gap-3">
       <TextField
-        {...escapeFieldProps}
+        {...editFieldProps}
         autoFocus
         editable={!isSaving}
         label={t("edit.description")}
@@ -48,10 +58,20 @@ const DescriptionEditor = ({
         multiline
         onChangeText={onChange}
         onKeyPress={(event) => {
+          if (isSaving) {
+            return;
+          }
           // The field owns Escape (R24-01): it cancels the edit; the pane stays for the next one.
-          if (!isSaving && event.nativeEvent.key === "Escape") {
+          if (event.nativeEvent.key === "Escape") {
             onCancel();
           }
+          // And ⌘/Ctrl+Enter, a form's submit: it saves the text, never the task's Done (R26-02).
+          if (!isModEnter(event.nativeEvent)) {
+            return;
+          }
+
+          event.preventDefault();
+          onSave();
         }}
         value={draft}
       />

@@ -145,3 +145,25 @@ test("Escape closes Now's task pane and gives the focus back to its row; an edit
   await page.keyboard.press("Escape");
   await expect(header).toHaveCount(0);
 });
+
+test("Ctrl+Enter in the description edited in the pane saves it, never the task's Done (QA round 26 R26-02)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 800, width: 1280 });
+  await loginViaApi(page);
+  await page.goto("/");
+  await addTask(page, "Water the ficus");
+  const header = page.getByRole("heading", { exact: true, name: "Water the ficus" });
+  await expect(header).toBeVisible();
+  await page.getByRole("button", { exact: true, name: "Add description" }).click();
+  const field = page.getByRole("textbox", { exact: true, name: "Description" });
+  await expect(field).toBeFocused();
+  await field.pressSequentially("Half a can");
+  await page.keyboard.press("Control+Enter");
+  await expect(field).toHaveCount(0);
+  await expect(page.getByText("Half a can", { exact: true })).toBeVisible();
+  await expect(header).toBeVisible();
+  // Still open: the row stays in Now, and no Done toast came.
+  await expect(nowTasks(page).getByRole("link", { name: /^Water the ficus/u })).toBeVisible();
+  await expect(page.getByText(/^Done:/u)).toHaveCount(0);
+});

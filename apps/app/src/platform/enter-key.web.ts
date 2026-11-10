@@ -30,10 +30,11 @@ cursor stays; Escape is the field's own (it closes it) rather than the page's (a
 export const entryFieldProps = webEntry as TextInputProps;
 
 /**
-A field edited in place inside a pane (the task's description, R24-01): Escape is the field's own
-(it cancels the edit) rather than the page's (the pane's close); the next Escape closes the pane.
+A field edited in place inside a pane (the task's description, R24-01): Escape and ⌘/Ctrl+Enter
+are the field's own (it cancels or saves the edit) rather than the page's (the pane's close, the
+task's Done; R26-02); the next Escape closes the pane.
 */
-export const escapeFieldProps = { dataSet: { paceKeys: "escape" } } as TextInputProps;
+export const editFieldProps = { dataSet: { paceKeys: "edit" } } as TextInputProps;
 
 /**
 A single-line field of a sheet (QA round 21 M1): Enter presses the form's action and the cursor
