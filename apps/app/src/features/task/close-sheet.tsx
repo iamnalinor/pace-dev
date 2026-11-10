@@ -7,6 +7,7 @@ import { useViewer } from "#app/shared/use-viewer.ts";
 import { RadioChips } from "#app/ui/radio-chips.tsx";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
+import { TimeCheckScope, useTimeChecks } from "#app/ui/time-check.tsx";
 
 import type { CloseMode } from "./close-model.ts";
 
@@ -92,7 +93,14 @@ export const CloseSheet = ({
   const t = useT();
   const { deviceTz, now } = useViewer();
   const form = useCloseForm(view, { deviceTz, now }, startMode);
-  const submit = useSubmitClose(view, form, onClose);
+  const submitClose = useSubmitClose(view, form, onClose);
+  const times = useTimeChecks();
+  // A time typed and not readable refuses Done, said under its field (R27-01, R27-02).
+  const submit = (): void => {
+    if (times.isAllRead()) {
+      submitClose();
+    }
+  };
   // Each press of Cancelled or Skipped asks Reason for the cursor (with a keyboard), as opening
   // on them from "Close as…" does; an arrow moving through the outcomes keeps it in the row
   // (round 7 review 9).
@@ -126,7 +134,14 @@ export const CloseSheet = ({
         }}
       />
       {form.mode === "other" ? <GiveUpFields form={form} reasonAsked={reasonAsked} /> : null}
-      <WhenPicker deviceTz={deviceTz} form={form} label={whenLabel} quickTimes={view.quickTimes} />
+      <TimeCheckScope checks={times}>
+        <WhenPicker
+          deviceTz={deviceTz}
+          form={form}
+          label={whenLabel}
+          quickTimes={view.quickTimes}
+        />
+      </TimeCheckScope>
       <PrecisionRow form={form} />
       <ClosePreview form={form} view={view} />
     </Sheet>

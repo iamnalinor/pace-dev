@@ -4,8 +4,10 @@ import { TextInput, View } from "react-native";
 import { typeTime } from "@pace/client";
 
 import { useT } from "../app-state.tsx";
+import { submitFieldProps } from "../platform/enter-key.ts";
 import { cx } from "./cx.ts";
 import { ErrorMessage } from "./field-error.tsx";
+import { useSheetSubmit } from "./sheet-submit.tsx";
 import { boxClass, FocusRing } from "./text-field.tsx";
 import { useTheme } from "./theme-provider.tsx";
 import { useTimeCheck } from "./time-check.tsx";
@@ -60,7 +62,7 @@ const useStoredValue = (
 };
 
 /**
-The typed text of a `TimeInput` and when it is saved: on leave or Enter (`commit`), as it is typed
+The typed text of a `TimeInput` and when it is saved: on leave or Enter (`isCommitted`), as it is typed
 inside a draft, and as the field goes away holding a time it was not left with.
 */
 const useTypedTime = ({
@@ -98,15 +100,16 @@ const useTypedTime = ({
     [],
   );
   useUnreadableCheck(pendingRef, latestRef, setIsWrong);
-  const commit = (): void => {
+  /** Saves what is typed; `true` when the stored time already is what the field shows. */
+  const isCommitted = (): boolean => {
     if (!isEdited) {
       setText(value);
-      return;
+      return true;
     }
     const read = typeTime(text);
     if (!read.isComplete) {
       setIsWrong(true);
-      return;
+      return false;
     }
     pendingRef.current = null;
     setIsWrong(false);
@@ -114,7 +117,9 @@ const useTypedTime = ({
     setText(read.text);
     if (read.text !== value) {
       onTime(read.text);
+      return false;
     }
+    return true;
   };
   const type = (raw: string): void => {
     const typed = typeTime(raw, text);
@@ -125,7 +130,7 @@ const useTypedTime = ({
       onTime(typed.text);
     }
   };
-  return { commit, isWrong, text, type };
+  return { isCommitted, isWrong, text, type };
 };
 
 /**
@@ -169,7 +174,8 @@ export const TimeInput = ({
   const t = useT();
   const messageId = useId();
   const [isFocused, setIsFocused] = useState(false);
-  const { commit, isWrong, text, type } = useTypedTime({ isDraft, onTime, value });
+  const { isCommitted, isWrong, text, type } = useTypedTime({ isDraft, onTime, value });
+  const sheetSubmit = useSheetSubmit();
   return (
     <View className={cx("gap-2 self-start", className)}>
       <View className={boxClass({ isDisabled: !editable, isErrored: isWrong, multiline: false })}>
@@ -188,13 +194,20 @@ export const TimeInput = ({
           maxLength={TIME_MAX_LENGTH}
           onBlur={() => {
             setIsFocused(false);
-            commit();
+            isCommitted();
           }}
+          {...(sheetSubmit !== undefined && submitFieldProps)}
           onChangeText={type}
           onFocus={() => {
             setIsFocused(true);
           }}
-          onSubmitEditing={commit}
+          onSubmitEditing={() => {
+            // In a sheet Enter presses its Done or Save, as in its other fields (R27-01), once the
+            // form holds the time shown; a time just handed over waits for the next Enter.
+            if (isCommitted()) {
+              sheetSubmit?.();
+            }
+          }}
           placeholder="00:00"
           placeholderTextColor={palette["label.tertiary"]}
           ref={ref}

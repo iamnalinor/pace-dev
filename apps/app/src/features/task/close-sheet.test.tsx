@@ -98,10 +98,39 @@ describe("CloseSheet — a homework task (one done mark per subtask, nothing to 
     expect(screen.getByText(en("edit.inZone", { zone: "Europe/Moscow" }))).toBeOnTheScreen();
     const time = screen.getByLabelText(en("close.time"));
     await fireEvent.changeText(time, "25:00");
-    expect(screen.getByText(en("close.timeInvalid"))).toBeOnTheScreen();
-    expect(screen.getByRole("button", { name: en("common.done") })).toBeDisabled();
+    await fireEvent(time, "blur");
+    expect(screen.getByRole("alert")).toHaveTextContent(en("day.badTime"));
     await fireEvent.changeText(time, "10:15");
     expect(preview("recorded")).toHaveTextContent("12:50 · happened 10:15", { exact: false });
+  });
+
+  it("reads its time as every time field does, and says which field is wrong (R27-01)", async () => {
+    const runtime = await openClose();
+    await fireEvent.press(screen.getByRole("radio", { name: en("close.pickExact") }));
+    const time = screen.getByLabelText(en("close.time"));
+    // «930», «0930», «9.30» are 09:30 here too, the colon comes by itself.
+    for (const raw of ["930", "0930", "9.30"]) {
+      await fireEvent.changeText(time, "");
+      await fireEvent.changeText(time, raw);
+      expect(screen.getByLabelText(en("close.time")).props["value"]).toBe("09:30");
+      expect(preview("recorded")).toHaveTextContent("happened 09:30", { exact: false });
+    }
+    // A date it cannot read is said under the date, not as one sentence for both.
+    await fireEvent.changeText(screen.getByLabelText(en("close.date")), "2026-13-01");
+    expect(screen.getByText(en("close.dateInvalid"))).toBeOnTheScreen();
+    expect(preview("recorded")).not.toHaveTextContent("—");
+    await fireEvent.changeText(screen.getByLabelText(en("close.date")), "2026-10-07");
+    // Done with a time it cannot read refuses and says so; Enter presses Done when it can.
+    await fireEvent.changeText(time, "25:00");
+    await fireEvent.press(screen.getByRole("button", { name: en("common.done") }));
+    expect(screen.getByRole("alert")).toHaveTextContent(en("day.badTime"));
+    expect(runtime.state.store.getState().log.at(-1)?.type).not.toBe("task.closed");
+    await fireEvent.changeText(time, "");
+    await fireEvent.changeText(time, "0930");
+    await fireEvent(time, "submitEditing");
+    await waitFor(() => {
+      expect(runtime.state.store.getState().log.at(-1)?.type).toBe("task.closed");
+    });
   });
 
   it("says why a typed time cannot be taken, before Done is pressed: ahead of now, before the task", async () => {

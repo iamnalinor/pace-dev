@@ -78,8 +78,9 @@ export const ClosePreview = ({
   // Its day too when it is not today: "yesterday 18:00", "Oct 31 09:30" (QA round 20 L5).
   const happened = form.at === null ? "—" : happenedText(form.at, { language, now, tz: deviceTz });
   const recorded = clockTime(now, deviceTz);
+  // No instant yet (a date it cannot read): the recorded time alone, never «happened —».
   const isSameMinute =
-    form.at !== null &&
+    form.at === null ||
     Math.floor(Date.parse(form.at) / 60_000) === Math.floor(Date.parse(now) / 60_000);
   return (
     <View className="gap-2 rounded-md bg-inset p-3">
