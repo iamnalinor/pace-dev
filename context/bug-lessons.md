@@ -1919,6 +1919,8 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-10 | PR 55 follow-up review, item 3: one event this build cannot read in a checkpoint copy's tail, then any correction, stopped the copy's sync for good: the strict source read failed the run before its push, the outbox never left and every run repeated the same requests | 361 (new), 300 | yes: every place the checkpoint run asks for the complete source (`retryPage`, `sourceBootstrap`, `acceptSource`); the History screen and export keep the strict read | `checkpoint-sync-tail.test.ts` (HTTP and socket: the copy turns full, the outbox is sent, the next run is one pull) |
 | 2026-11-10 | PR 55 follow-up review, item 5: a long-lived tab kept the checkpoint run after a deploy rollback or a version bump and failed every run until a reload; the server's pull compared with a literal `1` | 362 (new), 270 | yes: the one cached negotiation on the client (`isOffered`); the other version comparisons on the server already use `CHECKPOINT_VERSION` | `checkpoint-sync-modes.test.ts` (rollback under a running tab: one failed run, then the legacy run settles) |
 | 2026-11-10 | PR 55 follow-up review, item 6: a full copy whose `upgradeCursor` rewind was cut off before its pull was read as never pulled and cut down to a checkpoint | 363 (new), 300 | yes: `isCheckpointRun` and `requiresBootstrap` were the two readers of "has pulled" | `checkpoint-sync-modes.test.ts` (rewound full copy: no bootstrap, whole log kept) |
+| 2026-11-10 | Commit ae5644cd: main's review-I3 refusal (a revocation of an event revoked already) reads the server's `Materialized.revoked`, and the second path that builds a `Materialized`, the checkpoint candidate, did not fill the new field: a state served from a checkpoint took every event as unrevoked. Missed because the candidate's tests compared the fields that existed when it was written | 302 | yes: the full rebuild and the checkpoint candidate are the two builders of `Materialized`; the client's `CoreState` has one (`materialize`) | the shadow comparison of the candidate against the full rebuild checks the revoked set; `checkpoint-cache.int.test.ts` "knows on a cold restart from a checkpoint which events are revoked" (the cold state's `revoked` equals the full rebuild's) |
+| 2026-11-10 | PR 55 follow-up review, item 9: `state-shape.test.ts` wrote a missing frozen shape into the source tree on any run, and did not say it compares zod's printed JSON Schema | 364 (new) | yes: every test that writes a file (the OTA config test writes into a temp folder) | the test fails on a missing file unless `PACE_FREEZE_CHECKPOINT_SHAPE=1` (checked by hand: file moved away, test failed, nothing written) |
 
 ### 125. A live region around a ticking value
 - **Bug.** PR B 4.2 (F-A11Y-10): the running row sat in `accessibilityLiveRegion="polite"` around the
@@ -3366,3 +3368,18 @@ New bugs go here with their class; a new class gets its own section above.
   rewinds (`storeId`), not one a resumable step moves back and forth.
 - **Sweep and guard.** `isCheckpointRun` and `requiresBootstrap` read `storeId`.
   `checkpoint-sync-modes.test.ts` "a full copy whose schema upgrade was cut off".
+
+### 364. A test that writes into the source tree when what it compares against is missing
+- **Bug.** PR 55 follow-up review, item 9: `state-shape.test.ts` wrote the frozen shape of a new
+  `CHECKPOINT_VERSION` itself when the file was missing. Any run (CI, a fresh checkout, a version
+  raised by mistake) could freeze whatever shape the code had into the source tree, and a frozen
+  file is never to be written twice.
+- **Missed because.** The write was meant as a convenience for the one person raising the version;
+  nothing separated that deliberate step from every other run of the suite.
+- **Rule.** A test fails when its reference is missing; writing a reference (a frozen shape, a
+  snapshot that guards a contract) is a separate, explicit step behind a variable. A test that
+  compares a library's printed output says so, and what to do when only the library changed.
+- **Sweep and guard.** `state-shape.test.ts` writes only with `PACE_FREEZE_CHECKPOINT_SHAPE=1`
+  and says in its header that it reads zod's JSON Schema output. Swept every test that writes a
+  file: the only other one (`apps/app/ota-build-config.test.ts`) writes into a `mkdtemp` folder;
+  the presets' previous-release test (`old-reader-compat.test.ts`) only reads.

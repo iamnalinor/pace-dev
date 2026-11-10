@@ -18,13 +18,20 @@ template), so a change in a shared leaf shows as well as a new field. This test 
 shape printed now differs from the one frozen for the current version.
 
 When it fails: the shape changed. Raise `CHECKPOINT_VERSION` (`version.ts`) and run this test
-again; it writes the new version's file, which is committed with the change. A client that reads
+once with `PACE_FREEZE_CHECKPOINT_SHAPE=1`; it writes the new version's file, which is committed
+with the change. Without that variable a missing file fails the test and nothing is written: a run
+in CI or on a checkout must never freeze a shape into the source tree by itself. A client that reads
 the new number as unknown (`features.historyCheckpoint` is `null` to it) falls back to the legacy
 pull and turns its checkpoint copy into a full one (`legacyPageChange`). Never edit a frozen file
 and never re-freeze under the same number: builds with that number are in use.
 
 What this cannot see: a reducer that fills the same shape differently. That is a version bump
 too (`version.ts`), by review.
+
+It depends on zod's JSON Schema output (`z.toJSONSchema`): the shape is compared as zod prints it.
+A zod update that prints the same shape in other words fails this test with no change to what the
+schema accepts. Then compare what the two schemas accept; if nothing changed, teach `ownWords` to
+leave the library's new wording out. Do not edit the frozen file or raise the version for that.
 
 Version 1 is the shape with `Subtask.doneAt` (one mark, the redesign of PR 54), not the earlier
 `done` / `doneAt` pair. No bump was needed for that change: checkpoints first exist in the build
@@ -67,7 +74,12 @@ describe("the shape of a checkpoint's state", () => {
     const file = frozenFile(CHECKPOINT_VERSION);
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- this package's own frozen file, named by the version
     if (!existsSync(file)) {
-      // A new version has no frozen shape yet: it is written once, here, and never overwritten.
+      // A new version has no frozen shape yet: it is written once, on request, never overwritten.
+      if (process.env["PACE_FREEZE_CHECKPOINT_SHAPE"] !== "1") {
+        throw new Error(
+          `No frozen state shape for version ${String(CHECKPOINT_VERSION)}: run this test once with PACE_FREEZE_CHECKPOINT_SHAPE=1 and commit ${file.pathname}`,
+        );
+      }
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- this package's own frozen file, named by the version
       writeFileSync(file, `${JSON.stringify(shapeOf(CoreStateSchema), null, 2)}\n`);
       throw new Error(
