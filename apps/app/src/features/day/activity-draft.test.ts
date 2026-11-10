@@ -468,6 +468,15 @@ describe("overlapOf: a block may not overlap another, in either direction (revie
     });
   });
 
+  it("names the block a same-start draft lies inside as the one before it (QA round 27 R27-05)", () => {
+    // 10:00–10:15 and 10:00–10:30 inside the logged 10:00–10:30: it is that block's time.
+    for (const end of ["10:15", "10:30"]) {
+      expect(
+        overlapOf(timeOf(logged), { now: NOW_AT, range: range("10:00", end), target: logTarget }),
+      ).toEqual({ ...CLEAR, previous: true });
+    }
+  });
+
   it("refuses a new block that starts inside a logged one before it", () => {
     expect(
       overlapOf(timeOf(logged), { now: NOW_AT, range: range("10:15", "11:00"), target: logTarget }),

@@ -319,10 +319,12 @@ const clashesOf = (
       start: Date.parse(other.startAt),
     }))
     .filter((span) => span.start < end && span.end > start)
-    .map(({ other, start: otherStart }) => ({
+    .map(({ end: otherEnd, other, start: otherStart }) => ({
       id: other.id,
-      // A later start (or the same one) is the next block: the timeline would cut one of them.
-      isLater: otherStart >= start,
+      // A later start is the next block; with the same start, the next one only when the draft
+      // runs past its end (it would swallow it), else the draft lies inside it: the block before
+      // (QA round 27 R27-05).
+      isLater: otherStart > start || (otherStart === start && otherEnd < end),
       // A logged block wins over the live time it covers: the live one before it gives it up.
       isYielding: isLogged && !other.isLogged && otherStart < start,
       label: other.label,
