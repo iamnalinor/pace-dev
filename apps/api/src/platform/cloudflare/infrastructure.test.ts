@@ -14,10 +14,11 @@ import { keyValue } from "./key-value.ts";
 import { UserStore as HostedStore } from "./user-store.ts";
 
 /**
-Service methods the host does not forward: the alarm's own pass, and `useDeriveSteps`, a seam tests
-call on the service itself (`runInUserStore`), never over RPC.
+Service methods the host does not forward: the alarm's own pass, `logHead` (read by the live
+socket's own accept inside the object, never over RPC), and `useDeriveSteps`, a seam tests call on
+the service itself (`runInUserStore`), never over RPC.
 */
-const NOT_HOSTED: ReadonlySet<string> = new Set(["sleepPass", "useDeriveSteps"]);
+const NOT_HOSTED: ReadonlySet<string> = new Set(["logHead", "sleepPass", "useDeriveSteps"]);
 
 /** Own callable methods, excluding constructor and accessors. */
 const ownMethods = (prototype: object): readonly string[] =>
