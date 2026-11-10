@@ -232,6 +232,8 @@ export const enShell = {
   "settings.quietHours.to": "To",
   "settings.nightHours": "Show night hours",
   "settings.nightHours.hint": "Week shows the whole day, from 00 to 24.",
+  "settings.nightHours.hintOff":
+    "Week starts at 07, earlier only when the week has something before 07. The moon on Week turns this on too.",
   "settings.presets": "Presets",
   "settings.presets.hint": "Courses, work, personal: how each kind of task behaves.",
   "settings.review": "To sort",

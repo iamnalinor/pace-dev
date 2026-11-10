@@ -8,7 +8,7 @@ import { SettingsScreen } from "#app/screens/settings-screen.tsx";
 import { isAtTextWidth } from "#app/test/button-width.ts";
 import { deadControls } from "#app/test/dead-controls.ts";
 import { isControl } from "#app/test/focus-target.ts";
-import { renderScreen } from "#app/test/render.tsx";
+import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { REQUEST_DEADLINE_MS } from "@pace/client";
@@ -900,6 +900,16 @@ const settingsOutline = (): readonly string[] => {
 };
 
 describe("Settings' order", () => {
+  it("says what the night-hours switch does in the state it is in (QA round 25 R25-08)", async () => {
+    await renderSettings({
+      "GET /api/sessions": () => SessionsOutputSchema.parse({ sessions: [] }),
+    });
+    expect(await screen.findByText(en("settings.nightHours.hintOff"))).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("switch", { name: en("settings.nightHours") }));
+    expect(await screen.findByText(en("settings.nightHours.hint"))).toBeOnTheScreen();
+    expect(screen.queryByText(en("settings.nightHours.hintOff"))).toBeNull();
+  });
+
   it("puts the preferences first, then devices and sessions, log out and the danger zone last", async () => {
     await renderSettings(sessionsServer([THIS_BROWSER]).routes);
     await screen.findByLabelText("Chrome on macOS");

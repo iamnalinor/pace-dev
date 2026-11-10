@@ -231,6 +231,8 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "settings.quietHours.to": "До",
   "settings.nightHours": "Показывать ночные часы",
   "settings.nightHours.hint": "Неделя показывает весь день, с 00 до 24.",
+  "settings.nightHours.hintOff":
+    "Неделя начинается с 07, раньше — только если на неделе что-то было до 07. Луна на Неделе включает то же самое.",
   "settings.presets": "Пресеты",
   "settings.presets.hint": "Курсы, работа, личное: как ведёт себя каждый вид задач.",
   "settings.review": "Разобрать",

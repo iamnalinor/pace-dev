@@ -122,7 +122,8 @@ const NightHoursRow = () => {
   return (
     <KnownAfterSync>
       <SwitchRow
-        hint={t("settings.nightHours.hint")}
+        // The hint says what the switch does now (QA round 25 R25-08), and that Week's moon is it.
+        hint={t(settings.nightHours ? "settings.nightHours.hint" : "settings.nightHours.hintOff")}
         isOn={settings.nightHours}
         label={t("settings.nightHours")}
         onChange={(isOn) => {
