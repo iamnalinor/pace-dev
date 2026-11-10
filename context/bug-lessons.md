@@ -3357,6 +3357,21 @@ New bugs go here with their class; a new class gets its own section above.
 - **Sweep and guard.** The phone-only sections already ask `IS_PHONE` (usage access, calendar);
   `day-web.test.tsx` runs Day as the web build.
 
+### 324. Focus that falls to the page when its control is replaced by something that takes no focus
+- **Bug.** A row checked off from the keyboard left the list and focus went to the page start (QA
+  PR55-1-10); «Очистить через Telegram» gave way to the waiting line and focus went to `body`;
+  Week's «Изменить в Дне» opened Day's editor from the address, so Escape had no opener to give
+  focus back to (R27-09 remainder).
+- **Missed because.** Class 5's guards cover a control that opens something (an opener comes back);
+  these three end with a different control, or none, in place of the one that had focus.
+- **Rule.** Whatever removes the focused control names where focus goes: the row that takes its
+  place in the list (`focusedRowPlace` / `focusRowPlace`), the control that replaces it
+  (`useConfirmFocus().toStatus`), or the item the editor edited (`focusPlaceById`, after the
+  editor's exit animation, only where focus was lost).
+- **Sweep and guard.** Now/Inbox/project rows (`TaskRows`), the danger zone's waiting line, Day's
+  editor opened from the address. `focus-after-swap.e2e.ts` checks a row off and closes Week's
+  «Edit in Day» from the keyboard and fails on `body`.
+
 ### 326. The same read made twice because each caller fetches for itself
 - **Bug.** Every load sent `/api/instance` twice (the app's server check and the checkpoint
   negotiation), `/api/notifications` twice on the Notifications route (the screen's mount and the

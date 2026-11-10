@@ -188,7 +188,7 @@ export const LogPastRow = ({ onPress }: { readonly onPress: () => void }) => {
 export type SatOf = (startAt: string, endAt: string) => readonly SatRow[];
 
 /** Whether an entry is the one open in the editor (the inspector marks it). */
-const isTarget = (entry: DayEntry, selected: null | SheetTarget): boolean =>
+export const isTarget = (entry: DayEntry, selected: null | SheetTarget): boolean =>
   selected !== null &&
   (entry.kind === "gap"
     ? selected.kind === "log" && selected.startAt === entry.gap.startAt

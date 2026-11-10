@@ -20,6 +20,8 @@ import { PushIneligibilityReason } from "./notification-settings.tsx";
 /** Where focus went and what was said, as a confirm asked the platform (bug class 5). */
 const mockMoveFocus = jest.fn<undefined, [unknown, string | undefined]>();
 jest.mock("#app/platform/move-focus.ts", (): unknown => ({
+  // The page has no focus of its own here: a control that goes leaves it nowhere.
+  isFocusLost: () => true,
   moveFocus: (target: unknown, say?: string) => {
     mockMoveFocus(target, say);
   },
@@ -706,6 +708,33 @@ describe("SettingsScreen", () => {
     const [wipeBack] = mockMoveFocus.mock.calls[3] ?? [];
     const wipeBackControl = screen.getByRole("button", { name: en("settings.wipe") });
     expect(isControl(wipeBack, wipeBackControl)).toBe(true);
+  });
+
+  it("gives focus to the waiting line's Cancel once Telegram is asked, and back to Wipe after it (QA PR55-1-10)", async () => {
+    const id = "123e4567-e89b-42d3-a456-426614174009";
+    const runtime = await createTestRuntime({
+      routes: {
+        "POST /api/account/confirmations": () => ({
+          id,
+          expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+        }),
+        [`GET /api/account/confirmations/${id}`]: () => ({ status: "pending" }),
+        [`POST /api/account/confirmations/${id}/cancel`]: () => ({ status: "cancelled" }),
+      },
+      world: "empty",
+    });
+    await renderScreen(<SettingsScreen />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.wipe") }));
+    mockMoveFocus.mockClear();
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.wipe.confirm") }));
+    expect(await screen.findByText(en("settings.confirmation.waiting"))).toBeOnTheScreen();
+    const [toWaiting] = mockMoveFocus.mock.calls[0] ?? [];
+    const waitingCancel = screen.getByRole("button", { name: en("common.cancel") });
+    expect(isControl(toWaiting, waitingCancel)).toBe(true);
+    await fireEvent.press(waitingCancel);
+    const wipe = await screen.findByRole("button", { name: en("settings.wipe") });
+    const [back] = mockMoveFocus.mock.calls[1] ?? [];
+    expect(isControl(back, wipe)).toBe(true);
   });
 
   it("follows the server, not this device's clock, past the request's expiry (bug class 35)", async () => {

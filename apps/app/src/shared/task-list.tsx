@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { View } from "react-native";
 import Animated from "react-native-reanimated";
 
 import type { NowRow } from "@pace/client";
 
 import { useT } from "#app/app-state.tsx";
+import { focusedRowPlace, focusRowPlace, type RowPlace } from "#app/platform/focus-place.ts";
 import { Button } from "#app/ui/button.tsx";
 import { Disclosure } from "#app/ui/disclosure.tsx";
 import { Group } from "#app/ui/group.tsx";
@@ -47,8 +48,16 @@ const useSettling = (rows: readonly NowRow[]) => {
     setDissolving((current) => keeping(current, (id) => ids.has(id)));
     setGone((current) => keeping(current, (id) => ids.has(id)));
   }
+  // Where each checked row's focus stood: it goes to the row that takes its place (PR55-1-10).
+  const placesRef = useRef(new Map<string, RowPlace>());
+  const begin = (row: NowRow): void => {
+    placesRef.current.set(row.id, focusedRowPlace());
+    setDissolving((current) => new Set([...current, row.id]));
+  };
   const settle = async (row: NowRow): Promise<void> => {
     setGone((current) => new Set([...current, row.id]));
+    focusRowPlace(placesRef.current.get(row.id) ?? null);
+    placesRef.current.delete(row.id);
     const checking = await check(row);
     if (checking.ok) {
       return;
@@ -57,7 +66,7 @@ const useSettling = (rows: readonly NowRow[]) => {
     setGone((current) => keeping(current, (id) => id !== row.id));
     setDissolving((current) => keeping(current, (id) => id !== row.id));
   };
-  return { dissolving, gone, setDissolving, settle };
+  return { begin, dissolving, gone, settle };
 };
 
 /** The key of the first row of the second kind, with the boundary's name; none when only one kind is shown. */
@@ -93,7 +102,7 @@ export const TaskRows = ({
   const t = useT();
   const openTask = useOpenTask();
   const [shownCount, setShownCount] = useState(PAGE_SIZE);
-  const { dissolving, gone, setDissolving, settle } = useSettling(rows);
+  const { begin, dissolving, gone, settle } = useSettling(rows);
   const open = rows.filter((row) => !gone.has(row.id));
   const hidden = Math.max(0, open.length - shownCount);
   // A long list turns the layout animation off: sliding a page of rows is not worth the frames.
@@ -128,7 +137,7 @@ export const TaskRows = ({
               withTag={withTag}
               {...(!checked && {
                 onCheck: () => {
-                  setDissolving((current) => new Set([...current, row.id]));
+                  begin(row);
                 },
               })}
             />

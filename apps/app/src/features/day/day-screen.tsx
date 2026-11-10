@@ -4,6 +4,7 @@ import Animated from "react-native-reanimated";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { IS_PHONE } from "#app/platform/device.ts";
+import { focusPlaceById } from "#app/platform/focus-place.ts";
 import { ScreenTimeSection } from "#app/shared/activity-usage.tsx";
 import { useBlockRetry } from "#app/shared/use-block-retry.ts";
 import { useSearchParam, useZonedDateParam } from "#app/shared/use-search-param.ts";
@@ -25,7 +26,7 @@ import { ActivityPane } from "./activity-pane.tsx";
 import { ActivitySheet, type SheetTarget } from "./activity-sheet.tsx";
 import { DayNav } from "./day-nav.tsx";
 import { DayRail, NowMargin, type RowFrame, type RowFrames } from "./day-rail.tsx";
-import { EntryRow, LogPastRow, type SatOf } from "./day-rows.tsx";
+import { EntryRow, isTarget, LogPastRow, type SatOf } from "./day-rows.tsx";
 import { Totals } from "./day-totals.tsx";
 import * as Phone from "./phone-section.tsx";
 import { type DayPhone, useDayPhone } from "./use-day-phone.ts";
@@ -59,6 +60,9 @@ type RowsProps = {
   readonly onFrame: (key: string, frame: RowFrame) => void;
 };
 
+/** The id of a day's row on the page (the web's `id`): where focus goes back to (`closeSheet`). */
+const dayEntryId = (key: string): string => `day-entry-${key}`;
+
 /** One keyed row per entry, for the `Group` to put its one divider rule between. */
 const entryRows = ({
   entries,
@@ -78,6 +82,7 @@ const entryRows = ({
         exiting: ROW_EXIT,
         layout: ROW_LAYOUT,
       })}
+      nativeID={dayEntryId(entry.key)}
       onLayout={(event) => {
         const { height, y } = event.nativeEvent.layout;
         onFrame(entry.key, { height, top: y });
@@ -276,7 +281,13 @@ export const DayScreen = () => {
   };
   useOpenedBlock(day, setSheet);
   const closeSheet = (): void => {
+    // Opened from the address (Week's «Edit in Day»), the editor had no control to give focus back
+    // to: the row it edited takes it, where nothing else did (R27-09).
+    const edited = day.entries.find((entry) => isTarget(entry, sheet));
     setSheet(null);
+    if (edited !== undefined) {
+      focusPlaceById(dayEntryId(edited.key));
+    }
   };
   const screen = (
     <Screen
