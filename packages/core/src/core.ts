@@ -124,6 +124,7 @@ export {
   effectiveInOrder,
   foldEffective,
   isCorrection,
+  isRevokedIn,
   materialize,
   materializeAt,
   type MaterializeOptions,

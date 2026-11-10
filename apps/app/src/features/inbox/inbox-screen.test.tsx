@@ -125,7 +125,13 @@ describe("InboxScreen", () => {
     await fireEvent.press(screen.getByRole("button", { name: `${en("common.accept")}: ${text}` }));
     expect(await screen.findByText(/^Task created: /u)).toBeOnTheScreen();
     expect(screen.queryByText(text)).toBeNull();
+    const before = runtime.state.store.getState().log.length;
     await fireEvent.press(screen.getByRole("button", { name: en("common.undo") }));
     expect(await screen.findByText(text)).toBeOnTheScreen();
+    // One action: its revocations share one instant, a single History row (review M2, R26-10).
+    const revocations = runtime.state.store.getState().log.slice(before);
+    expect(revocations.length).toBeGreaterThan(1);
+    expect(revocations.every((event) => event.type === "event.revoked")).toBe(true);
+    expect(new Set(revocations.map((event) => event.recordedAt)).size).toBe(1);
   });
 });

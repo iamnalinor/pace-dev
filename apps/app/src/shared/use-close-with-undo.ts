@@ -30,6 +30,7 @@ export const useCloseWithUndo = (): ((taskId: string, title: string) => ActionRe
                 onPress: () => {
                   void run(actions.revoke(closed.id));
                 },
+                undoes: [closed.id],
               },
             },
       );

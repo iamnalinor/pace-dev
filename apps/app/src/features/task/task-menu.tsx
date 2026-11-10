@@ -37,6 +37,7 @@ const useDeleteTask = (view: TaskViewModel): (() => Promise<void>) => {
         action: {
           label: t("common.undo"),
           onPress: () => void run(actions.revoke(revocation.id)),
+          undoes: [revocation.id],
         },
       }),
     });

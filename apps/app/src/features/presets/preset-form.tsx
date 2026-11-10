@@ -194,7 +194,11 @@ const usePresetWrites = ({
       toast.show({
         message: t("presets.deleted", { name }),
         ...(archive !== undefined && {
-          action: { label: t("common.undo"), onPress: () => void run(actions.revoke(archive.id)) },
+          action: {
+            label: t("common.undo"),
+            onPress: () => void run(actions.revoke(archive.id)),
+            undoes: [archive.id],
+          },
         }),
       });
     },

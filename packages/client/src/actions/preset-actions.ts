@@ -11,7 +11,7 @@ import {
   validatePresetInput,
 } from "@pace/core";
 
-import { type ActionDeps, type ActionResult, emit, fromStore, stamp } from "./deps.ts";
+import { type ActionDeps, type ActionResult, emit, fromStoreAll, stamp } from "./deps.ts";
 
 export type PresetActions = {
   readonly createPreset: (input: PresetInput) => ActionResult;
@@ -96,12 +96,13 @@ const restorePreset =
     if (!preset.archived) {
       return err("action/nothing-to-do");
     }
-    const archive = events.findLast(
+    // Every archive in effect, in one batch: two devices may have archived it offline (review M1).
+    const archives = events.filter(
       (event) => event.type === "preset.archived" && event.payload.id === presetId,
     );
-    return archive === undefined
+    return archives.length === 0
       ? err("action/nothing-to-do")
-      : fromStore(await deps.state.revoke(archive.id));
+      : fromStoreAll(await deps.state.revokeAll(archives.map((event) => event.id)));
   };
 
 /**

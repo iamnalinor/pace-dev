@@ -38,6 +38,7 @@ export const useToInbox = (
               }
             })();
           },
+          undoes: [created.id],
         },
       }),
     });

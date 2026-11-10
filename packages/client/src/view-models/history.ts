@@ -25,6 +25,11 @@ export type HistorySource = CoreState & {
 
 export type HistoryEntry = {
   readonly id: string;
+  /**
+  Every event the row stands for: its own, or the revocations one Undo wrote together (an Inbox
+  Accept undone is one row, not three; QA round 26 R26-10). Undoing the row undoes them all.
+  */
+  readonly ids: readonly string[];
   readonly type: Event["type"];
   readonly occurredAt: string;
   readonly recordedAt: string;
@@ -141,9 +146,47 @@ const labelKeyOf = (event: Event): MessageKey => {
   }
 };
 
+/** The revocations one action wrote together: one device, one instant written and recorded. */
+const isSameBatch = (a: Event, b: Event): boolean =>
+  a.type === "event.revoked" &&
+  b.type === "event.revoked" &&
+  a.deviceId === b.deviceId &&
+  a.occurredAt === b.occurredAt &&
+  a.recordedAt === b.recordedAt;
+
+type Row = { readonly event: Event; readonly entry: HistoryEntry };
+
+/** Neighbouring rows of one batch of revocations as one row, named by the first that names something. */
+const groupBatches = (rows: readonly Row[]): readonly HistoryEntry[] => {
+  const starts = rows
+    .map((row, index) => {
+      const previous = rows[index - 1];
+      return previous === undefined || !isSameBatch(previous.event, row.event) ? index : -1;
+    })
+    .filter((index) => index >= 0);
+  return starts
+    .map((start, position) => {
+      const members = rows
+        .slice(start, starts[position + 1] ?? rows.length)
+        .map((row) => row.entry);
+      const [first] = members;
+      if (first === undefined) {
+        return null;
+      }
+      const named = members.find((member) => member.taskTitle !== null) ?? first;
+      return {
+        ...first,
+        ids: members.map((member) => member.id),
+        taskId: named.taskId,
+        taskTitle: named.taskTitle,
+      };
+    })
+    .filter((entry) => entry !== null);
+};
+
 const entries = (state: HistorySource): readonly HistoryEntry[] => {
   const effective = new Set(state.events.map((event) => event.id));
-  return state.log.toSorted(newestFirst).map((event) => {
+  const rows = state.log.toSorted(newestFirst).map((event) => {
     const taskId = taskIdOf(event, state.log);
     const isEffective = effective.has(event.id);
     const revokedBy = isEffective
@@ -152,8 +195,9 @@ const entries = (state: HistorySource): readonly HistoryEntry[] => {
           (candidate) =>
             candidate.type === "event.revoked" && candidate.payload.targetId === event.id,
         )?.id ?? null);
-    return {
+    const entry: HistoryEntry = {
       id: event.id,
+      ids: [event.id],
       type: event.type,
       occurredAt: event.occurredAt,
       recordedAt: event.recordedAt,
@@ -164,7 +208,9 @@ const entries = (state: HistorySource): readonly HistoryEntry[] => {
       revokedBy,
       labelKey: labelKeyOf(event),
     };
+    return { entry, event };
   });
+  return groupBatches(rows);
 };
 
 export const historyViewModel = (

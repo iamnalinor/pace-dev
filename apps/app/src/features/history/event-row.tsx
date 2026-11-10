@@ -71,7 +71,10 @@ const useUndo = (entry: HistoryEntry) => {
     undo: async (): Promise<void> => {
       setIsBusy(true);
       try {
-        const revocation = await run(actions.revoke(entry.id));
+        // A row of several revocations written together is undone together (R26-10).
+        const revocation = await run(
+          entry.ids.length > 1 ? actions.revokeAll(entry.ids) : actions.revoke(entry.id),
+        );
         if (revocation.ok) {
           setIsConfirming(false);
         }

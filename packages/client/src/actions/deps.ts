@@ -86,6 +86,7 @@ export const stamp = (deps: ActionDeps, body: Body, when: When = {}): EventInput
 });
 
 const STORE_ERRORS = [
+  "action/nothing-to-do",
   "event/duplicate",
   "event/not-found",
   "persist_failed",
@@ -98,6 +99,11 @@ const isStoreError = (code: string): code is StoreError =>
   (STORE_ERRORS as readonly string[]).includes(code);
 
 const storeError = (code: string): ActionError => (isStoreError(code) ? code : `dispatch/${code}`);
+
+/** A batch the store wrote (several revocations) as an action result. */
+export const fromStoreAll = (
+  result: Result<readonly Event[], string>,
+): Result<readonly Event[], ActionError> => (result.ok ? result : err(storeError(result.error)));
 
 /** A single store answer (dispatch, revoke, undo) as an action result. */
 export const fromStore = (result: Result<Event, string>): Result<readonly Event[], ActionError> =>

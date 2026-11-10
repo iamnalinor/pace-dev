@@ -45,6 +45,7 @@ import {
   type Persisted,
   type Staged,
 } from "./local-log.ts";
+import { createRevocations } from "./revocations.ts";
 
 /**
 The whole client state: the materialized slices (the same four as the core's `CoreState`,
@@ -96,7 +97,13 @@ export type AppStateHandle = {
   (and takes them back) when the local store refuses them.
   */
   readonly ingest: (events: readonly Event[]) => Promise<void>;
+  /** Revokes one event; `action/nothing-to-do` when it is revoked already (review M2). */
   readonly revoke: (eventId: string) => Promise<Result<Event, string>>;
+  /**
+  Revokes several events as one action: the revocations share their instants and are staged and
+  written in one go, or none is (one refused, one revoked already: nothing is written).
+  */
+  readonly revokeAll: (eventIds: readonly string[]) => Promise<Result<readonly Event[], string>>;
   /** Revokes the latest effective event recorded by this device. */
   readonly undoLast: () => Promise<Result<Event, string>>;
   /** Full rebuild from the event store (after another writer touched it). */
@@ -327,17 +334,13 @@ export const createAppState = (options: Options): AppStateHandle => {
     return event !== undefined && written.ok ? ok(event) : err("persist_failed");
   };
 
-  const revoke: AppStateHandle["revoke"] = async (eventId) => {
-    await ready;
-    if (!log.has(eventId)) {
-      return err("event/not-found");
-    }
-    return await dispatch({
-      occurredAt: now(),
-      payload: { targetId: eventId },
-      type: "event.revoked",
-    });
-  };
+  const { revoke, revokeAll } = createRevocations({
+    hasEvent: (eventId) => log.has(eventId),
+    log: () => store.getState().log,
+    now,
+    ready,
+    stage,
+  });
 
   return {
     ...externalChanges(log, enqueue, options.onStored),
@@ -358,6 +361,7 @@ export const createAppState = (options: Options): AppStateHandle => {
     dispatch,
     ready,
     revoke,
+    revokeAll,
     stage,
     store,
     undoLast: async () => {

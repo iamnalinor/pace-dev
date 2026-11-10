@@ -6,7 +6,7 @@ import { toastQuote, useToast } from "#app/ui/toast.tsx";
 
 /**
 Accept (the capture becomes a task with its guess) and Delete, each with the toast's Undo, as the
-app's other actions (QA round 25 R25-06): Undo revokes what the action wrote, newest first.
+app's other actions (QA round 25 R25-06): Undo revokes what the action wrote, in one batch.
 */
 export const useCaptureActions = (card: InboxCard) => {
   const t = useT();
@@ -19,22 +19,14 @@ export const useCaptureActions = (card: InboxCard) => {
       if (!result.ok) {
         return false;
       }
-      const written = result.value.toReversed();
+      const written = result.value.map((event) => event.id);
       toast.show({
         message: t("inbox.accepted", { title: toastQuote(card.text) }),
         action: {
           label: t("common.undo"),
-          onPress: () => {
-            void (async () => {
-              // Each correction lands before the next, newest first.
-              for (const event of written) {
-                const undone = await run(actions.revoke(event.id));
-                if (!undone.ok) {
-                  return;
-                }
-              }
-            })();
-          },
+          // One action, all or none: no half-sorted note on a failure, one History row (M2, R26-10).
+          onPress: () => void run(actions.revokeAll(written)),
+          undoes: written,
         },
       });
       return true;
@@ -51,6 +43,7 @@ export const useCaptureActions = (card: InboxCard) => {
           action: {
             label: t("common.undo"),
             onPress: () => void run(actions.revoke(revocation.id)),
+            undoes: [revocation.id],
           },
         }),
       });

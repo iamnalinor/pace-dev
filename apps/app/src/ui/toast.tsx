@@ -10,9 +10,9 @@ import {
 } from "react";
 import { View } from "react-native";
 
-import { clipText, clipWords, z } from "@pace/core";
+import { clipText, clipWords, isRevokedIn, z } from "@pace/core";
 
-import { useT } from "../app-state.tsx";
+import { useAppState, useT } from "../app-state.tsx";
 import { cx } from "./cx.ts";
 import { CHROME_GAP, PlaceContext, PublishersContext, useFloatLayer } from "./float-layer.ts";
 import { IconButton } from "./icon-button.tsx";
@@ -22,7 +22,15 @@ import { Text } from "./text.tsx";
 
 export type ToastInput = {
   readonly message: string;
-  readonly action?: { readonly label: string; readonly onPress: () => void };
+  readonly action?: {
+    readonly label: string;
+    readonly onPress: () => void;
+    /**
+    The events an Undo revokes: once any of them is revoked another way (History, a restore, another
+    device), the toast goes, so its Undo never offers what was already done (QA round 26 R26-06).
+    */
+    readonly undoes?: readonly string[];
+  };
   /**
   The control the outcome belongs to, when it is still on screen: the toast sits just above it
   (spec §4.1.4) rather than at the foot of the screen.
@@ -80,6 +88,15 @@ export const ToastCard = ({
   readonly toast: ToastInput;
 }) => {
   const t = useT();
+  const undoes = toast.action?.undoes;
+  const isUndone = useAppState(
+    (state) => undoes?.some((eventId) => isRevokedIn(state.log, eventId)) === true,
+  );
+  useEffect(() => {
+    if (isUndone) {
+      onDone();
+    }
+  }, [isUndone, onDone]);
   return (
     <View
       className={cx(

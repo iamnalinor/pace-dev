@@ -700,6 +700,43 @@ describe("presets", () => {
     expect(world.state.store.getState().presets.byId["hw.physics"]?.archived).toBe(false);
   });
 
+  it("restores a preset two devices archived offline in one press, one batch (review M1)", async () => {
+    const world = await setupActions();
+    const [archive] = unwrap(await world.actions.archivePreset("hw.algebra"));
+    if (archive === undefined) {
+      throw new Error("archived");
+    }
+    // The other device's archive of the same preset, synced in.
+    await world.state.ingest([{ ...archive, deviceId: "phone", id: "01KOTHERDEVICEARCHIVE00000" }]);
+    const restored = unwrap(await world.actions.restorePreset("hw.algebra"));
+    expect(restored.map((event) => event.type)).toEqual(["event.revoked", "event.revoked"]);
+    // One action: the revocations share their instants.
+    expect(new Set(restored.map((event) => `${event.occurredAt}${event.recordedAt}`)).size).toBe(1);
+    expect(world.state.store.getState().presets.byId["hw.algebra"]?.archived).toBe(false);
+  });
+
+  it("refuses to revoke an event revoked already, and revokes a set all or none (review M2)", async () => {
+    const world = await setupActions();
+    const [archive] = unwrap(await world.actions.archivePreset("hw.algebra"));
+    const [moved] = unwrap(await world.actions.archivePreset("work"));
+    if (archive === undefined || moved === undefined) {
+      throw new Error("archived");
+    }
+    unwrap(await world.actions.revoke(archive.id));
+    const logLength = world.state.store.getState().log.length;
+    await expect(world.actions.revoke(archive.id)).resolves.toEqual({
+      error: "action/nothing-to-do",
+      ok: false,
+    });
+    // One of the set revoked already: nothing of it is written.
+    await expect(world.actions.revokeAll([moved.id, archive.id])).resolves.toEqual({
+      error: "action/nothing-to-do",
+      ok: false,
+    });
+    expect(world.state.store.getState().log).toHaveLength(logLength);
+    expect(world.state.store.getState().presets.byId["work"]?.archived).toBe(true);
+  });
+
   it("returns the preset validation errors", async () => {
     const world = await setupActions();
     await expect(

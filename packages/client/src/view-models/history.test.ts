@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { addMinutesIso } from "@pace/core";
 import { CALC_HW5_ID, HW_ID, MOSCOW, NOW, sheetId, TRK_ID } from "@pace/core/testing";
 
 import { setupActions, unwrap } from "../actions/fixture.fake.ts";
@@ -16,6 +17,28 @@ describe("historyViewModel", () => {
     expect(history.events.find((entry) => entry.id === skipped?.id)?.labelKey).toBe(
       "event.task.skipped",
     );
+  });
+
+  it("shows the revocations one Undo wrote together as one row that undoes them all (QA round 26 R26-10)", async () => {
+    const world = await setupActions();
+    const [done] = unwrap(await world.actions.closeTask({ outcome: "done", taskId: TRK_ID }));
+    const [started] = unwrap(await world.actions.startChoice("rest"));
+    if (done === undefined || started === undefined) {
+      throw new Error("written");
+    }
+    const batch = unwrap(await world.actions.revokeAll([done.id, started.id]));
+    const history = historyViewModel(world.state.store.getState(), {
+      atIso: NOW,
+      deviceTz: MOSCOW,
+    });
+    const rows = history.events.filter((entry) => entry.type === "event.revoked");
+    expect(rows).toHaveLength(1);
+    expect(new Set(rows[0]?.ids)).toEqual(new Set(batch.map((event) => event.id)));
+    // A revocation written alone, later, stays a row of its own.
+    world.setNow(addMinutesIso(NOW, 1));
+    unwrap(await world.actions.revoke(batch[0]?.id ?? ""));
+    const after = historyViewModel(world.state.store.getState(), { atIso: NOW, deviceTz: MOSCOW });
+    expect(after.events.filter((entry) => entry.type === "event.revoked")).toHaveLength(2);
   });
 
   it("names the activity an activity event is about", async () => {

@@ -28,6 +28,10 @@ const linearAlgebra = (runtime: PaceRuntime) =>
     (preset) => preset.name === "Linear Algebra",
   );
 
+const unwrapOk = (result: { readonly ok: boolean }): void => {
+  expect(result.ok).toBe(true);
+};
+
 const presetOf = (runtime: PaceRuntime, id: string) =>
   runtime.state.store.getState().presets.byId[id];
 
@@ -162,6 +166,18 @@ describe("PresetScreen", () => {
     await fireEvent.press(await screen.findByRole("button", { name: en("common.undo") }));
     await waitFor(() => {
       expect(presetOf(runtime, "deferred")?.archived).toBe(false);
+    });
+  });
+
+  it("takes the Delete toast away once the preset is restored another way (QA round 26 R26-06)", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    await renderScreen(<PresetScreen from={undefined} id="deferred" />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("presets.archive") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("common.delete") }));
+    expect(await screen.findByRole("button", { name: en("common.undo") })).toBeOnTheScreen();
+    unwrapOk(await runtime.actions.restorePreset("deferred"));
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: en("common.undo") })).toBeNull();
     });
   });
 
