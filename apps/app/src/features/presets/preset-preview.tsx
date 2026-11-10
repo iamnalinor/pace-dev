@@ -17,7 +17,9 @@ export const PresetPreview = ({ draft }: { readonly draft: PresetDraft }) => {
   if (preview === null) {
     return null;
   }
-  const name = draft.name.trim() === "" ? t("presets.sampleTitle") : draft.name;
+  // The sample is a task of this preset: «Sample task», tagged with the preset's name (R25-14:
+  // «Курсовая 2 1» read as a broken title, and the name stood twice).
+  const name = draft.name.trim();
   return (
     <View
       accessibilityLabel={t("presets.preview")}
@@ -37,11 +39,11 @@ export const PresetPreview = ({ draft }: { readonly draft: PresetDraft }) => {
             )}
             numberOfLines={1}
           >
-            {draft.name.trim() === "" ? name : `${draft.name} 1`}
+            {t("presets.sampleTitle")}
           </Text>
           <MetaLine
             parts={preview.meta}
-            tag={{ color: preview.color, tag: { kind: "project", name } }}
+            tag={name === "" ? null : { color: preview.color, tag: { kind: "project", name } }}
           />
           {preview.progressMode === "none" ? null : (
             <ProgressBar label={t("presets.preview")} value={PREVIEW_SAMPLE.progress} />

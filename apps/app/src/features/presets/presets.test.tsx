@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 
 import type { PaceRuntime } from "#app/runtime.ts";
 
@@ -208,6 +208,18 @@ describe("PresetScreen", () => {
       expect(router.back).toHaveBeenCalled();
     });
     expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it("previews a sample task tagged with the preset's name, the name once (QA round 25 R25-14)", async () => {
+    await renderScreen(
+      <PresetScreen from="work" id="new" />,
+      await createTestRuntime({ world: "empty" }),
+    );
+    await fireEvent.changeText(screen.getByLabelText(en("presets.name")), "Thesis");
+    const [preview] = screen.getAllByLabelText(en("presets.preview"));
+    expect(within(preview as never).getByText(en("presets.sampleTitle"))).toBeOnTheScreen();
+    expect(within(preview as never).queryByText("Thesis 1")).toBeNull();
+    expect(within(preview as never).getAllByText("Thesis")).toHaveLength(1);
   });
 
   it("creates a preset under an id from its name, which nobody types (QA round 18 L4)", async () => {
