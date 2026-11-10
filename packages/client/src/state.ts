@@ -88,8 +88,13 @@ export type AppStateHandle = {
   Validates every input, then shows them all in the state at once and writes them to the local
   store in one go, answering as soon as the state shows them (or with the first refusal, before
   anything is shown). `persisted` settles with the write: refused, the events leave the state.
+  `refusal` runs in the write queue, on the log as every write before it left it, so a check and
+  the write it guards cannot be split by another write (check, then act; review I4).
   */
-  readonly stage: (inputs: readonly DispatchInput[]) => Promise<Result<Staged, string>>;
+  readonly stage: (
+    inputs: readonly DispatchInput[],
+    refusal?: () => null | string,
+  ) => Promise<Result<Staged, string>>;
   /** One event, staged; answers once its local write landed (`persist_failed` when refused). */
   readonly dispatch: (input: DispatchInput) => Promise<Result<Event, string>>;
   /**
@@ -295,8 +300,12 @@ const createStage =
     enqueue: ReturnType<typeof createQueue>,
     options: Options,
   ): AppStateHandle["stage"] =>
-  async (inputs) =>
+  async (inputs, refusal) =>
     await enqueue(() => {
+      const refused = refusal?.() ?? null;
+      if (refused !== null) {
+        return err(refused);
+      }
       const events: Event[] = [];
       const ids = new Set<string>();
       for (const input of inputs) {

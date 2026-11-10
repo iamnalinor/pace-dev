@@ -109,21 +109,17 @@ export const fromStoreAll = (
 export const fromStore = (result: Result<Event, string>): Result<readonly Event[], ActionError> =>
   result.ok ? ok([result.value]) : err(storeError(result.error));
 
-const stageAll = async (deps: ActionDeps, inputs: readonly EventInput[]): Promise<StagedResult> => {
-  const staged = await deps.state.stage(inputs);
-  return staged.ok ? ok(staged.value) : err(storeError(staged.error));
-};
-
 /**
 The one path to the log: every input is checked by the core's retro rules against the
 current state before any is shown, so a rejected batch leaves no trace; the batch is then
-shown at once and written in one go. Answers as soon as the state shows it.
+shown at once and written in one go. Answers as soon as the state shows it. The rules run in
+the store's write queue, on the state every earlier write left, so two taps in one tick cannot
+both pass them (check, then act; review I4).
 */
 export const stageEmit = async (
   deps: ActionDeps,
   inputs: readonly EventInput[],
 ): Promise<StagedResult> => {
-  const snapshot = deps.state.store.getState();
   const now = deps.clock.now();
   const malformed = inputs
     .map((input) =>
@@ -138,10 +134,17 @@ export const stageEmit = async (
   if (malformed !== undefined) {
     return err(storeError(malformed.error));
   }
-  const rejected = inputs
-    .map((input) => validateEventInput(snapshot, input, now))
-    .find((checked) => !checked.ok);
-  return rejected === undefined ? await stageAll(deps, inputs) : err(rejected.error);
+  // What the rules said, kept apart from the store's own refusals (those go behind `dispatch/`).
+  const verdict: { rejected: null | RetroError } = { rejected: null };
+  const staged = await deps.state.stage(inputs, () => {
+    const snapshot = deps.state.store.getState();
+    const refusal = inputs
+      .map((input) => validateEventInput(snapshot, input, now))
+      .find((checked) => !checked.ok);
+    verdict.rejected = refusal?.error ?? null;
+    return verdict.rejected;
+  });
+  return staged.ok ? ok(staged.value) : err(verdict.rejected ?? storeError(staged.error));
 };
 
 /** `stageEmit`, answering once the write landed (`persist_failed` when the store refused it). */

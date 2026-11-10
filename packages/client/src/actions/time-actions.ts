@@ -18,7 +18,15 @@ import {
 } from "@pace/core";
 
 import { editActions, type EditActions, logPast } from "./activity-edits.ts";
-import { type ActionDeps, type ActionResult, emit, stamp, type When } from "./deps.ts";
+import {
+  type ActionDeps,
+  type ActionResult,
+  emit,
+  serially,
+  stageEmit,
+  stamp,
+  type When,
+} from "./deps.ts";
 
 export type { ActivityEntry, ActivityTarget, PastActivity } from "./activity-edits.ts";
 
@@ -128,19 +136,22 @@ const startActivity = async (
   ]);
 };
 
-const stopActivity = async (deps: ActionDeps, when: StopWhen = {}): ActionResult => {
-  const at = when.at ?? deps.clock.now();
-  const running =
-    when.activityId === undefined
-      ? runningActivity(timeOf(deps), at)
-      : (runningActivities(timeOf(deps), at).find((activity) => activity.id === when.activityId) ??
-        null);
-  return running === null
-    ? err("action/nothing-to-do")
-    : await emit(deps, [
-        stamp(deps, { payload: { activityId: running.id }, type: "activity.stopped" }, when),
-      ]);
-};
+/** Stop asks what runs after the previous action is shown: a double press stops once (I4). */
+const stopActivity = async (deps: ActionDeps, when: StopWhen = {}): ActionResult =>
+  await serially(deps, async () => {
+    const at = when.at ?? deps.clock.now();
+    const running =
+      when.activityId === undefined
+        ? runningActivity(timeOf(deps), at)
+        : (runningActivities(timeOf(deps), at).find(
+            (activity) => activity.id === when.activityId,
+          ) ?? null);
+    return running === null
+      ? err("action/nothing-to-do")
+      : await stageEmit(deps, [
+          stamp(deps, { payload: { activityId: running.id }, type: "activity.stopped" }, when),
+        ]);
+  });
 
 const startChoice = async (
   deps: ActionDeps,

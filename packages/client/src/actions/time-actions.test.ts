@@ -465,6 +465,18 @@ describe("time actions", () => {
     expect(running?.expectMinutes).toBe(24 * 60);
   });
 
+  it("writes one stop when Stop is pressed twice in one tick (review I4 sweep)", async () => {
+    const world = await setupActions();
+    unwrap(await world.actions.startTyped("Reading"));
+    world.setNow(later(5));
+    const results = await Promise.all([world.actions.stopActivity(), world.actions.stopActivity()]);
+    expect(results.map((result) => result.ok)).toEqual([true, false]);
+    const stops = world.state.store
+      .getState()
+      .log.filter((event) => event.type === "activity.stopped");
+    expect(stops).toHaveLength(1);
+  });
+
   it("stops at a past instant, and the assistant's reading relabels the running one", async () => {
     const world = await setupActions();
     unwrap(await world.actions.startTyped("цсс"));

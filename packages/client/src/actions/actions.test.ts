@@ -737,6 +737,29 @@ describe("presets", () => {
     expect(world.state.store.getState().presets.byId["work"]?.archived).toBe(true);
   });
 
+  it("writes one revocation when two revokes of the same event run at once (review I4)", async () => {
+    const world = await setupActions();
+    const [archive] = unwrap(await world.actions.archivePreset("hw.algebra"));
+    const [moved] = unwrap(await world.actions.archivePreset("work"));
+    if (archive === undefined || moved === undefined) {
+      throw new Error("archived");
+    }
+    // A double press on History's Undo, or a toast's Undo racing History's: both in one tick.
+    const results = await Promise.all([
+      world.actions.revoke(archive.id),
+      world.actions.revoke(archive.id),
+      world.actions.revokeAll([moved.id, archive.id]),
+    ]);
+    expect(results.map((result) => result.ok)).toEqual([true, false, false]);
+    const revocations = world.state.store
+      .getState()
+      .log.filter((event) => event.type === "event.revoked");
+    expect(revocations.map((event) => event.payload.targetId)).toEqual([archive.id]);
+    // So one Undo of the Undo puts the archive back in force.
+    unwrap(await world.actions.revoke(revocations[0]?.id ?? ""));
+    expect(world.state.store.getState().presets.byId["hw.algebra"]?.archived).toBe(true);
+  });
+
   it("returns the preset validation errors", async () => {
     const world = await setupActions();
     await expect(

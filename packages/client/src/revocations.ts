@@ -1,4 +1,4 @@
-import { err, type Event, isRevokedIn, ok, type Result } from "@pace/core";
+import { err, type Event, ok, type Result, revokedIdsIn } from "@pace/core";
 
 type Revocations = {
   readonly revoke: (eventId: string) => Promise<Result<Event, string>>;
@@ -13,7 +13,10 @@ type RevocationInput = {
 };
 
 /** The store's stage, as revocations use it (`AppStateHandle["stage"]`). */
-type Stage = (inputs: readonly RevocationInput[]) => Promise<
+type Stage = (
+  inputs: readonly RevocationInput[],
+  refusal: () => null | string,
+) => Promise<
   Result<
     {
       readonly events: readonly Event[];
@@ -26,7 +29,8 @@ type Stage = (inputs: readonly RevocationInput[]) => Promise<
 /**
 The store's revocations: one event, or several as one action. A batch shares one instant (History
 shows it as the one action it was, QA round 26 R26-10) and is staged and written in one go, or
-not at all; a target revoked already is refused (`action/nothing-to-do`, review M2).
+not at all; a target revoked already is refused (`action/nothing-to-do`, review M2), checked in
+the store's write queue so a revocation staged a moment before counts (review I4).
 */
 export const createRevocations = ({
   hasEvent,
@@ -42,22 +46,26 @@ export const createRevocations = ({
   readonly ready: Promise<void>;
   readonly stage: Stage;
 }): Revocations => {
-  /** Why an event cannot be revoked now, if it cannot. */
-  const refusalOf = (eventId: string): null | string => {
-    if (!hasEvent(eventId)) {
-      return "event/not-found";
-    }
-    return isRevokedIn(log(), eventId) ? "action/nothing-to-do" : null;
+  /** Why the events cannot be revoked now, if they cannot: the log's revoked set read once. */
+  const refusalOf = (eventIds: readonly string[]): null | string => {
+    const revoked = revokedIdsIn(log());
+    const codes = eventIds.map((id) => {
+      if (!hasEvent(id)) {
+        return "event/not-found";
+      }
+      return revoked.has(id) ? "action/nothing-to-do" : null;
+    });
+    return codes.find((code) => code !== null) ?? null;
   };
 
   const revokeAll: Revocations["revokeAll"] = async (eventIds) => {
     await ready;
     const ids = [...new Set(eventIds)];
-    const refusal = ids.map((id) => refusalOf(id)).find((code) => code !== null);
-    if (refusal !== undefined || ids.length === 0) {
-      return err(refusal ?? "action/nothing-to-do");
+    if (ids.length === 0) {
+      return err("action/nothing-to-do");
     }
     const at = now();
+    // Checked in the write queue: two Undos of one event in one tick write one revocation (I4).
     const staged = await stage(
       ids.map((id) => ({
         occurredAt: at,
@@ -65,6 +73,7 @@ export const createRevocations = ({
         recordedAt: at,
         type: "event.revoked" as const,
       })),
+      () => refusalOf(ids),
     );
     if (!staged.ok) {
       return staged;
