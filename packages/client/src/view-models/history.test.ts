@@ -34,11 +34,34 @@ describe("historyViewModel", () => {
     const rows = history.events.filter((entry) => entry.type === "event.revoked");
     expect(rows).toHaveLength(1);
     expect(new Set(rows[0]?.ids)).toEqual(new Set(batch.map((event) => event.id)));
-    // A revocation written alone, later, stays a row of its own.
+  });
+
+  it("undoes what is still in effect of a batch partly taken back another way (review I2)", async () => {
+    const world = await setupActions();
+    const [done] = unwrap(await world.actions.closeTask({ outcome: "done", taskId: TRK_ID }));
+    const [started] = unwrap(await world.actions.startChoice("rest"));
+    if (done === undefined || started === undefined) {
+      throw new Error("written");
+    }
+    const [first, second] = unwrap(await world.actions.revokeAll([done.id, started.id]));
+    if (first === undefined || second === undefined) {
+      throw new Error("revoked");
+    }
+    // One member of the batch taken back alone (an older client, MCP's revoke_event), later.
     world.setNow(addMinutesIso(NOW, 1));
-    unwrap(await world.actions.revoke(batch[0]?.id ?? ""));
-    const after = historyViewModel(world.state.store.getState(), { atIso: NOW, deviceTz: MOSCOW });
-    expect(after.events.filter((entry) => entry.type === "event.revoked")).toHaveLength(2);
+    unwrap(await world.actions.revoke(first.id));
+    const rowsOf = () =>
+      historyViewModel(world.state.store.getState(), {
+        atIso: NOW,
+        deviceTz: MOSCOW,
+      }).events.filter((entry) => entry.ids.includes(first.id) || entry.ids.includes(second.id));
+    // The row says what holds: the part still in effect can be undone, the other says revoked.
+    const inEffect = rowsOf().find((entry) => entry.revokedBy === null);
+    expect(inEffect?.ids).toEqual([second.id]);
+    expect(rowsOf().find((entry) => entry.revokedBy !== null)?.ids).toEqual([first.id]);
+    // Its Undo goes through, and nothing of the batch is left to undo after it.
+    unwrap(await world.actions.revokeAll(inEffect?.ids ?? []));
+    expect(rowsOf().every((entry) => entry.revokedBy !== null)).toBe(true);
   });
 
   it("names the activity an activity event is about", async () => {

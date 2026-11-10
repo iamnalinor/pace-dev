@@ -156,7 +156,26 @@ const isSameBatch = (a: Event, b: Event): boolean =>
 
 type Row = { readonly event: Event; readonly entry: HistoryEntry };
 
-/** Neighbouring rows of one batch of revocations as one row, named by the first that names something. */
+/** Members of one batch as one row, named by the first that names something. */
+const rowOf = (members: readonly HistoryEntry[]): HistoryEntry | null => {
+  const [first] = members;
+  if (first === undefined) {
+    return null;
+  }
+  const named = members.find((member) => member.taskTitle !== null) ?? first;
+  return {
+    ...first,
+    ids: members.map((member) => member.id),
+    taskId: named.taskId,
+    taskTitle: named.taskTitle,
+  };
+};
+
+/**
+Neighbouring rows of one batch of revocations as one row. A batch partly taken back another way
+(one member revoked alone, by an older client or MCP) is two rows: the members still in effect,
+whose Undo revokes only them, and the ones revoked already, which say so (review I2).
+*/
 const groupBatches = (rows: readonly Row[]): readonly HistoryEntry[] => {
   const starts = rows
     .map((row, index) => {
@@ -165,21 +184,14 @@ const groupBatches = (rows: readonly Row[]): readonly HistoryEntry[] => {
     })
     .filter((index) => index >= 0);
   return starts
-    .map((start, position) => {
+    .flatMap((start, position) => {
       const members = rows
         .slice(start, starts[position + 1] ?? rows.length)
         .map((row) => row.entry);
-      const [first] = members;
-      if (first === undefined) {
-        return null;
-      }
-      const named = members.find((member) => member.taskTitle !== null) ?? first;
-      return {
-        ...first,
-        ids: members.map((member) => member.id),
-        taskId: named.taskId,
-        taskTitle: named.taskTitle,
-      };
+      const inEffect = members.filter((member) => member.revokedBy === null);
+      const revoked = members.filter((member) => member.revokedBy !== null);
+      const parts = [rowOf(inEffect), rowOf(revoked)];
+      return members[0]?.revokedBy === null ? parts : parts.toReversed();
     })
     .filter((entry) => entry !== null);
 };
