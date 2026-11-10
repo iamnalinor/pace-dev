@@ -2502,3 +2502,9 @@ New bugs go here with their class; a new class gets its own section above.
 - **Missed because.** The R26-01 tests revealed one message once.
 - **Class.** Independent side effects that each act on shared, not-yet-updated state (one scroll position), and an effect keyed on content where it means presence.
 - **Sweep and guard.** `OverlayBody` coalesces the reveals of one render (`firstOfTick`): the first message, the top one, is revealed once the render's effects are done; `useRevealOnShow` runs when a message appears, not when its text changes. Every message that reveals goes through these two (`ErrorMessage`, `FormAlert`). Guards: `overlay-reveal.test.tsx` (two at once: the first; a changed text: no second scroll).
+
+### 225. A one-shot read of the address done before the data it points into is loaded
+- **Bug.** A cold load of `/day?date=…&block=…` (Week's «Edit in Day» reloaded, a pasted link) read the param while the device's copy was still being read: `day.entries` was empty, the param was marked handled and taken off, and nothing opened (review of the QA 26 wave, M10).
+- **Missed because.** The test's runtime was always read before the screen rendered.
+- **Class.** A deep link consumed once, with "not found" and "not loaded yet" read as the same answer.
+- **Sweep and guard.** Day waits for the store's `ready` before it handles `?block=`; a block the day does not hold opens nothing and the param goes. The other one-shot deep links: Now's `?task=` and Inbox's `?open=` read the item through the screen's own model, which renders after the copy is read (the `FirstSyncBody` cover), and Week's links carry ids only. Guards: `day-screen.test.tsx` (a cold load opens the block once read; an unknown block opens nothing).

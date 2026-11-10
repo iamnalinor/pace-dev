@@ -1,10 +1,12 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 
+import { createRuntime } from "#app/runtime.ts";
 import { controlsInsideControls } from "#app/test/nested-controls.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { paramsSet, router, searchParams, setSearchParams } from "#app/test/router.ts";
-import { createTestRuntime } from "#app/test/runtime.ts";
-import { problem } from "@pace/client/testing";
+import { createTestRuntime, frozenClock } from "#app/test/runtime.ts";
+import { createMemoryEventStore, createMemorySessionStore } from "@pace/client";
+import { createFakeFetch, emptySyncRoutes, problem } from "@pace/client/testing";
 import { addMinutesIso } from "@pace/core";
 import { NOW } from "@pace/core/testing";
 
@@ -235,6 +237,56 @@ describe("DayScreen", () => {
     await waitFor(() => {
       expect(searchParams()["block"]).toBeUndefined();
     });
+  });
+
+  it("opens the named block once the local store is read on a cold load (review M10)", async () => {
+    const eventStore = createMemoryEventStore();
+    const first = await createTestRuntime({ eventStore });
+    await first.actions.logPast({
+      category: "work",
+      endAt: addMinutesIso(NOW, -240),
+      label: "Team chat",
+      startAt: addMinutesIso(NOW, -270),
+    });
+    const chat = Object.values(first.state.store.getState().time.activities).find(
+      (activity) => activity.label === "Team chat",
+    );
+    // A cold load: the copy on the device is still being read when Day reads the address.
+    const { promise: gate, resolve: release } = Promise.withResolvers<undefined>();
+    const slow = {
+      ...eventStore,
+      listAll: async () => {
+        await gate;
+        return await eventStore.listAll();
+      },
+    };
+    const runtime = await createRuntime({
+      clock: frozenClock(),
+      deviceId: async () => "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+      eventStore: slow,
+      fetch: createFakeFetch(emptySyncRoutes).fetch,
+      session: createMemorySessionStore(),
+    });
+    setSearchParams({ block: `${chat?.id ?? ""}-${addMinutesIso(NOW, -270)}`, date: "2026-10-06" });
+    await renderScreen(<DayScreen />, runtime);
+    expect(searchParams()["block"]).toBeDefined();
+    await act(async () => {
+      release(undefined);
+      await runtime.state.ready;
+    });
+    expect(await screen.findByLabelText("What")).toHaveDisplayValue("Team chat");
+    await waitFor(() => {
+      expect(searchParams()["block"]).toBeUndefined();
+    });
+  });
+
+  it("opens nothing for a block the day does not hold, and takes the param off (review M10)", async () => {
+    setSearchParams({ block: "gone-2026-10-06T06:00:00.000Z", date: "2026-10-06" });
+    await renderScreen(<DayScreen />, await createTestRuntime());
+    await waitFor(() => {
+      expect(searchParams()["block"]).toBeUndefined();
+    });
+    expect(screen.queryByLabelText("What")).toBeNull();
   });
 
   it("opens the day the address names, and today for one it cannot read, writing nothing back", async () => {

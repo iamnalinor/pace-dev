@@ -216,7 +216,8 @@ const DayPage = ({
 /**
 A block named in the address (`?block=<its key>`, Week's «Edit in Day»; review M3, R26-04) opens
 in the editor once, as if picked; the param is then taken off in place, so closing the editor or
-coming back later does not open it again.
+coming back later does not open it again. It waits for the device's copy to be read; a block
+the day does not hold (deleted elsewhere) opens nothing and the param still goes.
 */
 const useOpenedBlock = (
   day: { readonly entries: readonly { readonly key: string; readonly target: SheetTarget }[] },
@@ -224,10 +225,12 @@ const useOpenedBlock = (
 ): void => {
   const [block, , forgetBlock] = useSearchParam("block");
   const [handled, setHandled] = useState<null | string>(null);
+  // On a cold load the day has no blocks until the device's copy is read: wait for it (M10).
+  const isRead = usePace().hooks.useAppState((state) => state.status === "ready");
   if (block === null && handled !== null) {
     setHandled(null);
   }
-  if (block !== null && block !== handled) {
+  if (isRead && block !== null && block !== handled) {
     setHandled(block);
     const entry = day.entries.find((candidate) => candidate.key === block);
     if (entry !== undefined) {
