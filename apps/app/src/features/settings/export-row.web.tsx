@@ -1,10 +1,10 @@
 import { useState } from "react";
 
 import { usePace, useT } from "#app/app-state.tsx";
-import { downloadXlsx } from "#app/platform/xlsx.web.ts";
+import { exportData } from "#app/features/settings/export-data.web.ts";
+import { errorText } from "#app/format/action-error.ts";
 import { Button } from "#app/ui/button.tsx";
 import { useToast } from "#app/ui/toast.tsx";
-import { exportSheets } from "@pace/client";
 
 /**
 "Export data": downloads the whole account as a spreadsheet, built from the local copy of the log,
@@ -13,7 +13,7 @@ and says which file it downloaded (a download alone gives no word in the page, Q
 export const ExportRow = () => {
   const t = useT();
   const toast = useToast();
-  const { clock, state } = usePace();
+  const runtime = usePace();
   const [isBusy, setIsBusy] = useState(false);
   return (
     <Button
@@ -21,10 +21,17 @@ export const ExportRow = () => {
       onPress={async () => {
         setIsBusy(true);
         try {
-          const now = clock.now();
-          const file = `pace-${now.slice(0, 10)}.xlsx`;
-          await downloadXlsx(exportSheets(state.store.getState(), now), file);
-          toast.show({ message: t("settings.export.done", { file }) });
+          const result = await exportData(runtime);
+          if (result.ok) {
+            toast.show({ message: t("settings.export.done", { file: result.value }) });
+            return;
+          }
+          toast.show({
+            message:
+              result.error === "export/unavailable"
+                ? t("settings.export.failed")
+                : errorText(t, result.error),
+          });
         } finally {
           setIsBusy(false);
         }

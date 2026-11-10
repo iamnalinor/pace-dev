@@ -1,5 +1,11 @@
 import { withinDeadline } from "@pace/client";
-import { addDaysIn, addMinutesIso, endpoints, type MessageKey, startOfDayIn } from "@pace/core";
+import {
+  addMinutesIso,
+  endpoints,
+  type MessageKey,
+  nextDayStartIn,
+  startOfDayIn,
+} from "@pace/core";
 
 import type { CalendarSource, CalendarToday } from "./calendar-today.ts";
 
@@ -46,7 +52,7 @@ In a browser there is no calendar to read: today's events come from the copy the
 export const calendarToday = async ({ api, now, zone }: CalendarSource): Promise<CalendarToday> => {
   const from = startOfDayIn(now, zone);
   try {
-    const events = await dayEvents(api, from, addDaysIn(from, 1, zone));
+    const events = await dayEvents(api, from, nextDayStartIn(from, zone));
     return {
       access: "granted",
       events: events.filter((event) => event.endAt > addMinutesIso(now, -RECENT_MINUTES)),

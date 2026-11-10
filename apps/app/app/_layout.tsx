@@ -8,13 +8,16 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { PaceProvider, useAuth } from "#app/app-state.tsx";
 import { GateProvider, isBarePath, NavigatorHold, RouteGate } from "#app/auth/route-gate.tsx";
+import { useServerProblem } from "#app/features/server/configuration-notice.tsx";
 import { IncompatibleGate, useIsServerBlocked } from "#app/features/server/incompatible-screen.tsx";
+import { ServerSwitchGate } from "#app/features/server/server-switch-gate.tsx";
 import { CrashDocumentLanguage } from "#app/platform/crash-document-language.tsx";
 import { useCrashNotice } from "#app/platform/crash-notice.ts";
 import { DocumentHead } from "#app/platform/document-head.tsx";
 import { DocumentLanguage } from "#app/platform/document-language.tsx";
 import { DocumentTheme } from "#app/platform/document-theme.tsx";
 import { NotificationLinks } from "#app/platform/notification-links.ts";
+import { OtaProvider } from "#app/platform/ota-provider.tsx";
 import { UpdateBanner } from "#app/platform/update-banner.tsx";
 // Defines the push task (and the foreground handler) before Android may run it.
 import "#app/platform/push-task.ts";
@@ -64,53 +67,56 @@ const Navigator = () => {
   const { palette, scheme } = useTheme();
   const hasNavigation = useHasNavigation();
   const path = usePathname();
+  const serverProblem = useServerProblem();
   useCrashNotice();
   return (
-    <UpdateBanner>
-      <SyncFrame isBare={isBarePath(path)}>
-        <CrashContext />
-        <DocumentLanguage />
-        <DocumentHead />
-        <AppDocumentTheme />
-        <Shell
-          content={
-            <NavigatorHold>
-              <Stack
-                // A signed-in app its server does not fit sees the versions screen instead of any
-                // route; the navigator stays mounted, so logging out lands on the login screen.
-                layout={({ children }) => (
-                  <IncompatibleGate>
-                    <RouteGate path={path}>
-                      {/* Under the hold and the gate: a tap is followed once the Stack exists. */}
-                      <NotificationLinks />
-                      {children}
-                    </RouteGate>
-                  </IncompatibleGate>
-                )}
-                screenLayout={({ children }) => <ScreenScene>{children}</ScreenScene>}
-                screenOptions={{
-                  contentStyle: { backgroundColor: palette["bg.app"] },
-                  headerShown: false,
-                }}
-              >
-                <Stack.Screen name="(tabs)" />
-                <Stack.Screen name="login" options={{ animation: "fade" }} />
-                <Stack.Screen name="auth/index" options={{ animation: "fade" }} />
-                <Stack.Screen name="task/[id]" />
-                <Stack.Screen name="review" />
-                <Stack.Screen name="permissions" />
-                <Stack.Screen
-                  name="onboarding"
-                  options={{ animation: "fade", gestureEnabled: false }}
-                />
-              </Stack>
-            </NavigatorHold>
-          }
-          {...(hasNavigation && { navigation: <Navigation /> })}
-        />
-        <StatusBar style={scheme === "dark" ? "light" : "dark"} />
-      </SyncFrame>
-    </UpdateBanner>
+    <ServerSwitchGate>
+      <UpdateBanner>
+        <SyncFrame isBare={isBarePath(path)} serverProblem={serverProblem}>
+          <CrashContext />
+          <DocumentLanguage />
+          <DocumentHead />
+          <AppDocumentTheme />
+          <Shell
+            content={
+              <NavigatorHold>
+                <Stack
+                  // A signed-in app its server does not fit sees the versions screen instead of any
+                  // route; the navigator stays mounted, so logging out lands on the login screen.
+                  layout={({ children }) => (
+                    <IncompatibleGate>
+                      <RouteGate path={path}>
+                        {/* Under the hold and the gate: a tap is followed once the Stack exists. */}
+                        <NotificationLinks />
+                        {children}
+                      </RouteGate>
+                    </IncompatibleGate>
+                  )}
+                  screenLayout={({ children }) => <ScreenScene>{children}</ScreenScene>}
+                  screenOptions={{
+                    contentStyle: { backgroundColor: palette["bg.app"] },
+                    headerShown: false,
+                  }}
+                >
+                  <Stack.Screen name="(tabs)" />
+                  <Stack.Screen name="login" options={{ animation: "fade" }} />
+                  <Stack.Screen name="auth/index" options={{ animation: "fade" }} />
+                  <Stack.Screen name="task/[id]" />
+                  <Stack.Screen name="review" />
+                  <Stack.Screen name="permissions" />
+                  <Stack.Screen
+                    name="onboarding"
+                    options={{ animation: "fade", gestureEnabled: false }}
+                  />
+                </Stack>
+              </NavigatorHold>
+            }
+            {...(hasNavigation && { navigation: <Navigation /> })}
+          />
+          <StatusBar style={scheme === "dark" ? "light" : "dark"} />
+        </SyncFrame>
+      </UpdateBanner>
+    </ServerSwitchGate>
   );
 };
 
@@ -135,17 +141,19 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ThemeProvider>
-          <PaceProvider>
-            <ShareIntentProvider>
-              <ToastProvider>
-                <TooltipHost>
-                  <GateProvider>
-                    <Navigator />
-                  </GateProvider>
-                </TooltipHost>
-              </ToastProvider>
-            </ShareIntentProvider>
-          </PaceProvider>
+          <OtaProvider>
+            <PaceProvider>
+              <ShareIntentProvider>
+                <ToastProvider>
+                  <TooltipHost>
+                    <GateProvider>
+                      <Navigator />
+                    </GateProvider>
+                  </TooltipHost>
+                </ToastProvider>
+              </ShareIntentProvider>
+            </PaceProvider>
+          </OtaProvider>
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

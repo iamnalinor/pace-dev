@@ -49,6 +49,39 @@ folders (`auth/`, `bot/`, `sync/`, `user-store/`) only reach each other through
 `packages/client/src/view-models/**` additionally run eslint-plugin-functional: no `let`,
 no mutation, no classes, no `throw`.
 
+## Infrastructure ports and adapters
+
+API domain modules consume contracts in `shared/ports`. Cloudflare composition lives in
+`platform/cloudflare` and `worker.ts`; raw bindings and driver construction do not cross into
+routes, notifications, sync or the user-store service.
+
+| Contract | Responsibility | Cloudflare adapter |
+| --- | --- | --- |
+| SQLite database | Existing typed SQLite queries; shared database batches commit atomically | `sqlite.ts` (D1), `actor-storage.ts` (DO SQLite and migrations) |
+| ActorStorage / ActorValues | Actor-owned SQLite transactions and durable values | `actor-storage.ts` |
+| Scheduler | Persistent get/set/delete alarm, preserving earliest-wakeup policy | `actor-storage.ts` |
+| ActorContext / LiveChannel | Session-tagged sockets, upgrades, keepalive and actor initialization | `live-channel.ts` |
+| UserStoreHost | Resolve a person's existing typed RPC service | `bindings.ts`, hosted `user-store.ts` |
+| KeyValue / OAuth | Grant storage and provider operations | `key-value.ts`, `oauth.ts` |
+| RequestPlaceReader | Trusted request provenance | `request-place.ts` |
+
+The domain UserStore keeps its current service composition. The Cloudflare Durable Object wraps
+that service and forwards its explicit RPC surface. Each actor serializes top-level calls through
+its own queue, including external awaits; internal service calls do not re-enter it. A slow external
+operation can therefore delay that user's next call, while another user's actor remains independent.
+The adapter owns DO inheritance, migration execution, WebSocket pairs and hibernating keepalive.
+
+The database contract deliberately targets SQLite, not arbitrary SQL dialects. No second runtime
+or production migration is implemented here. The web assets binding already lives exclusively in
+`apps/app/worker.ts`, the web deployment's composition entry; API domain code does not consume it,
+so no unused API Assets abstraction or cross-app import is introduced.
+
+ESLint AST checks reject Cloudflare ambient types and request metadata outside composition;
+dependency-cruiser rejects domain imports of platform modules. Tests exercise the actual workerd
+adapters, atomic batch rollback, repeated migrations, persisted/earliest/past alarms, actor RPC
+serialization across an await, other-user progress, and the existing session-scoped socket tests.
+See [the execution plan](../context/technical-execution/tasks-8-9-plan.md).
+
 ## The event model
 
 Everything the user does is an append-only event. State is never stored as the truth on
@@ -317,14 +350,68 @@ the local log, outbox, cursor and id as well.
 **A one-time re-pull after an update.** A client update that accepts events older clients left
 out (their pull skipped what they could not read and moved the cursor past it) raises
 `SYNC_SCHEMA_VERSION` in `sync-version.ts`; the store keeps the version its log was pulled under
-(`getSyncVersion`, 0 for logs from before versions). A run that finds a lower one sets the cursor
-to 0 and the version to the current one, in that order, before its pull: the log and the outbox
+(`syncVersion` in the copy's meta, 0 for logs from before versions). A run that finds a lower one
+rewinds the cursor to 0 and stores the current version in one guarded write (`upgradeCursor`, a
+legacy page from 0 with no events), before its pull: the log and the outbox
 stay, events the log already holds are skipped on the way in, the outbox is pushed as usual, and
 the next start pulls from its cursor again. A reset stores the current version with the fresh copy,
 and a log without a store id is dropped by its pull anyway. Version 1 is the id limit raised from
 64 to 128. On the server the re-pull is the ordinary paged pull (`listPage`: the next `limit`
 events after `since` by the `seq` primary key), so it costs one request per 200 events, once per
 device.
+
+**The local copy.** The device's copy of the log is behind the `EventStore` port
+(`packages/client/src/event-store.ts`; IndexedDB, SQLite, memory). Next to the events and the
+outbox it keeps the copy's meta: `copyToken` (a random identity, new after a clear or another
+owner), `owner` (the session's mark), `storeId`, `cursor`, `syncVersion` and `coverage`.
+`readMeta` reads the meta alone, `readSnapshot` the whole copy (`LocalSnapshot`: the meta, the
+stored checkpoint if any, the records with their `seq`, the outbox ids), for a load only. The
+port has no setter for the cursor or the store id: the meta moves only with what it describes,
+through the guarded operations (`applyLegacyPage`, `installBootstrap`, `applyRemotePage`,
+`installHistory`), each checked against a `CopyGuard` inside its own transaction, as `append`
+and `markSynced` are. A refusal that cannot travel as a `Result` is thrown as a `SyncError` and
+read by its `code` (`COPY_CHANGED` ends the run and has the client ask whether its session
+still stands).
+
+**Checkpoint sync (off by default).** With `PACE_HISTORY_CHECKPOINT_MODE=active` the server
+offers `features.historyCheckpoint` (the `CHECKPOINT_VERSION`) on `/api/instance`, and a copy
+that has pulled nothing yet starts from a checkpoint instead of the whole log:
+
+- `GET /api/sync/bootstrap?limit=` answers `kind: "checkpoint"` with the checkpoint as a JSON
+  string and its SHA-256, the high-water mark `throughSeq` and the first page of the tail
+  (`records`, `seq`, `more`), or `kind: "source"` when it has no checkpoint to give (the client
+  then pulls the whole log). The client checks hash, version, shape and store before installing.
+- `GET /api/sync/pull` takes three optional parameters. `checkpointVersion` asks for `records`
+  (each event with its `seq`) and may be answered `bootstrapRequired` when the cursor is behind
+  the server's checkpoint; `storeId` makes a pull of another store a `409 store/changed`;
+  `through` pins a read of the complete source up to that `seq` and is never redirected to a
+  bootstrap. The socket's `pull` and `events` carry the same fields.
+- A copy built on a checkpoint has `coverage: "checkpoint"`: its state is the checkpoint's
+  `CoreState` with the tail and the outbox replayed on top (`replayCheckpoint`), and its log
+  holds only what came after. An event the base cannot take (a correction, a backdate, an id a
+  known correction targets: `requiresSource`) needs the source first. `state.ensureHistory()`
+  (the History screen, export, undo, revoke, source-dependent edits, the system's own backdated
+  instances) reads the complete source with pinned pulls and installs it in one write
+  (`installHistory`); the copy is `coverage: "full"` from then on.
+- Which run a copy takes is decided per run from its meta (`CheckpointSync.enabled`): the
+  checkpoint run when the server offers checkpoints and the copy is built on one or has pulled
+  nothing; the legacy run otherwise. A full copy that has pulled is never bootstrapped again or
+  cut down to a checkpoint. A checkpoint copy on a server that stopped offering them (the flag
+  rolled back, or a version this build reads as none) is turned into a full one by the legacy
+  run: a pull from 0 whose first page replaces the base and keeps the outbox. Both runs push
+  the outbox through one function (`sync-push.ts`).
+- A tail page is read as a legacy page is: an event this build cannot read is left out and the
+  cursor moves past it (`readTailRecords`), so a newer client's event never stops an older
+  client's sync. Only the pinned read of the complete source is strict.
+- The shape of a checkpoint's state belongs to `CHECKPOINT_VERSION`:
+  `packages/core/src/checkpoint/state-shape.test.ts` fails when the shape differs from the one
+  frozen for the current version. A stored base this build cannot read leaves the state not
+  ready until the next run replaces it (a bootstrap, or the legacy pull from 0); the outbox is
+  kept through both.
+
+A store fenced for an account cleanup answers its sync routes `503 cleanup/busy`. The client
+takes that as "not now": the run fails, the loop backs off, and the status keeps what the last
+run said (no error, not offline).
 
 A reset also forgets the store's Telegram chat; the store then sends to the user's private
 chat, whose id is their Telegram id (looked up in D1 by the store's name, the user id).
@@ -593,3 +680,13 @@ boundary.
 5. Nothing changes on the server: the Durable Object validates with `parseEvent` from
    core, so the new type is accepted as soon as the package is rebuilt. If the UI shows
    it, add the strings to `i18n/en.ts` **and** `ru.ts` (a test asserts the same keys).
+
+### Android update publisher
+
+`apps/updates` is an isolated Worker serving publisher-owned OTA artifacts from its own R2
+binding. It imports neither the account API nor the app. Account-server selection never
+changes the publisher, runtime, channel or signing authority. Runtime-safe manifest/protocol
+and release-storage helpers live in `apps/updates/src/shared`, exported through
+`@pace/updates/*` to publication commands under `scripts/ota`;
+filesystem export reading and private-key signing remain CLI-only and are excluded from the
+Worker runtime dependency graph. The publisher is not deployed or enabled by adding this workspace.

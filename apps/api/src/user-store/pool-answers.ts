@@ -12,7 +12,9 @@ import {
   runningActivity,
 } from "@pace/core";
 
-import { d1 } from "../shared/db/d1.ts";
+import type { Db as SharedDb } from "../shared/db/d1.ts";
+import type { ActorContext } from "../shared/ports/live-channel.ts";
+
 import { deleteSession } from "../shared/session-rows.ts";
 import { endLiveSessions } from "./live-sessions.ts";
 
@@ -78,7 +80,7 @@ before the notification is resolved, so a failure leaves it open to be pressed a
 export const applyAnswer = async (
   notification: PoolNotification,
   resolution: Resolution,
-  store: { readonly env: { readonly DB: D1Database }; readonly ctx: DurableObjectState },
+  store: { readonly env: { readonly DB: SharedDb }; readonly ctx: ActorContext },
 ): Promise<void> => {
   if (resolution !== "revoked" || notification.kind !== "login") {
     return;
@@ -94,11 +96,7 @@ export const applyAnswer = async (
       await endLiveSessions(store.ctx, sessionId, until);
     },
   };
-  await deleteSession(
-    d1(store.env.DB),
-    { sessionId: notification.payload.sessionId, userId },
-    live,
-  );
+  await deleteSession(store.env.DB, { sessionId: notification.payload.sessionId, userId }, live);
 };
 
 /**

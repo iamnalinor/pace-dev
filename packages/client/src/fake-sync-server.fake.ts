@@ -13,7 +13,7 @@ import {
 
 import type { SocketLike } from "./live.ts";
 
-import { type FakeRoute, problem } from "./fake-fetch.fake.ts";
+import { fakeInstance, type FakeRoute, problem } from "./fake-fetch.fake.ts";
 import { type FakeSocket, fakeSockets, say as send } from "./fake-socket.fake.ts";
 
 /** Which way a request reached the fake server. */
@@ -46,6 +46,12 @@ export type FakeSyncServer = {
   readonly options: {
     /** `pace.v1` only: no hello, no socket requests answered (an older server). */
     speaksV2: boolean;
+    /** undefined = old server, null = enhanced source fallback. */
+    historyCheckpoint?: null | {
+      readonly json: string;
+      readonly sha256: string;
+      readonly coveredSeq: number;
+    };
     /** Socket requests of these types are run but never answered (the answer is lost). */
     silent: ReadonlySet<FakeRequest["type"]>;
     /** Socket requests are held, unanswered, until `release` is called. */
@@ -62,6 +68,22 @@ export type FakeSyncServer = {
 const deviceOf = (socket: FakeSocket): null | string =>
   new URL(socket.url).searchParams.get("device");
 
+const shouldBootstrap = (
+  since: number,
+  enhanced:
+    | undefined
+    | { readonly checkpointVersion?: number | undefined; readonly through?: number | undefined },
+  checkpoint: FakeSyncServer["options"]["historyCheckpoint"],
+): boolean => {
+  return (
+    checkpoint !== undefined &&
+    checkpoint !== null &&
+    enhanced !== undefined &&
+    since < checkpoint.coveredSeq &&
+    enhanced.checkpointVersion === 1 &&
+    enhanced.through === undefined
+  );
+};
 export const createFakeSyncServer = (initialStoreId: string): FakeSyncServer => {
   const sockets = fakeSockets();
   const requests: FakeRequest[] = [];
@@ -89,7 +111,17 @@ export const createFakeSyncServer = (initialStoreId: string): FakeSyncServer => 
       send(
         socket,
         isV2(socket)
-          ? { events: inserted, more: false, seq: log.length, since, storeId, type: "events" }
+          ? {
+              events: inserted,
+              more: false,
+              seq: log.length,
+              since,
+              storeId,
+              type: "events",
+              ...(server.options.historyCheckpoint !== undefined && {
+                records: inserted.map((event, index) => ({ event, seq: since + index + 1 })),
+              }),
+            }
           : { seq: log.length, type: "changed" },
       );
     }
@@ -109,12 +141,30 @@ export const createFakeSyncServer = (initialStoreId: string): FakeSyncServer => 
     return ok({ accepted: events.map((event) => event.id), rejected: [], seq: log.length });
   };
 
-  const page = (since: number, limit: number) => ({
-    events: log.slice(since, since + limit),
-    more: since + limit < log.length,
-    seq: Math.min(log.length, since + limit),
-    storeId,
-  });
+  const page = (
+    since: number,
+    limit: number,
+    enhanced?: {
+      readonly checkpointVersion?: number | undefined;
+      readonly through?: number | undefined;
+    },
+  ) => {
+    const through = Math.min(enhanced?.through ?? log.length, log.length);
+    const checkpoint = server.options.historyCheckpoint;
+    if (shouldBootstrap(since, enhanced, checkpoint)) {
+      return { events: [], records: [], more: false, seq: since, storeId, bootstrapRequired: true };
+    }
+    const events = log.slice(since, Math.min(through, since + limit));
+    return {
+      events,
+      more: since + limit < through,
+      seq: Math.min(through, since + limit),
+      storeId,
+      ...(enhanced?.checkpointVersion === 1 && {
+        records: events.map((event, index) => ({ event, seq: since + index + 1 })),
+      }),
+    };
+  };
 
   const answer = (message: LiveClientMessage): KnownLiveServerMessage => {
     switch (message.type) {
@@ -125,8 +175,11 @@ export const createFakeSyncServer = (initialStoreId: string): FakeSyncServer => 
           : { code: result.error, id: message.id, type: "error" };
       }
       case "pull": {
+        if (message.storeId !== undefined && message.storeId !== storeId) {
+          return { type: "error", id: message.id, code: STORE_CHANGED };
+        }
         return {
-          ...page(message.since, message.limit ?? LIVE_PAGE),
+          ...page(message.since, message.limit ?? LIVE_PAGE, message),
           id: message.id,
           since: message.since,
           type: "events",
@@ -185,10 +238,44 @@ export const createFakeSyncServer = (initialStoreId: string): FakeSyncServer => 
     },
     requests,
     routes: {
+      "GET /api/instance": () => ({
+        ...fakeInstance,
+        ...(server.options.historyCheckpoint !== undefined && {
+          features: { ...fakeInstance.features, historyCheckpoint: 1 },
+        }),
+      }),
+      "GET /api/sync/bootstrap": ({ url }) => {
+        const checkpoint = server.options.historyCheckpoint;
+        if (checkpoint === undefined || checkpoint === null) {
+          return { kind: "source", storeId };
+        }
+        const throughSeq = log.length;
+        return {
+          kind: "checkpoint",
+          checkpointJson: checkpoint.json,
+          checkpointSha256: checkpoint.sha256,
+          throughSeq,
+          ...page(checkpoint.coveredSeq, Number(url.searchParams.get("limit") ?? "200"), {
+            checkpointVersion: 1,
+            through: throughSeq,
+          }),
+        };
+      },
       "GET /api/sync/pull": ({ url }) => {
         requests.push({ transport: "http", type: "pull" });
         const since = Number(url.searchParams.get("since") ?? "0");
-        return page(since, Number(url.searchParams.get("limit") ?? String(LIVE_PAGE)));
+        const generation = url.searchParams.get("storeId");
+        if (generation !== null && generation !== storeId) {
+          return problem(409, STORE_CHANGED);
+        }
+        return page(since, Number(url.searchParams.get("limit") ?? String(LIVE_PAGE)), {
+          ...(url.searchParams.has("checkpointVersion") && {
+            checkpointVersion: Number(url.searchParams.get("checkpointVersion")),
+          }),
+          ...(url.searchParams.has("through") && {
+            through: Number(url.searchParams.get("through")),
+          }),
+        });
       },
       "POST /api/sync/push": ({ body }) => {
         requests.push({ transport: "http", type: "push" });

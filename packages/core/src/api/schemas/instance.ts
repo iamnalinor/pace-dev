@@ -1,6 +1,10 @@
 import { z } from "zod";
 
+import { CHECKPOINT_VERSION } from "../../checkpoint/version.ts";
+import { FirebaseAndroidConfigSchema } from "../../firebase/config.ts";
 import { knownOrNull, knownValues } from "../tolerant.ts";
+
+const HistoryCheckpointFeatureSchema = knownOrNull(z.literal(CHECKPOINT_VERSION));
 
 /** The ways a person can sign in on this server. */
 const LOGIN_METHODS = ["telegram-widget", "telegram-deeplink"] as const;
@@ -21,6 +25,8 @@ export const InstanceSchema = z.object({
   /** The web app served with this server; `null` when there is none. */
   webOrigin: knownOrNull(z.string()),
   apiOrigin: z.string(),
+  /** Public Android initialization metadata, when this server provides it. */
+  firebase: knownOrNull(FirebaseAndroidConfigSchema),
   /** A method this client does not know (a newer server's) is dropped. */
   loginMethods: knownValues(z.enum(LOGIN_METHODS)),
   /**
@@ -29,6 +35,7 @@ export const InstanceSchema = z.object({
   */
   features: z
     .object({
+      historyCheckpoint: HistoryCheckpointFeatureSchema,
       push: z.boolean().default(false),
       assistant: z.boolean().default(false),
       /** False when no origin the OAuth provider accepts fits (plain http on a LAN): no MCP. */

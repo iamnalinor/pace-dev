@@ -25,6 +25,40 @@ const App = () => (
   </SyncFrame>
 );
 
+describe("a server problem the composer hands in", () => {
+  const serverProblem = {
+    action: <Text>Ask again</Text>,
+    message: "server.firebaseProjectMismatch",
+  } as const;
+
+  it("says it with the composer's control instead of the strip's own Retry", async () => {
+    const runtime = await createTestRuntime();
+    await runtime.auth.me();
+    await renderScreen(
+      <SyncFrame isBare={false} serverProblem={serverProblem}>
+        <Text>{en("now.empty")}</Text>
+      </SyncFrame>,
+      runtime,
+    );
+    expect(screen.getByText(en("server.firebaseProjectMismatch"))).toBeOnTheScreen();
+    expect(screen.getByText("Ask again")).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: en("sync.retry") })).toBeNull();
+    expect(screen.getByText(en("now.empty"))).toBeOnTheScreen();
+  });
+
+  it("says nothing on the bare screens (signing in has its own notice)", async () => {
+    const runtime = await createTestRuntime();
+    await runtime.auth.me();
+    await renderScreen(
+      <SyncFrame isBare serverProblem={serverProblem}>
+        <Text>{en("now.empty")}</Text>
+      </SyncFrame>,
+      runtime,
+    );
+    expect(screen.queryByText(en("server.firebaseProjectMismatch"))).toBeNull();
+  });
+});
+
 describe("the first-sync cover (QA round 17 M4)", () => {
   it("shows no empty copy while an empty copy waits for its first sync, then the screen", async () => {
     const pull = heldPull();

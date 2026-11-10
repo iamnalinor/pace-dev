@@ -255,9 +255,9 @@ describe("DayScreen", () => {
     const { promise: gate, resolve: release } = Promise.withResolvers<undefined>();
     const slow = {
       ...eventStore,
-      listAll: async () => {
+      readSnapshot: async () => {
         await gate;
-        return await eventStore.listAll();
+        return await eventStore.readSnapshot();
       },
     };
     const runtime = await createRuntime({

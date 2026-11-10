@@ -27,6 +27,10 @@ internal object DebugInfo {
   fun describe(context: Context): String =
     listOf(
       line("app") { app(context) },
+      line("firebase") {
+        val status = FirebaseRuntime.controller(context).status()
+        "${status.status}; project=${status.projectId ?: "none"}; reason=${status.reason ?: "none"}"
+      },
       line("device") {
         "${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT}), " +
           Build.SUPPORTED_ABIS.firstOrNull().orEmpty()

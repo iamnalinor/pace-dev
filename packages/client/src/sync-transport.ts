@@ -1,4 +1,11 @@
-import { type EndpointOutput, endpoints, type Event, newId, STORE_CHANGED } from "@pace/core";
+import {
+  type CHECKPOINT_VERSION,
+  type EndpointOutput,
+  endpoints,
+  type Event,
+  newId,
+  STORE_CHANGED,
+} from "@pace/core";
 
 import type { LiveChannel } from "./live.ts";
 
@@ -12,7 +19,16 @@ and never knows which one carried a call; `preferSocket` decides that, per call.
 */
 
 /** A page of the store's log after `since`, up to `seq`; `more` says there is more past it. */
+export type PullOptions = {
+  readonly signal?: AbortSignal;
+  readonly storeId?: string;
+  readonly through?: number;
+  readonly checkpointVersion?: typeof CHECKPOINT_VERSION;
+};
+
 export type PullPage = {
+  records?: readonly { readonly seq: number; readonly event: unknown }[] | undefined;
+  bootstrapRequired?: boolean | undefined;
   since: number;
   seq: number;
   storeId: string;
@@ -28,7 +44,7 @@ export type SyncTransport = {
     events: readonly Event[],
     storeId: string,
   ) => Promise<PushAnswer | typeof STORE_CHANGED>;
-  readonly pull: (since: number, limit: number) => Promise<PullPage>;
+  readonly pull: (since: number, limit: number, options?: PullOptions) => Promise<PullPage>;
 };
 
 const isStoreChanged = (error: unknown): boolean =>
@@ -51,8 +67,18 @@ export class SyncTimeout extends Error {
   }
 }
 
-const withinTimeout = async <T>(call: (signal: AbortSignal) => Promise<T>): Promise<T> => {
+const withinTimeout = async <T>(
+  call: (signal: AbortSignal) => Promise<T>,
+  signal?: AbortSignal,
+): Promise<T> => {
   const controller = new AbortController();
+  const abort = (): void => {
+    controller.abort();
+  };
+  if (signal?.aborted === true) {
+    controller.abort();
+  }
+  signal?.addEventListener("abort", abort);
   const timer = setTimeout(() => {
     controller.abort();
   }, HTTP_SYNC_TIMEOUT_MS);
@@ -62,6 +88,7 @@ const withinTimeout = async <T>(call: (signal: AbortSignal) => Promise<T>): Prom
     throw controller.signal.aborted ? new SyncTimeout() : error;
   } finally {
     clearTimeout(timer);
+    signal?.removeEventListener("abort", abort);
   }
 };
 
@@ -75,16 +102,37 @@ export const isUnreachable = (error: unknown): boolean =>
   error instanceof SyncTimeout ||
   error instanceof LiveUnavailable;
 
+/** The code (HTTP 503) of a store the server has fenced while an account cleanup runs in it. */
+export const STORE_BUSY = "cleanup/busy";
+
+/**
+The server answered, and said "not now": the store is fenced for an account cleanup. Not a fault
+of this run and not a missing network; the sync tries again with its backoff and puts no error up.
+*/
+export const isStoreBusy = (error: unknown): boolean =>
+  error instanceof ApiError && error.status === 503 && error.code === STORE_BUSY;
+
 /** The HTTP routes: a `409 store/changed` is read as the value, any other failure thrown. */
 export const httpTransport = (api: ApiClient): SyncTransport => ({
-  pull: async (since, limit) => {
+  pull: async (since, limit, options) => {
     const page = await withinTimeout(
       async (signal) =>
         await api.call(
           endpoints.sync.pull,
-          { query: { limit: String(limit), since: String(since) } },
+          {
+            query: {
+              limit: String(limit),
+              since: String(since),
+              ...(options?.storeId !== undefined && { storeId: options.storeId }),
+              ...(options?.through !== undefined && { through: String(options.through) }),
+              ...(options?.checkpointVersion !== undefined && {
+                checkpointVersion: String(options.checkpointVersion),
+              }),
+            },
+          },
           { signal },
         ),
+      options?.signal,
     );
     return { ...page, since };
   },
@@ -113,13 +161,25 @@ The live socket: a push answered `pushed` (or `error` `store/changed`), a pull a
 does any other answer (a `bad-request` the HTTP route will answer properly).
 */
 export const socketTransport = (live: LiveChannel): SyncTransport => ({
-  pull: async (since, limit) => {
-    const answer = await live.request({ id: newId(), limit, since, type: "pull" });
+  pull: async (since, limit, options) => {
+    const { signal: _signal, ...query } = options ?? {};
+    const answer = await live.request({ id: newId(), limit, since, type: "pull", ...query });
+    if (answer.type === "error" && answer.code === STORE_CHANGED) {
+      throw new ApiError(409, STORE_CHANGED, STORE_CHANGED);
+    }
     if (answer.type !== "events") {
       throw new LiveUnavailable("refused");
     }
-    const { events, more, seq, storeId } = answer;
-    return { events, more, seq, since: answer.since, storeId };
+    const { events, more, seq, storeId, records, bootstrapRequired } = answer;
+    return {
+      events,
+      more,
+      seq,
+      since: answer.since,
+      storeId,
+      ...(records !== undefined && { records }),
+      ...(bootstrapRequired !== undefined && { bootstrapRequired }),
+    };
   },
   push: async (events, storeId) => {
     const answer = await live.request({ events: [...events], id: newId(), storeId, type: "push" });

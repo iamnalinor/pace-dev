@@ -1,6 +1,8 @@
 import { z } from "zod";
 
+import { CHECKPOINT_VERSION } from "../../checkpoint/version.ts";
 import { EVENT_ID_MAX, PrecisionSchema, SourceSchema } from "../../events/event-schema.ts";
+import { loosen } from "../loose.ts";
 import { knownValue, knownValues } from "../tolerant.ts";
 
 /**
@@ -31,6 +33,14 @@ const PulledEventSchema = SyncEventSchema.extend({
 
 export type SyncEvent = z.output<typeof SyncEventSchema>;
 
+const LoosePulledEventSchema = loosen(PulledEventSchema);
+
+/** One entry of a tail read as a pull reads it (`PulledEventSchema`); `null` when it cannot be. */
+export const readPulledEvent = (entry: unknown): null | SyncEvent => {
+  const parsed = LoosePulledEventSchema.safeParse(entry);
+  return parsed.success ? parsed.data : null;
+};
+
 /**
 The identity of the user's store on the server, made anew whenever the store is wiped. A
 client keeps the id its local log came from; a different one means the server's data was
@@ -57,12 +67,29 @@ export const SyncPushOutputSchema = z.object({
   seq: z.number().int().nonnegative(),
 });
 
+/**
+An entry of the log with the sequence number the store gave it, as a checkpoint-aware pull, a
+bootstrap's tail and the socket's `events` carry it. The event is opaque here, as it is in
+`events`: one a newer client wrote must not make an older client refuse the whole answer (the
+sync would stop there for good, bug-lessons 13 and 150). Whoever reads the record decides: the
+tail skips what it cannot read (`readPulledEvent`), the pinned read of a complete history refuses.
+*/
+export const SequencedSyncRecordSchema = z.object({
+  seq: z.int().positive(),
+  event: z.unknown(),
+});
+
 export const SyncPullQuerySchema = z.object({
+  storeId: StoreIdSchema.optional(),
+  through: z.coerce.number().int().nonnegative().optional(),
+  checkpointVersion: z.coerce.number().pipe(z.literal(CHECKPOINT_VERSION)).optional(),
   since: z.coerce.number().int().nonnegative().default(0),
   limit: z.coerce.number().int().min(1).max(500).default(200),
 });
 
 export const SyncPullOutputSchema = z.object({
+  records: z.array(SequencedSyncRecordSchema).optional(),
+  bootstrapRequired: z.boolean().optional(),
   events: knownValues(PulledEventSchema),
   /** Cursor for the next pull: the sequence number of the last event returned. */
   seq: z.number().int().nonnegative(),

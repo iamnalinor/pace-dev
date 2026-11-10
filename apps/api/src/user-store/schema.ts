@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { index, integer, primaryKey, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 /** The append-only event log: the source of truth for everything the user did. */
@@ -14,7 +15,11 @@ export const events = sqliteTable(
     source: text().notNull(),
     payload: text().notNull(),
   },
-  (table) => [index("events_occurred_idx").on(table.occurredAt)],
+  (table) => [
+    index("events_occurred_idx").on(table.occurredAt),
+    // The revocations alone, for a state served from a checkpoint (`loadRevocations`).
+    index("events_type_idx").on(table.type, table.seq),
+  ],
 );
 
 /** A phone's calendar copy: one row per occurrence, replaced range by range by that phone. */
@@ -39,7 +44,7 @@ export const calendarEvents = sqliteTable(
     primaryKey({ columns: [table.deviceId, table.eventId, table.startAt] }),
     index("calendar_events_start_idx").on(table.startAt),
     // Reads of a range go through the end: the start would reach back over all history.
-    index("calendar_events_end_idx").on(table.endAt),
+    index("calendar_events_end_instant_idx").on(sql`julianday(${table.endAt})`),
   ],
 );
 
@@ -57,7 +62,7 @@ export const usageSessions = sqliteTable(
     primaryKey({ columns: [table.deviceId, table.app, table.startAt] }),
     index("usage_sessions_start_idx").on(table.startAt),
     // Reads of a range (automatic sleep's, every pass) go through the end, not over all history.
-    index("usage_sessions_end_idx").on(table.endAt),
+    index("usage_sessions_end_instant_idx").on(sql`julianday(${table.endAt})`),
   ],
 );
 
@@ -75,7 +80,7 @@ export const phoneUses = sqliteTable(
   },
   (table) => [
     primaryKey({ columns: [table.deviceId, table.startAt] }),
-    index("phone_uses_end_idx").on(table.endAt),
+    index("phone_uses_end_instant_idx").on(sql`julianday(${table.endAt})`),
   ],
 );
 
@@ -253,3 +258,18 @@ export const presets = sqliteTable("presets", {
   /** The preset's own definition (what it changes relative to its parent), as JSON. */
   definition: text().notNull(),
 });
+
+export {
+  historyArchiveChunks,
+  historyArchiveManifests,
+  historyArchiveMonths,
+  historyArchiveOperations,
+  historyCheckpoint,
+  historyCheckpointChunks,
+  historyPhoneDaily,
+  historyRawRevisions,
+  historyRawState,
+  historyUsageState,
+  usageDailyApps,
+  usageDailyDevices,
+} from "./history-schema.ts";

@@ -1,13 +1,22 @@
-import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
 import type { SQLiteColumn } from "drizzle-orm/sqlite-core";
 
-import { and, eq, gt, max, notInArray, type Query, type SQL, sql } from "drizzle-orm";
+import { and, eq, notInArray, type Query, type SQL, sql } from "drizzle-orm";
 
-import type { CalendarEvent, DeviceUse, Interval, UsageRow } from "@pace/core";
+import type { CalendarEvent, DeviceUse, UsageRow } from "@pace/core";
 
+import type { UsageUpload } from "../shared/contract.ts";
+import type { ActorStorage } from "../shared/ports/actor-storage.ts";
+import type { SqliteDatabase } from "../shared/ports/sqlite.ts";
+
+import { SERVER_TZ } from "./notifier.ts";
+import { markOf } from "./projections.ts";
 import * as schema from "./schema.ts";
+import { storeIdOf } from "./store-identity.ts";
+import { writeUsageWithRevisions } from "./usage-revisions.ts";
 
-type Db = DrizzleSqliteDODatabase<typeof schema>;
+export type { UsageUpload } from "../shared/contract.ts";
+
+type Db = SqliteDatabase<"sync", typeof schema>;
 
 /** [from, to): the rows of a table that overlap it. */
 export type Range = { readonly from: string; readonly to: string };
@@ -20,14 +29,18 @@ export type CalendarUpload = Range & {
 };
 
 /**
-The rows of a table overlapping a range, read through the index on their end: those that end after
-`from`, the history before it left unread. (`+` keeps SQLite off the start's index, which would
-read every row that starts before `to`, back to the first.)
+The rows of a table overlapping a range, read through the index on their end's instant
+(`julianday(end_at)`): those that end after `from`, the history before it left unread. The start
+is compared as an instant too, which no index covers, so SQLite never reads through the start's.
 */
 const overlapping = (
   columns: { readonly startAt: SQLiteColumn; readonly endAt: SQLiteColumn },
   { from, to }: Range,
-): SQL | undefined => and(sql`+${columns.startAt} < ${to}`, gt(columns.endAt, from));
+): SQL | undefined =>
+  and(
+    sql`julianday(${columns.startAt}) < julianday(${to})`,
+    sql`julianday(${columns.endAt}) > julianday(${from})`,
+  );
 
 /**
 One phone's calendar rows overlapping a range, read through the end index too (`+` keeps SQLite off
@@ -142,7 +155,7 @@ const calendarRange = (db: Db, range: Range) =>
   db.select().from(schema.calendarEvents).where(overlapping(schema.calendarEvents, range));
 
 const byStart = <T extends { readonly startAt: string }>(a: T, b: T): number =>
-  a.startAt.localeCompare(b.startAt);
+  Date.parse(a.startAt) - Date.parse(b.startAt);
 
 /**
 The calendar's events overlapping a range, each occurrence once: two phones send the same event
@@ -187,17 +200,6 @@ export const clearCalendar = async (db: Db, deviceId: string): Promise<void> => 
   await db.delete(schema.calendarEvents).where(eq(schema.calendarEvents.deviceId, deviceId));
 };
 
-/** One device's upload: its app sessions and, from a phone, its uses and how far it read. */
-export type UsageUpload = {
-  readonly deviceId: string;
-  readonly deviceName: string;
-  readonly sessions: readonly Omit<UsageRow, "deviceId" | "deviceName">[];
-  readonly uses?: readonly Interval[] | undefined;
-  readonly until?: string | undefined;
-  /** Sent by a phone (a full sign-in), not by a computer's agent token. */
-  readonly isPhone: boolean;
-};
-
 /** How far a device's usage is known, as its latest upload said. */
 type KnownUsage = {
   /** The end of what it read: quiet up to here is known quiet. */
@@ -218,66 +220,35 @@ as it was, so an older app never makes a quiet it did not read look known. A com
 counts up to when it arrived. Never past that moment: a phone clock running ahead claims nothing.
 */
 const noteKnown = async (
-  storage: DurableObjectStorage,
+  storage: ActorStorage,
   upload: UsageUpload,
   now: string,
 ): Promise<void> => {
   if (upload.isPhone && upload.until === undefined) {
     return;
   }
-  const until = upload.until === undefined || upload.until > now ? now : upload.until;
+  const until =
+    upload.until === undefined || Date.parse(upload.until) > Date.parse(now) ? now : upload.until;
   const known: KnownUsage = { isPhone: upload.isPhone, until, uploadedAt: now };
   await storage.put(`${KNOWN_PREFIX}${upload.deviceId}`, known);
 };
 
-/** A phone's uses: one per start, a use seen again (it was still going on) keeps the later end. */
-const addPhoneUses = async (
-  db: Db,
-  deviceId: string,
-  uses: readonly Interval[],
-): Promise<number> => {
-  const { phoneUses } = schema;
-  // A use whose screen-off was lost is only known to have started: it ends where it began.
-  const valid = uses.filter((use) => use.endAt >= use.startAt);
-  for (const use of valid) {
-    await db
-      .insert(phoneUses)
-      .values({ deviceId, endAt: use.endAt, startAt: use.startAt })
-      .onConflictDoUpdate({
-        set: { endAt: sql`max(${phoneUses.endAt}, excluded.end_at)` },
-        target: [phoneUses.deviceId, phoneUses.startAt],
-      });
-  }
-  return valid.length;
-};
-
 /**
-A device's sessions (a session seen again, same app and start, keeps the later end), a phone's
-uses, and how far the device's usage is known. Rows stored.
+Source bytes are preserved; actual instants decide validity and monotonic extension. With an
+archive bound (`hasArchive`) the upload also keeps the archive's revisions and daily totals.
 */
 export const addUsage = async (
-  { db, storage }: { readonly db: Db; readonly storage: DurableObjectStorage },
+  { storage, hasArchive }: { readonly storage: ActorStorage; readonly hasArchive: boolean },
   upload: UsageUpload,
   now: string,
 ): Promise<number> => {
-  const { usageSessions } = schema;
-  const valid = upload.sessions.filter((session) => session.endAt > session.startAt);
-  for (const session of valid) {
-    await db
-      .insert(usageSessions)
-      .values({ ...session, deviceId: upload.deviceId, deviceName: upload.deviceName })
-      .onConflictDoUpdate({
-        set: {
-          deviceName: upload.deviceName,
-          endAt: sql`max(${usageSessions.endAt}, excluded.end_at)`,
-        },
-        target: [usageSessions.deviceId, usageSessions.app, usageSessions.startAt],
-      });
-  }
-  // A computer's use is its sessions (its agent reads idle time); only a phone's uses are kept.
-  const uses = upload.isPhone ? await addPhoneUses(db, upload.deviceId, upload.uses ?? []) : 0;
+  const mark = hasArchive ? await markOf(storage) : undefined;
+  const archive = hasArchive
+    ? { storeId: await storeIdOf(storage), zone: mark?.timezone ?? SERVER_TZ, now }
+    : undefined;
+  const stored = writeUsageWithRevisions(storage, upload, archive);
   await noteKnown(storage, upload, now);
-  return valid.length + uses;
+  return stored;
 };
 
 /** Use on every device, and how far the phones' usage is known (`null`: nothing to decide on). */
@@ -287,7 +258,7 @@ export type SleepUsage = {
 };
 
 const byStartThenDevice = (a: DeviceUse, b: DeviceUse): number => {
-  const byStart = a.startAt.localeCompare(b.startAt);
+  const byStart = Date.parse(a.startAt) - Date.parse(b.startAt);
   return byStart === 0 ? a.deviceId.localeCompare(b.deviceId) : byStart;
 };
 
@@ -297,9 +268,9 @@ const knownUntilOf = (
   fresh: string,
 ): null | string =>
   phones
-    .filter((phone) => phone.uploadedAt > fresh)
+    .filter((phone) => Date.parse(phone.uploadedAt) > Date.parse(fresh))
     .map((phone) => phone.until)
-    .toSorted((a, b) => a.localeCompare(b))
+    .toSorted((a, b) => Date.parse(a) - Date.parse(b))
     .at(0) ?? null;
 
 /**
@@ -320,11 +291,16 @@ const sleepUses = (
         startAt: usageSessions.startAt,
       })
       .from(usageSessions)
-      .where(and(gt(usageSessions.endAt, from), notInArray(usageSessions.deviceId, phoneIds))),
+      .where(
+        and(
+          sql`julianday(${usageSessions.endAt}) > julianday(${from})`,
+          notInArray(usageSessions.deviceId, phoneIds),
+        ),
+      ),
     phones: db
       .select({ deviceId: phoneUses.deviceId, endAt: phoneUses.endAt, startAt: phoneUses.startAt })
       .from(phoneUses)
-      .where(gt(phoneUses.endAt, from)),
+      .where(sql`julianday(${phoneUses.endAt}) > julianday(${from})`),
   };
 };
 
@@ -335,7 +311,7 @@ that uploaded within a day (`null` when none did: nothing can be decided). A com
 nothing: switched off at night it stops sending.
 */
 export const usageForSleep = async (
-  { db, storage }: { readonly db: Db; readonly storage: DurableObjectStorage },
+  { db, storage }: { readonly db: Db; readonly storage: ActorStorage },
   { from, now }: { readonly from: string; readonly now: string },
 ): Promise<SleepUsage> => {
   const known = [...(await storage.list<KnownUsage>({ prefix: KNOWN_PREFIX }))];
@@ -388,19 +364,4 @@ export const rangeStatements = (
     phoneUses: uses.phones.toSQL(),
     usage: usageRange(db, range).toSQL(),
   };
-};
-
-/**
-Each device that sent usage and the end of its newest session: when the person's sessions list
-says an app or an agent last sent data.
-*/
-export const usageDevices = async (
-  db: Db,
-): Promise<readonly { readonly deviceId: string; readonly at: string }[]> => {
-  const { usageSessions } = schema;
-  const rows = await db
-    .select({ at: max(usageSessions.endAt), deviceId: usageSessions.deviceId })
-    .from(usageSessions)
-    .groupBy(usageSessions.deviceId);
-  return rows.filter((row): row is { at: string; deviceId: string } => row.at !== null);
 };

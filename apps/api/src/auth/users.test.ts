@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
-import { d1 } from "../shared/db/d1.ts";
+import { d1 } from "../../tests/host.ts";
 import { findUserById, upsertTelegramUser } from "./users.ts";
 
 const NOW = Date.UTC(2026, 9, 6, 10);

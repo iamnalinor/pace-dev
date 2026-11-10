@@ -1,5 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 
+import { waitForTransitions } from "./support/animation-wait.ts";
 import { addTask, approve, deleteOpenTask, nowTasks } from "./support/composer.ts";
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { controlsUnder } from "./support/geometry.ts";
@@ -404,9 +405,7 @@ test.describe("the calendar's Attend or skip on Now, phone (390px)", () => {
     await expect(prompt.getByText("Colloquium")).toBeVisible();
     const firstRow = nowTasks(page).getByRole("listitem").first();
     await expect(firstRow).toBeVisible();
-    await page.waitForFunction(() =>
-      document.getAnimations().every((animation) => animation.playState !== "running"),
-    );
+    await waitForTransitions(page);
     expect(await gapAbove(prompt, firstRow)).toBeGreaterThanOrEqual(0);
 
     await prompt.getByRole("button", { name: "Attend" }).click();

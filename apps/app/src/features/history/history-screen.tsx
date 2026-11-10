@@ -1,16 +1,20 @@
-import type { HistoryEntry, NowRow } from "@pace/client";
+import type { HistoryEntry, HistoryViewModel, NowRow } from "@pace/client";
+import type { HistoryResource } from "@pace/client/react";
 
 import { usePace, useT } from "#app/app-state.tsx";
+import { errorText } from "#app/format/action-error.ts";
 import { zonedText } from "#app/format/time.ts";
 import { PeriodStepper } from "#app/shared/period-stepper.tsx";
 import { useOpenTask } from "#app/shared/task-opener.tsx";
 import { useBack } from "#app/shared/use-back.ts";
 import { instantParam, useSearchParam } from "#app/shared/use-search-param.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
+import { Button } from "#app/ui/button.tsx";
 import { EmptyState } from "#app/ui/empty-state.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
 import { type ListSection, SectionedList } from "#app/ui/sectioned-list.tsx";
+import { Skeleton } from "#app/ui/skeleton.tsx";
 import { addMinutesIso } from "@pace/core";
 
 import { EventRow } from "./event-row.tsx";
@@ -38,6 +42,55 @@ const withLatest = (events: readonly HistoryEntry[]): readonly Row[] => {
     }
     return { entry, isLatest, kind: "event" };
   });
+};
+
+/**
+The complete source is still loading, or its load failed: never an empty board in its place, since
+a partial copy (a checkpoint and its tail) cannot say what the board was.
+*/
+const HistoryPending = ({
+  resource,
+}: {
+  readonly resource: Exclude<HistoryResource, { readonly status: "ready" }>;
+}) => {
+  const t = useT();
+  return resource.status === "loading" ? (
+    <Skeleton label={t("history.loading")} rows={6} />
+  ) : (
+    <EmptyState
+      action={
+        <Button onPress={resource.retry} size="small" variant="secondary">
+          {t("common.retry")}
+        </Button>
+      }
+      title={errorText(t, resource.error)}
+    />
+  );
+};
+
+/** The snapshot of the board at the moment, then the events up to `at` (all of them at "now"). */
+const historySections = (
+  history: HistoryViewModel,
+  { at, when }: { readonly at: null | string; readonly when: string },
+  t: ReturnType<typeof useT>,
+): readonly ListSection<Row>[] => {
+  // At "now" every event shows (the clock ticks by the minute; a fresh undo is not later).
+  const events =
+    at === null
+      ? history.events
+      : history.events.filter((entry) => Date.parse(entry.occurredAt) <= Date.parse(at));
+  return [
+    {
+      key: "tasks",
+      rows: history.board.rows.map((row): Row => ({ kind: "task", row })),
+      title: t("history.snapshot", { when }),
+    },
+    {
+      key: "events",
+      rows: withLatest(events),
+      title: at === null ? t("history.events") : t("history.eventsUntil", { when }),
+    },
+  ];
 };
 
 /** The moment the address asks for; a malformed one, or one not yet come, is now (`null`). */
@@ -112,23 +165,8 @@ export const HistoryScreen = () => {
     month: "numeric",
     timeZone: viewer.deviceTz,
   }).format(new Date(instant));
-  // At "now" every event shows (the clock ticks by the minute; a fresh undo is not later).
-  const events =
-    at === null
-      ? history.events
-      : history.events.filter((entry) => Date.parse(entry.occurredAt) <= Date.parse(at));
-  const sections: readonly ListSection<Row>[] = [
-    {
-      key: "tasks",
-      rows: history.board.rows.map((row): Row => ({ kind: "task", row })),
-      title: t("history.snapshot", { when }),
-    },
-    {
-      key: "events",
-      rows: withLatest(events),
-      title: at === null ? t("history.events") : t("history.eventsUntil", { when }),
-    },
-  ];
+  const sections =
+    history.status === "ready" ? historySections(history.value, { at, when }, t) : [];
   return (
     <Screen
       header={
@@ -143,7 +181,13 @@ export const HistoryScreen = () => {
       }
       scroller={(scroll) => (
         <SectionedList
-          empty={<EmptyState title={t(at === null ? "history.emptyAccount" : "history.emptyAt")} />}
+          empty={
+            history.status === "ready" ? (
+              <EmptyState title={t(at === null ? "history.emptyAccount" : "history.emptyAt")} />
+            ) : (
+              <HistoryPending resource={history} />
+            )
+          }
           renderRow={(row) =>
             row.kind === "event" ? (
               <EventRow entry={row.entry} isLatest={row.isLatest} />

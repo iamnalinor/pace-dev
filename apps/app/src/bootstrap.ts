@@ -5,7 +5,32 @@ import { claimLocalCopy } from "./local-copy.ts";
 import { sendPhoneData, startPhonePush } from "./phone-runtime.ts";
 import { startBackgroundCheck } from "./platform/background-check.ts";
 import { IS_PHONE } from "./platform/device.ts";
-import { startSenders } from "./senders.ts";
+import { isRuntimeFirebase } from "./platform/firebase-runtime.ts";
+import { checkServer } from "./platform/server-origin.ts";
+import { canStartSenders, startSenders } from "./senders.ts";
+
+const checkRuntimeServer = async (runtime: PaceRuntime): Promise<void> => {
+  if (isRuntimeFirebase()) {
+    await checkServer(runtime);
+  }
+};
+
+const canStartAfterPreparation = async (
+  runtime: PaceRuntime,
+  input: { readonly session: string | undefined; readonly canContinue: () => boolean },
+): Promise<boolean> => {
+  if (!input.canContinue()) {
+    return false;
+  }
+  await runtime.state.ready;
+  if (!input.canContinue()) {
+    return false;
+  }
+  // The copy is claimed before startup can write derived events.
+  await claimLocalCopy(runtime, input.session);
+  await checkRuntimeServer(runtime);
+  return input.canContinue();
+};
 
 /**
 A signed-in start: the local copy claimed, this week's homework instances, a first sync, then the time zone that sync
@@ -17,26 +42,44 @@ export const bootstrap = async (
     pool,
     session,
     zoneSettled,
+    isActive = () => true,
   }: {
     readonly pool: Pool;
     readonly session: string | undefined;
     readonly zoneSettled: () => Promise<void>;
+    readonly isActive?: () => boolean;
   },
 ): Promise<void> => {
-  const { actions, sync } = runtime;
-  // The copy is this session's before anything is written into it (re-review N3).
-  await claimLocalCopy(runtime, session);
+  const canContinue = () => isActive() && canStartSenders(runtime);
+  if (!(await canStartAfterPreparation(runtime, { session, canContinue }))) {
+    return;
+  }
   if (IS_PHONE) {
     // Every signed-in phone, before any network step (one failing must not skip it): it polls
     // when its method is `poll`, and always uploads its usage.
     void startBackgroundCheck();
   }
-  await actions.ensureInstances();
-  await sync.syncNow();
-  await zoneSettled();
-  await pool.refresh();
-  await sendPhoneData(runtime);
-  await startPhonePush(runtime);
+  const steps = [
+    // Before the sync, so it pushes them; a failed local write never holds the sync (class 271).
+    async () => {
+      try {
+        await runtime.actions.ensureInstances();
+      } catch {
+        // Written again at the next return or start.
+      }
+    },
+    () => runtime.sync.syncNow(),
+    zoneSettled,
+    () => pool.refresh(),
+    () => sendPhoneData(runtime),
+    () => startPhonePush(runtime),
+  ];
+  for (const step of steps) {
+    await step();
+    if (!canContinue()) {
+      return;
+    }
+  }
   // Signed out meanwhile, or ending this device's session: no loop, no socket. Otherwise its
   // first tick pushes what the bootstrap added.
   startSenders(runtime);

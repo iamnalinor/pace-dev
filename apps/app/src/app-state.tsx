@@ -1,5 +1,5 @@
 import { createContext, type ReactNode, use, useCallback, useEffect, useState } from "react";
-import { AppState, View } from "react-native";
+import { View } from "react-native";
 import { useStore } from "zustand";
 
 import type { Auth, AuthState, AppState as ClientState, SyncStatus } from "@pace/client";
@@ -13,20 +13,11 @@ import {
   type User,
 } from "@pace/core";
 
-import { bootstrap } from "./bootstrap.ts";
-import { dropLocalCopyOnSignOut, signOutCauseOf } from "./local-copy.ts";
-import { followPhoneNotices, sendPhoneData, startPhonePush } from "./phone-runtime.ts";
-import { stopBackgroundCheck } from "./platform/background-check.ts";
 import { deviceLanguage } from "./platform/device-language.ts";
-import { IS_PHONE } from "./platform/device.ts";
-import { clearPresentedPoolNotifications } from "./platform/notification-cleanup.ts";
-import { useServerOrigin, watchServer } from "./platform/server-origin.ts";
-import { forgetLineDraft } from "./platform/shared-in.ts";
-import { followReturns, poolOf } from "./runtime-pool.ts";
+import { useServerOrigin } from "./platform/server-origin.ts";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
-import { canStartSenders, POLL_LIVE_MS, POLL_OFFLINE_MS } from "./senders.ts";
-import { DraftOwnerContext, forgetDrafts } from "./ui/use-draft.ts";
-import { createZoneStep } from "./zone-after-sync.ts";
+import { runSyncLoop } from "./sync-loop.ts";
+import { DraftOwnerContext } from "./ui/use-draft.ts";
 
 const RuntimeContext = createContext<null | PaceRuntime>(null);
 /**
@@ -39,8 +30,6 @@ type SyncedSessions = { readonly ready: null | string; readonly ended: null | st
 const NO_SYNCED_SESSION: SyncedSessions = { ended: null, ready: null };
 
 /** A run of `owner`'s session finished (`null`: signed out); a failed one keeps what was ready. */
-type OnSynced = (owner: null | string, isSynced: boolean) => void;
-
 const syncedAfter = (
   previous: SyncedSessions,
   owner: null | string,
@@ -55,141 +44,6 @@ const SyncedContext = createContext<SyncedSessions>(NO_SYNCED_SESSION);
 
 /** The dev gallery shows a subtree in the language its URL names, whatever the account says. */
 export const LanguageOverrideContext = createContext<Language | null>(null);
-
-/**
-A finished sync is told for the session that started it: a successful one makes the account's
-settings safe to show, any one ends the first-sync cover.
-*/
-const followSyncedLanguage = (runtime: PaceRuntime, onSynced: OnSynced): (() => void) => {
-  const { auth, sync } = runtime;
-  let syncOwner = sync.status.getState().syncing ? runtime.api.currentSessionToken() : undefined;
-  return sync.status.subscribe((current, previous) => {
-    if (current.syncing && !previous.syncing) {
-      syncOwner = runtime.api.currentSessionToken();
-    }
-    if (
-      syncOwner === undefined ||
-      current.syncing ||
-      !previous.syncing ||
-      !runtime.api.isCurrentSession(syncOwner) ||
-      auth.store.getState().status !== "signed-in"
-    ) {
-      return;
-    }
-    onSynced(syncOwner, current.lastError === null && current.lastSyncAt !== null);
-  });
-};
-
-/** The half-typed line and the fields' drafts were this account's (class 103, feedback 5 item 7). */
-const forgetTyped = (): void => {
-  forgetLineDraft();
-  forgetDrafts();
-};
-
-/**
-The first status followed. Signed out at start (a token that expired while away), the fields'
-drafts go too: no draft outlives its account (security review L5); a sign-out later forgets them
-on its transition.
-*/
-const followFromStart = (
-  follow: (status: AuthState["status"]) => void,
-  status: AuthState["status"],
-): void => {
-  follow(status);
-  if (status === "signed-out") {
-    forgetDrafts();
-  }
-};
-
-/** Starts/stops the sync loop with the auth status; a foreground return syncs at once. */
-const runSyncLoop = (runtime: PaceRuntime, onSynced: OnSynced): (() => void) => {
-  const { actions, auth, sync } = runtime;
-  let activeSession = runtime.api.currentSessionToken();
-  const pool = poolOf(runtime);
-  const zone = createZoneStep(runtime);
-  const stopLanguageSync = followSyncedLanguage(runtime, zone.follow(onSynced));
-  const follow = (status: AuthState["status"]): void => {
-    if (status === "signed-in") {
-      activeSession = runtime.api.currentSessionToken();
-      void (async () => {
-        try {
-          await bootstrap(runtime, { pool, session: activeSession, zoneSettled: zone.settled });
-        } catch {
-          // Offline mid-start: a return to the app syncs and registers again (no unhandled rejection).
-        }
-      })();
-    } else {
-      onSynced(null, false);
-      sync.stop();
-      runtime.live.stop();
-    }
-  };
-  followFromStart(follow, auth.store.getState().status);
-  const unsubscribe = auth.store.subscribe((current, previous) => {
-    if (current.status === previous.status) {
-      return;
-    }
-    follow(current.status);
-    if (!(previous.status === "signed-in" && current.status === "signed-out")) {
-      return;
-    }
-
-    if (IS_PHONE) {
-      void stopBackgroundCheck();
-    }
-    if (activeSession !== undefined) {
-      void clearPresentedPoolNotifications(activeSession);
-    }
-    const leaving = activeSession;
-    activeSession = undefined;
-    forgetTyped();
-    void dropLocalCopyOnSignOut(runtime, { cause: signOutCauseOf(current), leaving });
-  });
-  // The poll is a safety net while the server can say "changed" itself.
-  const stopFollowingLive = runtime.live.status.subscribe(({ isConnected }, previous) => {
-    sync.setInterval(isConnected ? POLL_LIVE_MS : POLL_OFFLINE_MS);
-    // Back on the line: what the pool got meanwhile, unless it was just fetched.
-    if (isConnected && !previous.isConnected && !pool.isFresh()) {
-      void pool.refresh();
-    }
-  });
-  const subscription = AppState.addEventListener("change", (next) => {
-    // Signed out, or ending this device's session: nothing to send, no socket to rest or start.
-    if (!canStartSenders(runtime)) {
-      return;
-    }
-    if (next !== "active") {
-      // Leaving (a hidden tab, the app in the background): what is unsent goes now, and the
-      // socket rests until the person is back.
-      void sync.syncNow();
-      runtime.live.stop();
-      return;
-    }
-    runtime.live.start();
-
-    void actions.ensureInstances();
-    void (async () => {
-      await sync.syncNow();
-      await pool.refresh();
-      await sendPhoneData(runtime);
-      await startPhonePush(runtime);
-    })();
-  });
-  const stopNotices = followPhoneNotices(runtime);
-  const stopServerChecks = watchServer(runtime);
-  const stopFocus = followReturns(runtime);
-  return () => {
-    stopFocus();
-    stopServerChecks();
-    unsubscribe();
-    subscription.remove();
-    stopNotices();
-    stopLanguageSync();
-    stopFollowingLive();
-    sync.stop();
-    runtime.live.stop();
-  };
-};
 
 /**
 Wires auth → API → app state → sync for the whole app, for the chosen server. Renders a blank
@@ -306,7 +160,7 @@ const useIsEmptyCopyUntil = (isDone: boolean): boolean => {
   const { hooks } = usePace();
   const isLoading = hooks.useAppState((state) => state.status === "loading");
   const isEmpty = hooks.useAppState(
-    (state) => state.status === "ready" && state.events.length === 0,
+    (state) => state.status === "ready" && state.knownEventIds.size === 0,
   );
   const isWaiting = status === "signed-in" && !isDone;
   const [wasEmpty, setWasEmpty] = useState(false);

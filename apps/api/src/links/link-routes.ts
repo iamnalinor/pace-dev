@@ -5,13 +5,13 @@ import { endpoints, ok } from "@pace/core";
 import type { AppEnv } from "../shared/app-env.ts";
 
 import { mount } from "../shared/mount.ts";
-import { type Fetcher, fetchPreview } from "./link-preview.ts";
+import { fetchPreview, type PreviewFetch } from "./link-preview.ts";
 
 const CACHE_SECONDS = 7 * 24 * 60 * 60;
 const CACHE_ORIGIN = "https://link-preview.pace.internal/";
 
 /** Previews are cached per URL with the Cache API: no KV writes, shared by every user. */
-export const mountLinkRoutes = (app: Hono<AppEnv>, fetcher: Fetcher): void => {
+export const mountLinkRoutes = (app: Hono<AppEnv>, fetcher: PreviewFetch): void => {
   mount(app, endpoints.links.preview, async ({ query }) => {
     const cache = await caches.open("link-preview");
     const key = new Request(`${CACHE_ORIGIN}?url=${encodeURIComponent(query.url)}`);

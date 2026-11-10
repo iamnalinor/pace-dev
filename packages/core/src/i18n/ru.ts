@@ -1,5 +1,6 @@
 import type { en } from "./en.ts";
 
+import { ruAccount } from "./ru/account.ts";
 import { ruBoard } from "./ru/board.ts";
 import { ruDecisions } from "./ru/decisions.ts";
 import { ruDev } from "./ru/dev.ts";
@@ -7,6 +8,7 @@ import { ruDevices } from "./ru/devices.ts";
 import { ruInput } from "./ru/input.ts";
 import { ruLibrary } from "./ru/library.ts";
 import { ruNotify } from "./ru/notify.ts";
+import { ruOta } from "./ru/ota.ts";
 import { ruServer } from "./ru/server.ts";
 import { ruSessions } from "./ru/sessions.ts";
 import { ruSettings } from "./ru/settings.ts";
@@ -16,12 +18,14 @@ import { ruTime } from "./ru/time.ts";
 /** Russian: the same keys as `en`, area by area. */
 export const ru: { readonly [K in keyof typeof en]: string } = {
   ...ruShell,
+  ...ruAccount,
   ...ruDevices,
   ...ruBoard,
   ...ruInput,
   ...ruLibrary,
   ...ruTime,
   ...ruNotify,
+  ...ruOta,
   ...ruDecisions,
   ...ruServer,
   ...ruSettings,

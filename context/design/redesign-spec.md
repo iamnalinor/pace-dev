@@ -2117,6 +2117,16 @@ state.
 detected failure, promoted bot login (F-CMP-17); nested dev card removed (F-LAY-05); server line no
 longer wraps and orphans «Сменить» (F-DAT-11); EN uses "Log in" consistently (F-CPY-05).
 
+**Configuration recovery (technical roadmap, 2026-11-05).** A typed server configuration
+failure appears in the existing login error slot, separately from version mismatch. Known reasons
+use localized actionable copy; unknown future reasons use the generic configuration sentence.
+A kit Retry button performs one origin-scoped instance check. Busy state is immediate and disables
+repeated taps; success removes the message. Changing origin invalidates old answers. The signed-in
+view uses the existing floating sync strip and preserves local edits and authentication. The server
+picker refuses a misconfigured destination inline and never offers Use this server. No new colours,
+primitive, animation or direction: existing danger text/error and sync-strip pairs apply. Keyboard
+and reduced-motion behavior are inherited from the kit. Comp: `comps/server-configuration.html`.
+
 ### 5.19 Login return — `app/login`
 
 Web only (Android rewrites the link before routing). Where the bot's "Return to Pace" lands when

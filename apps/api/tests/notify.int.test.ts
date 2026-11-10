@@ -1,4 +1,3 @@
-import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it, onTestFinished, vi } from "vitest";
 
@@ -7,13 +6,14 @@ import { type CalendarEvent, endpoints, newId } from "@pace/core";
 import type { FcmTarget } from "../src/shared/fcm.ts";
 import type { TelegramTarget } from "../src/shared/telegram-api.ts";
 import type { Couriers } from "../src/user-store/notification-pool.ts";
-import type { UserStore } from "../src/user-store/user-store.ts";
 
+import { d1 } from "../src/platform/cloudflare/sqlite.ts";
 import { sha256Hex } from "../src/shared/crypto.ts";
 import { subscribe, subscriptionsOf, unsubscribe } from "../src/shared/push-subscriptions.ts";
 import { acceptedMethods, isRegistrable, pushMethodsOf } from "../src/shared/push/registry.ts";
 import { POOL_NEXT_AT_KEY } from "../src/user-store/pool-retry-alarm.ts";
 import { answerOf, call, json, loginAsDev } from "./helpers.ts";
+import { runInUserStore as runInDurableObject, type UserStore } from "./host.ts";
 
 const MOSCOW = "Europe/Moscow";
 // eslint-disable-next-line sonarjs/no-hardcoded-ip -- the address a sign-in notice shows
@@ -765,7 +765,7 @@ const phoneWithToken = async (pushToken: string) => {
   )
     .bind(userId)
     .first<{ id: string }>();
-  await subscribe(env.DB, {
+  await subscribe(d1(env.DB), {
     endpoint: pushToken,
     now: Date.now(),
     sessionId: session?.id ?? "",
@@ -938,7 +938,7 @@ describe("Firebase push", () => {
           { couriers },
         ),
       );
-      await unsubscribe(env.DB, sessionId);
+      await unsubscribe(d1(env.DB), sessionId);
       const now = new Date(Date.parse(started) + 60_000).toISOString();
       // The retry's alarm fires: the runtime takes it off before the pass.
       await state.storage.deleteAlarm();
@@ -951,7 +951,7 @@ describe("Firebase push", () => {
   it("keeps one way to push per device, even when it registers twice at once", async () => {
     const { sessionId, userId } = await phoneWithToken(`fcm-${crypto.randomUUID()}`);
     const at = async (transport: string, endpoint: string) => {
-      await subscribe(env.DB, { endpoint, now: Date.now(), sessionId, transport, userId });
+      await subscribe(d1(env.DB), { endpoint, now: Date.now(), sessionId, transport, userId });
     };
     await Promise.allSettled([at("fcm", `fcm-${crypto.randomUUID()}`), at("poll", sessionId)]);
     const rows = await env.DB.prepare(
@@ -970,15 +970,15 @@ describe("Firebase push", () => {
     )
       .bind(otherId)
       .first<{ id: string }>();
-    await subscribe(env.DB, {
+    await subscribe(d1(env.DB), {
       endpoint: token,
       now: Date.now(),
       sessionId: otherSession?.id ?? "",
       transport: "fcm",
       userId: otherId,
     });
-    expect(await subscriptionsOf(env.DB, userId, Date.now())).toEqual([]);
-    expect(await subscriptionsOf(env.DB, otherId, Date.now())).toContainEqual(
+    expect(await subscriptionsOf(d1(env.DB), userId, Date.now())).toEqual([]);
+    expect(await subscriptionsOf(d1(env.DB), otherId, Date.now())).toContainEqual(
       expect.objectContaining({ endpoint: token, transport: "fcm" }),
     );
     // The other account's tests expect no phone of its own.
@@ -1075,7 +1075,7 @@ describe("Firebase push", () => {
       const couriers = couriersOf(telegramRecorder().target, fcm.target);
       await instance.append([commute], { now: COMMUTE_START });
       const id = (await instance.runNotifications(CROSSED, couriers)).created[0]?.id ?? "";
-      await subscribe(env.DB, {
+      await subscribe(d1(env.DB), {
         endpoint: sessionId,
         now: Date.now(),
         sessionId,
@@ -1241,7 +1241,7 @@ describe("Firebase push", () => {
       const couriers = couriersOf(telegramRecorder().target, fcm.target);
       await instance.append([commute], { now: COMMUTE_START });
       await instance.runNotifications(CROSSED, couriers);
-      expect(await subscriptionsOf(env.DB, userId, Date.now())).toEqual([]);
+      expect(await subscriptionsOf(d1(env.DB), userId, Date.now())).toEqual([]);
       const page = await instance.listNotifications({ limit: 5 });
       expect(Object.values(page.deliveries).flat()).toEqual([
         expect.objectContaining({ reason: "gone", result: "failed" }),
@@ -1276,8 +1276,8 @@ describe("Firebase push", () => {
       await runInDurableObject(stub, async (instance: UserStore) => {
         await instance.append([commute], { now: COMMUTE_START });
         await instance.runNotifications(CROSSED, couriersOf(telegramRecorder().target, fcm.target));
-        expect(await subscriptionsOf(env.DB, userId, Date.now())).toEqual([]);
-        expect(await acceptedMethods(env.DB, { fcm: fcm.target }, Date.now())).toEqual([
+        expect(await subscriptionsOf(d1(env.DB), userId, Date.now())).toEqual([]);
+        expect(await acceptedMethods(d1(env.DB), { fcm: fcm.target }, Date.now())).toEqual([
           "fcm",
           "poll",
         ]);
@@ -1301,7 +1301,7 @@ describe("Firebase push", () => {
       await instance.append([commute], { now: COMMUTE_START });
       const run = await instance.runNotifications(CROSSED, couriers);
       const id = run.created[0]?.id ?? "";
-      expect(await subscriptionsOf(env.DB, userId, Date.now())).toEqual([
+      expect(await subscriptionsOf(d1(env.DB), userId, Date.now())).toEqual([
         expect.objectContaining({ endpoint: sessionId, transport: "poll" }),
       ]);
       // Not lost: the same notification waits for the phone's poll, and the log says why.
@@ -1315,16 +1315,16 @@ describe("Firebase push", () => {
         expect.objectContaining({ notificationId: id, type: "show" }),
       ]);
       // FCM stays on for everyone else; this phone's token is not taken for FCM again.
-      expect(await acceptedMethods(env.DB, config, Date.now())).toEqual(["fcm", "poll"]);
+      expect(await acceptedMethods(d1(env.DB), config, Date.now())).toEqual(["fcm", "poll"]);
       expect(
-        await isRegistrable(env.DB, config, {
+        await isRegistrable(d1(env.DB), config, {
           endpoint: pushToken,
           method: "fcm",
           now: Date.now(),
         }),
       ).toBe(false);
       expect(
-        await isRegistrable(env.DB, config, {
+        await isRegistrable(d1(env.DB), config, {
           endpoint: "fcm-other",
           method: "fcm",
           now: Date.now(),
@@ -1354,11 +1354,11 @@ describe("Firebase push", () => {
   it("says which Firebase project it sends with, and refuses a phone of another project", async () => {
     const fcm = await fcmRecorder();
     const config = { fcm: fcm.target };
-    expect(await pushMethodsOf(env.DB, config, Date.now())).toEqual({
+    expect(await pushMethodsOf(d1(env.DB), config, Date.now())).toEqual({
       fcmProject: "pace-test",
       pushMethods: ["fcm", "poll"],
     });
-    expect(await pushMethodsOf(env.DB, { fcm: null }, Date.now())).toEqual({
+    expect(await pushMethodsOf(d1(env.DB), { fcm: null }, Date.now())).toEqual({
       fcmProject: null,
       pushMethods: ["poll"],
     });
@@ -1367,13 +1367,15 @@ describe("Firebase push", () => {
       method: "fcm" as const,
       now: Date.now(),
     };
-    expect(await isRegistrable(env.DB, config, { ...token, projectId: "pace-test" })).toBe(true);
-    expect(await isRegistrable(env.DB, config, { ...token, projectId: "someone-else" })).toBe(
+    expect(await isRegistrable(d1(env.DB), config, { ...token, projectId: "pace-test" })).toBe(
+      true,
+    );
+    expect(await isRegistrable(d1(env.DB), config, { ...token, projectId: "someone-else" })).toBe(
       false,
     );
     // An app that does not say its project (an older one) is taken, as before.
-    expect(await isRegistrable(env.DB, config, token)).toBe(true);
-    expect(await isRegistrable(env.DB, { fcm: null }, token)).toBe(false);
+    expect(await isRegistrable(d1(env.DB), config, token)).toBe(true);
+    expect(await isRegistrable(d1(env.DB), { fcm: null }, token)).toBe(false);
   });
 
   it("keeps the device on a 404 that does not say the token is unregistered", async () => {
@@ -1384,7 +1386,7 @@ describe("Firebase push", () => {
       await runInDurableObject(stub, async (instance: UserStore) => {
         await instance.append([commute], { now: COMMUTE_START });
         await instance.runNotifications(CROSSED, couriersOf(telegramRecorder().target, fcm.target));
-        expect(await subscriptionsOf(env.DB, userId, Date.now())).toHaveLength(1);
+        expect(await subscriptionsOf(d1(env.DB), userId, Date.now())).toHaveLength(1);
         const page = await instance.listNotifications({ limit: 5 });
         expect(Object.values(page.deliveries).flat()).toEqual([
           expect.objectContaining({ reason: "failed", result: "failed" }),
@@ -1401,8 +1403,8 @@ describe("Firebase push", () => {
     await runInDurableObject(stub, async (instance: UserStore) => {
       await instance.append([commute], { now: COMMUTE_START });
       await instance.runNotifications(CROSSED, couriersOf(telegramRecorder().target, fcm.target));
-      expect(await subscriptionsOf(env.DB, userId, Date.now())).toHaveLength(1);
-      expect(await acceptedMethods(env.DB, { fcm: fcm.target }, Date.now())).toContain("fcm");
+      expect(await subscriptionsOf(d1(env.DB), userId, Date.now())).toHaveLength(1);
+      expect(await acceptedMethods(d1(env.DB), { fcm: fcm.target }, Date.now())).toContain("fcm");
     });
   });
 
@@ -1418,7 +1420,7 @@ describe("Firebase push", () => {
       expect(Object.values(page.deliveries).flat()).toEqual([
         expect.objectContaining({ reason: null, result: "sent" }),
       ]);
-      expect(await acceptedMethods(env.DB, { fcm: fcm.target }, Date.now())).toContain("fcm");
+      expect(await acceptedMethods(d1(env.DB), { fcm: fcm.target }, Date.now())).toContain("fcm");
     });
   });
 
@@ -1430,7 +1432,7 @@ describe("Firebase push", () => {
       await instance.append([commute], { now: COMMUTE_START });
       await instance.runNotifications(CROSSED, couriersOf(telegramRecorder().target, fcm.target));
       expect(fcm.sends()).toHaveLength(2);
-      expect(await acceptedMethods(env.DB, { fcm: fcm.target }, now)).toEqual(["poll"]);
+      expect(await acceptedMethods(d1(env.DB), { fcm: fcm.target }, now)).toEqual(["poll"]);
       // While broken, a device on it is not pushed to, and the log says why.
       const couriers = couriersOf(telegramRecorder().target, fcm.target);
       const signIn = {
@@ -1449,10 +1451,10 @@ describe("Firebase push", () => {
       expect(page.deliveries[login.id]).toContainEqual(
         expect.objectContaining({ method: "fcm", reason: "unavailable", result: "failed" }),
       );
-      expect(await acceptedMethods(env.DB, { fcm: fcm.target }, now + 59 * 60_000)).toEqual([
+      expect(await acceptedMethods(d1(env.DB), { fcm: fcm.target }, now + 59 * 60_000)).toEqual([
         "poll",
       ]);
-      expect(await acceptedMethods(env.DB, { fcm: fcm.target }, now + 61 * 60_000)).toEqual([
+      expect(await acceptedMethods(d1(env.DB), { fcm: fcm.target }, now + 61 * 60_000)).toEqual([
         "fcm",
         "poll",
       ]);
@@ -1490,12 +1492,12 @@ describe("Firebase push", () => {
     await runInDurableObject(stub, async (instance: UserStore) => {
       const couriers = couriersOf(telegramRecorder().target, fcm.target);
       await instance.append([commute], { now: COMMUTE_START });
-      expect(await acceptedMethods(env.DB, { fcm: fcm.target }, Date.now())).toEqual([
+      expect(await acceptedMethods(d1(env.DB), { fcm: fcm.target }, Date.now())).toEqual([
         "fcm",
         "poll",
       ]);
       await instance.runNotifications(CROSSED, couriers);
-      expect(await acceptedMethods(env.DB, { fcm: fcm.target }, Date.now())).toEqual(["poll"]);
+      expect(await acceptedMethods(d1(env.DB), { fcm: fcm.target }, Date.now())).toEqual(["poll"]);
       const page = await instance.listNotifications({ limit: 5 });
       expect(Object.values(page.deliveries).flat()).toEqual([
         expect.objectContaining({ reason: "unavailable", result: "failed" }),
@@ -1655,7 +1657,7 @@ describe("the pool's own bookkeeping", () => {
 
   it("loses nothing and sends nothing twice when a pass is cut short", async () => {
     const { sessionId, stub, userId } = await phoneWithToken(`fcm-${crypto.randomUUID()}`);
-    await subscribe(env.DB, {
+    await subscribe(d1(env.DB), {
       endpoint: sessionId,
       now: Date.now(),
       sessionId,

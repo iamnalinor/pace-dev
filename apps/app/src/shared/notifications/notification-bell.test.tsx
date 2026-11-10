@@ -4,7 +4,7 @@ import type { PoolNotification } from "@pace/core";
 
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
-import { createTestRuntime } from "#app/test/runtime.ts";
+import { createTestRuntime, pulledInto } from "#app/test/runtime.ts";
 
 import { NotificationBell } from "./notification-bell.tsx";
 
@@ -93,7 +93,7 @@ const feedRuntime = async (
     },
     world: "empty",
   });
-  await runtime.state.ingest([digestOnApp]);
+  await pulledInto(runtime, [digestOnApp]);
   return { read, runtime };
 };
 

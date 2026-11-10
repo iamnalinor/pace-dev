@@ -315,3 +315,62 @@ describe("createApiClient when the server cannot be reached", () => {
     await expect(call).rejects.toBeInstanceOf(SyntaxError);
   });
 });
+
+describe("createApiClient configuration failures", () => {
+  it.each([
+    "android-config-invalid",
+    "android-config-not-json",
+    "duplicate-android-package",
+    "invalid-service-account",
+    "invalid-config-policy",
+    "missing-android-config",
+    "missing-service-account",
+    "no-android-clients",
+    "project-mismatch",
+  ])("preserves the known reason %s without retrying or ending the session", async (reason) => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse(500, {
+        code: "server/misconfigured",
+        message: "Server configuration is invalid",
+        reason,
+      }),
+    );
+    const onUnauthorized = vi.fn();
+    const client = createApiClient({
+      baseUrl: "https://api.test",
+      fetch: fetchMock,
+      onUnauthorized,
+      token: () => "session",
+    });
+    await expect(client.call(endpoints.me, {})).rejects.toMatchObject({
+      status: 500,
+      code: "server/misconfigured",
+      configurationReason: reason,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(onUnauthorized).not.toHaveBeenCalled();
+    expect(client.currentSessionToken()).toBe("session");
+  });
+
+  it.each([
+    [500, "server/misconfigured", "future-reason"],
+    [500, "server/misconfigured", null],
+    [500, "server/misconfigured", 42],
+    [500, "server/misconfigured", undefined],
+    [500, "unknown", "project-mismatch"],
+    [503, "server/misconfigured", "project-mismatch"],
+    [404, "server/misconfigured", "project-mismatch"],
+    [426, "server/misconfigured", "project-mismatch"],
+  ])("does not trust reason for status %s, code %s, reason %s", async (status, code, reason) => {
+    const client = createApiClient({
+      baseUrl: "https://api.test",
+      fetch: async () => jsonResponse(status, { code, message: "Error", reason }),
+      token: () => undefined,
+    });
+    await expect(client.call(endpoints.instance, {})).rejects.toMatchObject({
+      status,
+      code,
+      configurationReason: null,
+    });
+  });
+});

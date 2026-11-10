@@ -16,8 +16,11 @@ type Seeded = { readonly state: AppStateHandle; readonly lastMs: number };
 const seeded = async (size: number): Promise<Seeded> => {
   const seed = yearOfUse(size, 7);
   const store = createMemoryEventStore();
-  await store.append(seed);
-  await store.markSynced(seed.map((event) => event.id));
+  await store.append(seed, await store.readMeta());
+  await store.markSynced(
+    seed.map((event) => event.id),
+    await store.readMeta(),
+  );
   const lastMs = Date.parse(seed.at(-1)?.occurredAt ?? "2026-01-01T00:00:00.000Z");
   const now = (): string => new Date(lastMs + 86_400_000).toISOString();
   const state = createAppState({ deviceId: "phone", now, source: "app", store });

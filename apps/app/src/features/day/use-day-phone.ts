@@ -21,11 +21,11 @@ import { useFeed } from "#app/shared/notifications/use-feed.ts";
 import { useLatestLoad, usePhoneAnswers } from "#app/shared/tracking/use-phone-answers.ts";
 import { activityLabel, type DayModel, eventAnswers } from "@pace/client";
 import {
-  addDaysIn,
   addMinutesIso,
   type AppMinutes,
   appUsage,
   calendarEventKey,
+  nextDayStartIn,
   type PhoneEvent,
   phonePickupAt,
 } from "@pace/core";
@@ -85,7 +85,7 @@ const EMPTY: Loaded = {
 };
 
 const load = async (day: Pick<DayModel, "date" | "zone">, now: string): Promise<Loaded> => {
-  const dayEnd = addDaysIn(day.date, 1, day.zone);
+  const dayEnd = nextDayStartIn(day.date, day.zone);
   const until = dayEnd > now ? now : dayEnd;
   const phone = await readPhoneEvents(addMinutesIso(day.date, -NIGHT_LOOKBACK_MINUTES), until);
   const apps = [

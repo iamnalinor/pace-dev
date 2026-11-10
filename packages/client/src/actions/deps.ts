@@ -2,9 +2,7 @@ import {
   err,
   type Event,
   type EventInput,
-  newId,
   ok,
-  parseEvent,
   type ActionError as PlannedActionError,
   type PresetError,
   type PresetValidationError,
@@ -16,8 +14,11 @@ import {
 } from "@pace/core";
 
 import type { Clock } from "../clock.ts";
+import type { HistoryError } from "../history-types.ts";
 import type { PersistError } from "../local-log.ts";
 import type { AppStateHandle } from "../state.ts";
+
+import { requiresSourceForEvent } from "../checkpoint-validation.ts";
 
 /**
 Every action answers with the events it appended or one of these codes: the core's own
@@ -38,6 +39,7 @@ export type ActionError =
   | "event/not-found"
   | "undo/nothing"
   | `dispatch/${string}`
+  | HistoryError
   | PersistError
   | PlannedActionError
   | PresetError
@@ -91,6 +93,11 @@ const STORE_ERRORS = [
   "event/not-found",
   "persist_failed",
   "undo/nothing",
+  "history/not-loaded",
+  "history/offline",
+  "history/unavailable",
+  "history/incomplete",
+  "sync/copy-changed",
 ] satisfies readonly ActionError[];
 
 type StoreError = (typeof STORE_ERRORS)[number];
@@ -109,10 +116,17 @@ export const fromStoreAll = (
 export const fromStore = (result: Result<Event, string>): Result<readonly Event[], ActionError> =>
   result.ok ? ok([result.value]) : err(storeError(result.error));
 
+/** Whether a checkpoint's base cannot take one of the events as it is: the source is needed first. */
+const requiresHistory = (deps: ActionDeps, events: readonly Event[]): boolean => {
+  const { checkpoint } = deps.state.store.getState();
+  return checkpoint !== null && events.some((event) => requiresSourceForEvent(checkpoint, event));
+};
+
 /**
 The one path to the log: every input is checked by the core's retro rules against the
 current state before any is shown, so a rejected batch leaves no trace; the batch is then
-shown at once and written in one go. Answers as soon as the state shows it. The rules run in
+shown at once and written in one go. Answers as soon as the state shows it. The envelopes are
+made once (`prepare`): the events checked here are the ones staged, ids included. The rules run in
 the store's write queue, on the state every earlier write left, so two taps in one tick cannot
 both pass them (check, then act; review I4).
 */
@@ -122,23 +136,20 @@ export const stageEmit = async (
   /** The action's own check of the state, run in the queue too (`action/nothing-to-do`, class 222). */
   check?: () => ActionError | null,
 ): Promise<StagedResult> => {
-  const now = deps.clock.now();
-  const malformed = inputs
-    .map((input) =>
-      parseEvent({
-        ...input,
-        deviceId: input.deviceId ?? "validation",
-        id: input.id ?? newId(),
-        recordedAt: input.recordedAt ?? now,
-      }),
-    )
-    .find((checked) => !checked.ok);
-  if (malformed !== undefined) {
-    return err(storeError(malformed.error));
+  const prepared = deps.state.prepare(inputs);
+  if (!prepared.ok) {
+    return err(storeError(prepared.error));
   }
+  if (requiresHistory(deps, prepared.value)) {
+    const history = await deps.state.ensureHistory();
+    if (!history.ok) {
+      return history;
+    }
+  }
+  const now = deps.clock.now();
   // What the rules said, kept apart from the store's own refusals (those go behind `dispatch/`).
   const verdict: { rejected: ActionError | null } = { rejected: null };
-  const staged = await deps.state.stage(inputs, () => {
+  const staged = await deps.state.stageEvents(prepared.value, () => {
     const own = check?.() ?? null;
     if (own !== null) {
       verdict.rejected = own;
@@ -190,3 +201,10 @@ export const taskOf = (deps: ActionDeps, taskId: string): Result<Task, "task/unk
   const task = taskById(deps.state.store.getState().tasks, taskId);
   return task === undefined ? err("task/unknown") : ok(task);
 };
+
+export const withCompleteHistory =
+  <A extends readonly unknown[]>(deps: ActionDeps, run: (...args: A) => ActionResult) =>
+  async (...args: A): ActionResult => {
+    const history = await deps.state.ensureHistory();
+    return history.ok ? await run(...args) : history;
+  };

@@ -31,8 +31,7 @@ written, unless no model can answer and the caller asked to `defer`: then the te
 the store and is read (and written) once one is back. Without a model the rules propose what
 they can. `GET /api/llm/status`: can the assistant read now?
 */
-const storeOf = (c: Context<AppEnv>) =>
-  c.env.USER_STORE.get(c.env.USER_STORE.idFromName(requireUser(c).id));
+const storeOf = (c: Context<AppEnv>) => c.env.USER_STORE.of(requireUser(c).id);
 
 /**
 No model can answer: logged, the rules' reading, and why. Kept for later when the caller asked to

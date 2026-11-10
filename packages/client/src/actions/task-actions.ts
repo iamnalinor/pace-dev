@@ -280,6 +280,10 @@ const setProject =
 const deleteTask =
   (deps: ActionDeps): TaskActions["deleteTask"] =>
   async (taskId) => {
+    const history = await deps.state.ensureHistory();
+    if (!history.ok) {
+      return history;
+    }
     const task = taskOf(deps, taskId);
     if (!task.ok) {
       return task;

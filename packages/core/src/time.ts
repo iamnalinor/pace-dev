@@ -26,6 +26,10 @@ const toIso = (date: Date): string => new Date(date).toISOString();
 export const endOfDayIn = (atIso: string, zone: string): string =>
   toIso(endOfDay(atIso, { in: tz(zone) }));
 
+/** First instant of the next existing local day, including when midnight is skipped by DST. */
+export const nextDayStartIn = (atIso: string, zone: string): string =>
+  new Date(Date.parse(endOfDayIn(atIso, zone)) + 1).toISOString();
+
 /** First millisecond of the calendar day containing `atIso` in `zone`, as a UTC instant. */
 export const startOfDayIn = (atIso: string, zone: string): string =>
   toIso(startOfDay(atIso, { in: tz(zone) }));

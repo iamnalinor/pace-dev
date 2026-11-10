@@ -6,6 +6,9 @@ import m0003 from './0003_handy_stryfe.sql';
 import m0004 from './0004_pale_rachel_grey.sql';
 import m0005 from './0005_striped_natasha_romanoff.sql';
 import m0006 from './0006_sharp_vermin.sql';
+import m0007 from './0007_tense_sandman.sql';
+import m0008 from './0008_black_speed_demon.sql';
+import m0009 from './0009_fair_queen_noir.sql';
 
   export default {
     journal,
@@ -16,7 +19,10 @@ m0002,
 m0003,
 m0004,
 m0005,
-m0006
+m0006,
+m0007,
+m0008,
+m0009
     }
   }
   

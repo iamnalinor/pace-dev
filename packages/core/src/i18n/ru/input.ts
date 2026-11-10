@@ -16,6 +16,12 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "review.action.skip": "Пропущено",
   "review.action.sort": "Принять подсказку",
   "review.action.undo": "Открыть снова",
+  "actionError.history/not-loaded": "Загрузите историю, прежде чем менять старые записи.",
+  "actionError.history/offline":
+    "Подключитесь к интернету, чтобы загрузить историю, и попробуйте снова.",
+  "actionError.history/unavailable": "Не удалось загрузить историю. Попробуйте снова.",
+  "actionError.history/incomplete": "Не удалось проверить историю. Попробуйте снова.",
+  "actionError.sync/copy-changed": "Локальная копия изменилась. Попробуйте снова.",
   "actionError.generic": "Не удалось применить изменение ({code}).",
   "actionError.action/empty-text": "Сначала напишите что-нибудь.",
   "actionError.action/invalid-input": "Проверьте значения и попробуйте снова.",

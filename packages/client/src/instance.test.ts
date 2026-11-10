@@ -80,3 +80,53 @@ describe("checkInstance", () => {
     });
   });
 });
+
+describe("checkInstance configuration failures", () => {
+  it.each([
+    ["project-mismatch", "project-mismatch"],
+    ["future-reason", null],
+    [undefined, null],
+  ])(
+    "preserves configuration failure with reason %s after one discovery call",
+    async (reason, expected) => {
+      const fake = createFakeFetch({
+        "GET /api/instance": () =>
+          Response.json(
+            {
+              code: "server/misconfigured",
+              message: "Server configuration is invalid",
+              reason,
+            },
+            { status: 500 },
+          ),
+      });
+      expect(await checkInstance("https://pace.example.dev", fake.fetch)).toEqual({
+        ok: false,
+        error: { kind: "server-misconfigured", reason: expected },
+      });
+      expect(fake.calls).toHaveLength(1);
+    },
+  );
+
+  it.each([
+    [500, "unknown", "unreachable"],
+    [503, "server/misconfigured", "unreachable"],
+    [426, "server/misconfigured", "unreachable"],
+    [404, "server/misconfigured", "not-pace"],
+  ])("keeps existing handling for status %s and code %s", async (status, code, expected) => {
+    const answer = serverAnswering(() =>
+      Response.json(
+        {
+          code,
+          message: "Error",
+          reason: "project-mismatch",
+        },
+        { status },
+      ),
+    );
+    expect(await checkInstance("https://pace.example.dev", answer)).toEqual({
+      ok: false,
+      error: expected,
+    });
+  });
+});

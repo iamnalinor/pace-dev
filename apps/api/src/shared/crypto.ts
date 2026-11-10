@@ -2,11 +2,16 @@ import { timingSafeEqual } from "node:crypto";
 
 const encoder = new TextEncoder();
 
-export const toHex = (bytes: ArrayBuffer): string =>
+const toHex = (bytes: ArrayBuffer): string =>
   [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 
+/** SHA-256 of `bytes`, as lowercase hex. */
+export const sha256BytesHex = async (bytes: Uint8Array): Promise<string> =>
+  toHex(await crypto.subtle.digest("SHA-256", Uint8Array.from(bytes)));
+
+/** SHA-256 of `text` (UTF-8), as lowercase hex. */
 export const sha256Hex = async (text: string): Promise<string> =>
-  toHex(await crypto.subtle.digest("SHA-256", encoder.encode(text)));
+  await sha256BytesHex(encoder.encode(text));
 
 /** HMAC-SHA-256 of `message` under a raw `key`, as lowercase hex. */
 export const hmacSha256Hex = async (key: ArrayBuffer, message: string): Promise<string> => {

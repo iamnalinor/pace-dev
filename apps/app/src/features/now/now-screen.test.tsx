@@ -11,7 +11,7 @@ import { heldRoute } from "#app/test/held-route.ts";
 import { controlsInsideControls } from "#app/test/nested-controls.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { paramsSet, router, searchParams, setSearchParams } from "#app/test/router.ts";
-import { createTestRuntime } from "#app/test/runtime.ts";
+import { createTestRuntime, pulledInto } from "#app/test/runtime.ts";
 import { rowsInFlattenableBoxes } from "#app/test/sliding-rows.ts";
 import { DISSOLVE_MS } from "#app/ui/dissolve.tsx";
 import { createMemoryEventStore } from "@pace/client";
@@ -203,7 +203,7 @@ describe("NowBoard", () => {
   it("marks the rows of repeating tasks, and the final deadline once the main one passed", async () => {
     const late = "2026-11-02T12:00:00.000Z";
     const runtime = await createTestRuntime({ now: late });
-    await runtime.state.ingest(rentSeriesEvents());
+    await pulledInto(runtime, rentSeriesEvents());
     await renderScreen(<Board />, runtime);
     const repeats = en("meta.repeats");
     const rent = screen.getByRole("link", { name: /^Rent/u });
@@ -215,7 +215,7 @@ describe("NowBoard", () => {
 
   it("says on a row past both deadlines that the final one went by too (QA 13 L10)", async () => {
     const runtime = await createTestRuntime({ now: "2026-11-10T12:00:00.000Z" });
-    await runtime.state.ingest(rentSeriesEvents());
+    await pulledInto(runtime, rentSeriesEvents());
     await renderScreen(<Board />, runtime);
     const rent = screen.getByRole("link", { name: /^Rent/u });
     expect(within(rent).getByText("9d late")).toBeOnTheScreen();
@@ -337,7 +337,7 @@ describe("NowBoard", () => {
             writes.push(events.length);
             throw new Error("QuotaExceededError");
           }
-          await memory.append(events);
+          await memory.append(events, await memory.readMeta());
         },
       };
       const runtime = await createTestRuntime({ eventStore });

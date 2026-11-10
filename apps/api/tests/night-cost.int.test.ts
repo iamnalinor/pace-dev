@@ -1,4 +1,3 @@
-import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -7,8 +6,8 @@ import { addMinutesIso, newId, wallClockInstant } from "@pace/core";
 import type { UsageUpload } from "../src/user-store/cloud-data.ts";
 
 import { POOL_LEASE_KEY, POOL_NEXT_AT_KEY } from "../src/user-store/pool-retry-alarm.ts";
-import { UserStore } from "../src/user-store/user-store.ts";
 import { meterSql } from "./helpers.ts";
+import { runInUserStore as runInDurableObject, UserStore } from "./host.ts";
 
 const MOSCOW = "Europe/Moscow";
 /** Moscow wall clock: the evening of 2099-10-07 (from noon on) and the morning after. */

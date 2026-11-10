@@ -1,5 +1,3 @@
-import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
-
 import { inArray } from "drizzle-orm";
 
 import {
@@ -13,11 +11,13 @@ import {
   taskOutcome,
 } from "@pace/core";
 
+import type { ActorStorage } from "../shared/ports/actor-storage.ts";
+import type { SqliteDatabase } from "../shared/ports/sqlite.ts";
 import type { Touched } from "./state.ts";
 
 import * as schema from "./schema.ts";
 
-type Db = DrizzleSqliteDODatabase<typeof schema>;
+type Db = SqliteDatabase<"sync", typeof schema>;
 
 type TaskRow = typeof schema.tasks.$inferInsert;
 type SubtaskRow = typeof schema.subtasks.$inferInsert;
@@ -239,7 +239,7 @@ export type ProjectionMark = {
 };
 
 /** The mark the last projection write left, if any. */
-export const markOf = async (storage: DurableObjectStorage): Promise<ProjectionMark | undefined> =>
+export const markOf = async (storage: ActorStorage): Promise<ProjectionMark | undefined> =>
   await storage.get<ProjectionMark>(MARK_KEY);
 
 /** Whether the rows mirror the log at `seq` as this build writes them. */
@@ -250,7 +250,7 @@ export const isMarkedAt = (
 
 /** Records that the rows now mirror `state` at `seq`. */
 export const saveMark = async (
-  storage: DurableObjectStorage,
+  storage: ActorStorage,
   { build, seq, state }: { build: string; seq: number; state: CoreState },
 ): Promise<void> => {
   const mark: ProjectionMark = { build, seq, timezone: state.settings.timezone };

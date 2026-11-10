@@ -1,12 +1,11 @@
-import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
 import { type EventInput, newId } from "@pace/core";
 
 import * as schema from "../src/user-store/schema.ts";
-import { UserStore } from "../src/user-store/user-store.ts";
 import { json, loginAsDev, meterSql, storeIdOf } from "./helpers.ts";
+import { runInUserStore as runInDurableObject, UserStore } from "./host.ts";
 
 const byText = (a: unknown, b: unknown): number => String(a).localeCompare(String(b));
 

@@ -1,19 +1,14 @@
 import type { Context, Hono } from "hono";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { z } from "zod";
 
 import type { EndpointOutput, EndpointShape, Result } from "@pace/core";
 
 import type { AppEnv } from "./app-env.ts";
+import type { Problem } from "./problem.ts";
 
 import { requireAuth } from "../auth/auth-middleware.ts";
 
-/** A failure the handler chose: becomes `{ code, message }` with this status. */
-export type Problem = {
-  readonly status: ContentfulStatusCode;
-  readonly code: string;
-  readonly message: string;
-};
+export type { Problem } from "./problem.ts";
 
 type Parsed<T> = T extends z.ZodType ? z.output<T> : never;
 

@@ -8,12 +8,17 @@
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "routes": [{ "pattern": "pace-api.nalinor.dev", "custom_domain": true }],
   "observability": { "enabled": true },
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
+  // Every 15 minutes the Worker's `scheduled` handler resumes account cleanups left pending (an
+  // outage, a crash, more than 100 archive objects) and settles confirmations still processing;
+  // without it they move on only when the person presses Confirm again or the app polls.
+  "triggers": { "crons": ["*/15 * * * *"] },
   // Secrets (set with `wrangler secret put`, never here): TELEGRAM_BOT_TOKEN (from @BotFather),
   // TELEGRAM_WEBHOOK_SECRET (random string echoed by Telegram on every webhook call).
   // Optional vars set at deploy time: BOT_INFO (JSON of getMe), TELEGRAM_API_ROOT (tests only),
   // PACE_VERSION (the release tag or short commit, `wrangler deploy --var PACE_VERSION:<v>`;
   // shown by GET /api/instance, `dev` when unset).
-  // All are typed in src/shared/env.d.ts and parsed by src/shared/config.ts.
+  // All are typed in src/platform/cloudflare/env.d.ts and parsed by src/shared/config.ts.
   "vars": {
     "ENVIRONMENT": "production",
     // Telegram user ids allowed to sign in (comma separated). Empty = the whitelist is off

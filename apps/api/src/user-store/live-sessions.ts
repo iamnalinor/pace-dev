@@ -1,5 +1,7 @@
 import { LIVE_SESSION_ENDED } from "@pace/core";
 
+import type { ActorContext, LiveSocket } from "../shared/ports/live-channel.ts";
+
 /*
 A live socket lives no longer than the session that opened it. The Worker checks the bearer once,
 at the upgrade; after that the socket carries the session's id and expiry in its tags (all a
@@ -17,7 +19,7 @@ export const sessionTags = (sessionId: string, expiresAt: number): readonly stri
 ];
 
 /** The session a socket was opened by (from its tag); `undefined` for one with none. */
-export const sessionOf = (ctx: DurableObjectState, socket: WebSocket): string | undefined =>
+export const sessionOf = (ctx: ActorContext, socket: LiveSocket): string | undefined =>
   ctx
     .getTags(socket)
     .find((tag) => tag.startsWith(SESSION_TAG))
@@ -35,7 +37,7 @@ export const namedSession = (
 };
 
 /** Closes a socket as one whose session ended; one already closing is left to finish. */
-const endSocket = (socket: WebSocket): void => {
+const endSocket = (socket: LiveSocket): void => {
   try {
     socket.close(LIVE_SESSION_ENDED, "session ended");
   } catch {
@@ -44,7 +46,7 @@ const endSocket = (socket: WebSocket): void => {
 };
 
 /** Whether a socket's session has expired by `now` (a socket with no expiry has none to pass). */
-const isExpired = (ctx: DurableObjectState, socket: WebSocket, now: number): boolean => {
+const isExpired = (ctx: ActorContext, socket: LiveSocket, now: number): boolean => {
   const tag = ctx.getTags(socket).find((item) => item.startsWith(EXPIRES_TAG));
   return tag !== undefined && Number(tag.slice(EXPIRES_TAG.length)) <= now;
 };
@@ -53,7 +55,7 @@ const isExpired = (ctx: DurableObjectState, socket: WebSocket, now: number): boo
 Whether a socket may still be served at `now`. One whose session expired is closed with
 `LIVE_SESSION_ENDED` instead, so its app checks its session rather than reconnecting.
 */
-export const isServed = (ctx: DurableObjectState, socket: WebSocket, now = Date.now()): boolean => {
+export const isServed = (ctx: ActorContext, socket: LiveSocket, now = Date.now()): boolean => {
   if (isExpired(ctx, socket, now)) {
     endSocket(socket);
     return false;
@@ -62,7 +64,7 @@ export const isServed = (ctx: DurableObjectState, socket: WebSocket, now = Date.
 };
 
 /** The sockets (with `tag`, or all) that may still be served; expired ones are closed on the way. */
-export const servedSockets = (ctx: DurableObjectState, tag?: string): readonly WebSocket[] => {
+export const servedSockets = (ctx: ActorContext, tag?: string): readonly LiveSocket[] => {
   const now = Date.now();
   return ctx.getWebSockets(tag).filter((socket) => isServed(ctx, socket, now));
 };
@@ -74,13 +76,11 @@ const ENDED_PREFIX = "ended-session:";
 Whether a session has ended here: an upgrade the Worker checked before a revoke can reach the store
 after the revoke's `endLiveSessions`, and must not be accepted then (the store serializes both).
 */
-export const isEndedSession = async (
-  ctx: DurableObjectState,
-  sessionId: string,
-): Promise<boolean> => (await ctx.storage.get<number>(`${ENDED_PREFIX}${sessionId}`)) !== undefined;
+export const isEndedSession = async (ctx: ActorContext, sessionId: string): Promise<boolean> =>
+  (await ctx.storage.get<number>(`${ENDED_PREFIX}${sessionId}`)) !== undefined;
 
 /** Drops the ended sessions that have expired by `now`: no upgrade can name them any more. */
-const pruneEnded = async (ctx: DurableObjectState, now: number): Promise<void> => {
+const pruneEnded = async (ctx: ActorContext, now: number): Promise<void> => {
   const ended = await ctx.storage.list<number>({ prefix: ENDED_PREFIX });
   const expired = [...ended].filter(([, until]) => until <= now).map(([key]) => key);
   if (expired.length > 0) {
@@ -95,7 +95,7 @@ with its expiry (`until`) is also kept as ended until then, so an upgrade racing
 refused (`isEndedSession`); that bounds the record by the session's own life.
 */
 export const endLiveSessions = async (
-  ctx: DurableObjectState,
+  ctx: ActorContext,
   sessionId?: string,
   until?: number,
 ): Promise<void> => {

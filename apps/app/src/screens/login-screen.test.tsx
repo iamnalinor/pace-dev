@@ -13,9 +13,15 @@ import { ok, t } from "@pace/core";
 
 import type * as DeviceIdActual from "../platform/device-id.ts";
 
+import { isNativeDevLoginEnabled } from "../platform/api-base.ts";
 import * as mockSecureStoreModule from "../testing/secure-store.fake.ts";
 import { ThemeProvider } from "../ui/theme-provider.tsx";
 import { LoginScreen } from "./login-screen.tsx";
+
+jest.mock("../platform/api-base.ts", () => ({
+  ...jest.requireActual<object>("../platform/api-base.ts"),
+  isNativeDevLoginEnabled: jest.fn(() => true),
+}));
 
 jest.mock("expo-secure-store", () => mockSecureStoreModule.createFakeSecureStore());
 jest.mock("expo-constants", () => {
@@ -89,6 +95,7 @@ const auth = mockAuth as unknown as jest.Mocked<Auth> & typeof mockAuth;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  jest.mocked(isNativeDevLoginEnabled).mockReturnValue(true);
   mockStatus.current = "signed-out";
   mockStatus.endedElsewhere = false;
   mockStatus.endedInAnotherTab = false;
@@ -119,6 +126,13 @@ describe("LoginScreen", () => {
   it("says nothing of the kind on a plain visit", async () => {
     await renderScreen();
     expect(screen.queryByText(t("en", "login.endedElsewhere"))).toBeNull();
+  });
+
+  it("hides dev login when the Android build has not enabled it", async () => {
+    jest.mocked(isNativeDevLoginEnabled).mockReturnValue(false);
+    await renderScreen();
+    expect(screen.queryByLabelText("Telegram id")).toBeNull();
+    expect(screen.queryByText("Sign in as dev")).toBeNull();
   });
 
   it("signs in through the dev route with the typed Telegram id", async () => {

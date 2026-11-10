@@ -4,16 +4,19 @@ import { useCallback, useState } from "react";
 import { Text, View } from "react-native";
 import { useStore } from "zustand";
 
+import { ConfigurationNotice } from "#app/features/server/configuration-notice.tsx";
 import { SESSION_CHANGED } from "@pace/client";
 
 import { useAuth, useT } from "../app-state.tsx";
 import { ServerLine } from "../features/server/server-line.tsx";
+import { isNativeDevLoginEnabled } from "../platform/api-base.ts";
 import { serverStore, useServerInfo } from "../platform/server-store.ts";
 import { isPresent } from "../platform/strings.ts";
 import { Button } from "../ui/button.tsx";
 import { PaceLogo } from "../ui/logo.tsx";
-import { DevLoginForm, errorKey, SignedOutLine, Waiting } from "./login-parts.tsx";
-import { useBotLogin } from "./use-bot-login.ts";
+import { Text as KitText } from "../ui/text.tsx";
+import { DevLoginForm, errorKey, LoginChoices, SignedOutLine } from "./login-parts.tsx";
+import { type useBotLogin, useServerBotLogin } from "./use-bot-login.ts";
 
 const AUTH_RETURN_URL = "pace://auth";
 
@@ -86,10 +89,39 @@ const SignInButtons = ({
   );
 };
 
+const LoginFeedback = ({
+  isConfigured,
+  isRefused,
+  isWaiting,
+  error,
+  onFailure,
+}: {
+  readonly isConfigured: boolean;
+  readonly isRefused: boolean;
+  readonly isWaiting: boolean;
+  readonly error: ReturnType<typeof errorKey>;
+  readonly onFailure: () => void;
+}) => {
+  const t = useT();
+  return (
+    <>
+      {isConfigured && isRefused ? <Mismatch /> : null}
+      {!isConfigured || error === undefined ? null : (
+        <KitText className="text-center" role="footnote" tone="danger">
+          {t(error)}
+        </KitText>
+      )}
+      {isConfigured && !isWaiting && isNativeDevLoginEnabled() ? (
+        <DevLoginForm onFailure={onFailure} />
+      ) : null}
+    </>
+  );
+};
+
 export const LoginScreen = () => {
   const t = useT();
   const { auth, status } = useAuth();
-  const bot = useBotLogin();
+  const { bot, configurationError } = useServerBotLogin();
   const { guard, isRefused } = useSignInGuard();
   const [isWebFailed, setIsWebFailed] = useState(false);
 
@@ -122,22 +154,22 @@ export const LoginScreen = () => {
         </Text>
         <SignedOutLine />
       </View>
-      {isWaiting ? (
-        <Waiting onCancel={bot.reset} onReopen={bot.reopen} />
+      {configurationError === null ? (
+        <LoginChoices bot={bot}>
+          <SignInButtons bot={bot} guard={guard} onWeb={loginOnWeb} />
+        </LoginChoices>
       ) : (
-        <SignInButtons bot={bot} guard={guard} onWeb={loginOnWeb} />
+        <ConfigurationNotice />
       )}
-      {isRefused ? <Mismatch /> : null}
-      {error === undefined ? null : (
-        <Text className="text-center font-sans text-footnote text-danger">{t(error)}</Text>
-      )}
-      {__DEV__ && !isWaiting ? (
-        <DevLoginForm
-          onFailure={() => {
-            setIsWebFailed(true);
-          }}
-        />
-      ) : null}
+      <LoginFeedback
+        error={error}
+        isConfigured={configurationError === null}
+        isRefused={isRefused}
+        isWaiting={isWaiting}
+        onFailure={() => {
+          setIsWebFailed(true);
+        }}
+      />
       {isWaiting ? null : <ServerLine />}
     </View>
   );

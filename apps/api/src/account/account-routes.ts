@@ -5,11 +5,13 @@ import { and, eq } from "drizzle-orm";
 import { endpoints, err, ok, t } from "@pace/core";
 
 import type { AppEnv } from "../shared/app-env.ts";
+import type { Db } from "../shared/db/d1.ts";
 
+import { reconcileAccountConfirmation } from "../shared/account-cleanup-reconciliation.ts";
 import { requireUser } from "../shared/current-user.ts";
 import { accountConfirmations } from "../shared/db/d1-schema.ts";
-import { d1 } from "../shared/db/d1.ts";
 import { mount } from "../shared/mount.ts";
+import { bearerOf, resolveSessionIdentity } from "../shared/session-identity.ts";
 import {
   editTelegramMessage,
   sendTelegramMessage,
@@ -33,34 +35,46 @@ const visibleStatus = (row: Confirmation): VisibleStatus => {
   return row.status === "processing" ? "pending" : row.status;
 };
 
-export const expireConfirmation = async (
-  binding: D1Database,
-  row: Confirmation,
-): Promise<Confirmation> => {
+export const expireConfirmation = async (binding: Db, row: Confirmation): Promise<Confirmation> => {
   if (row.status !== "pending" || row.expiresAt.getTime() > Date.now()) {
     return row;
   }
-  const claimed = await d1(binding)
+  const claimed = await binding
     .update(accountConfirmations)
     .set({ status: "expired" })
     .where(and(eq(accountConfirmations.id, row.id), eq(accountConfirmations.status, "pending")))
     .returning({ id: accountConfirmations.id });
   return claimed.length > 0
     ? { ...row, status: "expired" }
-    : ((await d1(binding).query.accountConfirmations.findFirst({
+    : ((await binding.query.accountConfirmations.findFirst({
         where: eq(accountConfirmations.id, row.id),
       })) ?? row);
 };
 
 const confirmationOf = async (c: Context<AppEnv>, id: string): Promise<Confirmation | undefined> =>
-  await d1(c.env.DB).query.accountConfirmations.findFirst({
+  await c.env.DB.query.accountConfirmations.findFirst({
     where: eq(accountConfirmations.id, id),
   });
 
+/**
+The person a request is signed in as, if its bearer is a live sign-in. The status poll needs none:
+after a deletion the app polls with a session that is gone, the unguessable id being the
+capability. A live session of someone else is refused like an unknown id.
+*/
+const signedInCaller = async (c: Context<AppEnv>): Promise<string | undefined> => {
+  const bearer = bearerOf(c.req.header("Authorization"));
+  if (bearer === undefined) {
+    return undefined;
+  }
+  const identity = await resolveSessionIdentity(c.env.DB, c.get("config"), {
+    token: bearer,
+    now: Date.now(),
+  });
+  return identity.ok ? identity.value.id : undefined;
+};
+
 const languageOf = async (c: Context<AppEnv>, userId: string): Promise<"en" | "ru"> => {
-  const read = await c.env.USER_STORE.get(c.env.USER_STORE.idFromName(userId)).read(
-    new Date().toISOString(),
-  );
+  const read = await c.env.USER_STORE.of(userId).read(new Date().toISOString());
   return read.state.settings.language;
 };
 
@@ -106,7 +120,7 @@ const wasRequestDelivered = async (
   if (messageId === null) {
     return false;
   }
-  const db = d1(c.env.DB);
+  const db = c.env.DB;
   const active = and(
     eq(accountConfirmations.userId, row.userId),
     eq(accountConfirmations.action, row.action),
@@ -128,6 +142,7 @@ const pendingConfirmation = (input: {
   readonly telegramId: string;
   readonly action: Confirmation["action"];
   readonly sessionId: string;
+  readonly language: "en" | "ru";
 }): Confirmation => {
   const now = new Date();
   const row: Confirmation = {
@@ -140,6 +155,7 @@ const pendingConfirmation = (input: {
     expiresAt: new Date(now.getTime() + CONFIRM_MS),
     sessionId: input.sessionId,
     messageId: null,
+    language: input.language,
   };
   return row;
 };
@@ -168,6 +184,7 @@ const requestConfirmation = async (
     telegramId: user.telegramId,
     action,
     sessionId,
+    language,
   });
   if (!(await wasRequestDelivered(c, target, { row, language }))) {
     return err({
@@ -187,8 +204,7 @@ const wasPendingClaimed = async (
   row: Confirmation,
   status: "cancelled" | "processing",
 ): Promise<boolean> => {
-  const claimed = await d1(c.env.DB)
-    .update(accountConfirmations)
+  const claimed = await c.env.DB.update(accountConfirmations)
     .set({ status })
     .where(and(eq(accountConfirmations.id, row.id), eq(accountConfirmations.status, "pending")))
     .returning({ id: accountConfirmations.id });
@@ -205,39 +221,35 @@ const cancelFromBot = async (
     : { text: t(language, "account.alreadyHandled"), isRefused: true };
 };
 
-const performConfirmedAction = async (c: Context<AppEnv>, row: Confirmation): Promise<void> => {
-  if (row.action === "wipe") {
-    await c.env.USER_STORE.get(c.env.USER_STORE.idFromName(row.userId)).wipe();
-  } else {
-    await deleteAccount(c, row.userId);
-  }
-};
-
 const confirmFromBot = async (
   c: Context<AppEnv>,
   row: Confirmation,
   language: "en" | "ru",
 ): Promise<Answer> => {
-  if (!(await wasPendingClaimed(c, row, "processing"))) {
+  if (row.status !== "processing" && !(await wasPendingClaimed(c, row, "processing"))) {
     return { text: t(language, "account.alreadyHandled"), isRefused: true };
   }
-  try {
-    await performConfirmedAction(c, row);
-    await d1(c.env.DB)
-      .update(accountConfirmations)
-      .set({ status: "confirmed" })
-      .where(eq(accountConfirmations.id, row.id));
-    return { text: t(language, row.action === "wipe" ? "account.wiped" : "account.deleted") };
-  } catch {
-    await d1(c.env.DB)
-      .update(accountConfirmations)
-      .set({ status: "pending" })
-      .where(
-        and(eq(accountConfirmations.id, row.id), eq(accountConfirmations.status, "processing")),
-      );
+  const result = await reconcileAccountConfirmation(c.env, row);
+  if (!result.ok) {
     return { text: t(language, "account.failed"), isRefused: true };
   }
+  // Pending (more archive objects than one pass deletes): an alert keeps the buttons to press again.
+  return result.value.status === "complete"
+    ? { text: t(language, row.action === "wipe" ? "account.wiped" : "account.deleted") }
+    : { text: t(language, "account.inProgress"), isRefused: true };
 };
+
+const handledConfirmation = (row: Confirmation, language: "en" | "ru"): Answer => ({
+  text: t(language, row.status === "expired" ? "account.expired" : "account.alreadyHandled"),
+  isRefused: true,
+});
+
+/**
+The language the request was made in. A row from before it was kept falls back to the store's,
+readable only while the request is still pending (fenced or wiped after).
+*/
+const replyLanguage = async (c: Context<AppEnv>, row: Confirmation): Promise<"en" | "ru"> =>
+  row.language ?? (row.status === "pending" ? await languageOf(c, row.userId) : "en");
 
 /** The callback identity comes from Telegram's signed webhook update, never the callback data. */
 export const answerAccountConfirmation = async (
@@ -254,13 +266,12 @@ export const answerAccountConfirmation = async (
     return { text: t("en", "account.notYours"), isRefused: true };
   }
   const row = await expireConfirmation(c.env.DB, raw);
-  const language =
-    row.status === "confirmed" && row.action === "delete" ? "en" : await languageOf(c, row.userId);
+  const language = await replyLanguage(c, row);
+  if (row.status === "processing" && match[1] === "confirm") {
+    return await confirmFromBot(c, row, language);
+  }
   if (row.status !== "pending") {
-    return {
-      text: t(language, row.status === "expired" ? "account.expired" : "account.alreadyHandled"),
-      isRefused: true,
-    };
+    return handledConfirmation(row, language);
   }
   return match[1] === "cancel"
     ? await cancelFromBot(c, row, language)
@@ -274,7 +285,15 @@ export const mountAccountRoutes = (app: Hono<AppEnv>, fetch: TelegramTransport):
     async ({ c, body }) => await requestConfirmation(c, body.action, fetch),
   );
   mount(app, endpoints.account.confirmationStatus, async ({ c, params }) => {
-    const row = await confirmationOf(c, params.id);
+    let row = await confirmationOf(c, params.id);
+    const caller = await signedInCaller(c);
+    if (caller !== undefined && row?.userId !== caller) {
+      row = undefined;
+    }
+    if (row?.status === "processing") {
+      await reconcileAccountConfirmation(c.env, row);
+      row = await confirmationOf(c, params.id);
+    }
     return row === undefined
       ? err({
           status: 404,
@@ -307,7 +326,9 @@ export const mountAccountRoutes = (app: Hono<AppEnv>, fetch: TelegramTransport):
     if (c.get("config").environment !== "test") {
       return err({ status: 404, code: "not-found", message: "Not found" });
     }
-    await deleteAccount(c, requireUser(c).id);
-    return ok({ deleted: true as const });
+    const result = await deleteAccount(c, requireUser(c).id);
+    return result.ok && result.value.status === "complete"
+      ? ok({ deleted: true as const })
+      : err({ status: 503 as const, code: "internal", message: "Account cleanup is pending" });
   });
 };

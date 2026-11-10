@@ -1,7 +1,8 @@
 import { eq } from "drizzle-orm";
 
+import type { Db } from "../db/d1.ts";
+
 import { brokenPushMethods } from "../db/d1-schema.ts";
-import { d1 } from "../db/d1.ts";
 import { type FcmTarget, fcmTargetOf } from "../fcm.ts";
 import { createLogger } from "../logger.ts";
 import { isFcmTokenRefused } from "../push-subscriptions.ts";
@@ -62,11 +63,11 @@ The methods this server accepts at `now`: configured, and not found broken with 
 it has within the last `BROKEN_FOR_MS` (new credentials clear that at once).
 */
 export const acceptedMethods = async (
-  binding: D1Database,
+  binding: Db,
   config: PushConfig,
   now: number,
 ): Promise<readonly PushMethod[]> => {
-  const broken = await d1(binding).select().from(brokenPushMethods);
+  const broken = await binding.select().from(brokenPushMethods);
   return PUSH_METHODS.filter((method) => {
     const transport = FACTORIES[method](config);
     return transport !== null && broken.every((row) => !isMarkedBy(row, transport, now));
@@ -79,7 +80,7 @@ export const fcmProjectOf = (config: PushConfig): null | string =>
 
 /** The methods-check answer: what the server takes now, and the Firebase project it sends with. */
 export const pushMethodsOf = async (
-  binding: D1Database,
+  binding: Db,
   config: PushConfig,
   now: number,
 ): Promise<{ readonly pushMethods: PushMethod[]; readonly fcmProject: null | string }> => ({
@@ -93,7 +94,7 @@ project is the server's (when the app says it; an older app does not) and its to
 refused as another project's while the server sent with this one. Refused, the app polls.
 */
 export const isRegistrable = async (
-  binding: D1Database,
+  binding: Db,
   config: PushConfig,
   request: {
     readonly method: PushMethod;
@@ -122,7 +123,7 @@ Marks a method broken for everyone: its credentials were refused (not one device
 It stops being offered and used until the credentials change, or for `BROKEN_FOR_MS`.
 */
 export const markBroken = async (
-  binding: D1Database,
+  binding: Db,
   transport: PushTransport,
   { now, reason }: { readonly now: number; readonly reason: string },
 ): Promise<void> => {
@@ -133,7 +134,7 @@ export const markBroken = async (
     method: transport.method,
     reason,
   };
-  await d1(binding)
+  await binding
     .insert(brokenPushMethods)
     .values(row)
     .onConflictDoUpdate({ set: row, target: brokenPushMethods.method });
@@ -141,11 +142,11 @@ export const markBroken = async (
 
 /** Whether `method` is broken at `now` with the credentials the transport has. */
 export const isBroken = async (
-  binding: D1Database,
+  binding: Db,
   transport: PushTransport,
   now: number,
 ): Promise<boolean> => {
-  const [row] = await d1(binding)
+  const [row] = await binding
     .select()
     .from(brokenPushMethods)
     .where(eq(brokenPushMethods.method, transport.method));

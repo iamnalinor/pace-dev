@@ -1,15 +1,14 @@
-import { evictDurableObject, runInDurableObject } from "cloudflare:test";
+import { evictDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
 import { err, type EventInput, newId } from "@pace/core";
 
-import type { UserStore } from "../src/user-store/user-store.ts";
-
 import { DERIVE_STEPS } from "../src/user-store/derive-steps.ts";
 import { coreValidator } from "../src/user-store/event-log.ts";
 import { STORE_EPOCH } from "../src/user-store/store-identity.ts";
 import { call, json, loginAsDev, pushEvents, readJson, storeIdOf } from "./helpers.ts";
+import { runInUserStore as runInDurableObject, type UserStore } from "./host.ts";
 
 type PushResult = { accepted: string[]; rejected: { id: string; reason: string }[]; seq: number };
 type PullResult = {

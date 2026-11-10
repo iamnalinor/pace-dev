@@ -6,7 +6,7 @@ import type { ActivityCategory } from "./model.ts";
 
 import { isOpen, type Task, taskById } from "../model/task.ts";
 import { type Outcome, taskOutcome } from "../outcomes/outcome.ts";
-import { startOfWeekIn } from "../time.ts";
+import { startOfDayIn, startOfWeekIn } from "../time.ts";
 import { type Range, type Segment, sumMinutes, timeline } from "./timeline.ts";
 
 /** Before any activity can exist: the start of "all time" for per-task totals. */
@@ -79,8 +79,10 @@ export const weeklyProjectMinutes = (
 ): readonly number[] => {
   const thisWeek = startOfWeekIn(now, zone);
   return Array.from({ length: weeks }, (_, index) => {
-    const from = new Date(addWeeks(thisWeek, index - weeks + 1, { in: tz(zone) })).toISOString();
-    const to = new Date(addWeeks(from, 1, { in: tz(zone) })).toISOString();
+    const startDate = addWeeks(thisWeek, index - weeks + 1, { in: tz(zone) });
+    const from = startOfDayIn(startDate.toISOString(), zone);
+    const endDate = addWeeks(from, 1, { in: tz(zone) });
+    const to = startOfDayIn(endDate.toISOString(), zone);
     return (
       timeByProject(state, { from, now, to }).find((row) => row.projectId === projectId)?.minutes ??
       0

@@ -136,10 +136,13 @@ export const materializeAt = <S>(
 export const apply = <S>(state: S, event: Event, reducer: Reducer<S>): S =>
   isCorrection(event) ? state : reducer(state, event);
 
-/** True when `incoming` cannot be applied incrementally on top of the last applied event. */
+/**
+True when `incoming` cannot be applied incrementally on top of the last applied event. A timestamp
+alone cannot prove the id tie-break at the same instant, so equality needs a canonical rebuild.
+*/
 export const shouldRematerialize = (
   lastAppliedOccurredAt: null | string,
   incoming: Event,
 ): boolean =>
   isCorrection(incoming) ||
-  (lastAppliedOccurredAt !== null && incoming.occurredAt < lastAppliedOccurredAt);
+  (lastAppliedOccurredAt !== null && incoming.occurredAt <= lastAppliedOccurredAt);

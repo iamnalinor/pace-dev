@@ -154,6 +154,107 @@ describe("a bare pressable (bug-lessons F-CMP-01)", () => {
   );
 });
 
+const PORTABLE_FILE = "apps/api/src/shared/request-place.ts";
+const PLATFORM_MESSAGE = "Portable API code uses infrastructure ports";
+
+const platformMessages = async (code: string, file = PORTABLE_FILE): Promise<readonly string[]> => {
+  const [result] = await eslint.lintText(code, { filePath: path.join(ROOT, file) });
+  return (result?.messages ?? [])
+    .filter((message) => message.message.startsWith(PLATFORM_MESSAGE))
+    .map((message) => message.message);
+};
+
+/**
+Each type-aware `lintText` builds a program (seconds), so the cases for one file share one call:
+one case per line, and the answer is the cases with at least one boundary message on their line.
+*/
+const flaggedCases = async (
+  cases: readonly string[],
+  file = PORTABLE_FILE,
+): Promise<readonly string[]> => {
+  const [result] = await eslint.lintText(cases.join("\n"), { filePath: path.join(ROOT, file) });
+  const lines = new Set(
+    (result?.messages ?? [])
+      .filter((message) => message.message.startsWith(PLATFORM_MESSAGE))
+      .map((message) => message.line),
+  );
+  return cases.filter((_, index) => lines.has(index + 1));
+};
+
+/** The AST leaks, numbered so they can share one module without clashing names. */
+const AST_LEAKS = [
+  "export const leak0 = (request: Request) => request.cf;",
+  'export const leak1 = (request: Request) => request["cf"];',
+  "export const leak2 = (request: Request) => { const { cf } = request; return cf; };",
+  'export const leak3 = (request: Request) => { const { ["cf"]: data } = request; return data; };',
+  "export type Leak4 = Cloudflare.Env;",
+  "export type Leak5 = D1Database;",
+  "export type Leak6 = DurableObjectStorage;",
+  "export const leak7 = () => new WebSocketPair();",
+  'import type { DurableObject } from "cloudflare:workers"; export type Leak8 = DurableObject;',
+  'import type { ExecutionContext } from "@cloudflare/workers-types"; export type Leak9 = ExecutionContext;',
+  'import { drizzle } from "drizzle-orm/d1"; export const leak10 = drizzle;',
+];
+
+describe("portable API infrastructure boundaries", () => {
+  it.each([
+    "apps/api/src/auth/sessions.ts",
+    "apps/api/src/user-store/user-store.ts",
+    "apps/api/src/shared/llm/health-store.ts",
+    "apps/api/src/mcp/server.ts",
+    "apps/api/src/app.ts",
+  ])(
+    "guards every converted domain module: %s",
+    async (file) => {
+      const leaks = [
+        "export type Leak = DurableObjectStub;",
+        'export { drizzle } from "drizzle-orm/durable-sqlite";',
+      ];
+      expect(await flaggedCases(leaks, file)).toEqual(leaks);
+    },
+    LINT_APP_FILE_MS,
+  );
+
+  it(
+    "rejects every AST leak",
+    async () => {
+      expect(await flaggedCases(AST_LEAKS)).toEqual(AST_LEAKS);
+    },
+    LINT_APP_FILE_MS,
+  );
+
+  it(
+    "guards new ports as well as the first converted consumer",
+    async () => {
+      expect(
+        await platformMessages(
+          "export type Leak = D1Database;",
+          "apps/api/src/shared/ports/request-place.ts",
+        ),
+      ).not.toHaveLength(0);
+    },
+    LINT_APP_FILE_MS,
+  );
+
+  it(
+    "allows portable Request types and adapter-owned Cloudflare metadata",
+    async () => {
+      expect(
+        await platformMessages(
+          "export const read = (request: Request) => request.headers.get('User-Agent');",
+        ),
+      ).toHaveLength(0);
+      expect(
+        await platformMessages(
+          "export const read = (request: Request) => request.cf;",
+          "apps/api/src/platform/cloudflare/request-place.ts",
+        ),
+      ).toHaveLength(0);
+    },
+    LINT_APP_FILE_MS,
+  );
+});
+
 /** The `pace/kit-primitives` severity for one file (bug-lessons 109: icons and line limits from the kit). */
 const kitPrimitives = async (file: string): Promise<unknown> => {
   const config = (await eslint.calculateConfigForFile(path.join(ROOT, file))) as {

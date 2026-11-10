@@ -1,7 +1,6 @@
-import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
-
 import type { CalendarEvent, UsageRow } from "@pace/core";
 
+import type { SqliteDatabase } from "../shared/ports/sqlite.ts";
 import type * as schema from "./schema.ts";
 
 import { createLogger } from "../shared/logger.ts";
@@ -9,6 +8,7 @@ import * as cloud from "./cloud-data.ts";
 import { ruledSeriesChange, saveRuledSeries } from "./notification-pool.ts";
 import { armIfPoolUnplanned } from "./pool-retry-alarm.ts";
 import { PoolStore } from "./pool-store.ts";
+import { usageDevices } from "./usage-devices.ts";
 
 /**
 Storage key set while a change of a phone's calendar copy is written but not yet looked at by the
@@ -22,7 +22,9 @@ calendar and each device's usage (names and times, never contents). A usage uplo
 automatic sleep on what is then known.
 */
 export abstract class CloudStore extends PoolStore {
-  abstract readonly db: DrizzleSqliteDODatabase<typeof schema>;
+  protected abstract readonly assertCloudWritable: () => Promise<void>;
+
+  abstract readonly db: SqliteDatabase<"sync", typeof schema>;
 
   /** One pass of automatic sleep at `now` (see `runSleepPass`), through the store's write path. */
   protected abstract sleepPass(now: string): Promise<readonly string[]>;
@@ -37,6 +39,7 @@ export abstract class CloudStore extends PoolStore {
   many events came.
   */
   async syncCalendar(upload: cloud.CalendarUpload, now: string): Promise<number> {
+    await this.assertCloudWritable();
     const { storage } = this.ctx;
     const changes = await cloud.calendarChanges(this.db, upload);
     const series = await ruledSeriesChange(storage, upload.ruledSeries);
@@ -64,6 +67,7 @@ export abstract class CloudStore extends PoolStore {
 
   /** Forgets one phone's calendar copy (it stopped sending it). */
   async clearCalendar(deviceId: string): Promise<void> {
+    await this.assertCloudWritable();
     await cloud.clearCalendar(this.db, deviceId);
   }
 
@@ -74,7 +78,12 @@ export abstract class CloudStore extends PoolStore {
   pass that fails is logged and left to the alarm: the upload is stored and answered all the same.
   */
   async addUsage(upload: cloud.UsageUpload, now: string): Promise<number> {
-    const stored = await cloud.addUsage({ db: this.db, storage: this.ctx.storage }, upload, now);
+    await this.assertCloudWritable();
+    const stored = await cloud.addUsage(
+      { storage: this.ctx.storage, hasArchive: this.env.HISTORY_ARCHIVE !== undefined },
+      upload,
+      now,
+    );
     if (upload.isPhone) {
       try {
         await this.sleepPass(now);
@@ -96,8 +105,8 @@ export abstract class CloudStore extends PoolStore {
   }
 
   /** Each device that sent usage, with the end of its newest session. */
-  async usageDevices(): Promise<ReturnType<typeof cloud.usageDevices>> {
-    return await cloud.usageDevices(this.db);
+  async usageDevices(): Promise<ReturnType<typeof usageDevices>> {
+    return await usageDevices(this.db);
   }
 
   /** App sessions on every device overlapping a range. */

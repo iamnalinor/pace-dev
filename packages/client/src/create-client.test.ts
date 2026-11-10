@@ -16,6 +16,7 @@ import {
   problem,
 } from "./fake-fetch.fake.ts";
 import { createHeldEventStore } from "./held-event-store.fake.ts";
+import { storedEvents } from "./local-store.fake.ts";
 import { createMemorySessionStore } from "./session.ts";
 
 const setup = async (
@@ -151,7 +152,7 @@ describe("createPaceClient", () => {
     await held.writes[0]?.resolve();
     await Promise.all([written, dropped, claimed]);
     // The clear had its turn first (the copy was still the old session's): nothing stays.
-    await expect(held.store.listAll()).resolves.toEqual([]);
+    await expect(storedEvents(held.store)).resolves.toEqual([]);
     await expect(held.store.listPending()).resolves.toEqual([]);
   });
 
@@ -237,6 +238,62 @@ describe("createPaceClient", () => {
     await client.sync.syncNow();
     expect(api.pathsCalled("/api/me")).toHaveLength(2);
   });
+
+  it.each(["dropped", "claimed by a newer session"] as const)(
+    "a tab with no socket signs out when its session ended and the shared copy was %s in another tab (PR 55 CI, round 6 M6/I1)",
+    async (copy) => {
+      // Two tabs of one browser profile: one store, each tab its own client. The hidden tab has no
+      // socket to hear the end; the other tab heard it first and took the copy with it.
+      const store = createMemoryEventStore();
+      const server = { isRevoked: false };
+      const refusedWhenRevoked = (answer: object) => () =>
+        server.isRevoked ? problem(401, "auth/unauthorized") : answer;
+      const tab = async () => {
+        const session = createMemorySessionStore();
+        await session.set("tok_old");
+        const api = createFakeFetch({
+          ...emptySyncRoutes,
+          "GET /api/me": refusedWhenRevoked(fakeMe),
+          "GET /api/sync/pull": refusedWhenRevoked({
+            events: [],
+            more: false,
+            seq: 0,
+            storeId: "store-test",
+          }),
+        });
+        const client = createPaceClient({
+          baseUrl: "https://api.test",
+          deviceId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+          fetch: api.fetch,
+          now: () => "2026-10-06T12:00:00.000Z",
+          session,
+          source: "web",
+          store,
+        });
+        await client.auth.ready;
+        await client.state.ready;
+        return { api, client };
+      };
+      const hidden = await tab();
+      await hidden.client.claimLocalCopy("tok_old");
+      await expect(hidden.client.sync.syncNow()).resolves.toMatchObject({ ok: true });
+      const other = await tab();
+      server.isRevoked = true;
+      await other.client.dropLocalCopyOf("tok_old");
+      if (copy === "claimed by a newer session") {
+        await other.client.claimLocalCopy("tok_new");
+      }
+      // The hidden tab's poll: its run refuses to touch a copy that is no longer its own, and
+      // still finds out that its session ended.
+      await hidden.client.sync.syncNow();
+      await expect.poll(() => hidden.client.auth.store.getState().status).toBe("signed-out");
+      expect(hidden.client.auth.store.getState().endedElsewhere).toBe(true);
+      // Signed out, the network goes quiet: one check, no loop.
+      const checks = hidden.api.pathsCalled("/api/me").length;
+      await hidden.client.sync.syncNow();
+      expect(hidden.api.pathsCalled("/api/me")).toHaveLength(checks);
+    },
+  );
 
   it.each(["a call's 401", "the socket's close"] as const)(
     "sends nothing more with the session while %s has it checked, and nothing once it ended (CI run 41668309388)",

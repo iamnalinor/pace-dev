@@ -1,14 +1,15 @@
-import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
+import { and, asc, eq, gt, gte, lt, lte, max, min } from "drizzle-orm";
 
-import { asc, eq, gt, max } from "drizzle-orm";
-
-import { type Event, parseEvent } from "@pace/core";
+import { type Event, parseEvent, type SequencedCheckpointEvent } from "@pace/core";
 
 import type { EventPage, JsonValue, StoredEvent } from "../shared/contract.ts";
+import type { StoredSyncRecord } from "../shared/history-sync-types.ts";
+import type { ActorStorage } from "../shared/ports/actor-storage.ts";
+import type { SqliteDatabase } from "../shared/ports/sqlite.ts";
 
 import * as schema from "./schema.ts";
 
-type Db = DrizzleSqliteDODatabase<typeof schema>;
+type Db = SqliteDatabase<"sync", typeof schema>;
 
 export const toEvent = (row: typeof schema.events.$inferSelect): StoredEvent => ({
   id: row.id,
@@ -27,8 +28,28 @@ export const latestSeq = async (db: Db): Promise<number> => {
 };
 
 /** Every event of the log as the core sees it; a row the schema no longer accepts is skipped. */
-export const loadLog = async (db: Db): Promise<readonly Event[]> => {
-  const rows = await db.select().from(schema.events).orderBy(asc(schema.events.seq));
+export const loadLog = async (db: Db, through?: number): Promise<readonly Event[]> => {
+  const rows = await db
+    .select()
+    .from(schema.events)
+    .where(through === undefined ? undefined : lte(schema.events.seq, through))
+    .orderBy(asc(schema.events.seq));
+  return rows.flatMap((row) => {
+    const parsed = parseEvent(toEvent(row));
+    return parsed.ok ? [parsed.value] : [];
+  });
+};
+
+/**
+The log's revocations through `through`: what `revokedIdsIn` needs to name the revoked ids when the
+state comes from a checkpoint rather than the whole log (served by `events_type_idx`).
+*/
+export const loadRevocations = async (db: Db, through: number): Promise<readonly Event[]> => {
+  const rows = await db
+    .select()
+    .from(schema.events)
+    .where(and(eq(schema.events.type, "event.revoked"), lte(schema.events.seq, through)))
+    .orderBy(asc(schema.events.seq));
   return rows.flatMap((row) => {
     const parsed = parseEvent(toEvent(row));
     return parsed.ok ? [parsed.value] : [];
@@ -86,10 +107,80 @@ export const findEvent = async (db: Db, id: string): Promise<StoredEvent | undef
 
 /** A stored value, taken out: a second read finds nothing. */
 export const takeMemo = async (
-  storage: DurableObjectStorage,
+  storage: ActorStorage,
   key: string,
 ): Promise<JsonValue | undefined> => {
   const value = await storage.get<JsonValue>(key);
   await storage.delete(key);
   return value;
+};
+
+/** A complete delivery-cursor range; unknown raw rows must never silently disappear from a base. */
+export const loadRecords = async (
+  db: Db,
+  after: number,
+  through: number,
+): Promise<{
+  readonly records: readonly SequencedCheckpointEvent[];
+  readonly complete: boolean;
+}> => {
+  const rows = await db
+    .select()
+    .from(schema.events)
+    .where(and(gt(schema.events.seq, after), lte(schema.events.seq, through)))
+    .orderBy(asc(schema.events.seq));
+  const records = rows.flatMap((row) => {
+    const parsed = parseEvent(toEvent(row));
+    return parsed.ok ? { seq: row.seq, event: parsed.value } : [];
+  });
+  return { records, complete: records.length === rows.length };
+};
+
+/** Stop before the first recent arrival, retaining every later backdate in the cursor tail. */
+export const checkpointPrefix = async (
+  db: Db,
+  cutoff: string,
+  through: number,
+): Promise<number> => {
+  const [recent] = await db
+    .select({ first: min(schema.events.seq) })
+    .from(schema.events)
+    .where(and(gte(schema.events.occurredAt, cutoff), lte(schema.events.seq, through)));
+  const [prefix] = await db
+    .select({ seq: max(schema.events.seq) })
+    .from(schema.events)
+    .where(
+      and(
+        lte(schema.events.seq, through),
+        recent?.first === null || recent?.first === undefined
+          ? undefined
+          : lt(schema.events.seq, recent.first),
+      ),
+    );
+  return prefix?.seq ?? 0;
+};
+
+/** Original SQLite cursors are transferred explicitly; AUTOINCREMENT can leave allocated gaps. */
+export const storedPage = (
+  storage: ActorStorage,
+  input: { readonly after: number; readonly through: number; readonly limit: number },
+): EventPage & {
+  readonly records: readonly StoredSyncRecord[];
+} => {
+  const rows = storage.sql
+    .exec<typeof schema.events.$inferSelect>(
+      "SELECT seq,id,type,occurred_at AS occurredAt,recorded_at AS recordedAt,device_id AS deviceId,precision,source,payload FROM events WHERE seq > ? AND seq <= ? ORDER BY seq LIMIT ?",
+      input.after,
+      input.through,
+      input.limit + 1,
+    )
+    .toArray();
+  const page = rows.slice(0, input.limit);
+  const records = page.map((row) => ({ seq: row.seq, event: toEvent(row) }));
+  return {
+    events: records.map((record) => record.event),
+    records,
+    more: rows.length > input.limit,
+    seq: page.at(-1)?.seq ?? input.after,
+  };
 };

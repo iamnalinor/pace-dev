@@ -29,3 +29,10 @@ android {
     abortOnError false
   }
 }
+
+
+dependencies {
+  // Keep aligned with expo-notifications57: both consumers use the same default Firebase app.
+  implementation 'com.google.firebase:firebase-messaging:25.0.1'
+  testImplementation 'junit:junit:4.13.2'
+}

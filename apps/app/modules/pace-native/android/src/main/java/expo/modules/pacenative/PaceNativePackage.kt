@@ -15,6 +15,9 @@ class PaceNativePackage : Package {
       object : ApplicationLifecycleListener {
         override fun onCreate(application: Application) {
           CrashCatcher.install(application)
+          if (FirebaseRuntime.enabled(application)) {
+            FirebaseRuntime.controller(application).restore()
+          }
         }
       }
     )

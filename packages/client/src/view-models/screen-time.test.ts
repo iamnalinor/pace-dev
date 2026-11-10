@@ -78,6 +78,21 @@ describe("appsDuring", () => {
 });
 
 describe("screenTime", () => {
+  it("excludes the next day's usage after a day whose midnight was skipped", () => {
+    const result = screenTime(
+      [
+        row("Reader", "phone", {
+          startAt: "2018-11-04T03:00:00.000Z",
+          endAt: "2018-11-05T03:00:00.000Z",
+        }),
+      ],
+      "2018-11-04T12:00:00.000Z",
+      "America/Sao_Paulo",
+    );
+    expect(result.from).toBe("2018-11-04T03:00:00.000Z");
+    expect(result.to).toBe("2018-11-05T02:00:00.000Z");
+    expect(result.totalMinutes).toBe(23 * 60);
+  });
   it("splits a midnight-spanning session at the account's day boundary", () => {
     const usage = [
       row("Reader", "phone", {

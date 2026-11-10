@@ -6,6 +6,7 @@ import { DEFAULT_SETTINGS, type Event, isUlid } from "@pace/core";
 import { createMemoryEventStore } from "./adapters/memory-event-store.ts";
 import { at, settingsEvent } from "./fake-fetch.fake.ts";
 import { createHeldEventStore } from "./held-event-store.fake.ts";
+import { pullPage, seedPending, seedSynced, storedEvents } from "./local-store.fake.ts";
 import { type AppStateHandle, createAppState } from "./state.ts";
 
 const NOW = "2026-10-06T12:00:00.000Z";
@@ -17,8 +18,7 @@ const setup = async (
   readonly store: ReturnType<typeof createMemoryEventStore>;
 }> => {
   const store = createMemoryEventStore();
-  await store.append(seed);
-  await store.markSynced(seed.map((event) => event.id));
+  await seedSynced(store, seed);
   const state = createAppState({ deviceId: "dev-1", now: () => NOW, source: "web", store });
   await state.ready;
   return { state, store };
@@ -30,7 +30,9 @@ const languageInput = (occurredAt: string, language: "en" | "ru") =>
 describe("createAppState loading", () => {
   it("starts loading, then materializes what the store holds", async () => {
     const store = createMemoryEventStore();
-    await store.append([settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(9), { language: "ru" })]);
+    await seedPending(store, [
+      settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(9), { language: "ru" }),
+    ]);
     const state = createAppState({ deviceId: "dev-1", now: () => NOW, source: "web", store });
     expect(state.store.getState().status).toBe("loading");
     await state.ready;
@@ -75,7 +77,7 @@ describe("createAppState dispatch", () => {
       type: "settings.updated",
     });
     expect(result).toMatchObject({ ok: false });
-    await expect(store.listAll()).resolves.toEqual([]);
+    await expect(storedEvents(store)).resolves.toEqual([]);
   });
 
   it("re-materializes when a retro event arrives", async () => {
@@ -122,34 +124,38 @@ describe("createAppState corrections", () => {
   });
 });
 
-describe("createAppState ingest", () => {
-  it("skips known ids, persists remote events as synced and applies them", async () => {
+describe("createAppState and the pages of the server", () => {
+  it("skips known ids, stores a page as synced and applies it", async () => {
     const { state, store } = await setup();
     const remote = settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(10), { language: "ru" });
-    await state.ingest([remote, remote]);
-    await state.ingest([remote]);
-    await expect(store.listAll()).resolves.toEqual([remote]);
+    await pullPage(state, store, [remote, remote]);
+    await pullPage(state, store, [remote]);
+    await expect(storedEvents(store)).resolves.toEqual([remote]);
     await expect(store.listPending()).resolves.toEqual([]);
     expect(state.store.getState().settings.language).toBe("ru");
     expect(state.store.getState().version).toBe(2);
   });
 
   it("re-materializes when a remote event is older than the last applied one", async () => {
-    const { state } = await setup();
+    const { state, store } = await setup();
     await state.dispatch(languageInput(at(10), "ru"));
-    await state.ingest([settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(9), { language: "en" })]);
+    await pullPage(state, store, [
+      settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(9), { language: "en" }),
+    ]);
     expect(state.store.getState().settings.language).toBe("ru");
     expect(state.store.getState().events).toHaveLength(2);
   });
 
   it("rematerialize reloads from the store", async () => {
     const { state, store } = await setup();
-    await store.append([settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(10), { language: "ru" })]);
+    await seedPending(store, [
+      settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(10), { language: "ru" }),
+    ]);
     await state.rematerialize();
     expect(state.store.getState().settings.language).toBe("ru");
   });
 
-  it("yields the same state whatever the ingestion order", async () => {
+  it("yields the same state whatever order the pages bring the events in", async () => {
     const events = [
       settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(9), { language: "ru" }),
       settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAB", at(10), { timezone: "UTC" }),
@@ -159,9 +165,9 @@ describe("createAppState ingest", () => {
     const reference = (await setup(events)).state.store.getState();
     await fc.assert(
       fc.asyncProperty(fc.shuffledSubarray(events, { minLength: 4 }), async (shuffled) => {
-        const { state } = await setup();
+        const { state, store } = await setup();
         for (const event of shuffled) {
-          await state.ingest([event]);
+          await pullPage(state, store, [event]);
         }
         const actual = state.store.getState();
         expect(actual.settings).toEqual(reference.settings);
@@ -244,6 +250,16 @@ const heldSetup = async (): Promise<{
   return { held, locals: () => locals, state };
 };
 
+/** What a page was refused with (the store's own words), once it settles; `null` when it landed. */
+const refusalOf = async (page: Promise<void>): Promise<null | string> => {
+  try {
+    await page;
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+};
+
 /** A settled-or-not marker for a promise the test does not await yet. */
 const track = <T>(
   promise: Promise<T>,
@@ -306,7 +322,7 @@ describe("createAppState local writes (the screen first, the disk after)", () =>
     expect(after.log).toEqual(before.log);
     expect(after.lastAppliedOccurredAt).toBe(before.lastAppliedOccurredAt);
     expect(locals()).toBe(0);
-    await expect(held.store.listAll()).resolves.toEqual([]);
+    await expect(storedEvents(held.store)).resolves.toEqual([]);
     // The log forgot it too: it cannot be revoked, and the same id may be written again.
     const id = held.writes[0]?.events[0]?.id ?? "";
     await expect(state.revoke(id)).resolves.toEqual({ error: "event/not-found", ok: false });
@@ -334,20 +350,20 @@ describe("createAppState local writes (the screen first, the disk after)", () =>
     expect(second.value()).toMatchObject({ ok: true });
     expect(state.store.getState().settings).toEqual({ ...DEFAULT_SETTINGS, timezone: "UTC" });
     expect(state.store.getState().events.map((event) => event.occurredAt)).toEqual([at(11)]);
-    const stored = await held.store.listAll();
+    const stored = await storedEvents(held.store);
     expect(stored.map((event) => event.occurredAt)).toEqual([at(11)]);
   });
-
-  it("keeps remote events that arrive while a refused local write was in flight", async () => {
+  it("keeps the server's page that arrives while a refused local write was in flight", async () => {
     const { held, state } = await heldSetup();
     const local = track(state.dispatch(RU_AT_10));
     await flush();
     const remote = settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(9), { timezone: "UTC" });
-    const ingested = track(state.ingest([remote]));
+    const pulled = track(pullPage(state, held.store, [remote]));
     await flush();
-    // Both show while the local write is still on its way.
-    expect(state.store.getState().settings).toMatchObject({ language: "ru", timezone: "UTC" });
-    expect(ingested.isSettled()).toBe(false);
+    // The page waits for the write in flight: the state shows the action alone.
+    expect(state.store.getState().settings).toMatchObject({ language: "ru" });
+    expect(state.store.getState().settings.timezone).not.toBe("UTC");
+    expect(pulled.isSettled()).toBe(false);
 
     held.writes[0]?.reject();
     await flush();
@@ -355,10 +371,10 @@ describe("createAppState local writes (the screen first, the disk after)", () =>
     await flush();
 
     expect(local.value()).toEqual({ error: "persist_failed", ok: false });
-    expect(ingested.isSettled()).toBe(true);
+    expect(pulled.isSettled()).toBe(true);
     expect(state.store.getState().settings).toEqual({ ...DEFAULT_SETTINGS, timezone: "UTC" });
     expect(state.store.getState().events).toEqual([remote]);
-    await expect(held.store.listAll()).resolves.toEqual([remote]);
+    await expect(storedEvents(held.store)).resolves.toEqual([remote]);
     await expect(held.store.listPending()).resolves.toEqual([]);
   });
 
@@ -368,7 +384,7 @@ describe("createAppState local writes (the screen first, the disk after)", () =>
     const local = track(state.dispatch({ ...RU_AT_10, id }));
     await flush();
     const remote = settingsEvent(id, at(10), { language: "ru" });
-    const ingested = track(state.ingest([remote]));
+    const pulled = track(pullPage(state, held.store, [remote]));
     await flush();
     expect(state.store.getState().events).toHaveLength(1);
 
@@ -378,59 +394,64 @@ describe("createAppState local writes (the screen first, the disk after)", () =>
     await flush();
 
     expect(local.value()).toEqual({ error: "persist_failed", ok: false });
-    expect(ingested.isSettled()).toBe(true);
+    expect(pulled.isSettled()).toBe(true);
     expect(state.store.getState().settings.language).toBe("ru");
     expect(state.store.getState().events.map((event) => event.id)).toEqual([id]);
-    await expect(held.store.listAll()).resolves.toEqual([remote]);
+    await expect(storedEvents(held.store)).resolves.toEqual([remote]);
     await expect(held.store.listPending()).resolves.toEqual([]);
   });
 
-  it("keeps an adopted id on screen when the server's write is refused but its own local write landed", async () => {
+  it("keeps an id on screen when the server's page is refused but its own local write landed", async () => {
     const { held, state } = await heldSetup();
     const id = "01ARZ3NDEKTSV4RRFFQ69G5FAA";
     const local = track(state.dispatch({ ...RU_AT_10, id }));
     await flush();
-    const ingested = state.ingest([settingsEvent(id, at(10), { language: "ru" })]);
+    const remote = settingsEvent(id, at(10), { language: "ru" });
+    const pulled = refusalOf(pullPage(state, held.store, [remote]));
     await flush();
     await held.writes[0]?.resolve();
     await flush();
     held.writes[1]?.reject();
-    await expect(ingested).rejects.toThrow("QuotaExceededError");
+    expect(await pulled).toBe("QuotaExceededError");
     expect(local.value()).toMatchObject({ ok: true });
     // On the disk through its own write: it stays, on screen and in the log.
     expect(state.store.getState().events.map((event) => event.id)).toEqual([id]);
     expect(state.store.getState().settings.language).toBe("ru");
   });
 
-  it("shows the server's copy of an id whose local write is still in flight", async () => {
+  it("takes the server's copy of an id once that id's own local write landed", async () => {
     const { held, state } = await heldSetup();
     const id = "01ARZ3NDEKTSV4RRFFQ69G5FAA";
     void state.dispatch({ ...RU_AT_10, id });
     await flush();
     const copy = settingsEvent(id, at(10), { language: "en" });
-    void state.ingest([copy]);
+    void pullPage(state, held.store, [copy]);
     await flush();
-    expect(state.store.getState().settings.language).toBe("en");
-    expect(state.store.getState().log).toEqual([copy]);
+    // Still the local one: the page is committed after the write in flight.
+    expect(state.store.getState().settings.language).toBe("ru");
     await held.writes[0]?.resolve();
     await flush();
     await held.writes[1]?.resolve();
     await flush();
+    expect(state.store.getState().settings.language).toBe("en");
     expect(state.store.getState().log).toEqual([copy]);
+    await expect(storedEvents(held.store)).resolves.toEqual([copy]);
+    await expect(held.store.listPending()).resolves.toEqual([]);
   });
 
-  it("takes remote events back and rejects the ingest with the store's own error when the local store refuses them (bug-lessons 99)", async () => {
+  it("shows nothing of a page the local store refuses, and rejects with the store's own error (bug-lessons 99)", async () => {
     const { held, state } = await heldSetup();
     const remote = settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(9), { timezone: "UTC" });
-    const ingested = state.ingest([remote]);
+    const pulled = refusalOf(pullPage(state, held.store, [remote]));
     await flush();
-    expect(state.store.getState().settings.timezone).toBe("UTC");
+    // The store commits first: nothing is shown before it answered.
+    expect(state.store.getState().settings).toEqual(DEFAULT_SETTINGS);
     held.writes[0]?.reject();
-    await expect(ingested).rejects.toThrow("QuotaExceededError");
+    expect(await pulled).toBe("QuotaExceededError");
     expect(state.store.getState().settings).toEqual(DEFAULT_SETTINGS);
     // Not kept, so the next pull (the cursor did not move) brings it in again.
     held.release();
-    await state.ingest([remote]);
+    await pullPage(state, held.store, [remote]);
     expect(state.store.getState().settings.timezone).toBe("UTC");
   });
 
@@ -475,7 +496,7 @@ describe("createAppState local writes (the screen first, the disk after)", () =>
     expect(held.writes).toHaveLength(1);
     expect(second.value()).toEqual({ error: "persist_failed", ok: false });
     expect(first.value()).toMatchObject({ ok: true });
-    await expect(held.store.listAll()).resolves.toEqual([]);
+    await expect(storedEvents(held.store)).resolves.toEqual([]);
     await expect(held.store.listPending()).resolves.toEqual([]);
     expect(state.store.getState().events).toEqual([]);
     expect(locals()).toBe(1);

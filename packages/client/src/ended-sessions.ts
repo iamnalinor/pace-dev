@@ -134,9 +134,10 @@ told; a log-out it does not hear stays kept for the next try.
 export const endingLogout =
   (session: Session, ended: EndedSessions): (() => Promise<void>) =>
   async () => {
+    const owner = session.owner();
     const leaving = session.token();
     if (leaving === undefined) {
-      await session.signOut();
+      await session.signOut(undefined, owner);
       return;
     }
     // The note goes before anything else: another tab's 401 can come before the answer.
@@ -148,6 +149,12 @@ export const endingLogout =
     // ends the session it closes this device's socket (4401) and answers anything else 401,
     // and a check or a sync set off by that would read the person's own sign-out as "ended
     // elsewhere" (QA round 22 R22-02). Signed out, the device sends nothing more with it.
-    await session.signOut();
-    await ended.send(leaving);
+    await session.signOut(undefined, owner);
+    // A host that retired sign-in meanwhile (a server handoff) keeps it for the next start. So
+    // does a sign-out that did nothing (a sign-in began during the waits above, and it was the
+    // older owner's): the device still holds the token, and a session the server ended under it
+    // would read later as "ended elsewhere".
+    if (session.owns(session.owner()) && session.token() !== leaving) {
+      await ended.send(leaving);
+    }
   };

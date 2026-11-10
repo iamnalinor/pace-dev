@@ -23,6 +23,7 @@ export const enLibrary = {
   "history.dayBack": "A day earlier",
   "history.dayForward": "A day later",
   "history.title": "History",
+  "history.loading": "Loading history…",
   "history.events": "Events",
   "history.eventsUntil": "Events up to {when}",
   "history.revoked": "Undone",

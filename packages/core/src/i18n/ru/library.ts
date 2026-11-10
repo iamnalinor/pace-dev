@@ -25,6 +25,7 @@ export const ruLibrary: { readonly [K in keyof typeof enLibrary]: string } = {
   "history.dayBack": "На день раньше",
   "history.dayForward": "На день позже",
   "history.title": "История",
+  "history.loading": "Загрузка истории…",
   "history.events": "События",
   "history.eventsUntil": "События до {when}",
   "history.revoked": "Отменено",

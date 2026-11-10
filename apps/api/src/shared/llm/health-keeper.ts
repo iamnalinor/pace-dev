@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import type { ActorValues } from "../ports/actor-storage.ts";
+
 import { createLogger } from "../logger.ts";
 import {
   type Health,
@@ -12,7 +14,7 @@ import {
 const log = createLogger("info");
 
 /** The part of a Durable Object's storage the keeper uses. */
-export type KeeperStorage = Pick<DurableObjectStorage, "delete" | "get" | "put">;
+export type KeeperStorage = Pick<ActorValues, "delete" | "get" | "put">;
 
 const HEALTH_KEY = "health";
 

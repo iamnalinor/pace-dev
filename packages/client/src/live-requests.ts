@@ -1,5 +1,7 @@
 import { LIVE_MAX_IN_FLIGHT, LIVE_REQUEST_TIMEOUT_MS, type LiveServerMessage } from "@pace/core";
 
+import { INVALID_RESPONSE, SyncError } from "./sync-error.ts";
+
 /**
 A socket request that cannot be made or answered: the socket is closed or speaks only v1
 (`closed`), it already has `LIVE_MAX_IN_FLIGHT` requests open (`busy`), no answer came within
@@ -28,16 +30,26 @@ export type Requests = {
   readonly open: (id: string, send: () => void) => Promise<LiveServerMessage>;
   /** Settles the request a message answers; false when it answers none open. */
   readonly settle: (message: LiveServerMessage) => boolean;
+  readonly invalid: (id: string) => void;
 };
 
 export const createRequests = (onTimeout: () => void): Requests => {
   type Pending = {
     readonly resolve: (message: LiveServerMessage) => void;
-    readonly reject: (error: LiveUnavailable) => void;
+    readonly reject: (error: Error) => void;
     readonly timer: ReturnType<typeof setTimeout>;
   };
   const pending = new Map<string, Pending>();
   return {
+    invalid: (id) => {
+      const request = pending.get(id);
+      if (request === undefined) {
+        return;
+      }
+      pending.delete(id);
+      clearTimeout(request.timer);
+      request.reject(new SyncError(INVALID_RESPONSE));
+    },
     failAll: (): void => {
       for (const [id, request] of pending) {
         pending.delete(id);

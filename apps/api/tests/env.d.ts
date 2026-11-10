@@ -7,6 +7,8 @@ declare global {
       TEST_MIGRATIONS: D1Migration[];
       /** An empty D1 the migration tests apply older migrations to. */
       MIGRATION_DB: D1Database;
+      /** An isolated R2 bucket the archive tests bind as `HISTORY_ARCHIVE`. */
+      TEST_HISTORY_ARCHIVE: R2Bucket;
     }
     // Lets `exports.default.fetch()` from "cloudflare:workers" loop back into this Worker, typed.
     interface GlobalProps {

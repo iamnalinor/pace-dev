@@ -20,6 +20,7 @@ import {
   NoncePollSchema,
   TelegramLoginSchema,
 } from "./schemas/auth.ts";
+import { SyncBootstrapOutputSchema, SyncBootstrapQuerySchema } from "./schemas/bootstrap.ts";
 import {
   CalendarOutputSchema,
   CalendarSyncSchema,
@@ -31,6 +32,7 @@ import {
   UsageOutputSchema,
   UsageUploadSchema,
 } from "./schemas/cloud.ts";
+import { DeploymentReadinessSchema } from "./schemas/deployment-readiness.ts";
 import { InstanceSchema } from "./schemas/instance.ts";
 import { LinkPreviewQuerySchema, LinkPreviewSchema } from "./schemas/links.ts";
 import { CalendarSkipSchema } from "./schemas/notify.ts";
@@ -52,6 +54,12 @@ import {
 
 /** The whole HTTP contract of the Pace API. Add an endpoint here, mount it in apps/api, call it from @pace/client. */
 export const endpoints = {
+  deploymentReadiness: endpoint({
+    auth: false,
+    method: "GET",
+    path: "/api/deployment-readiness",
+    output: DeploymentReadinessSchema,
+  }),
   health: endpoint({
     auth: false,
     method: "GET",
@@ -150,6 +158,13 @@ export const endpoints = {
     }),
   },
   sync: {
+    bootstrap: endpoint({
+      auth: true,
+      method: "GET",
+      output: SyncBootstrapOutputSchema,
+      path: "/api/sync/bootstrap",
+      query: SyncBootstrapQuerySchema,
+    }),
     push: endpoint({
       auth: true,
       body: SyncPushBodySchema,

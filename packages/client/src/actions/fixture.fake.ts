@@ -6,6 +6,7 @@ import type { Clock } from "../clock.ts";
 import type { EventStore } from "../event-store.ts";
 
 import { createMemoryEventStore } from "../adapters/memory-event-store.ts";
+import { seedSynced } from "../local-store.fake.ts";
 import { type AppStateHandle, createAppState } from "../state.ts";
 import { type Actions, createActions } from "./actions.ts";
 
@@ -22,8 +23,7 @@ export const setupActions = async (
   seed: readonly Event[] = artboardEvents(),
   store: EventStore = createMemoryEventStore(),
 ): Promise<ActionsWorld> => {
-  await store.append(seed);
-  await store.markSynced(seed.map((event) => event.id));
+  await seedSynced(store, seed);
   let now = NOW;
   const clock: Clock = { deviceTz: MOSCOW, now: () => now };
   const inner = createAppState({ deviceId: "dev-1", now: clock.now, source: "web", store });

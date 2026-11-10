@@ -25,7 +25,7 @@ export const refusingStore = (): RefusingStore => {
           refused.push(events.length);
           throw new Error("QuotaExceededError");
         }
-        await memory.append(events);
+        await memory.append(events, await memory.readMeta());
       },
     },
     refuse: () => {

@@ -18,7 +18,7 @@ import { Screen } from "#app/ui/screen.tsx";
 import { Shell } from "#app/ui/shell.tsx";
 import { type DayEntry, type DayModel, dayRail } from "@pace/client";
 import { useUsageRead } from "@pace/client/react";
-import { addDaysIn, formatEyebrow } from "@pace/core";
+import { formatEyebrow, nextDayStartIn } from "@pace/core";
 
 import { ActivityPane } from "./activity-pane.tsx";
 import { ActivitySheet, type SheetTarget } from "./activity-sheet.tsx";
@@ -175,7 +175,7 @@ const DayPage = ({
   const phone = useDayPhone(day, now);
   const openingKeys = useOpeningKeys(day.date, day.entries);
   // One read of the day's usage for every part that shows it (QA round 21 L5).
-  const usageRead = useUsageRead(api, day.date, addDaysIn(day.date, 1, day.zone));
+  const usageRead = useUsageRead(api, day.date, nextDayStartIn(day.date, day.zone));
   const sat = useWhereSat(usageRead.rows);
   return (
     <FirstSyncBody>

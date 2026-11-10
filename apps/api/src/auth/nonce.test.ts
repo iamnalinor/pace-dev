@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
-import { d1 } from "../shared/db/d1.ts";
+import { d1 } from "../../tests/host.ts";
 import { bindNonce, consumeNonce, createNonce, linkNonceSession } from "./nonce.ts";
 import { upsertTelegramUser } from "./users.ts";
 

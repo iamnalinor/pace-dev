@@ -15,14 +15,15 @@ import {
 
 import type { ApiClient } from "./api-client.ts";
 import type { AiOutcome, Assistant } from "./assistant.ts";
+import type { HistoryCoordinator } from "./history-types.ts";
 import type { AppState, AppStateHandle } from "./state.ts";
 import type { AiReading } from "./view-models/ai-reading.ts";
 
 import { type Clock, queryContext, systemClock } from "./clock.ts";
 import { withinDeadline } from "./deadline.ts";
+import { createHistoryHook, type HistoryResource } from "./react/history.ts";
 import { type ComposerDraft, composerModel, type ComposerModel } from "./view-models/composer.ts";
 import { type DayModel, dayModel } from "./view-models/day.ts";
-import { type HistoryViewModel, historyViewModel } from "./view-models/history.ts";
 import { type InboxViewModel, inboxViewModel } from "./view-models/inbox.ts";
 import { type InsightsModel, insightsModel } from "./view-models/insights.ts";
 import { type NowViewModel, nowViewModel } from "./view-models/now.ts";
@@ -32,6 +33,8 @@ import { type ReviewViewModel, reviewViewModel } from "./view-models/review.ts";
 import { type TaskViewModel, taskViewModel } from "./view-models/task.ts";
 import { type TimeBarModel, timeBarModel } from "./view-models/time-bar.ts";
 import { type WeekModel, weekModel } from "./view-models/week.ts";
+
+export type { HistoryResource } from "./react/history.ts";
 
 export {
   type Consent,
@@ -57,7 +60,7 @@ export type AppHooks = {
   readonly useProjectView: (projectId: string) => Result<ProjectViewModel, "project/unknown">;
   readonly useInbox: () => InboxViewModel;
   readonly useReview: () => ReviewViewModel;
-  readonly useHistory: (atIso: string) => HistoryViewModel;
+  readonly useHistory: (atIso: string) => HistoryResource;
   /** The composer's live chips for the typed line and the user's taps. */
   readonly useComposer: (draft: ComposerDraft) => ComposerModel;
   /** The time bar: buttons and the running activity (refreshed with the clock). */
@@ -73,7 +76,11 @@ export type AppHooks = {
 const TICK_MS = 30_000;
 
 /** Hooks bound to one app state, so screens never pass the store around. */
-export const createAppHooks = (state: AppStateHandle, clock: Clock = systemClock()): AppHooks => {
+export const createAppHooks = (
+  state: AppStateHandle,
+  clock: Clock = systemClock(),
+  history?: HistoryCoordinator,
+): AppHooks => {
   const useVersion = (): number => useStore(state.store, (current) => current.version);
   const useClock = (): QueryContext => {
     const [ctx, setCtx] = useState(() => queryContext(clock));
@@ -111,11 +118,7 @@ export const createAppHooks = (state: AppStateHandle, clock: Clock = systemClock
     useTimeBar: () => useView(timeBarModel),
     useComposer: (draft) =>
       useView((current, ctx) => composerModel(current, draft, ctx), JSON.stringify(draft)),
-    useHistory: (atIso) =>
-      useView(
-        (current, ctx) => historyViewModel(current, { atIso, deviceTz: ctx.deviceTz }),
-        atIso,
-      ),
+    useHistory: createHistoryHook({ state, history, useView }),
     useInbox: () => useView(inboxViewModel),
     useLanguage: () => useStore(state.store, (current) => current.settings.language),
     useNow: (options) =>
