@@ -115,8 +115,37 @@ const titleOf = (state: HistorySource, event: Event, taskId: null | string): nul
       return named;
     }
   }
-  return event.type === "task.created" ? event.payload.title : null;
+  return event.type === "task.created" ? event.payload.title : loggedTitleOf(state.log, taskId);
 };
+
+/**
+A task that is gone (its creation undone) is named as the log last wrote it, so its other rows
+keep their subject (QA round 27 R27-07).
+*/
+const loggedTitleOf = (log: readonly Event[], taskId: null | string): null | string => {
+  if (taskId === null) {
+    return null;
+  }
+  const titled = log.findLast(
+    (event) =>
+      "taskId" in event.payload &&
+      event.payload.taskId === taskId &&
+      "title" in event.payload &&
+      typeof event.payload.title === "string",
+  );
+  return titled !== undefined &&
+    "title" in titled.payload &&
+    typeof titled.payload.title === "string"
+    ? titled.payload.title
+    : null;
+};
+
+/**
+A task event about a task the state no longer holds (its creation was undone); an activity spent
+on it still stands on its own.
+*/
+const isOfGoneTask = (state: HistorySource, event: Event, taskId: null | string): boolean =>
+  event.type.startsWith("task.") && taskId !== null && taskById(state.tasks, taskId) === undefined;
 
 const newestFirst = (a: Event, b: Event): number => {
   const keyA = `${a.occurredAt}${a.recordedAt}${a.id}`;
@@ -216,7 +245,8 @@ const entries = (state: HistorySource): readonly HistoryEntry[] => {
       source: event.source,
       taskId,
       taskTitle: titleOf(state, event, taskId),
-      revocable: !isCorrection(event) && isEffective,
+      // Undoing an edit of a task that is gone changes nothing: no Undo on it (R27-07).
+      revocable: !isCorrection(event) && isEffective && !isOfGoneTask(state, event, taskId),
       revokedBy,
       labelKey: labelKeyOf(event),
     };

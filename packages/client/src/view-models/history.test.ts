@@ -64,6 +64,21 @@ describe("historyViewModel", () => {
     expect(rowsOf().every((entry) => entry.revokedBy !== null)).toBe(true);
   });
 
+  it("keeps naming a task whose creation was undone, and offers no Undo for its later rows (QA round 27 R27-07)", async () => {
+    const world = await setupActions();
+    const [created] = unwrap(
+      await world.actions.createTask({ presetId: "personal", title: "Call the bank" }),
+    );
+    const taskId = created?.type === "task.created" ? created.payload.taskId : "";
+    const [importance] = unwrap(await world.actions.setImportance(taskId, "asap"));
+    unwrap(await world.actions.revoke(created?.id ?? ""));
+    const row = historyViewModel(world.state.store.getState(), {
+      atIso: NOW,
+      deviceTz: MOSCOW,
+    }).events.find((entry) => entry.id === importance?.id);
+    expect(row).toMatchObject({ revocable: false, taskTitle: "Call the bank" });
+  });
+
   it("names the activity an activity event is about", async () => {
     const world = await setupActions();
     const [started] = unwrap(await world.actions.startChoice("rest"));

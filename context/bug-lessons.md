@@ -2544,3 +2544,9 @@ New bugs go here with their class; a new class gets its own section above.
 - **Missed because.** Class 211 made errors and alerts reveal themselves; a panel the person opens is the same "appears below the fold" case and was not listed.
 - **Class.** Class 211 again: content that appears in a scrolling body behind a pinned footer, without being brought into view.
 - **Sweep and guard.** The date panel (deadline, start, final deadline, the Close sheet does not use it) asks the overlay body to reveal it as it opens (`useRevealOnShow`), so its time and Done come into view above Save. The other unfolding parts of a sheet: the estimate chips are one row under their chip; Day's day choices and the repeat fields grow by a line or two beside the field just used. Guard: `overlay-reveal.test.tsx` (the date panel asks to be revealed as it opens).
+
+### 232. Rows that read their subject from the live state, after the subject was undone
+- **Bug.** After History's Undo of «Задача создана · <note>», the later «Важность изменена» and «Пресет изменён» rows lost the task's name, and «Важность изменена» still offered a live «Вернуть» that would change nothing (QA round 27 R27-07).
+- **Missed because.** History's tests undid the newest row; none undid an event that later rows depend on.
+- **Class.** A derived row that names and acts on its subject through the current state, with no case for a subject that a correction removed.
+- **Sweep and guard.** A row of a task that is gone is named as the log last wrote the task's title, and a task event of a gone task offers no Undo (an activity spent on it still does: it stands on its own). The other subjects History names: presets and activities fall back to the name the event wrote already (R23-07). Guard: `history.test.ts` (creation undone: the later row keeps the title and has no Undo).
