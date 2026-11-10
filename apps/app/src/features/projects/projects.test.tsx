@@ -4,6 +4,7 @@ import { ProjectScreen } from "#app/features/projects/project-screen.tsx";
 import { ProjectsScreen } from "#app/features/projects/projects-screen.tsx";
 import { isControl } from "#app/test/focus-target.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
+import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { ALGEBRA_ID } from "@pace/core/testing";
 
@@ -85,6 +86,40 @@ describe("project forms", () => {
     await fireEvent.press(screen.getByRole("button", { name: en("project.archive") }));
     await waitFor(() => {
       expect(project()?.archived).toBe(true);
+    });
+  });
+
+  it("says a project went to the archive, with Undo, and goes back to the list (R27-03)", async () => {
+    const runtime = await createTestRuntime();
+    await renderScreen(<ProjectScreen id={ALGEBRA_ID} />, runtime);
+    const project = () => runtime.state.store.getState().projects.byId[ALGEBRA_ID];
+    const name = project()?.name ?? "";
+    await fireEvent.press(screen.getByRole("button", { name: en("project.edit") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("project.archive") }));
+    expect(await screen.findByText(en("project.archived", { name }))).toBeOnTheScreen();
+    expect(router.back).toHaveBeenCalled();
+    await fireEvent.press(screen.getByRole("button", { name: en("common.undo") }));
+    await waitFor(() => {
+      expect(project()?.archived).toBe(false);
+    });
+  });
+
+  it("lists archived projects once asked, and an archived one says so with Restore at hand (R27-03)", async () => {
+    const runtime = await createTestRuntime();
+    const name = runtime.state.store.getState().projects.byId[ALGEBRA_ID]?.name ?? "";
+    await runtime.actions.updateProject(ALGEBRA_ID, { archived: true });
+    const list = await renderScreen(<ProjectsScreen />, runtime);
+    expect(screen.queryByText(name)).toBeNull();
+    await fireEvent.press(screen.getByRole("switch", { name: en("projects.showArchived") }));
+    expect(
+      screen.getByRole("link", { name: `${name}, ${en("project.archivedBadge")}` }),
+    ).toBeOnTheScreen();
+    await list.unmount();
+    await renderScreen(<ProjectScreen id={ALGEBRA_ID} />, runtime);
+    expect(screen.getByText(en("project.archivedMark"))).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: en("project.restore") }));
+    await waitFor(() => {
+      expect(runtime.state.store.getState().projects.byId[ALGEBRA_ID]?.archived).toBe(false);
     });
   });
 });

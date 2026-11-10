@@ -5,7 +5,7 @@ import type { ProjectViewModel } from "@pace/client";
 
 import { useAppState, useLanguage, usePace, useT } from "#app/app-state.tsx";
 import { FoldedSection, TaskRows } from "#app/shared/task-list.tsx";
-import { useBack } from "#app/shared/use-back.ts";
+import { useBack, useLeave } from "#app/shared/use-back.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button } from "#app/ui/button.tsx";
 import { EmptyState } from "#app/ui/empty-state.tsx";
@@ -13,9 +13,49 @@ import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
 import { SectionHeader } from "#app/ui/section-header.tsx";
 import { Text } from "#app/ui/text.tsx";
+import { toastQuote, useToast } from "#app/ui/toast.tsx";
 import { formatCount, projectById } from "@pace/core";
 
 import { ProjectForm } from "./project-form.tsx";
+
+/** Whether the project is archived now (the page stays open on an archived one). */
+const useIsArchived = (projectId: string): boolean =>
+  useAppState((state) => projectById(state.projects, projectId)?.archived ?? false);
+
+/**
+Archive and restore. Archiving says so with Undo, as the app's other soft deletes do, and goes
+back to the list it leaves (QA round 27 R27-03); restoring brings it back where it is.
+*/
+const useArchive = (project: ProjectViewModel) => {
+  const t = useT();
+  const { actions } = usePace();
+  const run = useRunAction();
+  const toast = useToast();
+  const leave = useLeave("/projects");
+  return {
+    archive: async (): Promise<void> => {
+      const result = await run(actions.updateProject(project.id, { archived: true }));
+      if (!result.ok) {
+        return;
+      }
+      const [archived] = result.value;
+      toast.show({
+        message: t("project.archived", { name: toastQuote(project.name) }),
+        ...(archived !== undefined && {
+          action: {
+            label: t("common.undo"),
+            onPress: () => void run(actions.revoke(archived.id)),
+            undoes: [archived.id],
+          },
+        }),
+      });
+      leave();
+    },
+    restore: async (): Promise<void> => {
+      await run(actions.updateProject(project.id, { archived: false }));
+    },
+  };
+};
 
 /** Name, color and description, plus archive / restore. */
 const EditProject = ({
@@ -27,10 +67,8 @@ const EditProject = ({
 }) => {
   const t = useT();
   const { actions } = usePace();
-  const run = useRunAction();
-  const isArchived = useAppState(
-    (state) => projectById(state.projects, project.id)?.archived ?? false,
-  );
+  const isArchived = useIsArchived(project.id);
+  const { archive, restore } = useArchive(project);
   return (
     <View className="mx-gutter mb-4">
       <ProjectForm
@@ -38,8 +76,8 @@ const EditProject = ({
         extra={
           <Button
             onPress={() => {
-              void run(actions.updateProject(project.id, { archived: !isArchived }));
               onDone();
+              void (isArchived ? restore() : archive());
             }}
             variant="plain"
           >
@@ -81,20 +119,40 @@ const StatsLine = ({ project }: { readonly project: ProjectViewModel }) => {
   );
 };
 
-/** The name as the page's heading, its figures line and its description. */
-const ProjectTitle = ({ project }: { readonly project: ProjectViewModel }) => (
-  <View className="mx-gutter mb-2 gap-1 px-row-x">
-    <Text level={1} role="title1">
-      {project.name}
-    </Text>
-    <StatsLine project={project} />
-    {project.description === null ? null : (
-      <Text lines={3} policy="clamp" role="callout" tone="secondary">
-        {project.description}
+/** An archived project says so, with Restore at hand rather than under Edit (R27-03). */
+const ArchivedMark = ({ project }: { readonly project: ProjectViewModel }) => {
+  const t = useT();
+  const { restore } = useArchive(project);
+  return (
+    <View className="mt-1 items-start gap-1">
+      <Text role="footnote" tone="secondary">
+        {t("project.archivedMark")}
       </Text>
-    )}
-  </View>
-);
+      <Button onPress={() => void restore()} size="small" variant="secondary">
+        {t("project.restore")}
+      </Button>
+    </View>
+  );
+};
+
+/** The name as the page's heading, its figures line and its description. */
+const ProjectTitle = ({ project }: { readonly project: ProjectViewModel }) => {
+  const isArchived = useIsArchived(project.id);
+  return (
+    <View className="mx-gutter mb-2 gap-1 px-row-x">
+      <Text level={1} role="title1">
+        {project.name}
+      </Text>
+      <StatsLine project={project} />
+      {project.description === null ? null : (
+        <Text lines={3} policy="clamp" role="callout" tone="secondary">
+          {project.description}
+        </Text>
+      )}
+      {isArchived ? <ArchivedMark project={project} /> : null}
+    </View>
+  );
+};
 
 /** A project: its name and figures, then its tasks as on Now: open, in future, done (each one opens). */
 export const ProjectScreen = ({ id }: { readonly id: string }) => {
