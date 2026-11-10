@@ -95,27 +95,19 @@
       "indexes": {
         "calendar_events_start_idx": {
           "name": "calendar_events_start_idx",
-          "columns": [
-            "start_at"
-          ],
+          "columns": ["start_at"],
           "isUnique": false
         },
         "calendar_events_end_instant_idx": {
           "name": "calendar_events_end_instant_idx",
-          "columns": [
-            "julianday(\"end_at\")"
-          ],
+          "columns": ["julianday(\"end_at\")"],
           "isUnique": false
         }
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "calendar_events_device_id_event_id_start_at_pk": {
-          "columns": [
-            "device_id",
-            "event_id",
-            "start_at"
-          ],
+          "columns": ["device_id", "event_id", "start_at"],
           "name": "calendar_events_device_id_event_id_start_at_pk"
         }
       },
@@ -192,16 +184,12 @@
       "indexes": {
         "decisions_task_idx": {
           "name": "decisions_task_idx",
-          "columns": [
-            "task_id"
-          ],
+          "columns": ["task_id"],
           "isUnique": false
         },
         "decisions_at_idx": {
           "name": "decisions_at_idx",
-          "columns": [
-            "at"
-          ],
+          "columns": ["at"],
           "isUnique": false
         }
       },
@@ -280,24 +268,17 @@
       "indexes": {
         "events_id_unique": {
           "name": "events_id_unique",
-          "columns": [
-            "id"
-          ],
+          "columns": ["id"],
           "isUnique": true
         },
         "events_occurred_idx": {
           "name": "events_occurred_idx",
-          "columns": [
-            "occurred_at"
-          ],
+          "columns": ["occurred_at"],
           "isUnique": false
         },
         "events_type_idx": {
           "name": "events_type_idx",
-          "columns": [
-            "type",
-            "seq"
-          ],
+          "columns": ["type", "seq"],
           "isUnique": false
         }
       },
@@ -335,10 +316,7 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "_history_archive_chunks_operation_id_chunk_pk": {
-          "columns": [
-            "operation_id",
-            "chunk"
-          ],
+          "columns": ["operation_id", "chunk"],
           "name": "_history_archive_chunks_operation_id_chunk_pk"
         }
       },
@@ -380,9 +358,7 @@
       "indexes": {
         "_history_archive_manifests_manifestKey_unique": {
           "name": "_history_archive_manifests_manifestKey_unique",
-          "columns": [
-            "manifest_key"
-          ],
+          "columns": ["manifest_key"],
           "isUnique": true
         }
       },
@@ -708,12 +684,7 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "_history_phone_daily_store_id_zone_day_device_id_pk": {
-          "columns": [
-            "store_id",
-            "zone",
-            "day",
-            "device_id"
-          ],
+          "columns": ["store_id", "zone", "day", "device_id"],
           "name": "_history_phone_daily_store_id_zone_day_device_id_pk"
         }
       },
@@ -755,19 +726,14 @@
       "indexes": {
         "history_raw_month_idx": {
           "name": "history_raw_month_idx",
-          "columns": [
-            "month"
-          ],
+          "columns": ["month"],
           "isUnique": false
         }
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "_history_raw_revisions_kind_row_key_pk": {
-          "columns": [
-            "kind",
-            "row_key"
-          ],
+          "columns": ["kind", "row_key"],
           "name": "_history_raw_revisions_kind_row_key_pk"
         }
       },
@@ -930,10 +896,7 @@
       "indexes": {
         "notification_deliveries_idx": {
           "name": "notification_deliveries_idx",
-          "columns": [
-            "notification_id",
-            "session_id"
-          ],
+          "columns": ["notification_id", "session_id"],
           "isUnique": false
         }
       },
@@ -1033,17 +996,12 @@
       "indexes": {
         "notifications_ref_idx": {
           "name": "notifications_ref_idx",
-          "columns": [
-            "kind",
-            "ref"
-          ],
+          "columns": ["kind", "ref"],
           "isUnique": false
         },
         "notifications_open_idx": {
           "name": "notifications_open_idx",
-          "columns": [
-            "resolved_at"
-          ],
+          "columns": ["resolved_at"],
           "isUnique": false
         }
       },
@@ -1080,19 +1038,14 @@
       "indexes": {
         "phone_uses_end_instant_idx": {
           "name": "phone_uses_end_instant_idx",
-          "columns": [
-            "julianday(\"end_at\")"
-          ],
+          "columns": ["julianday(\"end_at\")"],
           "isUnique": false
         }
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "phone_uses_device_id_start_at_pk": {
-          "columns": [
-            "device_id",
-            "start_at"
-          ],
+          "columns": ["device_id", "start_at"],
           "name": "phone_uses_device_id_start_at_pk"
         }
       },
@@ -1155,10 +1108,7 @@
       "indexes": {
         "poll_outbox_session_idx": {
           "name": "poll_outbox_session_idx",
-          "columns": [
-            "session_id",
-            "seq"
-          ],
+          "columns": ["session_id", "seq"],
           "isUnique": false
         }
       },
@@ -1321,10 +1271,7 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "subtasks_task_id_id_pk": {
-          "columns": [
-            "task_id",
-            "id"
-          ],
+          "columns": ["task_id", "id"],
           "name": "subtasks_task_id_id_pk"
         }
       },
@@ -1450,23 +1397,17 @@
       "indexes": {
         "tasks_project_idx": {
           "name": "tasks_project_idx",
-          "columns": [
-            "project_id"
-          ],
+          "columns": ["project_id"],
           "isUnique": false
         },
         "tasks_status_idx": {
           "name": "tasks_status_idx",
-          "columns": [
-            "status"
-          ],
+          "columns": ["status"],
           "isUnique": false
         },
         "tasks_due_idx": {
           "name": "tasks_due_idx",
-          "columns": [
-            "due_at"
-          ],
+          "columns": ["due_at"],
           "isUnique": false
         }
       },
@@ -1546,13 +1487,7 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "usage_daily_apps_store_id_zone_day_device_id_app_pk": {
-          "columns": [
-            "store_id",
-            "zone",
-            "day",
-            "device_id",
-            "app"
-          ],
+          "columns": ["store_id", "zone", "day", "device_id", "app"],
           "name": "usage_daily_apps_store_id_zone_day_device_id_app_pk"
         }
       },
@@ -1609,12 +1544,7 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "usage_daily_devices_store_id_zone_day_device_id_pk": {
-          "columns": [
-            "store_id",
-            "zone",
-            "day",
-            "device_id"
-          ],
+          "columns": ["store_id", "zone", "day", "device_id"],
           "name": "usage_daily_devices_store_id_zone_day_device_id_pk"
         }
       },
@@ -1663,27 +1593,19 @@
       "indexes": {
         "usage_sessions_start_idx": {
           "name": "usage_sessions_start_idx",
-          "columns": [
-            "start_at"
-          ],
+          "columns": ["start_at"],
           "isUnique": false
         },
         "usage_sessions_end_instant_idx": {
           "name": "usage_sessions_end_instant_idx",
-          "columns": [
-            "julianday(\"end_at\")"
-          ],
+          "columns": ["julianday(\"end_at\")"],
           "isUnique": false
         }
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "usage_sessions_device_id_app_start_at_pk": {
-          "columns": [
-            "device_id",
-            "app",
-            "start_at"
-          ],
+          "columns": ["device_id", "app", "start_at"],
           "name": "usage_sessions_device_id_app_start_at_pk"
         }
       },

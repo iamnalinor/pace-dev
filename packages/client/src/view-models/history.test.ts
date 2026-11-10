@@ -61,7 +61,8 @@ describe("historyViewModel", () => {
       }),
     );
     const rows = () =>
-      historyViewModel(fullSource(world.state.store.getState()), { atIso: NOW, deviceTz: MOSCOW }).events;
+      historyViewModel(fullSource(world.state.store.getState()), { atIso: NOW, deviceTz: MOSCOW })
+        .events;
     const row = rows().find((entry) => entry.ids.includes(written[0]?.id ?? ""));
     expect(row).toMatchObject({ revocable: true, type: "activity.logged" });
     expect(new Set(row?.ids)).toEqual(new Set(written.map((event) => event.id)));

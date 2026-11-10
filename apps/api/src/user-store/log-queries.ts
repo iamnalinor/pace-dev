@@ -27,33 +27,32 @@ export const latestSeq = async (db: Db): Promise<number> => {
   return row?.seq ?? 0;
 };
 
-/** Every event of the log as the core sees it; a row the schema no longer accepts is skipped. */
-export const loadLog = async (db: Db, through?: number): Promise<readonly Event[]> => {
-  const rows = await db
-    .select()
-    .from(schema.events)
-    .where(through === undefined ? undefined : lte(schema.events.seq, through))
-    .orderBy(asc(schema.events.seq));
-  return rows.flatMap((row) => {
+/** Rows as the core's events; a row the schema no longer accepts is skipped. */
+const parsedEvents = (rows: readonly (typeof schema.events.$inferSelect)[]): readonly Event[] =>
+  rows.flatMap((row) => {
     const parsed = parseEvent(toEvent(row));
     return parsed.ok ? [parsed.value] : [];
   });
-};
+
+/** Every event of the log as the core sees it; a row the schema no longer accepts is skipped. */
+export const loadLog = async (db: Db, through?: number): Promise<readonly Event[]> =>
+  parsedEvents(
+    await db
+      .select()
+      .from(schema.events)
+      .where(through === undefined ? undefined : lte(schema.events.seq, through))
+      .orderBy(asc(schema.events.seq)),
+  );
 
 /**
 The log's revocations through `through`: what `revokedIdsIn` needs to name the revoked ids when the
 state comes from a checkpoint rather than the whole log (served by `events_type_idx`).
 */
 export const loadRevocations = async (db: Db, through: number): Promise<readonly Event[]> => {
-  const rows = await db
-    .select()
-    .from(schema.events)
-    .where(and(eq(schema.events.type, "event.revoked"), lte(schema.events.seq, through)))
-    .orderBy(asc(schema.events.seq));
-  return rows.flatMap((row) => {
-    const parsed = parseEvent(toEvent(row));
-    return parsed.ok ? [parsed.value] : [];
-  });
+  const revocations = and(eq(schema.events.type, "event.revoked"), lte(schema.events.seq, through));
+  return parsedEvents(
+    await db.select().from(schema.events).where(revocations).orderBy(asc(schema.events.seq)),
+  );
 };
 
 /** Inserts the events whose id is new to the log (and to this batch), in order. */

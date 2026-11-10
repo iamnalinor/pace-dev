@@ -73,6 +73,34 @@ describe("checkpoint state cache", () => {
       expect(await store.countEvents()).toBe(2);
     });
   });
+
+  it("knows on a cold restart from a checkpoint which events are revoked, so none is revoked twice", async () => {
+    const stub = env.USER_STORE.get(env.USER_STORE.idFromName(crypto.randomUUID()));
+    await runInUserStore(stub, async (_store, state) => {
+      const db = actorDatabase(state.storage);
+      const created = event("made", "task.created", {
+        payload: { taskId: "made", title: "Undone long ago", presetId: "personal" },
+      });
+      const revoked = event("undo", "event.revoked", { payload: { targetId: created.id } });
+      const recent = event("recent", "settings.updated", {
+        payload: { language: "ru" },
+        occurredAt: "2026-11-05T12:00:00.000Z",
+      });
+      await insertNew(db, [created, revoked, recent], new Set());
+      const options = {
+        build: "checkpoint-cache-revoked",
+        db,
+        storage: actorStorage(state.storage),
+        isNamed: true,
+        checkpointMode: "active" as const,
+        now: () => NOW,
+      };
+      const initial = await new StateCache(options).current();
+      const cold = await new StateCache(options).current();
+      expect(initial.revoked).toEqual(new Set([created.id]));
+      expect(cold.revoked).toEqual(new Set([created.id]));
+    });
+  });
 });
 
 describe("checkpoint privacy", () => {

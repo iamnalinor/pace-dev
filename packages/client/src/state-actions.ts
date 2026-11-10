@@ -2,14 +2,10 @@ import { err, type Event, ok } from "@pace/core";
 
 import type { createQueue, LocalLog, Persisted } from "./local-log.ts";
 import type { StoreChange } from "./peer-tabs.ts";
-import type {
-  AppState,
-  AppStateHandle,
-  AppStateOptions as Options,
-} from "./state-types.ts";
+import type { AppState, AppStateHandle, AppStateOptions as Options } from "./state-types.ts";
 
-import { requiresSourceForEvent } from "./checkpoint-validation.ts";
 import { batchInstant, parseBatch } from "./batch.ts";
+import { requiresSourceForEvent } from "./checkpoint-validation.ts";
 
 /**
 The device's write instants: each batch gets one of its own, later than the one before it on this

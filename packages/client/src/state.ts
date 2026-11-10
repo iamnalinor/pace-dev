@@ -6,7 +6,12 @@ import type { HistoryError } from "./history-types.ts";
 import type { AppState, AppStateHandle, AppStateOptions as Options } from "./state-types.ts";
 
 import { createLocalLog, createQueue } from "./local-log.ts";
-import { createBatchClock, createPrepare, createStageEvents, externalChanges } from "./state-actions.ts";
+import {
+  createBatchClock,
+  createPrepare,
+  createStageEvents,
+  externalChanges,
+} from "./state-actions.ts";
 import { createAnnounce, createCopyControls } from "./state-controls.ts";
 import { createEventActions } from "./state-dispatch.ts";
 import { FOLD, initialState } from "./state-fold.ts";
