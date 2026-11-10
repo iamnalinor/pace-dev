@@ -133,6 +133,26 @@ describe("CloseSheet — a homework task (one done mark per subtask, nothing to 
     });
   });
 
+  it("closes at an hour typed alone with one press of Done, or one Enter, without leaving the field (QA 27 review I3)", async () => {
+    for (const press of ["Done", "Enter"] as const) {
+      const runtime = await openClose();
+      await fireEvent.press(screen.getByRole("radio", { name: en("close.pickExact") }));
+      const time = screen.getByLabelText(en("close.time"));
+      await fireEvent.changeText(time, "");
+      await fireEvent.changeText(time, "7");
+      await (press === "Done"
+        ? fireEvent.press(screen.getByRole("button", { name: en("common.done") }))
+        : fireEvent(time, "submitEditing"));
+      await waitFor(() => {
+        expect(runtime.state.store.getState().log.at(-1)).toMatchObject({
+          occurredAt: "2026-10-07T04:00:00.000Z",
+          type: "task.closed",
+        });
+      });
+      await screen.unmount();
+    }
+  });
+
   it("says why a typed time cannot be taken, before Done is pressed: ahead of now, before the task", async () => {
     // The sheet and the write read one rule: Done is never enabled for a time it would refuse.
     await openClose();

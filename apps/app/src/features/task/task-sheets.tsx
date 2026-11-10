@@ -10,7 +10,7 @@ import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
-import { TimeCheckScope, useTimeChecks } from "#app/ui/time-check.tsx";
+import { TimeCheckScope, useCheckedSubmit, useTimeChecks } from "#app/ui/time-check.tsx";
 import { useDiscardDraft, useDraft } from "#app/ui/use-draft.ts";
 import {
   type AppState,
@@ -278,6 +278,13 @@ const useEditDrafts = (
   return { draftKey, onClose };
 };
 
+/** Save behind the time fields (R27-02); a time the press hands over is saved by it (review I3). */
+const useEditSubmit = (isDisabled: boolean, save: () => Promise<unknown>) => {
+  const times = useTimeChecks();
+  const submit = useCheckedSubmit(times, () => !isDisabled && void save());
+  return { isDisabled, submit, times };
+};
+
 export const EditTaskSheet = ({
   onClose: close,
   view,
@@ -302,21 +309,15 @@ export const EditTaskSheet = ({
   const repeatProblem = useRepeatProblem(view.id, before, values);
   const toAdd = withDraft(added, subtaskDraft);
   const save = useSave({ added: toAdd, before, removed, seriesId, values, view }, onClose);
-  const times = useTimeChecks();
+  const { isDisabled, submit, times } = useEditSubmit(
+    values.title.trim() === "" || !deadline.valid || repeatProblem !== null,
+    save,
+  );
   return (
     <Sheet
       closeLabel={t("common.close")}
       footer={
-        <SheetActions
-          isDisabled={values.title.trim() === "" || !deadline.valid || repeatProblem !== null}
-          onPrimary={() => {
-            // A time typed and not readable refuses Save, said under its field (R27-02).
-            if (times.isAllRead()) {
-              void save();
-            }
-          }}
-          primaryLabel={t("common.save")}
-        />
+        <SheetActions isDisabled={isDisabled} onPrimary={submit} primaryLabel={t("common.save")} />
       }
       name="task-edit"
       onClose={onClose}

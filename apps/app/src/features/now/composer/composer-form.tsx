@@ -11,7 +11,7 @@ import { IconButton } from "#app/ui/icon-button.tsx";
 import { RadioChips } from "#app/ui/radio-chips.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 import { Text } from "#app/ui/text.tsx";
-import { TimeCheckScope, useTimeChecks } from "#app/ui/time-check.tsx";
+import { TimeCheckScope, useCheckedSubmit, useTimeChecks } from "#app/ui/time-check.tsx";
 import { HotkeyLayer, useHotkey } from "#app/ui/use-hotkey.tsx";
 import { type ComposerEdits, type ComposerModel, taskFormOptions } from "@pace/client";
 
@@ -227,17 +227,15 @@ export const ComposerForm = ({
   const times = useTimeChecks();
   const isTitleMissing = model.target.kind !== "instance" && model.title.trim() === "";
   // With no title, Create (and its keys) says what is missing instead of doing nothing (R24-06).
-  const add = (): void => {
-    // A time typed and not readable refuses Create, said under its field (R27-02).
-    if (!times.isAllRead()) {
-      return;
-    }
+  // A time typed and not readable refuses Create, said under its field (R27-02); one handed over
+  // by the press is created with (review I3).
+  const add = useCheckedSubmit(times, () => {
     if (isTitleMissing) {
       setSubmitTries((tries) => tries + 1);
       return;
     }
     onAdd();
-  };
+  });
   return (
     <HotkeyLayer>
       <View

@@ -10,7 +10,7 @@ import { ErrorMessage } from "./field-error.tsx";
 import { useSheetSubmit } from "./sheet-submit.tsx";
 import { boxClass, FocusRing } from "./text-field.tsx";
 import { useTheme } from "./theme-provider.tsx";
-import { useTimeCheck } from "./time-check.tsx";
+import { type TimeVerdict, useTimeCheck } from "./time-check.tsx";
 
 /**
 How long a typed time may get: room for a paste the parser reads whole («9:30 PM», «12:345» are
@@ -21,38 +21,55 @@ export const TIME_MAX_LENGTH = 8;
 /**
 A Save around the field asks first: typed text that is not a time (in a draft, not the time the
 draft holds either: «0:30» on the way to retyping the hour) refuses it, and the field says why
-(QA round 27 R27-02).
+(QA round 27 R27-02). A time the field hands over to the draft for that press («7» read whole is
+07:00), or handed over a moment ago and not yet drawn (Enter), makes the press wait for the render
+that gives the form the time; the form then runs it again (`useCheckedSubmit`, review I3).
 */
 const useUnreadableCheck = (
-  pendingRef: RefObject<null | string>,
-  latestRef: RefObject<{ readonly isDraft: boolean; readonly onTime: (time: string) => void }>,
+  refs: {
+    readonly pendingRef: RefObject<null | string>;
+    readonly handedRef: RefObject<boolean>;
+    readonly latestRef: RefObject<{
+      readonly isDraft: boolean;
+      readonly onTime: (time: string) => void;
+    }>;
+  },
   setters: {
     readonly setIsWrong: (isWrong: boolean) => void;
     /** Shows a text as the one typed, still to be saved. */
     readonly adopt: (text: string) => void;
   },
 ): void => {
+  const { handedRef, latestRef, pendingRef } = refs;
   const { adopt, setIsWrong } = setters;
   useTimeCheck(
-    useCallback(() => {
-      const typed = pendingRef.current;
-      if (typed === null) {
-        return false;
-      }
-      const read = readTime(typed);
-      if (!read.isComplete) {
-        setIsWrong(true);
-        return true;
-      }
-      if (latestRef.current.isDraft && read.text !== typed) {
-        // Read whole it is a time the draft does not hold yet («7» is 07:00): handed over and
-        // shown, and this press waits for the next one, which saves what the field now shows.
-        adopt(read.text);
-        latestRef.current.onTime(read.text);
-        return true;
-      }
-      return false;
-    }, [adopt, latestRef, pendingRef, setIsWrong]),
+    useCallback(
+      (canHandOver: boolean): TimeVerdict => {
+        if (handedRef.current || pendingRef.current === null) {
+          // Handed over a moment ago: once only, the press's next run finds it drawn.
+          const verdict = handedRef.current ? "waits" : "read";
+          handedRef.current = false;
+          return verdict;
+        }
+        const typed = pendingRef.current;
+        const read = readTime(typed);
+        if (!read.isComplete) {
+          setIsWrong(true);
+          return "wrong";
+        }
+        if (!latestRef.current.isDraft || read.text === typed) {
+          return "read";
+        }
+        if (canHandOver) {
+          // Read whole it is a time the draft does not hold yet («7» is 07:00): handed over and
+          // shown; the press runs again once the form has it.
+          adopt(read.text);
+          latestRef.current.onTime(read.text);
+        }
+        return "waits";
+      },
+      [adopt, handedRef, latestRef, pendingRef, setIsWrong],
+    ),
   );
 };
 
@@ -74,7 +91,7 @@ const useStoredValue = (
 };
 
 /**
-The typed text of a `TimeInput` and when it is saved: on leave or Enter (`isCommitted`), as it is typed
+The typed text of a `TimeInput` and when it is saved: on leave or Enter (`commit`), as it is typed
 inside a draft, and as the field goes away holding a time it was not left with.
 */
 const useTypedTime = ({
@@ -94,9 +111,12 @@ const useTypedTime = ({
   useStoredValue(value, isEdited, setText);
   // What an unmount must still save: the text typed and not yet saved, and who hears it.
   const pendingRef = useRef<null | string>(null);
+  // A time handed to `onTime` that the caller has not drawn yet: a Save pressed now waits for it.
+  const handedRef = useRef(false);
   const latestRef = useRef({ isDraft, onTime, value });
   useEffect(() => {
     latestRef.current = { isDraft, onTime, value };
+    handedRef.current = false;
   });
   useEffect(
     () => () => {
@@ -115,38 +135,42 @@ const useTypedTime = ({
     pendingRef.current = typed;
     setText(typed);
   }, []);
-  useUnreadableCheck(pendingRef, latestRef, { adopt, setIsWrong });
-  /** Saves what is typed; `true` when the stored time already is what the field shows. */
-  const isCommitted = (): boolean => {
+  useUnreadableCheck({ handedRef, latestRef, pendingRef }, { adopt, setIsWrong });
+  /** Saves what is typed, read whole; a text that is not a time stays, said wrong. */
+  const commit = (): void => {
     if (!isEdited) {
       setText(value);
-      return true;
+      return;
     }
     const read = readTime(text);
     if (!read.isComplete) {
       setIsWrong(true);
-      return false;
+      return;
     }
     pendingRef.current = null;
     setIsWrong(false);
     setIsEdited(false);
     setText(read.text);
-    if (read.text !== value) {
-      onTime(read.text);
-      return false;
+    if (read.text === value) {
+      return;
     }
-    return true;
+
+    handedRef.current = true;
+    onTime(read.text);
   };
   const type = (raw: string): void => {
     const typed = typeTime(raw, text);
     setIsEdited(true);
     setText(typed.text);
     pendingRef.current = typed.text;
-    if (isDraft && typed.isComplete && typed.text !== value) {
-      onTime(typed.text);
+    if (!(isDraft && typed.isComplete) || typed.text === value) {
+      return;
     }
+
+    handedRef.current = true;
+    onTime(typed.text);
   };
-  return { isCommitted, isWrong, text, type };
+  return { commit, isWrong, text, type };
 };
 
 /**
@@ -190,7 +214,7 @@ export const TimeInput = ({
   const t = useT();
   const messageId = useId();
   const [isFocused, setIsFocused] = useState(false);
-  const { isCommitted, isWrong, text, type } = useTypedTime({ isDraft, onTime, value });
+  const { commit, isWrong, text, type } = useTypedTime({ isDraft, onTime, value });
   const sheetSubmit = useSheetSubmit();
   return (
     <View className={cx("gap-2 self-start", className)}>
@@ -210,7 +234,7 @@ export const TimeInput = ({
           maxLength={TIME_MAX_LENGTH}
           onBlur={() => {
             setIsFocused(false);
-            isCommitted();
+            commit();
           }}
           {...(sheetSubmit !== undefined && submitFieldProps)}
           onChangeText={type}
@@ -218,11 +242,10 @@ export const TimeInput = ({
             setIsFocused(true);
           }}
           onSubmitEditing={() => {
-            // In a sheet Enter presses its Done or Save, as in its other fields (R27-01), once the
-            // form holds the time shown; a time just handed over waits for the next Enter.
-            if (isCommitted()) {
-              sheetSubmit?.();
-            }
+            // In a sheet Enter presses its Done or Save, as in its other fields (R27-01). A time
+            // just handed over is saved by that same press: it waits for the render that has it.
+            commit();
+            sheetSubmit?.();
           }}
           placeholder="00:00"
           placeholderTextColor={palette["label.tertiary"]}

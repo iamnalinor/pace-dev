@@ -7,7 +7,7 @@ import { Button } from "#app/ui/button.tsx";
 import { Calendar } from "#app/ui/calendar.tsx";
 import { Chip } from "#app/ui/chip.tsx";
 import { useRevealOnShow } from "#app/ui/overlay-reveal.ts";
-import { TimeCheckScope, useTimeChecks } from "#app/ui/time-check.tsx";
+import { TimeCheckScope, useCheckedSubmit, useTimeChecks } from "#app/ui/time-check.tsx";
 import { TimeInput } from "#app/ui/time-input.tsx";
 
 /** A time a person sets, with the zone it was set in; `null` when not set. */
@@ -118,6 +118,9 @@ export const DatePanel = ({
   const shown = due === null ? { date: null, time: DEFAULT_TIME[kind] } : wallClock(due.at, tz);
   const { time } = shown;
   const times = useTimeChecks();
+  // Done keeps the panel open on a time it cannot read, and says so (R27-02); a time handed over
+  // by the press closes it in one press (review I3).
+  const done = useCheckedSubmit(times, onClose);
   // Unfolded in a sheet, the panel scrolls whole into view above the pinned Save (R27-06).
   const panelRef = useRevealOnShow("date-panel");
   const set = (date: string, at: string): void => {
@@ -167,12 +170,7 @@ export const DatePanel = ({
                 onChange(null);
               }
         }
-        onDone={() => {
-          // Done keeps the panel open on a time it cannot read, and says so (R27-02).
-          if (times.isAllRead()) {
-            onClose();
-          }
-        }}
+        onDone={done}
       />
     </View>
   );

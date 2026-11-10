@@ -7,7 +7,7 @@ import { useViewer } from "#app/shared/use-viewer.ts";
 import { RadioChips } from "#app/ui/radio-chips.tsx";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
-import { TimeCheckScope, useTimeChecks } from "#app/ui/time-check.tsx";
+import { TimeCheckScope, useCheckedSubmit, useTimeChecks } from "#app/ui/time-check.tsx";
 
 import type { CloseMode } from "./close-model.ts";
 
@@ -95,12 +95,13 @@ export const CloseSheet = ({
   const form = useCloseForm(view, { deviceTz, now }, startMode);
   const submitClose = useSubmitClose(view, form, onClose);
   const times = useTimeChecks();
-  // A time typed and not readable refuses Done, said under its field (R27-01, R27-02).
-  const submit = (): void => {
-    if (times.isAllRead()) {
+  // A time typed and not readable refuses Done, said under its field (R27-01, R27-02); one
+  // handed over by the press is closed with (review I3), unless the sheet now refuses it.
+  const submit = useCheckedSubmit(times, () => {
+    if (form.at !== null && form.problem === null) {
       submitClose();
     }
-  };
+  });
   // Each press of Cancelled or Skipped asks Reason for the cursor (with a keyboard), as opening
   // on them from "Close as…" does; an arrow moving through the outcomes keeps it in the row
   // (round 7 review 9).

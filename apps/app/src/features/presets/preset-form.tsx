@@ -5,7 +5,7 @@ import { useAppState, useLanguage, usePace, useT } from "#app/app-state.tsx";
 import { errorText } from "#app/format/action-error.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { TextField } from "#app/ui/text-field.tsx";
-import { type TimeChecks, TimeCheckScope, useTimeChecks } from "#app/ui/time-check.tsx";
+import { TimeCheckScope, useCheckedSubmit, useTimeChecks } from "#app/ui/time-check.tsx";
 import { toastQuote, useToast } from "#app/ui/toast.tsx";
 import { useDiscardDraft } from "#app/ui/use-draft.ts";
 import { IS_TOUCH_BROWSER } from "#app/ui/use-hotkey.tsx";
@@ -99,13 +99,11 @@ const usePresetWrites = ({
   isNew,
   nameError,
   onDone,
-  times,
 }: {
   readonly draft: PresetDraft;
   readonly isNew: boolean;
   readonly nameError: ReturnType<typeof useNameError>;
   readonly onDone: () => void;
-  readonly times: TimeChecks;
 }) => {
   const t = useT();
   const { actions } = usePace();
@@ -148,10 +146,6 @@ const usePresetWrites = ({
       });
     },
     save: async (): Promise<void> => {
-      // A time typed and not readable refuses Save, said under its field (R27-02).
-      if (!times.isAllRead()) {
-        return;
-      }
       if (draft.name.trim() === "") {
         refuseName(t("presets.nameRequired"));
         return;
@@ -216,12 +210,14 @@ export const PresetForm = ({
     draft,
     isNew,
     nameError,
-    times,
     onDone: () => {
       discardDraft(nameDraftKey);
       onDone();
     },
   });
+  // A time typed and not readable refuses Save, said under its field (R27-02); times handed over
+  // by the press are saved by it (review I3).
+  const submit = useCheckedSubmit(times, () => void save());
   const parent = draft.extends === null ? undefined : presetById(presets, draft.extends);
   const inheritedHint =
     draft.extends === null
@@ -268,7 +264,7 @@ export const PresetForm = ({
       <PresetActions
         name={canDelete ? draft.name : null}
         onDelete={() => void remove()}
-        onSave={() => void save()}
+        onSave={submit}
       />
     </View>
   );
