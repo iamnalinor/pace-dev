@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import Animated, {
   type SharedValue,
@@ -14,6 +14,7 @@ import { cx } from "./cx.ts";
 import { IconButton } from "./icon-button.tsx";
 import { EASING } from "./motion-presets.ts";
 import { type OverlayKind, overlayTiming } from "./overlay-motion.ts";
+import { RevealContext, revealIn, type Viewport } from "./overlay-reveal.ts";
 import { SheetSubmitScope } from "./sheet-submit.tsx";
 import { HotkeyLayer } from "./use-hotkey.tsx";
 import { useIsMotionReduced } from "./use-reduced-motion.ts";
@@ -105,7 +106,8 @@ Under the title: the fixed header, the scrolling body and the fixed footer. The 
 scrolls inside the frame; its scroll stays in it, the page behind never scrolls on (QA round 15
 L8). A hairline parts it from the title only once it has scrolled (no permanent hairlines, spec
 §4.2.21). The ring of a focused control is not clipped: the body keeps 4 px of room on each side
-(§7).
+(§7). A message that appears inside it (a field's error) is scrolled into view above the footer
+(R26-01).
 */
 export const OverlayBody = ({
   children,
@@ -117,8 +119,13 @@ export const OverlayBody = ({
   readonly header: ReactNode;
 }) => {
   const [isScrolled, setIsScrolled] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const viewportRef = useRef<Viewport>({ height: 0, offset: 0 });
+  const reveal = useCallback((node: Parameters<typeof revealIn>[1]) => {
+    revealIn(scrollRef.current, node, viewportRef.current);
+  }, []);
   return (
-    <>
+    <RevealContext value={reveal}>
       {header === undefined ? null : <View className="mt-3 gap-3">{header}</View>}
       <ScrollView
         className={cx(
@@ -127,9 +134,14 @@ export const OverlayBody = ({
         )}
         contentContainerClassName="gap-5 px-1 pb-1 pt-4"
         keyboardShouldPersistTaps="handled"
+        onLayout={(event) => {
+          viewportRef.current.height = event.nativeEvent.layout.height;
+        }}
         onScroll={(event) => {
+          viewportRef.current.offset = event.nativeEvent.contentOffset.y;
           setIsScrolled(event.nativeEvent.contentOffset.y > 0);
         }}
+        ref={scrollRef}
         scrollEventThrottle={16}
         testID="overlay-body"
       >
@@ -138,7 +150,7 @@ export const OverlayBody = ({
       {footer === undefined ? null : (
         <View className="border-t border-separator pt-3">{footer}</View>
       )}
-    </>
+    </RevealContext>
   );
 };
 
