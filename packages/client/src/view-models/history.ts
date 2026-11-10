@@ -118,26 +118,40 @@ const titleOf = (state: HistorySource, event: Event, taskId: null | string): nul
   return event.type === "task.created" ? event.payload.title : loggedTitleOf(state.log, taskId);
 };
 
+/** The title an event wrote for `taskId` itself, or `null`. */
+const ownTitle = (event: Event, taskId: string): null | string =>
+  "taskId" in event.payload &&
+  event.payload.taskId === taskId &&
+  "title" in event.payload &&
+  typeof event.payload.title === "string"
+    ? event.payload.title
+    : null;
+
 /**
 A task that is gone (its creation undone) is named as the log last wrote it, so its other rows
-keep their subject (QA round 27 R27-07).
+keep their subject (QA round 27 R27-07): by a title its own events carry, or one an amendment of
+them wrote (`{targetId, patch}` names no task; review of the QA 27 wave, M6).
 */
 const loggedTitleOf = (log: readonly Event[], taskId: null | string): null | string => {
   if (taskId === null) {
     return null;
   }
-  const titled = log.findLast(
-    (event) =>
-      "taskId" in event.payload &&
-      event.payload.taskId === taskId &&
-      "title" in event.payload &&
-      typeof event.payload.title === "string",
-  );
-  return titled !== undefined &&
-    "title" in titled.payload &&
-    typeof titled.payload.title === "string"
-    ? titled.payload.title
-    : null;
+  const byId = new Map(log.map((event) => [event.id, event]));
+  for (const event of log.toReversed()) {
+    const own = ownTitle(event, taskId);
+    if (own !== null) {
+      return own;
+    }
+    if (event.type !== "event.amended") {
+      continue;
+    }
+    const target = byId.get(event.payload.targetId);
+    const title = event.payload.patch["title"];
+    if (typeof title === "string" && target !== undefined && ownTitle(target, taskId) !== null) {
+      return title;
+    }
+  }
+  return null;
 };
 
 /**

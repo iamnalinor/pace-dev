@@ -79,6 +79,31 @@ describe("historyViewModel", () => {
     expect(row).toMatchObject({ revocable: false, taskTitle: "Call the bank" });
   });
 
+  it("names a gone task by a title an amendment wrote last (QA 27 wave review M6)", async () => {
+    const world = await setupActions();
+    const [created] = unwrap(
+      await world.actions.createTask({ presetId: "personal", title: "Call the bank" }),
+    );
+    const taskId = created?.type === "task.created" ? created.payload.taskId : "";
+    const [importance] = unwrap(await world.actions.setImportance(taskId, "asap"));
+    // A retitle written as an amendment of the creation (an assistant's correction), then undone.
+    unwrap(
+      await world.state.dispatch({
+        occurredAt: NOW,
+        payload: { patch: { title: "Call the bank about the card" }, targetId: created?.id ?? "" },
+        precision: "exact",
+        source: "app",
+        type: "event.amended",
+      }),
+    );
+    unwrap(await world.actions.revoke(created?.id ?? ""));
+    const row = historyViewModel(world.state.store.getState(), {
+      atIso: NOW,
+      deviceTz: MOSCOW,
+    }).events.find((entry) => entry.id === importance?.id);
+    expect(row).toMatchObject({ taskTitle: "Call the bank about the card" });
+  });
+
   it("names the activity an activity event is about", async () => {
     const world = await setupActions();
     const [started] = unwrap(await world.actions.startChoice("rest"));
