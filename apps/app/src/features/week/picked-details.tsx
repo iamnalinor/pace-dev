@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { useRouter } from "expo-router";
 import { Linking, ScrollView, Text, View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
@@ -14,7 +15,7 @@ import { Icon, type IconName } from "#app/ui/icon.tsx";
 import { ListRow } from "#app/ui/list-row.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
 import { type EventDetails, eventDetails, type WeekBlock, type WeekModel } from "@pace/client";
-import { formatDuration, type Language, plural } from "@pace/core";
+import { formatDuration, formatInZone, type Language, plural } from "@pace/core";
 
 import { dayLabel } from "./day-strip.tsx";
 import { type Picked, pickedKey } from "./week-picked.ts";
@@ -190,6 +191,7 @@ const BlockFacts = ({
   const t = useT();
   const { language } = useViewer();
   const openTask = useOpenTask();
+  const router = useRouter();
   const { taskId } = block;
   return (
     <View className="gap-1">
@@ -208,6 +210,19 @@ const BlockFacts = ({
           {t("week.openTask")}
         </Button>
       )}
+      {/* Week only shows a block; its day is where it is edited (QA round 25 R25-07). */}
+      <Button
+        onPress={() => {
+          onLeave();
+          router.push({
+            params: { date: formatInZone(block.startAt, week.zone, "yyyy-MM-dd") },
+            pathname: "/day",
+          });
+        }}
+        variant="plain"
+      >
+        {t("week.editInDay")}
+      </Button>
     </View>
   );
 };

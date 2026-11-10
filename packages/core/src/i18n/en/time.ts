@@ -132,6 +132,7 @@ export const enTime = {
   "week.calendarFailed": "The calendar didn't load",
   "week.calendarEvent": "From the calendar",
   "week.openTask": "Open the task",
+  "week.editInDay": "Edit in Day",
   "period.thisWeek": "This week",
   "period.today": "Today",
   "period.group": "Period",

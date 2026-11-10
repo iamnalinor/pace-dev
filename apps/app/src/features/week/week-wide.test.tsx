@@ -1,7 +1,7 @@
 import { act, fireEvent, screen } from "@testing-library/react-native";
 
 import { en, renderScreen } from "#app/test/render.tsx";
-import { setSearchParams } from "#app/test/router.ts";
+import { router, setSearchParams } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { addMinutesIso } from "@pace/core";
 import { NOW } from "@pace/core/testing";
@@ -162,6 +162,21 @@ describe("WeekScreen on a wide window", () => {
     await fireEvent.press(await screen.findByRole("button", { name: /, Lecture notes$/u }));
     expect(pane()).toBeOnTheScreen();
     await pressEscape();
+    expect(pane()).toBeNull();
+  });
+
+  it("offers to edit a block in its day, as Week only shows it (QA round 25 R25-07)", async () => {
+    const runtime = await createTestRuntime();
+    await runtime.actions.logPast({
+      category: "study",
+      endAt: addMinutesIso(NOW, -180),
+      label: "Lecture notes",
+      startAt: addMinutesIso(NOW, -240),
+    });
+    await renderScreen(<WeekScreen />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: /, Lecture notes$/u }));
+    await fireEvent.press(await screen.findByRole("button", { name: en("week.editInDay") }));
+    expect(router.push).toHaveBeenCalledWith({ params: { date: "2026-10-06" }, pathname: "/day" });
     expect(pane()).toBeNull();
   });
 });

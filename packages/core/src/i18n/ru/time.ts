@@ -135,6 +135,7 @@ export const ruTime: { readonly [K in keyof typeof enTime]: string } = {
   "week.calendarFailed": "Календарь не загрузился",
   "week.calendarEvent": "Из календаря",
   "week.openTask": "Открыть задачу",
+  "week.editInDay": "Изменить в Дне",
   "period.thisWeek": "Эта неделя",
   "period.today": "Сегодня",
   "period.group": "Период",
