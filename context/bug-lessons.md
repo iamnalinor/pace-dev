@@ -2556,3 +2556,9 @@ New bugs go here with their class; a new class gets its own section above.
 - **Missed because.** B1's test checked the hint was gone from the narrow button; `KeyHintRoomContext`'s own rule ("its tooltip or hint still names it") had no test on the button that uses it.
 - **Class.** A display rule with a stated fallback that the call site did not implement.
 - **Sweep and guard.** The pane's Done names the key in its tooltip and hint (`labelWithHotkey`); Settings lists Ctrl/⌘+Enter («Готово или сохранить») with the others. The other narrow regions (`KeyHintRoomContext` false): the pane's footer only. Guards: `task-footer-pane.test.tsx` (Done's hint names Ctrl+Enter), `keyboard-row.test.tsx` (the list names it).
+
+### 234. A toast's Undo placed last in the page, after the control that would lead to it is gone
+- **Bug.** After a preset's Delete the confirm went and keyboard focus fell to the page: the toast's «Вернуть» was 17 Tabs away (the toast sits last in the DOM) (QA round 27 R27-09).
+- **Missed because.** Class 5's guards return focus within a form (confirm ↔ opener); nothing covered a control that goes away for good while a toast offers the way back.
+- **Class.** Class 5 again: focus left on nothing after a removal, with the next useful control far away.
+- **Sweep and guard.** An Undo toast watches a few frames as it shows and, on the web, takes focus that was left on the page to its action; focus the person put anywhere stays (`focusUndoIfLost`). Every Undo toast goes through `ToastCard` (preset Delete, task delete, Inbox accept and delete, Done, project archive). Left: Day's form closed with Escape and Week's «Изменить в Дне» then Escape still drop focus to the page; returning it to the row that opened the form is a separate change in the inspector. Guard: `toast-focus.web.test.ts` (lost focus goes to Undo; focus elsewhere stays).

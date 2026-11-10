@@ -6,6 +6,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { View } from "react-native";
@@ -13,6 +14,7 @@ import { View } from "react-native";
 import { clipText, clipWords, isRevokedIn, z } from "@pace/core";
 
 import { useAppState, useT } from "../app-state.tsx";
+import { focusUndoIfLost } from "../platform/toast-focus.ts";
 import { cx } from "./cx.ts";
 import { CHROME_GAP, PlaceContext, PublishersContext, useFloatLayer } from "./float-layer.ts";
 import { IconButton } from "./icon-button.tsx";
@@ -97,6 +99,10 @@ export const ToastCard = ({
       onDone();
     }
   }, [isUndone, onDone]);
+  // Focus a delete or a swap dropped goes to the Undo, not to the top of the page (R27-09).
+  const actionRef = useRef<View>(null);
+  const hasAction = toast.action !== undefined;
+  useEffect(() => (hasAction ? focusUndoIfLost(actionRef) : undefined), [hasAction, toast]);
   return (
     <View
       className={cx(
@@ -110,19 +116,21 @@ export const ToastCard = ({
         {toast.message}
       </Text>
       {toast.action === undefined ? null : (
-        <Pressable
-          className="shrink-0 items-center justify-center rounded-md px-3"
-          onPress={() => {
-            // Closed first, so the action may show a toast of its own.
-            onDone();
-            toast.action?.onPress();
-          }}
-          role="button"
-        >
-          <Text className="font-semibold" role="callout" tone="accent">
-            {toast.action.label}
-          </Text>
-        </Pressable>
+        <View ref={actionRef}>
+          <Pressable
+            className="shrink-0 items-center justify-center rounded-md px-3"
+            onPress={() => {
+              // Closed first, so the action may show a toast of its own.
+              onDone();
+              toast.action?.onPress();
+            }}
+            role="button"
+          >
+            <Text className="font-semibold" role="callout" tone="accent">
+              {toast.action.label}
+            </Text>
+          </Pressable>
+        </View>
       )}
       <IconButton icon="x" label={t("common.close")} onPress={onDone} />
     </View>
