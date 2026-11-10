@@ -12,6 +12,36 @@ import { historyViewModel } from "./history.ts";
 const fullSource = (state: AppState) => unwrap(completeHistoryOf(state));
 
 describe("historyViewModel", () => {
+  it("offers no Undo for the zone the app set by itself, a fresh account's first row (QA PR55-1-11)", async () => {
+    const world = await setupActions([]);
+    const [zone] = unwrap(await world.actions.ensureTimezone());
+    const [chosen] = unwrap(await world.actions.setTimezone("Europe/Berlin"));
+    const history = historyViewModel(fullSource(world.state.store.getState()), {
+      atIso: NOW,
+      deviceTz: MOSCOW,
+    });
+    expect(history.events.find((entry) => entry.id === zone?.id)?.revocable).toBe(false);
+    // The person's own change of zone afterwards is theirs to undo.
+    expect(history.events.find((entry) => entry.id === chosen?.id)?.revocable).toBe(true);
+  });
+
+  it("offers no Undo for the first zone of an account set up before it was written as the system's", async () => {
+    const world = await setupActions([]);
+    const legacy = unwrap(
+      await world.state.dispatch({
+        occurredAt: NOW,
+        payload: { timezone: MOSCOW },
+        source: "web",
+        type: "settings.updated",
+      }),
+    );
+    const history = historyViewModel(fullSource(world.state.store.getState()), {
+      atIso: NOW,
+      deviceTz: MOSCOW,
+    });
+    expect(history.events.find((entry) => entry.id === legacy.id)?.revocable).toBe(false);
+  });
+
   it("names how a task was closed: done, cancelled or skipped (QA round 20 L8)", async () => {
     const world = await setupActions();
     const [skipped] = unwrap(await world.actions.closeTask({ outcome: "skipped", taskId: TRK_ID }));

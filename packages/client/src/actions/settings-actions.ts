@@ -81,10 +81,17 @@ export const settingsActions = (deps: ActionDeps): SettingsActions => ({
         payload: { categoryEstimates: { [category]: minutes } },
       }),
     ]),
+  // The system's own setting, not the person's act: History lists it with no Undo (PR55-1-11).
   ensureTimezone: async () =>
     deps.state.store.getState().settings.timezone === null && isValidTimeZone(deps.clock.deviceTz)
       ? await emit(deps, [
-          stamp(deps, { type: "settings.updated", payload: { timezone: deps.clock.deviceTz } }),
+          {
+            ...stamp(deps, {
+              type: "settings.updated",
+              payload: { timezone: deps.clock.deviceTz },
+            }),
+            source: "system",
+          },
         ])
       : ok([]),
   setDigestWindows: async (digestWindows) =>

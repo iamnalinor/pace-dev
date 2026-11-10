@@ -3372,6 +3372,18 @@ New bugs go here with their class; a new class gets its own section above.
   editor opened from the address. `focus-after-swap.e2e.ts` checks a row off and closes Week's
   «Edit in Day» from the keyboard and fails on `body`.
 
+### 325. A system write that the History offers to undo
+- **Bug.** A fresh account's History began with «Settings changed · Web» and an Undo (QA
+  PR55-1-11, R27-12): the zone the app gives an account without one was written with the device's
+  source, as if the person had chosen it; undone, the app would only write it again.
+- **Missed because.** The zone tests checked that it is written once, never how History lists it.
+- **Rule.** A write the system makes on its own is `source: "system"`, and History offers no Undo
+  for it; the first zone of an account set up before is recognised by shape (the log's first event
+  that sets the zone, alone).
+- **Sweep and guard.** The other writes the client makes on its own already carry `system`
+  (instances of a series, the homework instances, auto outcomes). `history.test.ts` pins both
+  forms; `actions.test.ts` the source.
+
 ### 326. The same read made twice because each caller fetches for itself
 - **Bug.** Every load sent `/api/instance` twice (the app's server check and the checkpoint
   negotiation), `/api/notifications` twice on the Notifications route (the screen's mount and the

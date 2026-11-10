@@ -1098,6 +1098,12 @@ describe("settings", () => {
     expect(unwrap(await world.actions.ensureTimezone())).toHaveLength(0);
   });
 
+  it("writes the device zone as the system's own setting, not the person's (QA PR55-1-11)", async () => {
+    const world = await setupActions([]);
+    const [zone] = unwrap(await world.actions.ensureTimezone());
+    expect(zone?.source).toBe("system");
+  });
+
   it("updates the account settings", async () => {
     const world = await setupActions([]);
     unwrap(await world.actions.setLanguage("ru"));
