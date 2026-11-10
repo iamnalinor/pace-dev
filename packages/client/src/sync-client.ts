@@ -47,8 +47,9 @@ export type SyncClient = {
   readonly ingestLive: (page: PullPage) => Promise<void>;
   /**
   A socket connected and its server said where its log stands: a run (`soon`) only when the copy
-  is not there yet (another store, a lower cursor) or holds writes to send; a copy the start's
-  pull just brought there asks nothing (QA PR55-1-12: the same pull twice at every load).
+  is not there yet (another store, a lower cursor), holds writes to send, or the last run failed
+  (its success clears the offline line); a copy the start's pull just brought there asks nothing
+  (QA PR55-1-12: the same pull twice at every load).
   */
   readonly catchUpTo: (head: LogHead) => Promise<void>;
   /**
@@ -329,14 +330,17 @@ export const createSyncClient = (deps: SyncDeps): SyncClient => {
     setInterval: loop.setInterval,
     soon: loop.soon,
     catchUpTo: async (head) => {
-      try {
-        const meta = await deps.store.readMeta();
-        const pending = await deps.store.listPending();
-        if (meta.storeId === head.storeId && meta.cursor >= head.seq && pending.length === 0) {
-          return;
+      // A last run that failed still runs: its success is what clears the offline line.
+      if (status.getState().lastError === null) {
+        try {
+          const meta = await deps.store.readMeta();
+          const pending = await deps.store.listPending();
+          if (meta.storeId === head.storeId && meta.cursor >= head.seq && pending.length === 0) {
+            return;
+          }
+        } catch {
+          // The copy could not be read: a run finds out what is wrong.
         }
-      } catch {
-        // The copy could not be read: a run finds out what is wrong.
       }
       loop.soon();
     },

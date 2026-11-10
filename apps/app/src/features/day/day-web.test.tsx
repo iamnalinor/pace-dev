@@ -11,6 +11,10 @@ import { DayScreen } from "./day-screen.tsx";
 // The web build: no phone sections, and no screen time of its own.
 jest.mock("#app/platform/device.ts", () => ({ IS_PHONE: false }));
 
+// The file's first render compiles Day for the web build: under a full parallel run it takes more
+// than the default 5 s on its own.
+jest.setTimeout(20_000);
+
 const LAPTOP = {
   app: "code",
   deviceId: "01LAPTOP",

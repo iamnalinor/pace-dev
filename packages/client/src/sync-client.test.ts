@@ -124,6 +124,16 @@ describe("createSyncClient catching up to a connect's hello (QA PR55-1-12)", () 
     sync.stop();
   });
 
+  it("runs when the last run could not reach the server: its success clears the offline line", async () => {
+    const { calls, sync } = await caughtUp();
+    sync.status.setState({ lastError: "network", online: false });
+    await sync.catchUpTo({ seq: 2, storeId: STORE_ID });
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(calls().map((call) => call.path)).toContain("/api/sync/pull");
+    expect(sync.status.getState().online).toBe(true);
+    sync.stop();
+  });
+
   it("runs when the copy holds writes the server has not got", async () => {
     const { calls, state, sync } = await caughtUp();
     await state.dispatch({

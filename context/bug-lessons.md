@@ -3399,6 +3399,9 @@ New bugs go here with their class; a new class gets its own section above.
 - **Sweep and guard.** Instance, notifications, the socket's catch-up (load and reconnect). A
   check that must be current (a return to the app, Retry) still asks. `load-requests.e2e.ts` loads
   `/` and `/notifications` and goes offline and back, and fails on any read made twice.
+- **Other side traced.** The connect's pull was also what cleared the offline line after a failed
+  run; skipping it left the line up until the next poll (`sync-state.e2e.ts`, server gone while
+  idle). `catchUpTo` runs whenever the last run failed (`sync-client.test.ts`).
 
 ### 327. A placeholder drawn outside the frame the content lands in
 - **Bug.** The first-sync cover at 1440 was a centred column with no sidebar, 80 px right of where
