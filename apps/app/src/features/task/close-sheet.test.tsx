@@ -95,7 +95,12 @@ describe("CloseSheet — a homework task (one done mark per subtask, nothing to 
   it("takes an exact time typed in the device zone and refuses a malformed one", async () => {
     await openClose();
     await fireEvent.press(screen.getByRole("radio", { name: en("close.pickExact") }));
-    expect(screen.getByText(en("edit.inZone", { zone: "Europe/Moscow" }))).toBeOnTheScreen();
+    // The zone as people name it, not its IANA id (QA R28-08).
+    expect(screen.getByText(en("edit.inZone", { zone: "Moscow Standard Time" }))).toBeOnTheScreen();
+    expect(screen.queryByText(/Europe\/Moscow/u)).toBeNull();
+    // Both fields carry a visible label, so they line up under their words.
+    expect(screen.getByText(en("close.date"))).toBeOnTheScreen();
+    expect(screen.getByText(en("close.time"))).toBeOnTheScreen();
     const time = screen.getByLabelText(en("close.time"));
     await fireEvent.changeText(time, "25:00");
     await fireEvent(time, "blur");

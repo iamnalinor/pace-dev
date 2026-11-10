@@ -15,9 +15,8 @@ import { Icon, type IconName } from "#app/ui/icon.tsx";
 import { ListRow } from "#app/ui/list-row.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
 import { type EventDetails, eventDetails, type WeekBlock, type WeekModel } from "@pace/client";
-import { formatDuration, formatInZone, type Language, plural } from "@pace/core";
+import { formatDuration, formatInZone, formatShortDay, type Language, plural } from "@pace/core";
 
-import { dayLabel } from "./day-strip.tsx";
 import { type Picked, pickedKey } from "./week-picked.ts";
 
 /** Opens an address from the calendar; a refusal (no app for it) leaves the screen as it is. */
@@ -34,16 +33,17 @@ const open = (url: string): void => {
 };
 
 /**
-"6 Tue, 12:30–14:00"; an event past midnight names both days: "17 Sat, 17:44 – 18 Sun, 10:43".
+"Tue · Oct 6, 12:30–14:00" (the month too: the pane outlives the week strip it was picked from,
+R28-13); an event past midnight names both days: "Sat · Oct 17, 17:44 – Sun · Oct 18, 10:43".
 */
 const whenText = (
   stretch: { readonly startAt: string; readonly endAt: string; readonly isMultiDay: boolean },
   zone: string,
   language: Language,
 ): string => {
-  const start = `${dayLabel(stretch.startAt, zone, language)}, ${clockTime(stretch.startAt, zone)}`;
+  const start = `${formatShortDay(stretch.startAt, zone, language)}, ${clockTime(stretch.startAt, zone)}`;
   return stretch.isMultiDay
-    ? `${start} – ${dayLabel(stretch.endAt, zone, language)}, ${clockTime(stretch.endAt, zone)}`
+    ? `${start} – ${formatShortDay(stretch.endAt, zone, language)}, ${clockTime(stretch.endAt, zone)}`
     : `${start}–${clockTime(stretch.endAt, zone)}`;
 };
 
@@ -212,6 +212,7 @@ const BlockFacts = ({
       )}
       {/* Week only shows a block; its day is where it is edited, with it open (R25-07, R26-04). */}
       <Button
+        isFlush
         onPress={() => {
           onLeave();
           router.push({

@@ -94,13 +94,13 @@ describe("WeekScreen", () => {
     expect(screen.queryByText("Laptop: code 40m")).toBeNull();
   });
 
-  it("opens an event's details in a sheet: calendar, place, call, notes and people", async () => {
+  it("opens an event's details in a sheet: its day with the month (R28-13), calendar, place, call, notes and people", async () => {
     const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
     await renderScreen(<WeekScreen />, await world());
     await fireEvent.press(
       await screen.findByRole("button", { name: /, From the calendar: Seminar$/u }),
     );
-    expect(await screen.findByText("6 Tue, 12:30–14:00")).toBeOnTheScreen();
+    expect(await screen.findByText("Tue · Oct 6, 12:30–14:00")).toBeOnTheScreen();
     expect(screen.getByText("University")).toBeOnTheScreen();
     expect(screen.getByText("Organizer: Prof. Ivanova")).toBeOnTheScreen();
     expect(screen.getByText("12 people invited")).toBeOnTheScreen();
@@ -128,7 +128,7 @@ describe("WeekScreen", () => {
     await fireEvent.press(
       await screen.findByRole("button", { name: /, From the calendar: Call with Anna$/u }),
     );
-    expect(await screen.findByText("6 Tue, 12:30–14:00")).toBeOnTheScreen();
+    expect(await screen.findByText("Tue · Oct 6, 12:30–14:00")).toBeOnTheScreen();
     expect(screen.getByText("From the calendar")).toBeOnTheScreen();
     expect(screen.queryByRole("button", { name: "Join the call" })).toBeNull();
     expect(screen.queryByText(/invited/u)).toBeNull();

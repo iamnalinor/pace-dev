@@ -65,7 +65,7 @@ export const enInput = {
   "task.addDescription": "Add description",
   "task.editDescription": "Edit description",
   "edit.start": "Start",
-  "edit.inZone": "Times are read in {zone}",
+  "edit.inZone": "Times are in {zone}",
   "edit.importance": "Importance",
   "edit.link": "Link",
   "edit.titleRequired": "Give the task a title.",

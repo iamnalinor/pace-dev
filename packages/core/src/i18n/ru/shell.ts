@@ -218,13 +218,13 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "settings.digestWindows.remove": "Убрать {time}",
   "settings.digestWindows.time": "Время сводки {index}",
   "settings.quietHours.hint":
-    "Придерживает «начало события» и «всё ещё…?». Входы и сводки приходят всегда.",
+    "В эти часы «{event}» не приходит, а «{overrun}» ждёт их конца. «{login}» и «{digest}» приходят всегда.",
   "settings.quietHours.from": "С",
   "settings.quietHours.to": "До",
   "settings.nightHours": "Показывать ночные часы",
   "settings.nightHours.hint": "Неделя показывает весь день, с 00 до 24.",
   "settings.nightHours.hintOff":
-    "Неделя начинается с 07, раньше — только если на неделе что-то было до 07. Луна на Неделе включает то же самое.",
+    "Неделя начинается с 07, раньше — только если на неделе что-то было до 07. Кнопка «{button}» на Неделе переключает то же самое.",
   "settings.presets": "Пресеты",
   "settings.presets.hint": "Курсы, работа, личное: как ведёт себя каждый вид задач.",
   "settings.review": "Разобрать",

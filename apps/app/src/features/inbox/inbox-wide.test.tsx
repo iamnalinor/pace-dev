@@ -127,4 +127,10 @@ describe("InboxScreen on a wide window", () => {
     });
     expect(searchParams()).toEqual({});
   });
+
+  it("puts Accept and Delete side by side, so a capture is a row's height, not a tower (R25-17)", async () => {
+    await renderScreen(<InboxScreen />, await createTestRuntime());
+    const [actions] = screen.getAllByTestId("capture-actions");
+    expect(String(actions?.props["className"]).split(" ")).toContain("flex-row");
+  });
 });

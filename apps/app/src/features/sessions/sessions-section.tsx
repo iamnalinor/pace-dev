@@ -32,11 +32,9 @@ const ListFailed = ({ onRetry }: { readonly onRetry: () => void }) => {
       <Text className="font-sans text-subhead font-normal text-label-secondary">
         {t("sessions.failed")}
       </Text>
-      <View className="-ml-4">
-        <Button onPress={onRetry} variant="plain">
-          {t("sessions.retry")}
-        </Button>
-      </View>
+      <Button isFlush onPress={onRetry} variant="plain">
+        {t("sessions.retry")}
+      </Button>
     </View>
   );
 };

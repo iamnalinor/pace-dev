@@ -33,4 +33,27 @@ describe("a notification's text", () => {
     // What a person typed stays as they typed it.
     expect(phoneContent(overrun("a-typed"), RU, NOW).body).toContain(AUTO_SLEEP_LABEL);
   });
+
+  it("names a sign-in's place as the app does: city, then the country in words (QA PR55-1-17)", () => {
+    const login: PoolNotification = {
+      createdAt: NOW,
+      id: "n-login",
+      kind: "login",
+      payload: {
+        city: "Columbus",
+        country: "US",
+        ip: "",
+        kind: "browser",
+        name: "Chrome",
+        sessionId: "s-1",
+      },
+      readAt: null,
+      resolution: null,
+      resolvedAt: null,
+    };
+    expect(phoneContent(login, RU, NOW).body).toContain("Columbus, Соединённые Штаты");
+    expect(telegramMessage(login, RU, { now: NOW, webOrigin: "" }).text).toContain(
+      "Columbus, Соединённые Штаты",
+    );
+  });
 });

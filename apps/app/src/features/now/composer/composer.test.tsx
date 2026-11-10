@@ -960,3 +960,15 @@ describe("the line on a computer (design review 2 N5)", () => {
     expect(screen.queryByTestId("line-plus-slot", { includeHiddenElements: true })).toBeNull();
   });
 });
+
+describe("the line's buttons at its edges (QA PR55-1-15)", () => {
+  it("line their glyphs up with the gutter, giving the field the room their padding took", async () => {
+    await renderComposer(await createTestRuntime());
+    // At 320 «Задача или текст» needed 134 px and had 122: + stood 12 px in from the gutter.
+    const edges = screen
+      .getAllByTestId(/^line-edge-/u)
+      .map((node) => String(node.props["className"]));
+    // + pulls back by its target's padding (44 − 20) / 2; Send's 40 circle by (44 − 40) / 2.
+    expect(edges).toEqual(["-ml-4", "-mr-1 flex-row"]);
+  });
+});

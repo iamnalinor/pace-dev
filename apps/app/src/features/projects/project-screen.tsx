@@ -76,6 +76,7 @@ const EditProject = ({
         draftKey={`project.${project.id}`}
         extra={
           <Button
+            isFlush
             onPress={() => {
               onDone();
               void (isArchived ? restore() : archive());

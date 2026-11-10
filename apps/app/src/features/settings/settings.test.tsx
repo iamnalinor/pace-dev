@@ -267,6 +267,24 @@ describe("SettingsScreen", () => {
     });
   });
 
+  it("names the Week control its hint points to by the words Week shows, not by its glyph (QA PR55-1-17)", async () => {
+    await renderScreen(<SettingsScreen />, await createTestRuntime({ world: "empty" }));
+    const hint = en("settings.nightHours.hintOff", { button: en("week.nightHours") });
+    expect(screen.getByText(hint)).toBeOnTheScreen();
+    expect(hint).toContain(`“${en("week.nightHours")}”`);
+  });
+
+  it("says which notifications quiet hours hold back by the names their switches carry (QA PR55-1-17)", async () => {
+    await renderScreen(<SettingsScreen />, await createTestRuntime({ world: "empty" }));
+    const hint = en("settings.quietHours.hint", {
+      digest: en("notify.kind.deadline_digest"),
+      event: en("notify.kind.event_start"),
+      login: en("notify.kind.login"),
+      overrun: en("notify.kind.activity_overrun"),
+    });
+    expect(screen.getByText(hint)).toBeOnTheScreen();
+  });
+
   it("says so and turns night hours back when the device refuses to save it, then rests", async () => {
     const disk = refusingStore();
     const runtime = await createTestRuntime({ eventStore: disk.eventStore, world: "empty" });

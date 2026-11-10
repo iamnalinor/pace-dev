@@ -15,8 +15,10 @@ import {
   formatWeekRange,
   LANGUAGES,
   type MessageKey,
+  placeName,
   plural,
   t,
+  zoneName,
 } from "./i18n.ts";
 import { ru } from "./ru.ts";
 
@@ -202,6 +204,38 @@ describe("countryName", () => {
     // QA round 15 L10: the browser's data reads «Соединенные Штаты».
     expect(countryName("US", "ru")).toBe("Соединённые Штаты");
     expect(countryName("US", "en")).toBe("United States");
+  });
+});
+
+describe("zoneName", () => {
+  const AT = "2026-11-10T12:00:00.000Z";
+
+  it("names a zone the way people say it, not by its IANA id (QA R28-08)", () => {
+    expect(zoneName("America/New_York", "en", AT)).toBe("Eastern Time");
+    expect(zoneName("Europe/Moscow", "ru", AT)).toBe("Москва");
+    expect(zoneName("Europe/Moscow", "en", AT)).not.toContain("/");
+  });
+
+  it("falls back to the zone's city, never to a bare offset or the id", () => {
+    expect(zoneName("UTC", "en", AT)).toBe("UTC");
+    expect(zoneName("Etc/UTC", "ru", AT)).toBe("UTC");
+    expect(zoneName("Not/A_Zone", "en", AT)).toBe("A Zone");
+  });
+});
+
+describe("placeName", () => {
+  it("names a place city first, then the country in the reader's language (QA PR55-1-17)", () => {
+    // «Соединённые Штаты, Columbus» read backwards: a place is written city, country.
+    expect(placeName({ city: "Columbus", country: "US" }, "ru")).toBe(
+      "Columbus, Соединённые Штаты",
+    );
+    expect(placeName({ city: "Columbus", country: "US" }, "en")).toBe("Columbus, United States");
+  });
+
+  it("leaves out what was not reported", () => {
+    expect(placeName({ city: null, country: "DE" }, "en")).toBe("Germany");
+    expect(placeName({ city: "Berlin", country: "" }, "en")).toBe("Berlin");
+    expect(placeName({ city: undefined, country: null }, "en")).toBe("");
   });
 });
 

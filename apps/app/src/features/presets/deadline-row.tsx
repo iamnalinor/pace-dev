@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { Text, View } from "react-native";
 
-import type { DeadlinePolicy } from "@pace/core";
-
-import { usePace, useSettings, useT } from "#app/app-state.tsx";
+import { useLanguage, usePace, useSettings, useT } from "#app/app-state.tsx";
 import { fromWallClock, wallClock } from "#app/format/time.ts";
 import { TextField } from "#app/ui/text-field.tsx";
 import { TimeInput } from "#app/ui/time-input.tsx";
 import { isOverridden, setValue, toggleOverride } from "@pace/client";
+import { type DeadlinePolicy, zoneName } from "@pace/core";
 
 import type { SectionProps } from "./rows.tsx";
 
@@ -87,7 +86,8 @@ const ResubmissionFields = ({
 }) => {
   const t = useT();
   const { timezone } = useSettings();
-  const { deviceTz } = usePace().hooks.useClock();
+  const { deviceTz, now } = usePace().hooks.useClock();
+  const language = useLanguage();
   const zone = policy.finalTz ?? timezone ?? deviceTz;
   return (
     <View className="gap-2 pl-3 pt-2">
@@ -104,7 +104,7 @@ const ResubmissionFields = ({
       />
       <FinalAt onPolicy={onPolicy} policy={policy} zone={zone} />
       <Text className="font-sans text-caption font-normal tabular-nums text-label-tertiary">
-        {t("add.dueZone", { tz: zone })}
+        {t("add.dueZone", { tz: zoneName(zone, language, now) })}
       </Text>
     </View>
   );

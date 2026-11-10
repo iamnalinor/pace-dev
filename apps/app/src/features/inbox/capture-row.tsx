@@ -5,7 +5,9 @@ import type { InboxCard } from "@pace/client";
 
 import { useT } from "#app/app-state.tsx";
 import { Button } from "#app/ui/button.tsx";
+import { cx } from "#app/ui/cx.ts";
 import { Disclosure } from "#app/ui/disclosure.tsx";
+import { useIsWide } from "#app/ui/layout.ts";
 import { ListRow } from "#app/ui/list-row.tsx";
 import { Text } from "#app/ui/text.tsx";
 import { toastQuote } from "#app/ui/toast.tsx";
@@ -54,6 +56,7 @@ export const CaptureRow = ({
   const [isClamped, setIsClamped] = useState<boolean | null>(null);
   const isCut = isClamped ?? card.text.length > LONG_CAPTURE;
   const quote = toastQuote(card.text);
+  const isWide = useIsWide();
   return (
     <View>
       <View className="flex-row">
@@ -68,7 +71,15 @@ export const CaptureRow = ({
             titleLines={CAPTURE_LINES}
           />
         </View>
-        <View className="items-end gap-1 py-row-y pr-row-x">
+        {/* Side by side on a computer's row (stacked they made each capture 117 px, R25-17); stacked
+        on a phone, where beside each other they took the text's width. */}
+        <View
+          className={cx(
+            "gap-1 py-row-y pr-row-x",
+            isWide ? "flex-row items-start gap-2" : "items-end",
+          )}
+          testID="capture-actions"
+        >
           <Button
             label={`${t("common.accept")}: ${quote}`}
             onPress={andThen(accept, onRemoved)}

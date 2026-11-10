@@ -145,6 +145,29 @@ describe("Button", () => {
     expect(small).toEqual(expect.arrayContaining(["min-h-8", "rounded-sm"]));
   });
 
+  it("pulls a flush text button back by its own side padding, so its word starts where the column does (R28-13, bug-lessons 345)", async () => {
+    await render(
+      <ThemeProvider>
+        <Button isFlush onPress={() => undefined} variant="plain">
+          Archive
+        </Button>
+        <Button isFlush onPress={() => undefined} size="small" variant="plain">
+          Retry
+        </Button>
+      </ThemeProvider>,
+    );
+    // The pull is on a box around the target: on the target itself the row's `max-w-full` measured the
+    // pulled box and wrapped «В архив» into «В архи / в» (390, after-shots).
+    const [regular, small] = screen.getAllByTestId("button-flush");
+    const [regularVisual, smallVisual] = screen.getAllByTestId("pressable-visual");
+    const classes = (node: typeof regular) => String(node?.props["className"]).split(" ");
+    // Each offset is the visual's padding, at each width: px-5 / lg:px-4, and px-3 small.
+    expect(classes(regularVisual)).toEqual(expect.arrayContaining(["px-5", "lg:px-4"]));
+    expect(classes(regular)).toEqual(expect.arrayContaining(["-ml-5", "lg:-ml-4"]));
+    expect(classes(smallVisual)).toContain("px-3");
+    expect(classes(small)).toContain("-ml-3");
+  });
+
   it("leaves focus alone when it did not have it", async () => {
     const view = await render(saving(false));
     await view.rerender(saving(true));

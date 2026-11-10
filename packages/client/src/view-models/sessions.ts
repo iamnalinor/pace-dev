@@ -1,12 +1,12 @@
 import {
   capitalize,
-  countryName,
   formatDuration,
   formatInZone,
   formatShortDate,
   type Language,
   type MessageKey,
   minutesBetween,
+  placeName,
   type Session,
   t,
 } from "@pace/core";
@@ -77,7 +77,9 @@ const sinceText = (session: Session, context: SessionRowsContext): readonly stri
 const metaOf = (session: Session, context: SessionRowsContext): readonly string[] => {
   const place = [
     ...(session.current ? [t(context.language, "devices.thisDevice")] : []),
-    ...(session.country === null ? [] : [countryName(session.country, context.language)]),
+    ...(session.city === null && session.country === null
+      ? []
+      : [placeName({ city: session.city, country: session.country }, context.language)]),
     ...(session.ip === null ? [] : [session.ip]),
   ];
   const isUsageSender = session.kind === "app" || session.kind === "agent";

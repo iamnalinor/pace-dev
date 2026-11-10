@@ -303,7 +303,12 @@ export const QuietHours = () => {
   return (
     <View className="gap-2">
       <Text className="font-sans text-footnote text-label-secondary">
-        {t("settings.quietHours.hint")}
+        {t("settings.quietHours.hint", {
+          digest: t("notify.kind.deadline_digest"),
+          event: t("notify.kind.event_start"),
+          login: t("notify.kind.login"),
+          overrun: t("notify.kind.activity_overrun"),
+        })}
       </Text>
       <View className="flex-row flex-wrap gap-6">
         {edge("from")}

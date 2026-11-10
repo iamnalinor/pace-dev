@@ -97,14 +97,24 @@ describe("the sessions list", () => {
     expect(rows[1]?.isCurrent).toBe(false);
   });
 
-  it("names where a session signed in from: the country in the viewer's language and the address", () => {
+  it("names where a session signed in from: city, the country in the viewer's language, the address (PR55-1-17)", () => {
     const placed = session({ city: "Berlin", country: "DE", ip: "1.2.3.4" });
-    expect(metaOf(placed)).toEqual(["Browser", "Germany", "1.2.3.4", "Signed in Oct 1, 13:00"]);
-    expect(metaOf(placed, "ru")).toEqual(["Браузер", "Германия", "1.2.3.4", "Вход 1 окт., 13:00"]);
+    expect(metaOf(placed)).toEqual([
+      "Browser",
+      "Berlin, Germany",
+      "1.2.3.4",
+      "Signed in Oct 1, 13:00",
+    ]);
+    expect(metaOf(placed, "ru")).toEqual([
+      "Браузер",
+      "Berlin, Германия",
+      "1.2.3.4",
+      "Вход 1 окт., 13:00",
+    ]);
     expect(metaOf({ ...placed, current: true }, "ru")).toEqual([
       "Браузер",
       "Это устройство",
-      "Германия",
+      "Berlin, Германия",
       "1.2.3.4",
       "Вход 1 окт., 13:00",
     ]);

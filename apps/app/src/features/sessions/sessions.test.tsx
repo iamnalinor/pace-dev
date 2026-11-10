@@ -904,10 +904,11 @@ describe("Settings' order", () => {
     await renderSettings({
       "GET /api/sessions": () => SessionsOutputSchema.parse({ sessions: [] }),
     });
-    expect(await screen.findByText(en("settings.nightHours.hintOff"))).toBeOnTheScreen();
+    const hintOff = en("settings.nightHours.hintOff", { button: en("week.nightHours") });
+    expect(await screen.findByText(hintOff)).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("switch", { name: en("settings.nightHours") }));
     expect(await screen.findByText(en("settings.nightHours.hint"))).toBeOnTheScreen();
-    expect(screen.queryByText(en("settings.nightHours.hintOff"))).toBeNull();
+    expect(screen.queryByText(hintOff)).toBeNull();
   });
 
   it("puts the preferences first, then devices and sessions, log out and the danger zone last", async () => {

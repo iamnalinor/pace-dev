@@ -11,6 +11,7 @@ import { Chip } from "#app/ui/chip.tsx";
 import { useRevealOnShow } from "#app/ui/overlay-reveal.ts";
 import { TimeCheckScope, useCheckedSubmit, useTimeChecks } from "#app/ui/time-check.tsx";
 import { TimeInput } from "#app/ui/time-input.tsx";
+import { zoneName } from "@pace/core";
 
 import { useOutsidePress } from "./use-outside-press.ts";
 
@@ -169,7 +170,7 @@ export const DatePanel = ({
         </TimeCheckScope>
         {tz === viewer.deviceTz ? null : (
           <Text className="font-sans text-caption font-normal tabular-nums text-label-tertiary">
-            {t("add.dueZone", { tz })}
+            {t("add.dueZone", { tz: zoneName(tz, viewer.language, viewer.now) })}
           </Text>
         )}
       </View>

@@ -1,12 +1,16 @@
 import { useT } from "#app/app-state.tsx";
+import { useKeysShown } from "#app/ui/button.tsx";
 import { formatHotkey, HOTKEYS } from "#app/ui/hotkeys.ts";
 import { ListRow } from "#app/ui/list-row.tsx";
-import { KEYBOARD } from "#app/ui/use-hotkey.tsx";
 
-/** The shortcuts, written the way this computer names its keys; nothing where there is no keyboard. */
+/**
+The shortcuts, written the way this computer names its keys; nothing where there is no keyboard,
+and nothing at a phone's width, where no button shows a key hint either (`KeyHint`): a list of
+Alt+N keys on a phone's Settings described a keyboard the layout does not offer (QA PR55-1-17).
+*/
 export const KeyboardRow = () => {
   const t = useT();
-  const os = KEYBOARD;
+  const os = useKeysShown();
   if (os === null) {
     return null;
   }

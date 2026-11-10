@@ -9,11 +9,11 @@ import { Pressable } from "#app/ui/pressable.tsx";
 import { Text } from "#app/ui/text.tsx";
 import { type DeliveryEntry, type ListedSessions, signInState } from "@pace/client";
 import {
-  countryName,
   formatLeft,
   formatRelativeDay,
   type Language,
   minutesBetween,
+  placeName,
   plural,
   type PoolNotification,
   shownLabel,
@@ -42,10 +42,8 @@ const SignInBody = ({
   const t = useT();
   const language = useLanguage();
   const { city, country, ip, name } = payload;
-  // The country in words, as Settings and the Telegram notice spell it (QA round 17 L2).
-  const place = [country === "" ? "" : countryName(country, language), city]
-    .filter((part) => part !== undefined && part !== "")
-    .join(", ");
+  // City, country in words, as Settings and the Telegram notice spell it (QA round 17 L2, PR55-1-17).
+  const place = placeName({ city, country }, language);
   return (
     <View className="gap-0.5">
       <Line isStrong={isUnread}>{t("notifications.login", { name })}</Line>

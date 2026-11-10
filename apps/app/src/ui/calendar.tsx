@@ -1,4 +1,4 @@
-import { type Ref, useEffect, useRef, useState } from "react";
+import { type Ref, use, useEffect, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import {
@@ -16,6 +16,7 @@ import { enterAtStop } from "../platform/enter-at-stop.ts";
 import { moveFocus } from "../platform/move-focus.ts";
 import { cx } from "./cx.ts";
 import { IconButton } from "./icon-button.tsx";
+import { RevealContext } from "./overlay-reveal.ts";
 import { KEYBOARD } from "./use-hotkey.tsx";
 
 /** January 1, 2024 was a Monday: day `n` of that week names weekday `n`. */
@@ -185,7 +186,15 @@ const useRovingDays = ({
   const stop = rovingDay(month, wanted, max);
   const stopCellRef = useRef<View>(null);
   const gridRef = useRef<View>(null);
-  useEffect(() => (KEYBOARD === null ? undefined : claimFocus(() => stopCellRef.current)), []);
+  // In a sheet or a dialog the body reveals the opened panel whole; focus must not scroll it too.
+  const isRevealed = use(RevealContext) !== null;
+  useEffect(
+    () =>
+      KEYBOARD === null
+        ? undefined
+        : claimFocus(() => stopCellRef.current, { preventScroll: isRevealed }),
+    [isRevealed],
+  );
   const shouldFocusRef = useRef(false);
   useEffect(() => {
     if (!shouldFocusRef.current) {
