@@ -3462,6 +3462,172 @@ New bugs go here with their class; a new class gets its own section above.
 - **Sweep and guard.** The configuration strip's placement is PR55-1-14 (layout, not in this change).
   `sync-frame.test.tsx` renders the cover at 1440.
 
+### 340. A drawn box larger than what it holds, with nothing centring the content
+- **Bug.** The tonal `IconButton` (an alongside activity's Stop, the main Stop while the card
+  asks) drew a 32 `fill.2` disc as the Pressable's `visual` and put the 20 square in it; the
+  visual was a plain flex column, so the square sat at the disc's top-left (QA PR55-1-03, Now at
+  390 and 1440). The off-centre disc also read as clipped at the card's edge.
+- **Missed because.** The kit's tests checked the visual's classes (size, fill, corners) and the
+  target's centring, never where the content lands inside the visual; every other caller's visual
+  happened to say `items-center justify-center` itself (Button, Chip, Segmented, the swatches) or
+  was exactly its child's size (the check, the switch).
+- **Rule.** A container whose size is set independently of its content centres the content by
+  construction, in the primitive, not by each caller remembering to.
+- **Sweep and guard.** `visualClass` (`pressable-props.ts`) puts `items-center justify-center`
+  on every visual; the callers' own centring stays harmless. `pressable.test.tsx` pins it.
+
+### 341. Information order chosen per width, so the cut lands on the value that matters
+- **Bug.** The task meta line put the due date last on a phone so that the truncation would take
+  it rather than the countdown (design review 2 N10); the owner's own phone then showed
+  "1d left · 0/13 done · D…" and «осталось 23 ч 59 мин · Срок за…»: the deadline, the one fact a
+  person checks, was the piece that was always cut, and the two widths disagreed on the order
+  (QA PR55-1-04 = R28-11).
+- **Missed because.** The tests pinned the reorder itself ("the countdown comes first on a
+  phone"), i.e. the fix of the previous review, not the reader's need; no test looked at what a
+  one-line truncation leaves at 390 with a RU deadline.
+- **Rule.** A line of several facts keeps one reading order at every width. When it does not fit,
+  it wraps between facts (no-break spaces inside each fact, at most N lines), it does not choose a
+  victim by moving it to the end.
+- **Sweep and guard.** `MetaLine` (Now, project lists, History's snapshot rows, the preset preview,
+  the choices sheet) wraps at « · » to two lines; no other width-dependent ordering of joined
+  pieces exists (`join(" · ")` sweep: History's event rows, presets list, Inbox review rows and
+  the decisions footer already wrap as `ListRow` subtitles). `task-row.test.tsx` asserts the same
+  order at 390 and 1440 and the no-break pieces.
+
+### 342. A floating layer centred on the region, not on the column the screen reads in
+- **Bug.** The sync strip and the toast float centred in the shell's content region (248–1440 at
+  1440), while every screen's column hugs the region's leading edge (248–968 or 248–1208); the
+  configuration card sat at 604–1083, half off the column it spoke about (QA PR55-1-14).
+- **Missed because.** R23-13a's test asked only that the layer stay out of the sidebar; no test
+  put a screen's column and the layer in one picture.
+- **Rule.** What floats over a screen is placed against the box the person reads (the screen's
+  column), and that box is published by the screen, not guessed by the layer.
+- **Sweep and guard.** The only floating stack is `float-layer.ts` (toast, sync strip); `Screen`
+  publishes its anchored column width (`usePublishColumn`). `toast.test.tsx` and `screen.test.tsx`
+  pin the stack inside 248–968 and 248–1208.
+
+### 343. A control's label ending in "…" reads as cut text
+- **Bug.** The pane's «Другое время или итог…» link ended in the menu-item ellipsis of desktop HIG;
+  in a pane with room to spare, QA read it as truncated (PR55-1-16).
+- **Missed because.** The truncation sweep looks for clipped boxes; a literal "…" in a catalog
+  string is not clipped, so nothing flagged it.
+- **Rule.** "…" in a visible control's label is reserved for menus (where the convention is read
+  as "asks more"); a link or button says what it opens without it. Progress lines keep theirs.
+- **Sweep and guard.** Catalog sweep of labels ending in "…": only menu items (`Close as…`), the
+  assistant's correction placeholder and progress lines are left; `task.doneOther` lost it.
+
+### 344. A screen's header kind chosen by hand per screen
+- **Bug.** Notifications and the assistant's log on a phone used the pushed header (`title1`
+  under the bar) while Settings, reached the same way from More, used the top-level one; their
+  titles sat ~12 px higher and smaller (QA PR55-1-18, R27-10 Presets, R25-16).
+- **Missed because.** Each screen's test checked its own header, never one screen against its
+  siblings.
+- **Rule.** A collection (a list a phone pushes: Settings, Presets, Notifications, the log) gets
+  the top-level header with Back on a phone; an entity (a task, a project, a preset) gets the
+  pushed one. The choice is one helper, not a per-screen literal.
+- **Sweep and guard.** `ListScreen` / `useListVariant` (`pushed-screen.tsx`) for Presets and the
+  log, Notifications `top` at every width; `list-titles.test.tsx` renders the four lists at 390 and
+  asks each for a `largeTitle` and Back. The bar logic itself (`ScreenHeader`) is unchanged.
+
+### 345. A flush offset written by hand next to a padding it does not follow
+- **Bug.** A text button meant to start where the text above starts was pulled back with an ad
+  hoc `-ml-4` (12 px) while its padding is `px-5 lg:px-4` (16/12): 4 px off on a phone; and two
+  more (the project form's «В архив», Week's «Изменить в Дне») had no offset at all, indented by
+  16 px (R28-13, R27-11).
+- **Missed because.** The offsets were written at each caller (class 11 again) and checked by eye
+  at one width.
+- **Rule.** An offset that cancels a control's own padding lives in the control, beside the
+  padding it mirrors, at every breakpoint.
+- **Sweep and guard.** `Button isFlush` (`FLUSH` beside `SIDE_PAD` in `button.tsx`); the sessions
+  list's Retry moved to it. Day's screen-time Retry (`activity-usage.tsx`) still carries its own
+  `-ml-4`: left for the agent working on that block (PR55-1-08), to move to `isFlush`.
+  `button.test.tsx` pins the pull to the padding at each size.
+
+### 346. One control, two names
+- **Bug.** The same day stepper said «Предыдущий день» on Day and «На день раньше» on History
+  (QA PR55-1-18).
+- **Missed because.** Each screen had its own catalog keys; nothing compares labels of the same
+  control across screens.
+- **Rule.** A shared control takes its words from one key, whichever screen draws it.
+- **Sweep and guard.** History uses `day.previous` / `day.next`; `history.dayBack` /
+  `history.dayForward` are gone, so a new screen cannot pick them up.
+
+### 347. An identifier shown as words, and a field without the label its neighbour has
+- **Bug.** The Close sheet said «Время читается в поясе Europe/Moscow» (an IANA id), and its time
+  field had no visible label beside the labelled date, so it sat 25 px higher (R28-08). The same id
+  showed in a deadline's «в зоне America/New_York».
+- **Missed because.** The tests read the copy by its key with the id as the parameter, so the id
+  was the expected text.
+- **Rule.** A value meant for machines (an IANA zone, a code) reaches copy through a formatter
+  that names it as people do; a field beside labelled fields carries its own visible label.
+- **Sweep and guard.** Core `zoneName` (`longGeneric` in English, the city in Russian, the id's
+  city where `Intl` cannot say); the Close sheet, a task's deadline zone and a preset's final
+  deadline use it. Settings' timezone row keeps the id on purpose (it is the setting itself).
+  `TimeInput isLabelShown`. `close-sheet.test.tsx` checks no `Europe/Moscow` and both labels.
+
+### 348. A phrase composed in two places from the same parts
+- **Bug.** The app's feed and the server's Telegram notice each joined country and city, country
+  first: «Соединённые Штаты, Columbus» (QA PR55-1-17); Settings' session rows left the city out.
+- **Missed because.** Class 1 again, across the app and the Worker: each copy had its own test.
+- **Rule.** A phrase built from data parts (a place, a duration range) is one core function that
+  every surface calls.
+- **Sweep and guard.** Core `placeName` (city, then the country in the reader's language): the
+  feed, the Telegram/phone text and Settings' session rows. Tests in core, the client and the API.
+  The city stays in Cloudflare's English: no gazetteer ships to translate it (noted, not hidden).
+
+### 349. "No keys on a phone" decided per control
+- **Bug.** Buttons hid their key hints at a phone's width, but Settings' «Клавиши — Alt+N …» row
+  checked only for a fine pointer and showed at 390 in a desktop browser (QA PR55-1-17).
+- **Missed because.** The jest window is a phone and the row's test mocked a keyboard: the test
+  pinned the leak.
+- **Rule.** "Does this layout show keys" is one predicate that every hint and list asks.
+- **Sweep and guard.** `useKeysShown` (`button.tsx`) for `KeyHint` and `KeyboardRow`;
+  `keyboard-row.test.tsx` asks for nothing at 390 and the list at 1440.
+
+### 350. Focus moved with the browser's scroll while an overlay reveals the same view
+- **Bug.** Opening the deadline panel in the 1440 edit dialog, the body began a smooth scroll to
+  show the panel whole; a frame later the calendar claimed focus for its chosen day, and the
+  browser's focus scroll stopped the reveal with only the panel's top in view (R28-03). At 390 there
+  is no keyboard, so no focus claim, and the reveal finished.
+- **Missed because.** The reveal's tests ran without the calendar's focus claim (jest has no
+  scrolling), and the e2e looked at 390.
+- **Rule.** Inside a container that scrolls a view into place itself, moving focus uses
+  `preventScroll`; one owner per scroll.
+- **Sweep and guard.** `claimFocus(…, { preventScroll })`, the calendar passes it inside a
+  `RevealContext`; `claim-focus.web.test.ts`. `claimFocus` has no other caller.
+
+### 351. Copy that names a control by its glyph or by an inside word
+- **Bug.** «Луна на Неделе включает то же самое» (the Week button is labelled «Ночные часы»; the
+  moon is its icon), and quiet hours «Придерживает «начало события» и «всё ещё…?»» named the
+  notifications by paraphrase, not by the names their switches carry (QA PR55-1-17).
+- **Missed because.** Copy is reviewed per string; nothing ties a reference in one string to the
+  label it refers to.
+- **Rule.** A sentence that points at a control or a kind names it with that thing's own label,
+  passed as a parameter from its key, so the two cannot drift.
+- **Sweep and guard.** `settings.nightHours.hintOff` takes `{button}` = `week.nightHours`;
+  `settings.quietHours.hint` takes the four `notify.kind.*` names; `settings.test.tsx` renders both.
+
+### 352. An empty state that repeats the control right above it
+- **Bug.** Empty Now showed the composer's line and, an inch below, «Add a task» opening the same
+  form (QA PR55-1-19): one job, two controls (PRODUCT.md principle 2).
+- **Missed because.** The empty-state test asked for "a way to add", and found the duplicate.
+- **Rule.** An empty state offers an action only when the screen has no other way to that job in
+  view.
+- **Sweep and guard.** Every `EmptyState` with an action: Inbox's «Open the line» leads to a line
+  that is not on its screen, the others retry or clear a filter; only Now's went.
+  `now-screen.test.tsx` asks for the line and no «Add a task».
+
+### 353. Fixed side padding inside chrome whose width is fixed by the window
+- **Bug.** At 320 the composer's + kept 12 px of target padding at the gutter and the time-bar
+  tile kept 2 px a side: «Задача или…» (134 px needed, 122 left) and «Календ…» (66 of 64)
+  (QA PR55-1-15).
+- **Missed because.** The worst-case sweep runs at 390; 320 is below the target width.
+- **Rule.** In a row of fixed-width chrome, a control's visual edge (not its target's) sits on the
+  gutter, and a centred label gets the whole tile.
+- **Sweep and guard.** The composer's + and Send pulled to the gutter (`-ml-4`, `-mr-1`, mirrors
+  of the 44 target around a 20 glyph and a 40 circle), the tiles lost `px-1`;
+  `composer.test.tsx` pins the offsets.
+
 ### 360. A caller that reaches below the shared path and skips the step it adds
 - **Bug.** PR 55 follow-up review, item 1: the archive toast's Undo (`undoArchive`) staged its
   revocation with `state.stage(…)` to get an in-queue check, below `stageEmit`, which is where the
