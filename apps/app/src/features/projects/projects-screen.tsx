@@ -4,7 +4,7 @@ import { View } from "react-native";
 
 import type { Project } from "@pace/core";
 
-import { useAppState, useLanguage, usePace, useT } from "#app/app-state.tsx";
+import { useAppState, useIsAccountUnknown, useLanguage, usePace, useT } from "#app/app-state.tsx";
 import { useBack } from "#app/shared/use-back.ts";
 import { Button } from "#app/ui/button.tsx";
 import { useConfirmFocus } from "#app/ui/confirm-focus.ts";
@@ -100,6 +100,7 @@ export const ProjectsScreen = () => {
   // Archived projects come after the active ones, once asked for, as deleted presets do (R27-03).
   const [isShowingArchived, setIsShowingArchived] = useState(false);
   const archived = useArchivedProjects();
+  const isAccountUnknown = useIsAccountUnknown();
   const focus = useConfirmFocus();
   const close = (): void => {
     // The form goes and focus goes back to the button, not to the top of the page (QA round 18 L9).
@@ -145,15 +146,18 @@ export const ProjectsScreen = () => {
             ))
           : null}
       </Group>
-      <View className="mt-4">
-        <Group>
-          <SwitchRow
-            isOn={isShowingArchived}
-            label={t("projects.showArchived")}
-            onChange={setIsShowingArchived}
-          />
-        </Group>
-      </View>
+      {/* Nothing of the account before its first sync ends (QA 19 M1): no archive to show yet. */}
+      {isAccountUnknown ? null : (
+        <View className="mt-4">
+          <Group>
+            <SwitchRow
+              isOn={isShowingArchived}
+              label={t("projects.showArchived")}
+              onChange={setIsShowingArchived}
+            />
+          </Group>
+        </View>
+      )}
     </Screen>
   );
 };
