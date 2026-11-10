@@ -119,6 +119,8 @@ both pass them (check, then act; review I4).
 export const stageEmit = async (
   deps: ActionDeps,
   inputs: readonly EventInput[],
+  /** The action's own check of the state, run in the queue too (`action/nothing-to-do`, class 222). */
+  check?: () => ActionError | null,
 ): Promise<StagedResult> => {
   const now = deps.clock.now();
   const malformed = inputs
@@ -135,8 +137,13 @@ export const stageEmit = async (
     return err(storeError(malformed.error));
   }
   // What the rules said, kept apart from the store's own refusals (those go behind `dispatch/`).
-  const verdict: { rejected: null | RetroError } = { rejected: null };
+  const verdict: { rejected: ActionError | null } = { rejected: null };
   const staged = await deps.state.stage(inputs, () => {
+    const own = check?.() ?? null;
+    if (own !== null) {
+      verdict.rejected = own;
+      return own;
+    }
     const snapshot = deps.state.store.getState();
     const refusal = inputs
       .map((input) => validateEventInput(snapshot, input, now))
@@ -148,8 +155,11 @@ export const stageEmit = async (
 };
 
 /** `stageEmit`, answering once the write landed (`persist_failed` when the store refused it). */
-export const emit = async (deps: ActionDeps, inputs: readonly EventInput[]): ActionResult =>
-  await settle(await stageEmit(deps, inputs));
+export const emit = async (
+  deps: ActionDeps,
+  inputs: readonly EventInput[],
+  check?: () => ActionError | null,
+): ActionResult => await settle(await stageEmit(deps, inputs, check));
 
 /** Per client: the last check-then-show still running. */
 const queues = new WeakMap<ActionDeps, Promise<unknown>>();

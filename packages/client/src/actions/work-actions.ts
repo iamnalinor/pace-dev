@@ -4,6 +4,7 @@ import {
   type EventInput,
   type Importance,
   resolvePreset,
+  taskById,
   type TaskStatus,
 } from "@pace/core";
 
@@ -131,9 +132,14 @@ const reopen =
     if (!task.ok) {
       return task;
     }
+    // Asked again in the write queue: two presses at once write one reopen (class 222).
+    const isOpen = (): boolean =>
+      (taskById(deps.state.store.getState().tasks, taskId)?.closed ?? null) === null;
     return task.value.closed === null
       ? err("action/nothing-to-do")
-      : await emit(deps, [stamp(deps, { type: "task.reopened", payload: { taskId } })]);
+      : await emit(deps, [stamp(deps, { type: "task.reopened", payload: { taskId } })], () =>
+          isOpen() ? "action/nothing-to-do" : null,
+        );
   };
 
 const setOverrides =

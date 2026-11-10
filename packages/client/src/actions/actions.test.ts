@@ -857,6 +857,31 @@ describe("presets", () => {
   });
 });
 
+describe("a state check inside the write queue (class 222 sweep)", () => {
+  it("writes one event for two presses at once: preset delete, reopen, project archive", async () => {
+    const world = await setupActions([]);
+    const archives = await Promise.all([
+      world.actions.archivePreset("deferred"),
+      world.actions.archivePreset("deferred"),
+    ]);
+    expect(archives.map((result) => result.ok)).toEqual([true, false]);
+    const [created] = unwrap(
+      await world.actions.createTask({ presetId: "personal", title: "Twice" }),
+    );
+    const taskId = created?.type === "task.created" ? created.payload.taskId : "";
+    unwrap(await world.actions.closeTask({ outcome: "done", taskId }));
+    const reopens = await Promise.all([world.actions.reopen(taskId), world.actions.reopen(taskId)]);
+    expect(reopens.map((result) => result.ok)).toEqual([true, false]);
+    const [project] = unwrap(await world.actions.createProject({ color: "blue", name: "Infra" }));
+    const projectId = project?.type === "project.created" ? project.payload.projectId : "";
+    const projectArchives = await Promise.all([
+      world.actions.updateProject(projectId, { archived: true }),
+      world.actions.updateProject(projectId, { archived: true }),
+    ]);
+    expect(projectArchives.map((result) => result.ok)).toEqual([true, false]);
+  });
+});
+
 describe("projects", () => {
   it("creates a project with a trimmed name and edits, archives and restores it", async () => {
     const world = await setupActions([]);

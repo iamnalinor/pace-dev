@@ -80,9 +80,16 @@ const archivePreset =
     if (preset.id === "inbox") {
       return err("preset/built-in");
     }
-    return preset.archived
+    // Asked again in the write queue: two presses at once write one archive (class 222).
+    const isArchived = (): boolean =>
+      presetById(deps.state.store.getState().presets, presetId)?.archived === true;
+    return isArchived()
       ? err("action/nothing-to-do")
-      : await emit(deps, [stamp(deps, { type: "preset.archived", payload: { id: presetId } })]);
+      : await emit(
+          deps,
+          [stamp(deps, { type: "preset.archived", payload: { id: presetId } })],
+          () => (isArchived() ? "action/nothing-to-do" : null),
+        );
   };
 
 const restorePreset =

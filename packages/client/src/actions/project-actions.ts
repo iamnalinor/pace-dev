@@ -108,8 +108,15 @@ export const projectActions = (deps: ActionDeps): ProjectActions => ({
     if (problem !== null) {
       return err(problem);
     }
-    return await emit(deps, [
-      stamp(deps, { payload: patchPayload(projectId, patch), type: "project.updated" }),
-    ]);
+    // An archive or a restore it already is writes nothing, asked in the write queue (class 222).
+    const isAlready = (): boolean =>
+      patch.archived !== undefined &&
+      Object.keys(patch).length === 1 &&
+      projectById(deps.state.store.getState().projects, projectId)?.archived === patch.archived;
+    return await emit(
+      deps,
+      [stamp(deps, { payload: patchPayload(projectId, patch), type: "project.updated" })],
+      () => (isAlready() ? "action/nothing-to-do" : null),
+    );
   },
 });

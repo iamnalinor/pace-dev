@@ -2646,3 +2646,9 @@ New bugs go here with their class; a new class gets its own section above.
 - **Missed because.** The estimate tests picked a chip.
 - **Class.** Class 219 again: a field that hands its value over on an event the person's way of finishing does not send.
 - **Sweep and guard.** Inside a draft (the task fields, Day's sheet) every length the field reads is handed over as it is typed (`onTyped`), without closing the list; Enter still sets it and closes. Settings' category estimates write an event per pick, so they keep Enter. Guard: `task-screen.test.tsx` («45» typed, Save without Enter: 45 saved).
+
+### 249. Class 222's "left": the other actions that check the state before the write queue
+- **Bug.** Swept after class 222 (review of the QA 26 wave, I4, left for later): a preset's Delete, a task's Reopen and a project's archive or restore asked "already so?" before `emit`, so two presses in one tick (a double click before the button re-rendered) both passed and wrote two `preset.archived`, two `task.reopened`, two archives. The second archive made a later Undo or restore take back only one of them.
+- **Missed because.** Their refusal tests awaited the first call before the second.
+- **Class.** Class 222 again.
+- **Sweep and guard.** `stageEmit`/`emit` take the action's own check and run it in the store's write queue, before the core's retro rules; Delete, Reopen and a bare archive/restore of a project use it (a fast refusal before the queue stays, for the common case). Already in the queue: revocations (222), Stop and close (`serially`), the digest rows (235), Log past (241), the archive's Undo (244). Left, because a duplicate is harmless or refused by the core: renames and field edits (the second writes the same value), subtask marks (the reducer's toggle is by value), Inbox capture (two captures are two notes, as two presses mean). Guard: `actions.test.ts` (two presses at once of Delete, Reopen and archive: one event each).
