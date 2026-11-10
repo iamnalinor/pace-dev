@@ -4,6 +4,7 @@ import type { Event } from "@pace/core";
 
 import {
   checkpointServer,
+  languageChange,
   logOf,
   newer,
   old,
@@ -37,6 +38,64 @@ const unknownSource = {
   recordedAt: at(10, 30),
   source: "watch",
 } as unknown as Event;
+
+/** A correction in the tail: the base cannot take it, so the run needs the source. */
+const revokeOld = {
+  ...old,
+  id: "01ARZ3NDEKTSV4RRFFQ69G5FAE",
+  occurredAt: at(10, 45),
+  payload: { targetId: old.id },
+  recordedAt: at(10, 45),
+  type: "event.revoked",
+} as Event;
+
+describe.each(["http", "socket"] as const)(
+  "a checkpoint copy whose source holds an event this build cannot read, over %s",
+  (mode) => {
+    it("becomes a full copy the tolerant way when a correction needs the source, and sends its outbox", async () => {
+      const server = await checkpointServer();
+      const disk = await ownedDisk();
+      const { client, fake } = await startClient(server, disk, { mode });
+      await client.sync.syncNow();
+      expect((await disk.readMeta()).coverage).toBe("checkpoint");
+      // An unreadable event the tail skipped, then a correction the base cannot take: its source
+      // read now covers the unreadable one (bug-lessons 361).
+      server.append([unknownType]);
+      await client.sync.syncNow();
+      expect(await disk.readMeta()).toMatchObject({ coverage: "checkpoint", cursor: 2 });
+      server.append([revokeOld]);
+      const written = await client.state.dispatch(languageChange);
+
+      expect(await client.sync.syncNow()).toMatchObject({ ok: true, value: { pushed: 1 } });
+
+      expect(await disk.readMeta()).toMatchObject({ coverage: "full", cursor: 4, storeId: "one" });
+      expect(await disk.listPending()).toEqual([]);
+      expect(server.log().map((event) => event.id)).toContain(written.ok ? written.value.id : "?");
+      expect(client.state.store.getState()).toMatchObject({
+        historyCoverage: "full",
+        settings: { language: "en" },
+        status: "ready",
+      });
+      expect(client.sync.status.getState()).toMatchObject({ lastError: null });
+
+      // Settled: the next run makes one pull and nothing else.
+      const calls = fake.calls.length;
+      const socketRequests = server.requests.length;
+      expect(await client.sync.syncNow()).toEqual({ ok: true, value: { pulled: 0, pushed: 0 } });
+      const requests = [
+        ...fake.calls.slice(calls).map((call) => call.path),
+        ...server.requests
+          .slice(socketRequests)
+          .filter((request) => request.transport === "socket")
+          .map((request) => request.type),
+      ];
+      expect(requests).toHaveLength(1);
+      expect(requests[0]).toMatch(/pull/);
+      client.live.stop();
+      client.close();
+    });
+  },
+);
 
 describe.each(["http", "socket"] as const)("a checkpoint copy's tail over %s", (mode) => {
   it("skips an event this build cannot read, keeps the rest and moves the cursor past it", async () => {

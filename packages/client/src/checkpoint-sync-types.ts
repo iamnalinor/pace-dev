@@ -1,3 +1,5 @@
+import type { Result } from "@pace/core";
+
 import type { ApiClient } from "./api-client.ts";
 import type { CopyMeta, LocalSnapshot } from "./checkpoint-store-types.ts";
 import type { Sha256Text } from "./checkpoint-validation.ts";
@@ -6,7 +8,13 @@ import type { HistoryCoordinator } from "./history-types.ts";
 import type { AppStateHandle } from "./state.ts";
 import type { SyncTransport } from "./sync-transport.ts";
 
-import { COPY_CHANGED, SyncError } from "./sync-error.ts";
+import {
+  COPY_CHANGED,
+  HISTORY_INCOMPLETE,
+  SOURCE_UNREADABLE,
+  SyncError,
+  valueOrThrow,
+} from "./sync-error.ts";
 
 export type CheckpointSyncOptions = {
   readonly api: ApiClient;
@@ -46,6 +54,17 @@ export const assertRequestCopy = (context: CheckpointSyncContext, copy: number):
   if (context.state.copy() !== copy) {
     throw new SyncError(COPY_CHANGED);
   }
+};
+/**
+A strict source read the run itself asked for: an unreadable source is not the run's end but a
+reason to leave the checkpoint (`SOURCE_UNREADABLE`, taken by `sync-run.ts`). Every other refusal
+is thrown as it is.
+*/
+export const sourceOrConvert = <T, E extends string>(result: Result<T, E>): T => {
+  if (!result.ok && result.error === HISTORY_INCOMPLETE) {
+    throw new SyncError(SOURCE_UNREADABLE);
+  }
+  return valueOrThrow(result);
 };
 /** The copy's meta, once it is known to be this session's: what a page or a bootstrap is guarded by. */
 export const readOwnedMeta = async (context: CheckpointSyncContext): Promise<CopyMeta> => {

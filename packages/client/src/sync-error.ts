@@ -6,6 +6,12 @@ export const COPY_CHANGED = "sync/copy-changed";
 export const HISTORY_INCOMPLETE = "history/incomplete";
 /** The local copy cannot take the change as it is: its source is needed, or it moved meanwhile. */
 export const REBUILD_REQUIRED = "history/rebuild-required";
+/**
+The checkpoint run needed the complete source and this build cannot read all of it (an event of a
+newer client sits in it). The copy is turned into a full one by the tolerant legacy pull instead
+(`sync-run.ts`), with its outbox kept; the pinned read itself stays strict (bug-lessons 361).
+*/
+export const SOURCE_UNREADABLE = "checkpoint/source-unreadable";
 /** The server asked for a bootstrap again right after one was installed. */
 export const REPEATED_BOOTSTRAP = "checkpoint/repeated-bootstrap";
 

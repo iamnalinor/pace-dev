@@ -8,6 +8,7 @@ import {
   assertRequestCopy,
   type CheckpointSyncContext,
   readOwnedMeta,
+  sourceOrConvert,
 } from "./checkpoint-sync-types.ts";
 import { readTailRecords, validateCheckpoint } from "./checkpoint-validation.ts";
 import { readCompleteSource } from "./history-source.ts";
@@ -38,7 +39,7 @@ const sourceBootstrap = async (context: CheckpointSyncContext, input: Install): 
   const { state, store, pullSource } = context;
   const { answer, guard, checkpoint } = input;
   const copy = state.copy();
-  const source = valueOrThrow(
+  const source = sourceOrConvert(
     await readCompleteSource({
       storeId: answer.storeId,
       through: answer.throughSeq,
@@ -150,7 +151,7 @@ const acceptSource = async (
   const { runtime } = context;
   runtime.sourceStore = input.storeId;
   if (input.guard.coverage === "checkpoint" && input.guard.storeId === input.storeId) {
-    valueOrThrow(await context.history.ensureComplete());
+    sourceOrConvert(await context.history.ensureComplete());
   }
   runtime.initialized = true;
   return 0;

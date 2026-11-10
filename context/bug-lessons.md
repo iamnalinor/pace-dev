@@ -1916,6 +1916,7 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-10 | Dropping the phone's empty header bar (owner) moved the tabs' titles but not those under More's Back bar, and centring the title row moved a desktop title with actions by 5 px: `layout.e2e.ts` F-LAY-02 failed in CI | 37 | yes: every `ScreenHeader` caller is a destination in the spec, which now groups a phone's titles (tabs; under Back) | the spec checks each group at one y; the title row stays `items-start` |
 | 2026-11-10 | PR 55 follow-up review, item 1: on a checkpoint copy the archive toast's Undo (`undoArchive`) never loaded the history: it staged with `state.stage` below `stageEmit` and answered a refusal, the copy stayed a checkpoint | 360 (new) | yes: every action that writes `event.revoked` / `event.amended` (revoke, revokeAll, undoLast, deleteTask, discardInbox, unmarkDone, deleteActivity, confirm/undo an automatic outcome, startSeriesForTask, restorePreset, undoArchive); only `undoArchive` called below the shared path | `corrections-checkpoint.test.ts` (each action: one load, success, the same event types as a full copy); ESLint `state.stage(` ban in `actions/` (`eslint-scoped-bans.test.ts`) |
 | 2026-11-10 | PR 55 follow-up review, item 2: `restorePreset` read `state.events` before the history was loaded, so on a checkpoint copy (the archive in the base) it answered `action/nothing-to-do` | 118, 360 | yes: the actions that read the log for a target (deleteTask, discardInbox, deleteActivity, unmarkDone, startSeriesForTask) read it after the wait; `confirmAutoOutcome` checked "confirmed already" only before it and now asks again in the queue | `corrections-checkpoint.test.ts` (restorePreset case; two confirms at once write one amendment) |
+| 2026-11-10 | PR 55 follow-up review, item 3: one event this build cannot read in a checkpoint copy's tail, then any correction, stopped the copy's sync for good: the strict source read failed the run before its push, the outbox never left and every run repeated the same requests | 361 (new), 300 | yes: every place the checkpoint run asks for the complete source (`retryPage`, `sourceBootstrap`, `acceptSource`); the History screen and export keep the strict read | `checkpoint-sync-tail.test.ts` (HTTP and socket: the copy turns full, the outbox is sent, the next run is one pull) |
 
 ### 125. A live region around a ticking value
 - **Bug.** PR B 4.2 (F-A11Y-10): the running row sat in `accessibilityLiveRegion="polite"` around the
@@ -3314,3 +3315,25 @@ New bugs go here with their class; a new class gets its own section above.
   The sweep also found `confirmAutoOutcome` checking "confirmed already" only before the wait: it is
   asked again in the queue now. ESLint bans `state.stage(` in `packages/client/src/actions/`
   outside `deps.ts` and `instances.ts` (`scripts/eslint-scoped-bans.test.ts` pins the scope).
+
+### 361. A strict read on the one path a sync run must always get through
+- **Bug.** PR 55 follow-up review, item 3: a checkpoint copy's tail skips an event this build
+  cannot read (class 13, 150). Once any correction arrived after it, the page needed the source
+  (`history/rebuild-required` → `ensureComplete`), and the pinned read of the complete source, strict
+  on purpose, refused the skipped event with `history/incomplete`. The run threw before its push:
+  the cursor never moved, the outbox never left, and every later run sent the same requests again.
+  The bootstrap's recovery (`recoverBootstrap → sourceBootstrap`) and a `source` answer on a
+  checkpoint copy (`acceptSource`) had the same shape.
+- **Missed because.** The tail tests put the unreadable event and the strict read side by side but
+  never in the same run: no test sent a correction after an event the tail had skipped, so the run
+  never had to read a source it could not read.
+- **Rule.** A read that is strict for a person's view (History, export) is not the sync's way past
+  an obstacle: when a run needs it and it refuses for good, the run takes the tolerant way that
+  already exists (here the legacy pull from 0 that a flag rollback uses), and still pushes. Test a
+  refusal that does not go away by running twice: the second run must be quiet.
+- **Sweep and guard.** The three places the checkpoint run asks for the complete source go through
+  `sourceOrConvert` (`checkpoint-sync-types.ts`), which turns `history/incomplete` into
+  `checkpoint/source-unreadable`; `sync-run.ts` answers it with the legacy run (and a live page
+  with a pull). The History screen and export still read strictly. `checkpoint-sync-tail.test.ts`
+  "becomes a full copy the tolerant way…" (HTTP and socket): after the run the copy is full and the
+  outbox sent, and the next run makes exactly one request, a pull.

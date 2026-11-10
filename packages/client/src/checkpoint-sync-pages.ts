@@ -6,7 +6,12 @@ import type { PullPage } from "./sync-transport.ts";
 import { ApiError } from "./api-client.ts";
 import { isSameCopy } from "./checkpoint-store.ts";
 import { bootstrapCheckpoint } from "./checkpoint-sync-bootstrap.ts";
-import { assertLive, type CheckpointSyncContext, readOwnedMeta } from "./checkpoint-sync-types.ts";
+import {
+  assertLive,
+  type CheckpointSyncContext,
+  readOwnedMeta,
+  sourceOrConvert,
+} from "./checkpoint-sync-types.ts";
 import { readTailRecords } from "./checkpoint-validation.ts";
 import {
   COPY_CHANGED,
@@ -35,7 +40,7 @@ const commitPage = async (context: CheckpointSyncContext, input: PageInput) =>
     });
   });
 const retryPage = async (context: CheckpointSyncContext, input: PageInput) => {
-  valueOrThrow(await context.history.ensureComplete());
+  sourceOrConvert(await context.history.ensureComplete());
   const guard = await context.store.readMeta();
   if (!isSameCopy(guard, input.guard)) {
     throw new SyncError(COPY_CHANGED);

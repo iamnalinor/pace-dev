@@ -402,7 +402,10 @@ that has pulled nothing yet starts from a checkpoint instead of the whole log:
   the outbox through one function (`sync-push.ts`).
 - A tail page is read as a legacy page is: an event this build cannot read is left out and the
   cursor moves past it (`readTailRecords`), so a newer client's event never stops an older
-  client's sync. Only the pinned read of the complete source is strict.
+  client's sync. Only the pinned read of the complete source is strict. When the checkpoint run
+  itself needs that source (a correction in the tail, a bootstrap's recovery) and it holds an
+  event this build cannot read, the run does not fail: the copy is turned into a full one by the
+  legacy run's pull from 0, outbox kept, as on a flag rollback (`SOURCE_UNREADABLE`).
 - The shape of a checkpoint's state belongs to `CHECKPOINT_VERSION`:
   `packages/core/src/checkpoint/state-shape.test.ts` fails when the shape differs from the one
   frozen for the current version. A stored base this build cannot read leaves the state not
