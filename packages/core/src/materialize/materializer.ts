@@ -60,11 +60,13 @@ const revokedIds = (revocations: readonly Revocation[]): ReadonlySet<string> => 
   );
 };
 
+/** The events an active revocation in `log` targets: revoking one again would do nothing. */
+export const revokedIdsIn = (log: readonly Event[]): ReadonlySet<string> =>
+  revokedIds(log.filter((event): event is Revocation => event.type === "event.revoked"));
+
 /** Whether an active revocation in `log` targets the event: revoking it again would do nothing. */
 export const isRevokedIn = (log: readonly Event[], eventId: string): boolean =>
-  revokedIds(log.filter((event): event is Revocation => event.type === "event.revoked")).has(
-    eventId,
-  );
+  revokedIdsIn(log).has(eventId);
 
 /** Shallow-merges the patches in order; an amendment that makes the event invalid is ignored. */
 const patched = (event: Event, amendments: readonly Amendment[]): Event => {

@@ -13,6 +13,7 @@ import {
   parseEvent,
   parsePresetDefinition,
   type Result,
+  revokedIdsIn,
   type Series,
   shouldRematerialize,
   sortEvents,
@@ -30,6 +31,8 @@ export type Materialized = {
   readonly state: CoreState;
   /** Every id in the log, corrections and revoked events included. */
   readonly ids: ReadonlySet<string>;
+  /** The ids an active revocation targets: a second revocation of one would do nothing. */
+  readonly revoked: ReadonlySet<string>;
   /** `occurredAt` of the last effective event folded in; the incremental-apply guard. */
   readonly lastAppliedOccurredAt: null | string;
   /** The log sequence the state was built at; a different log seq means the cache is stale. */
@@ -45,6 +48,7 @@ export type Log = {
 export const rebuild = (log: Log): Materialized => ({
   ids: new Set(log.events.map((event) => event.id)),
   lastAppliedOccurredAt: materialize(log.events, lastOccurredAt, null),
+  revoked: revokedIdsIn(log.events),
   seq: log.seq,
   state: materialize(log.events, coreReducer, INITIAL_CORE_STATE),
 });
@@ -79,6 +83,8 @@ export const applyInOrder = (
   return {
     ids: new Set([...current.ids, ...sorted.map((event) => event.id)]),
     lastAppliedOccurredAt: sorted.at(-1)?.occurredAt ?? current.lastAppliedOccurredAt,
+    // The in-order path takes no corrections, so what is revoked stays as it was.
+    revoked: current.revoked,
     seq,
     state,
   };
@@ -141,6 +147,35 @@ const hasTarget = (input: EventInput, ids: ReadonlySet<string>, batch: readonly 
   ids.has(input.payload.targetId) ||
   batch.some((event) => event.id === input.payload.targetId);
 
+/**
+A revocation of an event an active revocation already targets (in the log, or earlier in the
+batch) would do nothing but stand behind the first one: a later "undo the undo" would leave the
+event revoked (review I3). The client refuses it the same way (`action/nothing-to-do`).
+*/
+const isRevokedAlready = (
+  input: EventInput,
+  revoked: ReadonlySet<string>,
+  batch: readonly Event[],
+): boolean =>
+  input.type === "event.revoked" &&
+  (revoked.has(input.payload.targetId) ||
+    batch.some(
+      (event) =>
+        event.type === "event.revoked" && event.payload.targetId === input.payload.targetId,
+    ));
+
+/** Why a correction cannot go in: its target is unknown, or revoked already. */
+const targetRefusal = (
+  input: EventInput,
+  current: Materialized,
+  batch: readonly Event[],
+): "action/nothing-to-do" | "event/not-found" | null => {
+  if (!hasTarget(input, current.ids, batch)) {
+    return "event/not-found";
+  }
+  return isRevokedAlready(input, current.revoked, batch) ? "action/nothing-to-do" : null;
+};
+
 const isCorrectionInput = (
   input: EventInput,
 ): input is Extract<EventInput, { readonly type: "event.amended" | "event.revoked" }> =>
@@ -172,8 +207,9 @@ export const prepareBatch = (
     if (!checked.ok) {
       return err({ code: checked.error, index });
     }
-    if (!hasTarget(input, current.ids, events)) {
-      return err({ code: "event/not-found", index });
+    const refused = targetRefusal(input, current, events);
+    if (refused !== null) {
+      return err({ code: refused, index });
     }
     const event = stamp(checked.value, meta);
     if (!event.ok) {

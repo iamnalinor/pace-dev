@@ -10,7 +10,7 @@ import { failure, runWrite, stamp, WRITE_OUTPUT } from "../tool-kit.ts";
 export const revokeEvent = defineTool({
   annotations: { destructiveHint: true, idempotentHint: true, readOnlyHint: false },
   description:
-    "Revokes one event by id (a subtask's done mark, a closure, an automatic outcome, an edit): the log keeps it, but the state is rebuilt as if it never happened. This is the undo of Pace. Event ids come from the `events` of every mutating tool and from get_task (closed.eventId). Revoking a revocation restores the original.",
+    "Revokes one event by id (a subtask's done mark, a closure, an automatic outcome, an edit): the log keeps it, but the state is rebuilt as if it never happened. This is the undo of Pace. Event ids come from the `events` of every mutating tool and from get_task (closed.eventId). Revoking a revocation restores the original. An event revoked already is refused with action/nothing-to-do, so a repeated call writes nothing.",
   handler: async (args, ctx) => {
     const target = await ctx.store.find(args.eventId);
     if (target === undefined) {

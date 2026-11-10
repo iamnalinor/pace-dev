@@ -555,6 +555,24 @@ describe("editing", () => {
       "event/not-found",
     );
   });
+
+  it("refuses to revoke an event revoked already, writing nothing (review I3)", async () => {
+    const token = await readWriteToken();
+    const taskId = await createTask(token, { presetId: "hw", subtasks: ["1"], title: "Sheet" });
+    const marked = await okTool(token, "mark_subtasks", { numbers: [1], taskId });
+    const solveId = String(rows(marked["events"])[0]?.["id"]);
+    const first = await okTool(token, "revoke_event", { eventId: solveId });
+    const revocationId = String(rows(first["events"])[0]?.["id"]);
+    expect(await errorText(token, "revoke_event", { eventId: solveId })).toContain(
+      "action/nothing-to-do",
+    );
+    // No second revocation stands behind the first: undoing the undo brings the mark back, and
+    // then the mark can be revoked again.
+    await okTool(token, "revoke_event", { eventId: revocationId });
+    expect(await okTool(token, "get_task", { id: taskId })).toMatchObject({ progress: 1 });
+    await okTool(token, "revoke_event", { eventId: solveId });
+    expect(await okTool(token, "get_task", { id: taskId })).toMatchObject({ progress: 0 });
+  });
 });
 
 describe("review", () => {

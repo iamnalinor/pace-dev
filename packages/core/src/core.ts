@@ -129,6 +129,7 @@ export {
   materializeAt,
   type MaterializeOptions,
   type Reducer,
+  revokedIdsIn,
   shouldRematerialize,
 } from "./materialize/materializer.ts";
 export { projectReducer } from "./materialize/project-reducer.ts";
