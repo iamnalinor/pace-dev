@@ -116,7 +116,7 @@ export const DatePanel = ({
         </Text>
         <TimeInput
           className="w-24"
-          key={time}
+          isDraft
           label={t(kind === "final" ? "form.finalTime" : "composer.dueTime")}
           onTime={(next) => {
             set(shown.date ?? today, next);

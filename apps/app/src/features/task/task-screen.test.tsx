@@ -581,6 +581,29 @@ describe("TaskScreen — work", () => {
     expect(screen.getByRole("button", { name: en("common.save") })).toBeEnabled();
   });
 
+  it("keeps a time typed in the due panel when Done is tapped without leaving the field (review I1)", async () => {
+    const runtime = await createTestRuntime({ deviceTz: "UTC", now: TRK_NOW });
+    const result = await runtime.actions.createTask({
+      dueAt: "2026-10-16T18:00:00.000Z",
+      presetId: "personal",
+      title: "Typed due time",
+    });
+    const created = result.ok ? result.value[0] : undefined;
+    const taskId = created?.type === "task.created" ? created.payload.taskId : "";
+    await renderScreen(<TaskScreen id={taskId} />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
+    await fireEvent.press(screen.getByRole("button", { name: /^Due: /u }));
+    // On Android the tap on Done blurs nothing: no blur reaches the field before it goes.
+    await fireEvent.changeText(screen.getByLabelText(en("composer.dueTime")), "2130");
+    await fireEvent.press(screen.getByRole("button", { name: en("common.done") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
+    await waitFor(() => {
+      expect(runtime.state.store.getState().tasks.byId[taskId]?.dueAt).toBe(
+        "2026-10-16T21:30:00.000Z",
+      );
+    });
+  });
+
   it("opens the final date's calendar under its label, and keeps quiet while it is open (QA 13 L8)", async () => {
     await trkScreen();
     await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));

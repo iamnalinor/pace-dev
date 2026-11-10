@@ -53,6 +53,7 @@ const SlotFields = ({
       <Text className="font-sans text-caption font-normal text-label-tertiary">{timeLabel}</Text>
       <TimeInput
         className="w-24"
+        isDraft
         label={timeLabel}
         onTime={(time) => {
           onSlot({ ...slot, time });

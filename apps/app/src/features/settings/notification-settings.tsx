@@ -187,7 +187,10 @@ export const PushStatus = () => {
   );
 };
 
-/** The daily digest times (`HH:MM` on the account's zone); every change is saved at once. */
+/**
+The daily digest times (`HH:MM` on the account's zone); a time is saved when its field is left,
+an added or removed one at once.
+*/
 export const DigestWindows = () => {
   const t = useT();
   const { actions } = usePace();
@@ -202,7 +205,8 @@ export const DigestWindows = () => {
         {t("settings.digestWindows.hint")}
       </Text>
       {digestWindows.map((time, index) => (
-        // The row is its position: keyed by value, editing a time would remount the input.
+        // The row is its position: keyed by value, saving a time with Enter would remount the
+        // input under the caret. An untouched field takes the time its row now holds (review I5).
         // eslint-disable-next-line @eslint-react/no-array-index-key -- see above
         <View className="min-h-hit-web flex-row items-center justify-between gap-2" key={index}>
           <TimeInput
@@ -233,7 +237,10 @@ export const DigestWindows = () => {
   );
 };
 
-/** The nightly window without notifications; each edge is saved as soon as it is a time. */
+/**
+The nightly window without notifications; an edge is saved when its field is left with a time
+(or goes away holding one), and says so under itself when what is left is not a time.
+*/
 export const QuietHours = () => {
   const t = useT();
   const { actions } = usePace();

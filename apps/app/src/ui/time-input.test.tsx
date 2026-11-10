@@ -1,4 +1,6 @@
 import { fireEvent, screen } from "@testing-library/react-native";
+import { useState } from "react";
+import { Pressable, Text } from "react-native";
 
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
@@ -64,6 +66,84 @@ describe("TimeInput (spec §4.2.29)", () => {
     const field = screen.getByLabelText("Starts at");
     await fireEvent(field, "focus");
     await fireEvent(field, "blur");
+    expect(onTime).not.toHaveBeenCalled();
+  });
+
+  it("keeps a typed time when the field goes away without being left (Android, review I1)", async () => {
+    // On Android a tap on Done or Save under `keyboardShouldPersistTaps="handled"` blurs nothing:
+    // the field unmounts still focused, and its blur never reaches it.
+    const onTime = jest.fn();
+    const { unmount } = await renderTime(onTime);
+    await fireEvent.changeText(screen.getByLabelText("Starts at"), "1830");
+    await unmount();
+    expect(onTime).toHaveBeenCalledTimes(1);
+    expect(onTime).toHaveBeenCalledWith("18:30");
+  });
+
+  it("going away saves nothing untouched, unreadable or already saved", async () => {
+    for (const [raw, isLeft] of [
+      [null, false],
+      ["18:3", false],
+      ["1830", true],
+    ] as const) {
+      const onTime = jest.fn();
+      const { unmount } = await renderTime(onTime);
+      const field = screen.getByLabelText("Starts at");
+      if (raw !== null) {
+        await fireEvent.changeText(field, raw);
+      }
+      if (isLeft) {
+        await fireEvent(field, "blur");
+      }
+      await unmount();
+      expect(onTime).toHaveBeenCalledTimes(isLeft ? 1 : 0);
+    }
+  });
+
+  it("in a draft, hands each complete time over as it is typed, never a deletion's reading", async () => {
+    const onTime = jest.fn();
+    await renderScreen(
+      <TimeInput isDraft label="Starts at" onTime={onTime} value="09:30" />,
+      await createTestRuntime({ world: "empty" }),
+    );
+    const field = screen.getByLabelText("Starts at");
+    // The hour digit deleted to retype it: «0:30» is not a time yet, whatever a whole reading says.
+    await fireEvent.changeText(field, "0:30");
+    expect(onTime).not.toHaveBeenCalled();
+    await fireEvent.changeText(field, "07:30");
+    expect(onTime).toHaveBeenLastCalledWith("07:30");
+    await fireEvent.changeText(field, "07:3");
+    await fireEvent.changeText(field, "07:35");
+    expect(onTime).toHaveBeenLastCalledWith("07:35");
+    expect(onTime).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows a stored time that changes while it is untouched, keeps one being typed (review I5)", async () => {
+    const onTime = jest.fn();
+    // The stored value moves on its own: synced from another device, or a row above removed.
+    const Stored = () => {
+      const [value, setValue] = useState("09:00");
+      return (
+        <>
+          <TimeInput label="Starts at" onTime={onTime} value={value} />
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              setValue((previous) => (previous === "09:00" ? "10:15" : "12:00"));
+            }}
+          >
+            <Text>Sync</Text>
+          </Pressable>
+        </>
+      );
+    };
+    await renderScreen(<Stored />, await createTestRuntime({ world: "empty" }));
+    const field = () => screen.getByLabelText("Starts at");
+    await fireEvent.press(screen.getByRole("button", { name: "Sync" }));
+    expect(field().props["value"]).toBe("10:15");
+    await fireEvent.changeText(field(), "11");
+    await fireEvent.press(screen.getByRole("button", { name: "Sync" }));
+    expect(field().props["value"]).toBe("11");
     expect(onTime).not.toHaveBeenCalled();
   });
 

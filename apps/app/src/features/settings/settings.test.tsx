@@ -144,6 +144,22 @@ describe("SettingsScreen", () => {
     });
   });
 
+  it("shows the next digest time in a row whose time was removed (review I5)", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    await renderScreen(<SettingsScreen />, runtime);
+    const settings = () => runtime.state.store.getState().settings;
+    const [first = "", second = ""] = settings().digestWindows;
+    await fireEvent.press(
+      screen.getByRole("button", { name: en("settings.digestWindows.remove", { time: first }) }),
+    );
+    await waitFor(() => {
+      expect(settings().digestWindows[0]).toBe(second);
+    });
+    expect(
+      screen.getByLabelText(en("settings.digestWindows.time", { index: 1 })).props["value"],
+    ).toBe(second);
+  });
+
   it("saves the quiet hours and opens the pages behind the links", async () => {
     const runtime = await createTestRuntime({ world: "empty" });
     await renderScreen(<SettingsScreen />, runtime);

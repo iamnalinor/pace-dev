@@ -138,6 +138,20 @@ describe("PresetScreen", () => {
     expect(router.back).toHaveBeenCalled();
   });
 
+  it("saves a time still being typed when Save is tapped without leaving the field (review I1)", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    await renderScreen(<PresetScreen from={undefined} id="work" />, runtime);
+    const field = en("presets.field.recurrence");
+    await fireEvent.press(screen.getByRole("switch", { name: en("presets.override", { field }) }));
+    await fireEvent.press(screen.getByRole("switch", { name: en("presets.repeats") }));
+    // On Android the tap on Save blurs nothing: the field never hears that it was left.
+    await fireEvent.changeText(screen.getByLabelText(en("presets.issuedAt")), "1115");
+    await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
+    await waitFor(() => {
+      expect(presetOf(runtime, "work")?.definition.recurrence?.issued.time).toBe("11:15");
+    });
+  });
+
   it("keeps focus through the delete confirmation: onto Cancel, saying the question, and back (bug class 5)", async () => {
     await renderScreen(
       <PresetScreen from={undefined} id="deferred" />,
