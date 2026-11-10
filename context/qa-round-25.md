@@ -142,3 +142,41 @@ R23-05 gone, R23-10 gone, R23-15 improved (15 stops), R22-20 still there (R25-15
 - Phone Week keyboard and the sideways-scroll cue beyond the shot (R22-12 hint still at the bottom).
 - Plain-http LAN line was checked by replaying the server's real answer into a browser on localhost, not from a browser on the LAN address (the web build points at :8787).
 - The tap-latency re-measure was one run on a shared machine.
+
+## Fix wave (after round 25)
+
+Review of the round 24 fixes (`review-qa24-fixes.md`):
+
+| Item | State |
+|---|---|
+| I1 Day's/Week's selection after Back | fixed in 977d0ea: the pick is stored with its date/week and reads as none for another one (bug-lessons 201) |
+| I2 Back stops on entries whose item is gone | fixed in dbca520: `useSearchParam`'s `forget` takes back the opening step (or clears in place); Inbox Accept/Delete/answers and the task pane's Delete use it (bug-lessons 202). Left: an older entry two steps back that named the item still shows the list. |
+| Minors 3–9 | fixed in f4ff045 (real TabRouter tests, typed router override, steps only from a focused screen inside the tabs, keepalive retry, readAnswer doc, phone-width Back e2e and a sidebar-switch-is-a-step e2e, header link while editing). Minor 6's router-side check covers a tab left behind; a screen outside the tabs is kept out by `isStepScreen` in the hook (the router's copy of More's stack has no keys, so it cannot be checked there). |
+
+Round 25 findings:
+
+| Id | State |
+|---|---|
+| R25-01 | fixed in adbb1a4: one "may not run into the next activity" rule for a gap's Log, Log past and the edit form, live and logged blocks alike (bug-lessons 203) |
+| R25-02 | fixed in 4286be7: deleted preset read-only with «Удалён» and «Восстановить пресет» (revokes the archive), Delete toast with Undo, deleted rows last without ▲▼ (bug-lessons 204) |
+| R25-03 | **left, measured** (see below) |
+| R25-04 | fixed in 5b1e883: `typeTime` reads the hour before a separator (bug-lessons 205) |
+| R25-05 | fixed in 4ea7b4d: Undo stays «Вернуть» (QA round 14 M2 keeps Undo and Cancel two words, guarded by `i18n.test.ts`), so the question is «Вернуть как было»; every way in is named «Вернуть: <row>» (bug-lessons 206) |
+| R25-06 | fixed in 4ea7b4d: Accept shows «Задача создана: …» with Undo (revokes what it wrote) |
+| R25-07 | fixed in cc095f3: «Изменить в Дне» on a Week block opens its day |
+| R25-08 | fixed in 4248a23: the hint follows the switch and names Week's moon as the same setting (both controls kept: the moon is the quick toggle where the hours are seen) |
+| R25-09 | fixed in 412ccc0: focus returns to the description's place after Escape/Cancel/Save; dropping the draft on Escape kept (as Cancel) |
+| R25-10 | fixed in 0f1f7b5: Save pinned in the sheet's footer |
+| R25-11 | fixed in 0d7bf17: the shown-once warning comes first in the steps |
+| R25-12 | fixed in 1021644: `useLeave(parent)`; presets and projects fall back to their list (bug-lessons 207) |
+| R25-13 | **left as specified**: the plan (Stage «Параллельные активности») says day totals count the main line only; «Учтено» follows it. A header note was not added (copy change for the design pass). |
+| R25-14 | fixed in fe31abc: preview «Пример задачи» tagged with the preset's name |
+| R25-15 | left: devices row separators and «Завершить» beside «Выйти» need a design decision (R22-20 carried) |
+| R25-16 | left: Presets header/row alignment is a visual pass with shots (design.md matrix), not done in this wave |
+| R25-17 | left: Inbox meta «Работа · Работа» (preset and project of one name) and the stacked buttons need a layout decision |
+| R25-18 | left: the pane's focus ring after programmatic focus needs a focus-visible decision for programmatic focus |
+| R25-19 | left: «Учтено» outdent is visual; «Сегодня» on `?date=garbage` is correct (the fallback is today) |
+
+**R25-03 measured, not committed.** Method as round 24 (390, touch, 4× CPU via CDP, Event Timing `click`, lived-in RU, production build), script `scratchpad/perf/lat.ts`, 5–7 runs, medians. Baseline at the start of the wave: Day tab 256 ms, Now tab 176, chip «Алгебра» 168, chip «Все» 152, open row 192. Render counting in a probe build (counters in the components) refuted the root-layout hypothesis: one tap renders the root `Navigator` once but no other scene (react-navigation's `StaticContainer` holds unchanged scenes); a chip tap renders `NowScreen`, `NowBoard`, `Screen` once and 1–4 `TaskRow`s; Now tab renders Now once; Day tab mounts Day. So the cost is one screen's own subtree (react-native-web's element and style resolution), not a re-render storm. Tried: (1) `startTransition` around tab navigation, `setParams` and the row push: no change (Now 184, chips 160/160, row 208) — the navigation state reaches React through expo-router's external store, which renders synchronously; reverted. (2) `memo` on Now's time bar, header, composer, banner and calendar prompt: 152/144/128/184 in one run on a quiet machine, but paired runs on the restarted (noisier) machine showed no difference (base Now 200 / chips 200, 208 / row 216 / JS 220, 147, 138, 225 ms vs memo 200 / 232, 176 / 264 / JS 254, 163, 139, 260 ms); not measurably better, reverted. Next step for the class: make the Now list rows cheaper (each TaskRow's RNW style work) or virtualise; this needs a profiling build with per-component timings.
+
+**Checks at the end of the wave.** `bun test:unit` 904 + 565 passed, `bun test:app` 1473 passed (195 suites), `bun test:api` 646 passed. Full e2e (`e2e-full-10.txt`): 252 passed, 2 failed, both latency ceilings (tab p75 336 > 240, dayStep 168 > 160); every chromium test passed. The machine was replaced between the start of the wave and the run and is slower: every latency case rose 25–65 % against round 24's run, the untouched ones too (picker 104 → 144, New task 136 → 168). The latency project alone (`--no-deps`), three runs: only the tab case fails (264 ms; dayStep 160, at its ceiling, passes). The same case on the wave's starting commit (ccb82e0) built on this machine, three runs each, alternating: old 312 / 288 / 240, new 240 / 264 / 288; row old 248 / 240, new 200 / 216; Log past old 176 / 192, new 168 / 200. The wave added no latency; the tab ceiling (240) sits inside this machine's run-to-run spread. Not weakened; carried with R25-03. A chromium flake seen once in a separate run: `login.e2e.ts` «Sign out … goes quiet (R22-02)» failed in one run and passed in the full run.
