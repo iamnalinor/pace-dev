@@ -139,10 +139,9 @@ wrong 00:30 (QA-25 review I1); one key typed in front of «:30» leaves «1:30»
 comes. Without `previous` the text is read whole, the way a field reads it when it is left or saved.
 */
 export const typeTime = (raw: string, previous?: string): TypedTime => {
-  if (previous !== undefined && isSecondSeparator(raw, previous)) {
-    // «09:9» and then «:»: one separator is all a time has (QA round 27 R27-04). The text stays as
-    // it was, read with nothing put in: «0:30» on the way to retyping the hour stays incomplete,
-    // never a filled-out 00:30 (review of the QA 27 wave, I2).
+  if (previous !== undefined && isRefusedKey(raw, previous)) {
+    // The text stays as it was, read with nothing put in: «0:30» on the way to retyping the hour
+    // stays incomplete, never a filled-out 00:30 (review of the QA 27 wave, I2).
     return typeTime(previous, previous);
   }
   const text = raw.trim();
@@ -154,6 +153,21 @@ export const typeTime = (raw: string, previous?: string): TypedTime => {
   }
   return DIGITS.test(text) ? readDigits(text, inserted > 0) : asTyped(raw);
 };
+
+/** Text `typeTime` reads as a time or the way to one. */
+const isReadable = (text: string): boolean => {
+  const trimmed = text.trim();
+  return SEPARATED.test(trimmed) || (DIGITS.test(trimmed) && trimmed.length <= MAX_DIGITS);
+};
+
+/**
+A key a time field does not take: a second separator («09:9» and «:»; QA round 27 R27-04), or one
+key that makes a readable text unreadable (a third minute digit, a fifth digit; QA round 28
+R28-09). A paste is taken as typed and said wrong on leave.
+*/
+const isRefusedKey = (raw: string, previous: string): boolean =>
+  isSecondSeparator(raw, previous) ||
+  (insertedLength(previous, raw) === 1 && isReadable(previous) && !isReadable(raw));
 
 /** A separator typed into a text that has one already. */
 const isSecondSeparator = (raw: string, previous: string): boolean =>

@@ -117,6 +117,19 @@ describe("typeTime", () => {
     }
   });
 
+  it("refuses a key that would make it no time at all: a third minute digit, a fifth digit (QA round 28 R28-09)", () => {
+    let text = "";
+    for (const key of "99:99") {
+      text = typeTime(`${text}${key}`, text).text;
+    }
+    expect(text).toBe("09:99");
+    expect(typeTime("09:999", "09:99")).toEqual({ isComplete: false, text: "09:99" });
+    expect(typeTime("09:305", "09:30")).toEqual({ isComplete: true, text: "09:30" });
+    expect(typeTime("12345", "1234")).toEqual({ isComplete: true, text: "12:34" });
+    // A paste is still kept as typed, said wrong on leave (QA-25 review M4).
+    expect(typeTime("12:345", "")).toEqual({ isComplete: false, text: "12:345" });
+  });
+
   it("keeps a stray separator after a deletion as the text was, never complete (QA 27 wave review I2)", () => {
     const doubled = ["0", "", "30"].join(":");
     expect(typeTime(doubled, "0:30")).toEqual({ isComplete: false, text: "0:30" });
