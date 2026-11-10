@@ -92,10 +92,20 @@ const renderDueSoon = async () => {
   return screen.getByText(/Due[\s\S]*left|left[\s\S]*Due/u);
 };
 
-describe("TaskRow's meta line on a phone (design review 2 N10)", () => {
-  it("puts the countdown before the date, so the date is what the line's end cuts", async () => {
-    // «Срок завтра 19:30 · осталос…»: the cut ate the one value that matters.
-    expect(await renderDueSoon()).toHaveTextContent(/left · Due/u);
+describe("TaskRow's meta line on a phone (QA PR55-1-04, bug-lessons 341)", () => {
+  it("keeps the date first, as a computer does: the order never depends on the width", async () => {
+    // «осталось 23 ч 59 мин · Срок за…»: the phone's own order cut the deadline itself.
+    expect(await renderDueSoon()).toHaveTextContent(/Due .* · .*left/u);
+  });
+
+  it("wraps to a second line between pieces rather than cutting one", async () => {
+    const line = await renderDueSoon();
+    expect(line).toHaveProp("numberOfLines", 2);
+    // Inside a piece the spaces do not break: «Срок завтра 19:30» stays whole on its line.
+    const asIs = { normalizer: (text: string) => text };
+    expect(screen.getAllByText(/Due\u{A0}tomorrow \d/u, asIs).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/m\u{A0}left/u, asIs).length).toBeGreaterThan(0);
+    expect(line).toHaveTextContent(/ · /u);
   });
 });
 

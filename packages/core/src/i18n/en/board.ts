@@ -2,7 +2,6 @@
 export const enBoard = {
   "now.empty": "Nothing to do right now.",
   "now.emptyBody": "Your tasks show here, the nearest deadline first.",
-  "now.emptyAdd": "Add a task",
   "task.reopened": "Reopened",
   "task.menu.preset": "Change preset",
   "task.menu.closeAs": "Close as…",
@@ -95,7 +94,7 @@ export const enBoard = {
   "task.showFull": "Show all",
   "task.done": "Done",
   "task.doneHint": "Finishes the task now.",
-  "task.doneOther": "Other time or outcome…",
+  "task.doneOther": "Other time or outcome",
   "task.estimate": "Est. {duration}",
   "task.trackedLine": "Tracked {duration}",
   "task.closedAs": "Closed · {outcome}",

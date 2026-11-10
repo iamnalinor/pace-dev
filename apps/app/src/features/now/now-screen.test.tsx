@@ -187,8 +187,8 @@ describe("NowBoard", () => {
       "Mark RFC: dedicated runner pool done",
       "Mark Return library books done",
     ]);
-    // On a phone the date goes last: the line's cut takes it, not the countdown (design review 2 N10).
-    expect(screen.getByText("1d 8h left · 4/7 done · Due tomorrow 23:59")).toBeOnTheScreen();
+    // The date first at every width; a long line wraps between pieces (QA PR55-1-04).
+    expect(screen.getByText("Due tomorrow 23:59 · 1d 8h left · 4/7 done")).toBeOnTheScreen();
     // The project (else the category) is a tag and a non-Normal importance a word; Normal says nothing.
     expect(screen.getAllByText("ASAP").length).toBeGreaterThan(0);
     expect(screen.queryByText("Normal")).not.toBeOnTheScreen();
@@ -838,10 +838,12 @@ describe("NowBoard", () => {
     });
   });
 
-  it("shows the empty state on a fresh account: what will appear, and a way to add a task (spec §5.1, M6)", async () => {
+  it("shows the empty state on a fresh account: what will appear, and the composer above it is the one way to add (spec §5.1, M6; QA PR55-1-19)", async () => {
     await renderScreen(<Board />, await createTestRuntime({ world: "empty" }));
     expect(screen.getByText(en("now.empty"))).toBeOnTheScreen();
     expect(screen.getByText(en("now.emptyBody"))).toBeOnTheScreen();
-    expect(screen.getByRole("button", { name: en("now.emptyAdd") })).toBeOnTheScreen();
+    // The composer's line is right above: a second «Add a task» was one job twice.
+    expect(screen.getByPlaceholderText(en("composer.placeholder"))).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: /^Add a task$/u })).toBeNull();
   });
 });

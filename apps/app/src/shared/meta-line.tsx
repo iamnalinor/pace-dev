@@ -5,9 +5,7 @@ import type { MetaPart, NowRow } from "@pace/client";
 
 import { useT } from "#app/app-state.tsx";
 import { metaTexts, type MetaTone } from "#app/format/meta.ts";
-import { cx } from "#app/ui/cx.ts";
 import { Icon } from "#app/ui/icon.tsx";
-import { useIsWide } from "#app/ui/layout.ts";
 import { Tag } from "#app/ui/tag.tsx";
 import { Text, type TextProps } from "#app/ui/text.tsx";
 import { type Importance, type Language, presetLabel } from "@pace/core";
@@ -37,18 +35,12 @@ const IMPORTANCE_LOOK: Readonly<
 };
 
 /**
-The pieces in the order the line keeps them. A phone's line is cut at its end, so there the due
-date, the longest and least urgent piece, goes after the rest: «Срок завтра 19:30 · осталос…» lost
-the countdown, the one value that matters (design review 2 N10). A wide line keeps the reading
-order, date first.
+A piece's own spaces do not break (no-break spaces): the line wraps between pieces, at « · », so
+«осталось 2 дн 23 ч» is read whole on one line or the next. The one break left inside a piece is
+before a clock time: a date too long for a 320 line went «Due Nov 21 00:4 / 0» when nothing in it
+could break, and now goes «Due Nov 21 / 00:40».
 */
-const inCutOrder = (parts: readonly MetaPart[], isWide: boolean): readonly MetaPart[] =>
-  isWide
-    ? parts
-    : [
-        ...parts.filter((part) => part.kind !== "due"),
-        ...parts.filter((part) => part.kind === "due"),
-      ];
+const unbroken = (text: string): string => text.replaceAll(/ (?!\d{1,2}:\d{2})/gu, "\u{A0}");
 
 /** A small repeat mark: the row is one of a series (or a weekly homework). */
 export const RepeatMark = () => {
@@ -61,10 +53,12 @@ export const RepeatMark = () => {
 };
 
 /**
-A row's meta line, one line (spec 4.3.2): the project (else the category) as a tag that yields
-first (at most half the line), the importance word when it is not Normal, a repeat mark for a
-series, then `by end of day · 2 subtasks left` in the footnote's tabular figures, ending in "…"
-when it does not fit (on a phone the due date goes last, so it is what yields). Lateness is red.
+A row's meta line (spec 4.3.2): the project (else the category) as a tag that yields first (at
+most half the line), the importance word when it is not Normal, a repeat mark for a series, then
+`Due tomorrow 19:30 · 1d left · 4/7 done` in the footnote's tabular figures. The order is the
+same at every width, and a line too long for a phone wraps between its pieces onto a second line
+(at most two, then "…"): the phone's own order once put the date last and its cut ate the deadline
+(QA PR55-1-04, bug-lessons 341). Lateness is red.
 */
 export const MetaLine = ({
   asOf,
@@ -87,47 +81,53 @@ export const MetaLine = ({
     .map((part) => part.importance)
     .filter((importance) => importance !== "normal");
   const isRepeating = showRepeat && parts.some((part) => part.kind === "repeats");
-  const isWide = useIsWide();
-  const rest = inCutOrder(
-    parts.filter((part) => part.kind !== "importance" && part.kind !== "repeats"),
-    isWide,
-  );
+  const rest = parts.filter((part) => part.kind !== "importance" && part.kind !== "repeats");
   const texts = metaTexts(rest, viewer);
   const tagLabel = tag === null ? null : rowTagLabel(tag.tag, viewer.language);
   return (
-    <View className="flex-row items-center gap-x-2">
+    // Leading-aligned: a second line of pieces starts under the first, the tag stays on the first.
+    <View className="flex-row items-start gap-x-2">
       {tag === null || tagLabel === null ? null : (
         <View className="max-w-1/2 shrink-0">
           <Tag hue={tag.color}>{tagLabel}</Tag>
         </View>
       )}
       {importances.map((importance) => (
-        <Text
-          className={cx("shrink-0", IMPORTANCE_LOOK[importance].className)}
-          key={importance}
-          role="footnote"
-          tone={IMPORTANCE_LOOK[importance].tone}
-        >
-          {t(`importance.${importance}`)}
-        </Text>
+        <View className="min-h-5 shrink-0 justify-center" key={importance}>
+          <Text
+            className={IMPORTANCE_LOOK[importance].className}
+            role="footnote"
+            tone={IMPORTANCE_LOOK[importance].tone}
+          >
+            {t(`importance.${importance}`)}
+          </Text>
+        </View>
       ))}
-      {isRepeating ? <RepeatMark /> : null}
+      {isRepeating ? (
+        <View className="min-h-5 justify-center">
+          <RepeatMark />
+        </View>
+      ) : null}
       {texts.length === 0 ? null : (
-        <Text
-          full={texts.map((piece) => piece.text).join(" · ")}
-          numeric
-          policy="truncate"
-          role="footnote"
-          tone="secondary"
-        >
-          {texts.map((piece, index) => (
-            // eslint-disable-next-line @eslint-react/no-array-index-key -- positional pieces without ids; a text can repeat
-            <Fragment key={index}>
-              {index === 0 ? null : " · "}
-              <NativeText className={TONE[piece.tone]}>{piece.text}</NativeText>
-            </Fragment>
-          ))}
-        </Text>
+        // The first line sits on the tag's centre line (a tag is 20, a footnote line 18).
+        <View className="min-h-5 min-w-0 shrink justify-center">
+          <Text
+            full={texts.map((piece) => piece.text).join(" · ")}
+            lines={2}
+            numeric
+            policy="clamp"
+            role="footnote"
+            tone="secondary"
+          >
+            {texts.map((piece, index) => (
+              // eslint-disable-next-line @eslint-react/no-array-index-key -- positional pieces without ids; a text can repeat
+              <Fragment key={index}>
+                {index === 0 ? null : " · "}
+                <NativeText className={TONE[piece.tone]}>{unbroken(piece.text)}</NativeText>
+              </Fragment>
+            ))}
+          </Text>
+        </View>
       )}
     </View>
   );
