@@ -140,8 +140,10 @@ comes. Without `previous` the text is read whole, the way a field reads it when 
 */
 export const typeTime = (raw: string, previous?: string): TypedTime => {
   if (previous !== undefined && isSecondSeparator(raw, previous)) {
-    // «09:9» and then «:»: one separator is all a time has (QA round 27 R27-04).
-    return typeTime(previous);
+    // «09:9» and then «:»: one separator is all a time has (QA round 27 R27-04). The text stays as
+    // it was, read with nothing put in: «0:30» on the way to retyping the hour stays incomplete,
+    // never a filled-out 00:30 (review of the QA 27 wave, I2).
+    return typeTime(previous, previous);
   }
   const text = raw.trim();
   const inserted = previous === undefined ? text.length : insertedLength(previous, raw);

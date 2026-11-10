@@ -1,3 +1,4 @@
+import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
 
 import { activityFormOf, readTime, typeTime } from "./time-forms.ts";
@@ -114,6 +115,57 @@ describe("typeTime", () => {
       text = typeTime(`${text}${key}`, text).text;
       expect(text.split(":").length).toBeLessThanOrEqual(2);
     }
+  });
+
+  it("keeps a stray separator after a deletion as the text was, never complete (QA 27 wave review I2)", () => {
+    const doubled = ["0", "", "30"].join(":");
+    expect(typeTime(doubled, "0:30")).toEqual({ isComplete: false, text: "0:30" });
+    expect(typeTime("0:30:", "0:30")).toEqual({ isComplete: false, text: "0:30" });
+    expect(typeTime("1:3:", "1:3")).toEqual({ isComplete: false, text: "1:3" });
+  });
+});
+
+/** A valid `HH:MM`. */
+const filledTime = fc
+  .tuple(fc.integer({ max: 23, min: 0 }), fc.integer({ max: 59, min: 0 }))
+  .map(
+    ([hours, minutes]) => `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`,
+  );
+
+/** `text` with the characters from `from` (inclusive) to `to` (exclusive) taken out. */
+const without = (text: string, from: number, to: number): string =>
+  text.slice(0, Math.min(from, to)) + text.slice(Math.max(from, to));
+
+/** A filled time, a range deleted from it, and a separator typed somewhere into what is left. */
+const strayCase = fc.record({
+  at: fc.nat(5),
+  from: fc.nat(5),
+  separator: fc.constantFrom(":", ".", ",", "h", "ч", " "),
+  time: filledTime,
+  to: fc.nat(5),
+});
+
+describe("typeTime: deletions and stray separators (class 208, review I2)", () => {
+  it("reads a deletion inside a filled time as incomplete, or the same time", () => {
+    fc.assert(
+      fc.property(filledTime, fc.nat(5), fc.nat(5), (time, from, to) => {
+        fc.pre(from !== to);
+        const read = typeTime(without(time, from, to), time);
+        expect(!read.isComplete || read.text === time).toBe(true);
+      }),
+    );
+  });
+
+  it("never completes a time out of a separator typed into a deletion's text", () => {
+    fc.assert(
+      fc.property(strayCase, ({ at, from, separator, time, to }) => {
+        const previous = without(time, from, to);
+        const place = Math.min(at, previous.length);
+        const raw = `${previous.slice(0, place)}${separator}${previous.slice(place)}`;
+        const read = typeTime(raw, previous);
+        expect(!read.isComplete || read.text === time).toBe(true);
+      }),
+    );
   });
 });
 
