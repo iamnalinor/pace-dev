@@ -10,6 +10,7 @@ import { useIsInPane } from "#app/shared/task-opener.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button } from "#app/ui/button.tsx";
 import { cx } from "#app/ui/cx.ts";
+import { HOTKEYS } from "#app/ui/hotkeys.ts";
 import { Pressable } from "#app/ui/pressable.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 import { TextLink } from "#app/ui/text-link.tsx";
@@ -79,7 +80,14 @@ const DescriptionEditor = ({
         <Button disabled={isSaving} onPress={onCancel} size="small" variant="plain">
           {t("common.cancel")}
         </Button>
-        <Button busy={isSaving} onPress={onSave} size="small">
+        {/* Ctrl/⌘+Enter saves (the field's own key): named on the button (R27-08, R28-07). */}
+        <Button
+          busy={isSaving}
+          onPress={onSave}
+          shortcut={HOTKEYS.primary}
+          shortcutMode="hint"
+          size="small"
+        >
           {t("common.save")}
         </Button>
       </View>

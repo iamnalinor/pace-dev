@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react-native";
+import { fireEvent, screen, within } from "@testing-library/react-native";
 
 import { TaskPaneProvider } from "#app/shared/task-opener.tsx";
 import { isAtTextWidth } from "#app/test/button-width.ts";
@@ -58,5 +58,15 @@ describe("the task footer in the pane beside the list (design review B1)", () =>
     await renderInPane();
     const done = screen.getByRole("button", { name: en("task.done") });
     expect(done.props["accessibilityHint"]).toBe(`${en("task.doneHint")} · Ctrl+Enter`);
+  });
+
+  it("shows Ctrl+Enter on the description's Save, which has room for it (R27-08 remainder, R28-07)", async () => {
+    await renderInPane();
+    const opener =
+      screen.queryByRole("button", { name: en("task.editDescription") }) ??
+      screen.getByRole("button", { name: en("task.addDescription") });
+    await fireEvent.press(opener);
+    const save = screen.getByRole("button", { name: /^Save/u });
+    expect(within(save).getByText("Ctrl+Enter", { includeHiddenElements: true })).toBeTruthy();
   });
 });

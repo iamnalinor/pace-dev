@@ -6,13 +6,14 @@ import { isDeadlineChoiceValid } from "#app/shared/task-fields/deadline-choice.t
 import { SubtaskList } from "#app/shared/task-fields/subtask-list.tsx";
 import { TaskFields, type TaskFormValues } from "#app/shared/task-fields/task-fields.tsx";
 import { Button, KeyHintRoomContext } from "#app/ui/button.tsx";
-import { HOTKEYS } from "#app/ui/hotkeys.ts";
+import { HOTKEYS, labelWithHotkey } from "#app/ui/hotkeys.ts";
 import { IconButton } from "#app/ui/icon-button.tsx";
 import { RadioChips } from "#app/ui/radio-chips.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 import { Text } from "#app/ui/text.tsx";
 import { TimeCheckScope, useCheckedSubmit, useTimeChecks } from "#app/ui/time-check.tsx";
-import { HotkeyLayer, useHotkey } from "#app/ui/use-hotkey.tsx";
+import { Tooltip } from "#app/ui/tooltip.tsx";
+import { HotkeyLayer, KEYBOARD, useHotkey } from "#app/ui/use-hotkey.tsx";
 import { type ComposerEdits, type ComposerModel, taskFormOptions } from "@pace/client";
 
 import { subtaskOf } from "./composer-flow.tsx";
@@ -108,6 +109,18 @@ const FormHeader = ({
   useHotkey(HOTKEYS.enter, onAdd);
   useHotkey(HOTKEYS.primary, onAdd);
   const closeIcon = variant === "pane" ? "x" : "chevron-up";
+  const keyName = labelWithHotkey(actionLabel, HOTKEYS.primary, KEYBOARD);
+  const create = (hint: string | undefined) => (
+    <Button
+      disabled={!canAdd}
+      {...(hint !== undefined && { hint })}
+      onPress={onAdd}
+      shortcut={HOTKEYS.primary}
+      shortcutMode="hint"
+    >
+      {actionLabel}
+    </Button>
+  );
   return (
     <View className="flex-row items-center gap-2">
       <Text className="flex-1" level={2} role={variant === "pane" ? "title2" : "headline"}>
@@ -117,9 +130,12 @@ const FormHeader = ({
         {/* In the 400 px pane the header has no room for the shortcut (the activity pane's title
         wrapped beside it, design review 2 N11); the shortcut still works. */}
         <KeyHintRoomContext value={variant !== "pane"}>
-          <Button disabled={!canAdd} onPress={onAdd} shortcut={HOTKEYS.primary} shortcutMode="hint">
-            {actionLabel}
-          </Button>
+          {variant === "pane" ? (
+            // With no room for it, its tooltip and hint name the key (R27-08, R28-07).
+            <Tooltip label={keyName}>{create(keyName)}</Tooltip>
+          ) : (
+            create(undefined)
+          )}
         </KeyHintRoomContext>
       </View>
       <IconButton icon={closeIcon} label={t("common.close")} onPress={onClose} />
