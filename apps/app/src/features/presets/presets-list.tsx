@@ -141,7 +141,8 @@ export const PresetsList = () => {
     .toSorted(byPresetOrder);
   // The ones in use in picker order; the deleted ones after them, once shown (R25-02).
   const live = all.filter((preset) => !preset.archived);
-  const shown = isShowingArchived ? [...live, ...all.filter((preset) => preset.archived)] : live;
+  const deleted = all.filter((preset) => preset.archived);
+  const shown = isShowingArchived ? [...live, ...deleted] : live;
   const hasExamples = EXAMPLE_PRESET_IDS.some((id) => presetById(presets, id) !== undefined);
   return (
     <View className="pb-6">
@@ -163,15 +164,18 @@ export const PresetsList = () => {
           </Button>
         </View>
       )}
-      <View className="mt-4">
-        <Group>
-          <SwitchRow
-            isOn={isShowingArchived}
-            label={t("presets.showArchived")}
-            onChange={setIsShowingArchived}
-          />
-        </Group>
-      </View>
+      {/* No switch for nothing deleted (QA 27 review M5). */}
+      {deleted.length === 0 ? null : (
+        <View className="mt-4">
+          <Group>
+            <SwitchRow
+              isOn={isShowingArchived}
+              label={t("presets.showArchived")}
+              onChange={setIsShowingArchived}
+            />
+          </Group>
+        </View>
+      )}
     </View>
   );
 };

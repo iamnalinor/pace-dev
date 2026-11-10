@@ -67,6 +67,11 @@ describe("PresetsList", () => {
     expect(icons(open).join(" ")).toMatch(/chevron-right/u);
   });
 
+  it("offers the deleted presets only when one is deleted (QA 27 review M5, swept)", async () => {
+    await renderScreen(<PresetsList />, await createTestRuntime({ world: "empty" }));
+    expect(screen.queryByRole("switch", { name: en("presets.showArchived") })).toBeNull();
+  });
+
   it("lists deleted presets last, without reorder arrows, once they are shown (QA round 25 R25-02)", async () => {
     const runtime = await createTestRuntime({ world: "empty" });
     await runtime.actions.archivePreset("work");
@@ -150,6 +155,24 @@ describe("PresetScreen", () => {
     await waitFor(() => {
       expect(presetOf(runtime, "work")?.definition.recurrence?.issued.time).toBe("11:15");
     });
+  });
+
+  it("saves hours typed alone in two fields with one press of Save (QA 27 review I3)", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    await renderScreen(<PresetScreen from={undefined} id="work" />, runtime);
+    const field = en("presets.field.recurrence");
+    await fireEvent.press(screen.getByRole("switch", { name: en("presets.override", { field }) }));
+    await fireEvent.press(screen.getByRole("switch", { name: en("presets.repeats") }));
+    await fireEvent.changeText(screen.getByLabelText(en("presets.issuedAt")), "7");
+    await fireEvent.changeText(screen.getByLabelText(en("presets.dueAt")), "9");
+    await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
+    await waitFor(() => {
+      expect(presetOf(runtime, "work")?.definition.recurrence).toMatchObject({
+        due: { time: "09:00" },
+        issued: { time: "07:00" },
+      });
+    });
+    expect(router.back).toHaveBeenCalled();
   });
 
   it("refuses Save while a typed time cannot be read, and says so under the field (R27-02)", async () => {

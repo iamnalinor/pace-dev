@@ -131,7 +131,10 @@ export const ProjectsScreen = () => {
       }
     >
       {isOpen ? <NewProject onClose={close} /> : null}
-      {active.length === 0 ? <EmptyState title={t("projects.empty")} /> : null}
+      {/* «No projects» only while no row shows: archived rows listed are projects (review M5). */}
+      {active.length === 0 && !(isShowingArchived && archived.length > 0) ? (
+        <EmptyState title={t("projects.empty")} />
+      ) : null}
       <Group>
         {active.map((project) => (
           <ProjectRow
@@ -146,8 +149,9 @@ export const ProjectsScreen = () => {
             ))
           : null}
       </Group>
-      {/* Nothing of the account before its first sync ends (QA 19 M1): no archive to show yet. */}
-      {isAccountUnknown ? null : (
+      {/* Nothing of the account before its first sync ends (QA 19 M1): no archive to show yet;
+      and no switch for an archive that holds nothing (review M5). */}
+      {isAccountUnknown || archived.length === 0 ? null : (
         <View className="mt-4">
           <Group>
             <SwitchRow

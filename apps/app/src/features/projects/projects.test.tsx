@@ -104,6 +104,20 @@ describe("project forms", () => {
     });
   });
 
+  it("offers the archive only when something is archived, and says «no projects» only when none is shown (QA 27 review M5)", async () => {
+    const runtime = await createTestRuntime();
+    const list = await renderScreen(<ProjectsScreen />, runtime);
+    expect(screen.queryByRole("switch", { name: en("projects.showArchived") })).toBeNull();
+    await list.unmount();
+    for (const project of Object.values(runtime.state.store.getState().projects.byId)) {
+      await runtime.actions.updateProject(project.id, { archived: true });
+    }
+    await renderScreen(<ProjectsScreen />, runtime);
+    expect(screen.getByText(en("projects.empty"))).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("switch", { name: en("projects.showArchived") }));
+    expect(screen.queryByText(en("projects.empty"))).toBeNull();
+  });
+
   it("lists archived projects once asked, and an archived one says so with Restore at hand (R27-03)", async () => {
     const runtime = await createTestRuntime();
     const name = runtime.state.store.getState().projects.byId[ALGEBRA_ID]?.name ?? "";
