@@ -202,7 +202,8 @@ for (const size of SIZES) {
       await page.getByRole("textbox", { exact: true, name: "What" }).fill("Lecture");
       await page.getByRole("radio", { name: "Study" }).click();
       await page.getByRole("button", { name: "Save" }).click();
-      await expect(page.getByText("Lecture")).toBeVisible();
+      // The row, not the form's hint naming a block it replaces (owner R27-05).
+      await expect(page.getByRole("button", { name: /Lecture Study/u })).toBeVisible();
       await shoot(page, `day-${size.name}`, (shot) => info.outputPath(shot));
       await expectNoA11yViolations(page);
       await page.goto("/insights");
@@ -433,7 +434,8 @@ test("the phone's activity sheet keeps Save in view without a scroll, Delete bel
 test("the phone's activity sheet scrolls an error under To into view above the pinned Save (QA round 26 R26-01)", async ({
   page,
 }) => {
-  await page.setViewportSize({ height: 844, width: 390 });
+  // A short phone (the message under To lands below the fold of the sheet's body).
+  await page.setViewportSize({ height: 700, width: 390 });
   // Yesterday noon on the page's clock: Log past offers 11:30–12:00.
   const noon = new Date();
   noon.setDate(noon.getDate() - 1);
@@ -446,17 +448,21 @@ test("the phone's activity sheet scrolls an error under To into view above the p
   await page.getByLabel("What", { exact: true }).fill("Commute");
   await save.click();
   await expect(page.getByRole("button", { name: /Commute/u })).toBeVisible();
-  // 10:00 to noon runs into Commute: said under To, four lines in its half of the row.
+  // An end still ahead (half past noon): said under To, two lines in its half of the row. (Over
+  // Commute it would now be taken, as in a calendar: owner R27-05.)
   await page.getByRole("button", { name: "Log past activity" }).click();
   await page.getByLabel("What", { exact: true }).fill("Nap");
   await page.getByLabel("From", { exact: true }).fill("10:00");
-  await page.getByLabel("To", { exact: true }).fill("12:00");
+  await page.getByLabel("To", { exact: true }).fill("12:30");
   const body = page.getByTestId("overlay-body");
-  expect(await body.evaluate((element) => element.scrollTop)).toBe(0);
+  // Back to the top, as the sheet opened: the reveal, not the typing, must bring the message up.
+  await body.evaluate((element) => {
+    element.scrollTo({ top: 0 });
+  });
   await save.click();
   const error = page
     .getByRole("alert")
-    .filter({ hasText: "That runs into the next activity: move its start first." });
+    .filter({ hasText: "That is still ahead: log what already happened." });
   await expect(error).toBeInViewport({ ratio: 1 });
   // Whole above the footer's Save, not under it: the body moved to show it.
   await expect.poll(async () => await gapAbove(error, save)).toBeGreaterThanOrEqual(0);

@@ -139,3 +139,9 @@ Left unfixed (frozen): R27-09 remainder (focus after Escape in Day's form and af
 Дне»), R28-03, R28-08, R28-11, R28-13, the pane Done's visible hint (owner's call), the calendar
 "attended" log not cutting neighbours, review M3/M4 (cosmetic). R28-12 and R28-14 left by the
 owner. Severity for each in the recheck checklist.
+
+E2E after the wave: the full run listed all 257 tests (none "did not run"). Two `time.e2e.ts` tests
+asserted the old R25-01/R26-03 refusal and were moved to the owner's R27-05 rule (the row, not the
+form's hint naming the block it replaces; the R26-01 reveal now driven by an end still ahead, on a
+700 px phone). One latency sample (a tab at 4x CPU, p75 280 ms against its 240 ms ceiling, R25-03)
+failed under the full run's load and passed on its re-run: 257 passed.
