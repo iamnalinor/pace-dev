@@ -12,7 +12,13 @@ import { TelegramWidget } from "../auth/telegram-widget.web.tsx";
 import { IS_DEV_LOGIN_ENABLED } from "../platform/api-base.ts";
 import { Button } from "../ui/button.tsx";
 import { PaceLogo } from "../ui/logo.tsx";
-import { DevLoginForm, errorKey, LoginChoices, SignedOutLine } from "./login-parts.tsx";
+import {
+  DevLoginForm,
+  errorKey,
+  LoginChoices,
+  SignedOutLine,
+  signInErrorKey,
+} from "./login-parts.tsx";
 import { type useBotLogin, useServerBotLogin } from "./use-bot-login.ts";
 
 /** The Android app opens this page for its browser login and waits on `pace://auth`. */
@@ -33,11 +39,8 @@ const errorMessage = (
   error: null | string,
   phase: ReturnType<typeof useBotLogin>["phase"],
 ): null | string => {
-  if (error === "auth/not-allowed") {
-    return t("login.notAllowed");
-  }
   if (error !== null) {
-    return t("login.failed");
+    return t(signInErrorKey(error));
   }
   const botError = errorKey(phase);
   return botError === undefined ? null : t(botError);
@@ -145,11 +148,7 @@ export const LoginScreen = () => {
           </Text>
         )}
         {configurationError === null && IS_DEV_LOGIN_ENABLED && !isWaiting ? (
-          <DevLoginForm
-            onFailure={() => {
-              setError("failed");
-            }}
-          />
+          <DevLoginForm />
         ) : null}
       </View>
     </View>

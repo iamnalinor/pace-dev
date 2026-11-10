@@ -3300,6 +3300,22 @@ New bugs go here with their class; a new class gets its own section above.
   and handles the rest; a refusal that asks for something (the source) is answered, once per call.
 - **Sweep and guard.** `instances-checkpoint.test.ts`, with and without the source to be had.
 
+### 320. A failure's cause folded into one message, and a form that only its button submits
+- **Bug.** The dev sign-in said «Не удалось войти» for an id not on the list (403), for «abc» (sent
+  to the server unchecked) and for a server it could not reach; Enter in its field did nothing
+  (QA PR55-1-06, -07). The form's `onFailure` took no argument, so the code was gone before any
+  screen could word it; the native browser login kept only a boolean.
+- **Missed because.** The tests pressed the button with a good id and a fake that answered; no test
+  sent Enter, a malformed id or a request that never got an answer.
+- **Rule.** A failure travels with its code to the one place that words it (`signInErrorKey`):
+  not allowed, no connection (`network`: the request got no answer) and the rest are three
+  sentences. Input the client can judge is judged there, before a round trip. A one-field form
+  submits on Enter as its button does.
+- **Sweep and guard.** The web Telegram widget's error, the native browser login and the dev form
+  all go through `signInErrorKey`; `login-screen.test.tsx` pins Enter, the local refusal and each
+  code's sentence. The bot flow's `network` stays «Не удалось войти»: it stands for any throw there,
+  not only an unreachable server.
+
 ### 360. A caller that reaches below the shared path and skips the step it adds
 - **Bug.** PR 55 follow-up review, item 1: the archive toast's Undo (`undoArchive`) staged its
   revocation with `state.stage(…)` to get an in-queue check, below `stageEmit`, which is where the

@@ -33,6 +33,7 @@ export const enShell = {
   "login.openTelegram": "Open Telegram",
   "login.timeout": "Telegram did not answer in time. Try again.",
   "login.failed": "Could not sign you in. Try again.",
+  "login.offline": "No connection to the server. Check the network and try again.",
   "auth.signingIn": "Signing you in…",
   "auth.invalidLink": "This sign-in link is not valid anymore.",
   "auth.backToLogin": "Back to sign-in",
@@ -45,6 +46,7 @@ export const enShell = {
   "login.dev": "Dev login",
   "login.devId": "Telegram id",
   "login.devSubmit": "Sign in as dev",
+  "login.devIdInvalid": "A Telegram id is digits only.",
   "loginReturn.title": "Back to Pace",
   "loginReturn.body":
     "Telegram has confirmed the login. If Pace did not open by itself, open it here.",

@@ -15,7 +15,13 @@ import { isPresent } from "../platform/strings.ts";
 import { Button } from "../ui/button.tsx";
 import { PaceLogo } from "../ui/logo.tsx";
 import { Text as KitText } from "../ui/text.tsx";
-import { DevLoginForm, errorKey, LoginChoices, SignedOutLine } from "./login-parts.tsx";
+import {
+  DevLoginForm,
+  errorKey,
+  LoginChoices,
+  SignedOutLine,
+  signInErrorKey,
+} from "./login-parts.tsx";
 import { type useBotLogin, useServerBotLogin } from "./use-bot-login.ts";
 
 const AUTH_RETURN_URL = "pace://auth";
@@ -94,13 +100,11 @@ const LoginFeedback = ({
   isRefused,
   isWaiting,
   error,
-  onFailure,
 }: {
   readonly isConfigured: boolean;
   readonly isRefused: boolean;
   readonly isWaiting: boolean;
   readonly error: ReturnType<typeof errorKey>;
-  readonly onFailure: () => void;
 }) => {
   const t = useT();
   return (
@@ -111,9 +115,7 @@ const LoginFeedback = ({
           {t(error)}
         </KitText>
       )}
-      {isConfigured && !isWaiting && isNativeDevLoginEnabled() ? (
-        <DevLoginForm onFailure={onFailure} />
-      ) : null}
+      {isConfigured && !isWaiting && isNativeDevLoginEnabled() ? <DevLoginForm /> : null}
     </>
   );
 };
@@ -123,18 +125,18 @@ export const LoginScreen = () => {
   const { auth, status } = useAuth();
   const { bot, configurationError } = useServerBotLogin();
   const { guard, isRefused } = useSignInGuard();
-  const [isWebFailed, setIsWebFailed] = useState(false);
+  const [webError, setWebError] = useState<null | string>(null);
 
   const loginOnWeb = useCallback(
     async (webOrigin: string) => {
-      setIsWebFailed(false);
+      setWebError(null);
       const token = await loginInBrowser(webOrigin);
       if (!isPresent(token)) {
         return;
       }
       const result = await auth.adoptToken(token);
       // A newer session or a Log out meanwhile is no failed sign-in (fix round 2 of QA 22).
-      setIsWebFailed(!result.ok && result.error !== SESSION_CHANGED);
+      setWebError(result.ok || result.error === SESSION_CHANGED ? null : result.error);
     },
     [auth],
   );
@@ -142,7 +144,7 @@ export const LoginScreen = () => {
   if (status === "signed-in") {
     return <Redirect href="/" />;
   }
-  const error = errorKey(bot.phase) ?? (isWebFailed ? "login.failed" : undefined);
+  const error = errorKey(bot.phase) ?? (webError === null ? undefined : signInErrorKey(webError));
   const isWaiting = bot.phase.kind === "waiting";
 
   return (
@@ -166,9 +168,6 @@ export const LoginScreen = () => {
         isConfigured={configurationError === null}
         isRefused={isRefused}
         isWaiting={isWaiting}
-        onFailure={() => {
-          setIsWebFailed(true);
-        }}
       />
       {isWaiting ? null : <ServerLine />}
     </View>
