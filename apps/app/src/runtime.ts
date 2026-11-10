@@ -30,6 +30,7 @@ import { applyInstanceCheck, markClientOutdated } from "./platform/server-store.
 import { canUseCurrentServer } from "./platform/server-switch-state.ts";
 import { readServer } from "./platform/server.ts";
 import { createSignOutNotes } from "./platform/sign-out-notes.ts";
+import { useScene } from "./ui/screen-active.ts";
 
 type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
 
@@ -157,7 +158,12 @@ export const createRuntime = async (options: RuntimeOptions = {}): Promise<PaceR
     baseUrl,
     checkInstance: async () => await checkInstanceWith(client.instance.read),
     deviceId,
-    hooks: createAppHooks(client.state, client.clock, client.history),
+    // A screen left behind (another tab, under a pushed screen) does not follow the store.
+    hooks: createAppHooks(client.state, {
+      clock: client.clock,
+      history: client.history,
+      useLiveness: useScene,
+    }),
     resetLocalData: async () => {
       // Through the log's write queue: a write still waiting must not land in the wiped store.
       await client.state.clear();

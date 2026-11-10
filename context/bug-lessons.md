@@ -3301,6 +3301,54 @@ New bugs go here with their class; a new class gets its own section above.
   and handles the rest; a refusal that asks for something (the source) is answered, once per call.
 - **Sweep and guard.** `instances-checkpoint.test.ts`, with and without the source to be had.
 
+### 310. A tap pays for everything mounted: nothing stops a render from walking whole screens
+- **Bug.** Owner, v0.12.0 on Android: every tap lags (check-off, tabs, opening a task), worse after
+  the redesign. Counted on the web build (React's commit hook, 24 open tasks): a tab switch
+  rendered 3 100–5 100 components, a check-off 5 000, an opened task 1 400. The store's speed was
+  not it (6 500 events cost the same as 27; `state-cost.test.ts` already pins that). The causes:
+  (1) every view hook rendered its component on every store version, on every mounted screen, in
+  front or not, and handed it all-new row objects; (2) no list row was memoized and its handlers
+  were new closures, so one check rendered all rows, twice; (3) the screen-in-front flag was a
+  React context, so leaving or entering a screen rendered every consumer, and Now's and Day's top
+  components were consumers; (4) the router makes a new, equal params object for the route it
+  enters, and `useLocalSearchParams` hands it on, so every entered screen rendered in full;
+  (5) the dust's 150 views mounted in the check's own commit; (6) on the web a hidden tab measures
+  0 × 0 and each row took that as a new size, twice per switch. The redesign's kit put more
+  components under each row, which multiplied all of it.
+- **Missed because.** `e2e/latency.e2e.ts` measures the frame after a tap on a 23-event account
+  and has ceilings of 240–380 ms that were "owned by later tasks"; nothing counted work. A render
+  that should not happen is invisible on a fast machine.
+- **Rule.** A change renders what it changed. A view-model shares its unchanged parts with the one
+  before and is computed where the store is read, so an equal view renders nothing; a row is
+  memoized on its own data with handlers that take the row; a screen behind does not follow the
+  store; a flag that only gates effects is a handle that is asked, not a context that renders; a
+  value handed down by a library (route params) is compared by content before it becomes a
+  context. Cost is asserted as a count, never as milliseconds.
+- **Sweep and guard.** `createViewHook` (`packages/client/src/react/view.ts`, `shareEqual`) under
+  every view hook; `Row` in `task-list.tsx` (Now, projects, done lists); `useScene` /
+  `useWhileScreenActive` for the composer's request and the hotkeys; `SearchParamsScene` under
+  every navigator's `sceneLayout`; `Dust`; the zero-size guards in `dissolve.tsx` and Day's rows.
+  Guards: `now-renders.test.tsx` (a check renders its row alone; a store change renders the row it
+  is about; a screen behind renders nothing and catches up in front), `nav-renders.test.tsx`
+  (leaving, entering and covering a tab render no screen; an own param change renders once),
+  `share-equal.test.ts`. Not swept: Day's and Inbox's rows are not memoized yet (their props are
+  rebuilt per render), and the navigators' own chrome still renders on every navigation.
+
+### 311. An action made to wait for the server because an earlier fix needed the refusal
+- **Bug.** Owner: Skip on Now's calendar card (and Day's row) hid the event only after
+  `POST /api/calendar/skip` answered, seconds later on a phone. The wait was put there on purpose
+  (2026-10-14, class 3): before it, the event was hidden at once and a failed skip was ignored.
+- **Missed because.** The tests of that fix pinned "shown while it is sent"; the delay was the
+  asserted behaviour, and class 108's sweep listed it as waiting "on purpose".
+- **Rule.** Handling a refusal is no reason to wait for the answer: show the result at the press,
+  keep what is needed to take it back, and take it back with the sentence when refused.
+- **Sweep and guard.** `usePhoneAnswers.skip` (both callers: `use-calendar-prompt.ts`,
+  `use-day-phone.ts`): hidden while sent, kept by the phone once taken, back when refused. Task
+  closes (Skipped in the close sheet, Inbox discard) already stage before the write. Still waiting
+  on the server by design: a notification's own Attend/Skip buttons in the feed, account sessions.
+  Guards: Now and Day tests with `heldRoute()`: gone while the route is held, one request, back
+  with "That did not go through" when refused.
+
 ### 320. A failure's cause folded into one message, and a form that only its button submits
 - **Bug.** The dev sign-in said «Не удалось войти» for an id not on the list (403), for «abc» (sent
   to the server unchecked) and for a server it could not reach; Enter in its field did nothing

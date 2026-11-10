@@ -1,4 +1,12 @@
-import { createContext, type ReactNode, use, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  type ReactNode,
+  use,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import { didTakeEscape, listenForEscape } from "./escape-first.ts";
 import {
@@ -8,7 +16,7 @@ import {
   type KeyboardOs,
   osOf,
 } from "./hotkeys.ts";
-import { useIsScreenActive } from "./screen-active.ts";
+import { useIsScreenActive, useWhileScreenActive } from "./screen-active.ts";
 
 type NavigatorWithHints = Navigator & { readonly userAgentData?: { readonly platform?: string } };
 
@@ -125,7 +133,6 @@ const LayerContext = createContext(0);
 /** Runs `onPress` on the shortcut while this component is mounted, in its layer. */
 export const useHotkey = (hotkey: Hotkey | undefined, onPress: () => void): void => {
   const layer = use(LayerContext);
-  const isActive = useIsScreenActive();
   const latestRef = useRef(onPress);
   useEffect(() => {
     latestRef.current = onPress;
@@ -134,21 +141,24 @@ export const useHotkey = (hotkey: Hotkey | undefined, onPress: () => void): void
   const isAlt = hotkey?.alt === true;
   const isMod = hotkey?.mod === true;
   const isShift = hotkey?.shift === true;
-  useEffect(() => {
-    if (KEYBOARD === null || key === "" || !isActive) {
-      return;
-    }
-    const entry: Entry = {
-      hotkey: { alt: isAlt, key, mod: isMod, shift: isShift },
-      layer,
-      onPress: latestRef,
-    };
-    entries.add(entry);
-    listen();
-    return () => {
-      entries.delete(entry);
-    };
-  }, [isActive, isAlt, key, layer, isMod, isShift]);
+  // Asked of the screen, not rendered for it: a screen's top component may hold a shortcut.
+  useWhileScreenActive(
+    useCallback(() => {
+      if (KEYBOARD === null || key === "") {
+        return;
+      }
+      const entry: Entry = {
+        hotkey: { alt: isAlt, key, mod: isMod, shift: isShift },
+        layer,
+        onPress: latestRef,
+      };
+      entries.add(entry);
+      listen();
+      return () => {
+        entries.delete(entry);
+      };
+    }, [isAlt, key, layer, isMod, isShift]),
+  );
 };
 
 /** A sheet or a dialog: while it is open, the shortcuts behind it are silent. */

@@ -707,7 +707,7 @@ describe("NowBoard", () => {
     expect(await screen.findByLabelText("From your calendar")).toBeOnTheScreen();
   });
 
-  it("skips a calendar event on every channel, and hides it once that went through", async () => {
+  it("skips a calendar event on every channel: its card goes at the press, before the server answers (bug-lessons 311)", async () => {
     seminarSoon();
     const skip = heldRoute();
     const runtime = await createTestRuntime({ routes: { "POST /api/calendar/skip": skip.route } });
@@ -719,14 +719,17 @@ describe("NowBoard", () => {
     });
     const eventKey = calendarEventKey({ startAt: addMinutesIso(NOW, 5), title: "Seminar" });
     expect(skip.calls).toEqual([{ eventKey, from: "app" }]);
-    expect(screen.getByLabelText("From your calendar")).toBeOnTheScreen();
+    // The server has not answered: the card is gone already.
+    expect(screen.queryByLabelText("From your calendar")).toBeNull();
     await act(async () => {
       skip.answer({ ok: true });
       await Promise.resolve();
     });
-    await waitFor(() => {
-      expect(screen.queryByLabelText("From your calendar")).toBeNull();
+    await act(async () => {
+      await Promise.resolve();
     });
+    expect(screen.queryByLabelText("From your calendar")).toBeNull();
+    expect(skip.calls).toHaveLength(1);
     expect(Object.values(runtime.state.store.getState().time.activities)).toEqual([]);
   });
 
@@ -754,7 +757,7 @@ describe("NowBoard", () => {
     });
   });
 
-  it("keeps the calendar card when its skip did not go through, and says so", async () => {
+  it("brings the calendar card back when its skip did not go through, and says so", async () => {
     seminarSoon();
     const skip = heldRoute();
     await renderScreen(
@@ -766,12 +769,13 @@ describe("NowBoard", () => {
     await waitFor(() => {
       expect(skip.waiting()).toBe(1);
     });
+    expect(screen.queryByLabelText("From your calendar")).toBeNull();
     await act(async () => {
       skip.refuse();
       await Promise.resolve();
     });
     expect(await screen.findByText(en("notifications.failedAction"))).toBeOnTheScreen();
-    expect(screen.getByLabelText("From your calendar")).toBeOnTheScreen();
+    expect(await screen.findByLabelText("From your calendar")).toBeOnTheScreen();
   });
 
   describe("the time bar on Now", () => {

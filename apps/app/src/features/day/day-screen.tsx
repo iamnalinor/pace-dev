@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { View } from "react-native";
 import Animated from "react-native-reanimated";
 
@@ -85,7 +85,10 @@ const entryRows = ({
       nativeID={dayEntryId(entry.key)}
       onLayout={(event) => {
         const { height, y } = event.nativeEvent.layout;
-        onFrame(entry.key, { height, top: y });
+        // A hidden row (Day left behind on the web) measures nothing: its bar keeps its frame.
+        if (height > 0) {
+          onFrame(entry.key, { height, top: y });
+        }
       }}
       testID="day-entry"
     >
@@ -261,7 +264,7 @@ const useOpenedBlock = (
 One day of the time ledger: totals per category, the timeline on its notebook page with its gaps,
 edits. On a computer the editor opens in the inspector beside the day; on a phone, in a sheet.
 */
-export const DayScreen = () => {
+export const DayScreen = memo(function DayScreen() {
   const t = useT();
   const { hooks } = usePace();
   const isWide = useIsWide();
@@ -335,4 +338,4 @@ export const DayScreen = () => {
       onInspectorClose={closeSheet}
     />
   );
-};
+});

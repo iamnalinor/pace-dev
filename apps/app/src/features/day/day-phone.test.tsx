@@ -461,21 +461,24 @@ const seminarSkip = async () =>
   });
 
 describe("Day and the notification pool", () => {
-  it("skips an event everywhere from Day, as Now does: shown while it is sent, gone once accepted", async () => {
+  it("skips an event everywhere from Day, as Now does: gone at the press, before the server answers (bug-lessons 311)", async () => {
     const { skip } = await withPool([]);
     await fireEvent.press(await seminarSkip());
     await waitFor(() => {
       expect(skip.waiting()).toBe(1);
     });
     expect(skip.calls).toEqual([{ eventKey: calendarEventKey(seminar), from: "app" }]);
-    expect(screen.getByText("Seminar")).toBeOnTheScreen();
+    // The server has not answered: the event is gone already.
+    expect(screen.queryByText("Seminar")).toBeNull();
     await act(async () => {
       skip.answer({ ok: true });
       await Promise.resolve();
     });
-    await waitFor(() => {
-      expect(screen.queryByText("Seminar")).toBeNull();
+    await act(async () => {
+      await Promise.resolve();
     });
+    expect(screen.queryByText("Seminar")).toBeNull();
+    expect(skip.calls).toHaveLength(1);
   });
 
   it("hides a skipped event once the server took it, without waiting for the phone to save it (bug-lessons 108)", async () => {
@@ -533,18 +536,19 @@ describe("Day and the notification pool", () => {
     }
   });
 
-  it("keeps an event whose skip did not go through, and says so", async () => {
+  it("brings back an event whose skip did not go through, and says so", async () => {
     const { skip } = await withPool([]);
     await fireEvent.press(await seminarSkip());
     await waitFor(() => {
       expect(skip.waiting()).toBe(1);
     });
+    expect(screen.queryByText("Seminar")).toBeNull();
     await act(async () => {
       skip.refuse();
       await Promise.resolve();
     });
     expect(await screen.findByText(en("notifications.failedAction"))).toBeOnTheScreen();
-    expect(screen.getByText("Seminar")).toBeOnTheScreen();
+    expect(await screen.findByText("Seminar")).toBeOnTheScreen();
   });
 
   it("does not ask again about an event skipped on another channel", async () => {

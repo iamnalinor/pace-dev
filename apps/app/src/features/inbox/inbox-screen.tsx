@@ -1,4 +1,5 @@
 import { useRouter } from "expo-router";
+import { memo } from "react";
 
 import { useLanguage, usePace, useT } from "#app/app-state.tsx";
 import { useSearchParam } from "#app/shared/use-search-param.ts";
@@ -149,7 +150,7 @@ decisions the rules want («To sort») first, then each capture verbatim with it
 opens its details: beside the list on a wide window, in a sheet on a phone. What is open is
 looked up again on every change, so an accepted or deleted capture closes its details.
 */
-export const InboxScreen = () => {
+export const InboxScreen = memo(function InboxScreen() {
   const t = useT();
   const isWide = useIsWide();
   const { hooks } = usePace();
@@ -204,4 +205,4 @@ export const InboxScreen = () => {
       </OverlayPresence>
     </>
   );
-};
+});

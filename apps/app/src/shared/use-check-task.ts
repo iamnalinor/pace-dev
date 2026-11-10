@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+
 import type { NowRow } from "@pace/client";
 
 import { useCloseWithUndo } from "./use-close-with-undo.ts";
@@ -14,5 +16,9 @@ export type CheckTask = {
 /** The row's check: close as done. */
 export const useCheckTask = (): CheckTask => {
   const closeWithUndo = useCloseWithUndo();
-  return { check: async (row) => await closeWithUndo(row.id, row.title) };
+  // One function for as long as the close is: a list's rows are memoized on it (bug-lessons 310).
+  return useMemo(
+    () => ({ check: async (row) => await closeWithUndo(row.id, row.title) }),
+    [closeWithUndo],
+  );
 };

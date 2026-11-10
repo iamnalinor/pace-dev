@@ -13,6 +13,12 @@ export type PhoneAnswers = {
   readonly rules: readonly SeriesRule[];
   readonly dismiss: (key: string) => void;
   readonly remember: (rule: SeriesRule) => void;
+  /**
+  A Skip: `key` is hidden at the press (it is in `dismissed` while `wasTaken` is asked), and for
+  good once the server took it (the phone then remembers it). A skip that did not go through
+  brings the event back, and answers `false` for the caller to say so.
+  */
+  readonly skip: (key: string, wasTaken: () => Promise<boolean>) => Promise<boolean>;
 };
 
 /**
@@ -31,6 +37,10 @@ export const usePhoneAnswers = (reload: () => Promise<void>, memory: number): Ph
     readonly rules: readonly Held<SeriesRule>[];
   }>({ dismissed: [], rules: [] });
   const nextRef = useRef(0);
+  // Skips on their way to the server (owner, bug-lessons 311): a Skip shows at the press, not
+  // when the server has answered; refused, the event is never gone here and still asked about
+  // everywhere else (bug class 3).
+  const [sending, setSending] = useState<ReadonlySet<string>>(() => new Set());
   // A change to what the phone remembers made elsewhere (Permissions forgot a rule): answers
   // that could not be saved give way to it. Adjusted while rendering, not in an effect.
   const [seenMemory, setSeenMemory] = useState(memory);
@@ -67,19 +77,30 @@ export const usePhoneAnswers = (reload: () => Promise<void>, memory: number): Ph
     },
     [reload],
   );
+  const dismiss = (key: string): void => {
+    nextRef.current += 1;
+    const id = nextRef.current;
+    setHeld((current) => ({
+      ...current,
+      dismissed: [...current.dismissed, { id, isRefused: false, value: key }],
+    }));
+    keep("dismissed", id, async () => {
+      await rememberDismissed(key);
+    });
+  };
   return {
-    dismiss: (key) => {
-      nextRef.current += 1;
-      const id = nextRef.current;
-      setHeld((current) => ({
-        ...current,
-        dismissed: [...current.dismissed, { id, isRefused: false, value: key }],
-      }));
-      keep("dismissed", id, async () => {
-        await rememberDismissed(key);
-      });
+    dismiss,
+    dismissed: new Set([...held.dismissed.map((each) => each.value), ...sending]),
+    skip: async (key, wasTaken) => {
+      setSending((current) => new Set([...current, key]));
+      const isTaken = await wasTaken();
+      if (isTaken) {
+        // Kept by the overlay before the skip lets go: the event never shows in between.
+        dismiss(key);
+      }
+      setSending((current) => new Set([...current].filter((each) => each !== key)));
+      return isTaken;
     },
-    dismissed: new Set(held.dismissed.map((each) => each.value)),
     remember: (rule) => {
       nextRef.current += 1;
       const id = nextRef.current;

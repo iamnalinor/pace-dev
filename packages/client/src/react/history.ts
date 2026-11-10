@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { useStore } from "zustand";
 
-import type { QueryContext } from "@pace/core";
-
-import type { AppState, AppStateHandle } from "../state.ts";
+import type { AppStateHandle } from "../state.ts";
+import type { ViewHook } from "./view.ts";
 
 import { completeHistoryOf, type HistoryCoordinator, type HistoryError } from "../history-types.ts";
 import { type HistoryViewModel, historyViewModel } from "../view-models/history.ts";
@@ -13,7 +12,6 @@ export type HistoryResource =
   | { readonly status: "loading" }
   | { readonly status: "ready"; readonly value: HistoryViewModel };
 
-type ViewHook = <T>(compute: (current: AppState, context: QueryContext) => T, key?: string) => T;
 export const createHistoryHook = ({
   state,
   history,

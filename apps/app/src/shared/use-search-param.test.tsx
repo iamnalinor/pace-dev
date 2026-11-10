@@ -1,5 +1,6 @@
 import { act, renderHook } from "@testing-library/react-native";
 
+import { AddressScene } from "#app/test/render.tsx";
 import { paramsSet, searchParams, setSearchParams } from "#app/test/router.ts";
 
 import { useSearchParam } from "./use-search-param.ts";
@@ -28,7 +29,7 @@ beforeEach(() => {
 
 describe("useSearchParam: Back and forward follow the screen (feedback 5 item 6, R24-02)", () => {
   it("takes a history step before each change it writes, so Back returns to what was shown", async () => {
-    const { result } = await renderHook(() => useSearchParam("task"));
+    const { result } = await renderHook(() => useSearchParam("task"), { wrapper: AddressScene });
     await act(() => {
       result.current[1]("t1");
     });
@@ -42,7 +43,7 @@ describe("useSearchParam: Back and forward follow the screen (feedback 5 item 6,
 
   it("writes nothing, and takes no step, when the value is the one already shown", async () => {
     setSearchParams({ task: "t1" });
-    const { result } = await renderHook(() => useSearchParam("task"));
+    const { result } = await renderHook(() => useSearchParam("task"), { wrapper: AddressScene });
     await act(() => {
       result.current[1]("t1");
     });
@@ -52,7 +53,7 @@ describe("useSearchParam: Back and forward follow the screen (feedback 5 item 6,
 
   it("forgets a param whose item is gone without a step: back over the step that opened it, else in place (review I2)", async () => {
     setSearchParams({ open: "n1", other: "x" });
-    const { result } = await renderHook(() => useSearchParam("open"));
+    const { result } = await renderHook(() => useSearchParam("open"), { wrapper: AddressScene });
     mockBack.canStepBack = true;
     await act(() => {
       result.current[2]();
@@ -69,7 +70,7 @@ describe("useSearchParam: Back and forward follow the screen (feedback 5 item 6,
   });
 
   it("forgets nothing when the param is not there", async () => {
-    const { result } = await renderHook(() => useSearchParam("open"));
+    const { result } = await renderHook(() => useSearchParam("open"), { wrapper: AddressScene });
     await act(() => {
       result.current[2]();
     });

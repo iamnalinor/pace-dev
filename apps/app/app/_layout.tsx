@@ -24,7 +24,7 @@ import "#app/platform/push-task.ts";
 import { useCrashContext } from "#app/platform/use-crash-context.ts";
 import { CrashScreen } from "#app/screens/crash-screen.tsx";
 import { Navigation } from "#app/ui/navigation.tsx";
-import { ScreenScene } from "#app/ui/screen-scene.tsx";
+import { sceneLayout } from "#app/ui/screen-scene.tsx";
 import { useIsScrimUp } from "#app/ui/scrim.ts";
 import { Shell } from "#app/ui/shell.tsx";
 import { SyncFrame } from "#app/ui/sync-frame.tsx";
@@ -92,7 +92,7 @@ const Navigator = () => {
                       </RouteGate>
                     </IncompatibleGate>
                   )}
-                  screenLayout={({ children }) => <ScreenScene>{children}</ScreenScene>}
+                  screenLayout={sceneLayout}
                   screenOptions={{
                     contentStyle: { backgroundColor: palette["bg.app"] },
                     headerShown: false,

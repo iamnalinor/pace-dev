@@ -1,6 +1,6 @@
-import { useEffect, useRef } from "react";
+import { type RefObject, useCallback, useEffect, useRef } from "react";
 
-import { useIsScreenActive } from "#app/ui/screen-active.ts";
+import { useWhileScreenActive } from "#app/ui/screen-active.ts";
 
 const listeners = new Set<() => void>();
 /** When New task was last asked for and not yet taken; null when nothing waits. */
@@ -27,30 +27,32 @@ export const requestNewTask = (): void => {
   }
 };
 
+/** Opens the form if a request waits. */
+const takerOf = (openRef: RefObject<() => void>) => (): void => {
+  if (canTakeRequest()) {
+    openRef.current();
+  }
+};
+
 /**
 Opens the form when New task was asked for while this screen is in front: a Now behind
 another tab waits until it is shown, so a form never opens out of sight. A request nobody took
 within a couple of seconds is forgotten: a Now shown much later opens no form by surprise.
 */
 export const useNewTaskRequest = (open: () => void): void => {
-  const isActive = useIsScreenActive();
   const openRef = useRef(open);
   useEffect(() => {
     openRef.current = open;
   });
-  useEffect(() => {
-    if (!isActive) {
-      return;
-    }
-    const take = (): void => {
-      if (canTakeRequest()) {
-        openRef.current();
-      }
-    };
-    take();
-    listeners.add(take);
-    return () => {
-      listeners.delete(take);
-    };
-  }, [isActive]);
+  // Asked of the screen, not rendered for it: Now's whole tree hangs under this hook's caller.
+  useWhileScreenActive(
+    useCallback(() => {
+      const take = takerOf(openRef);
+      take();
+      listeners.add(take);
+      return () => {
+        listeners.delete(take);
+      };
+    }, []),
+  );
 };
