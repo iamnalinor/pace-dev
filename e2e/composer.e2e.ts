@@ -231,6 +231,25 @@ test("an empty form asked to create says the title is missing, by the keys and b
   await expect(form.getByText("Give the task a title.")).toHaveCount(0);
 });
 
+test("a mouse click on Create with an unreadable time in the open date panel keeps the form and says so (QA round 28 R28-01)", async ({
+  page,
+}) => {
+  await loginViaApi(page);
+  await page.setViewportSize({ height: 900, width: 1440 });
+  await page.goto("/");
+  await expect(page.getByRole("textbox", { name: "New task" })).toBeVisible();
+  await page.keyboard.press("Alt+n");
+  const form = taskForm(page);
+  await form.getByRole("textbox", { exact: true, name: "Title" }).fill("Pay the rent");
+  await form.getByRole("button", { name: /^Due: /u }).click();
+  await form.getByRole("textbox", { exact: true, name: "Time" }).fill("25:00");
+  // The pointer goes down outside the panel first: that must not drop the panel and its text.
+  await form.getByRole("button", { exact: true, name: /^Create/u }).click();
+  await expect(form.getByRole("alert")).toHaveText("Type a time like 09:30.");
+  await expect(form.getByRole("textbox", { exact: true, name: "Time" })).toHaveValue("25:00");
+  await expect(nowTasks(page).getByText("Pay the rent")).toHaveCount(0);
+});
+
 test("the form's close drops its draft: New task opens an empty form again (QA 14 L6)", async ({
   page,
 }) => {

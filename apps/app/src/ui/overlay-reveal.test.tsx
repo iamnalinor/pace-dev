@@ -100,7 +100,13 @@ describe("a panel that unfolds in a sheet (QA round 27 R27-06)", () => {
     const reveal = jest.fn<undefined, [unknown]>();
     await renderScreen(
       <RevealContext value={reveal}>
-        <DatePanel kind="due" onChange={jest.fn()} onClose={jest.fn()} value={null} />
+        <DatePanel
+          kind="due"
+          onChange={jest.fn()}
+          onClose={jest.fn()}
+          region={{ current: null }}
+          value={null}
+        />
       </RevealContext>,
       await createTestRuntime({ world: "empty" }),
     );

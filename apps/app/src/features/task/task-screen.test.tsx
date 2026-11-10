@@ -650,6 +650,37 @@ describe("TaskScreen — work", () => {
     });
   });
 
+  it("keeps the due panel open on a touch elsewhere while its time cannot be read (QA round 28 R28-01)", async () => {
+    const runtime = await createTestRuntime({ deviceTz: "UTC", now: TRK_NOW });
+    const result = await runtime.actions.createTask({
+      dueAt: "2026-10-16T18:00:00.000Z",
+      presetId: "personal",
+      title: "Touch elsewhere",
+    });
+    const created = result.ok ? result.value[0] : undefined;
+    const taskId = created?.type === "task.created" ? created.payload.taskId : "";
+    await renderScreen(<TaskScreen id={taskId} />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
+    await fireEvent.press(screen.getByRole("button", { name: /^Due: /u }));
+    await fireEvent.changeText(screen.getByLabelText(en("composer.dueTime")), "2500");
+    // A touch on another field of the form (Android dismisses an open panel that way).
+    await fireEvent(screen.getByLabelText(en("edit.taskTitle")), "touchStart");
+    expect(screen.getByLabelText(en("composer.dueTime"))).toBeOnTheScreen();
+    expect(screen.getByRole("alert")).toHaveTextContent(en("day.badTime"));
+    // A time read whole is handed over, and the panel goes.
+    await fireEvent.changeText(screen.getByLabelText(en("composer.dueTime")), "7");
+    await fireEvent(screen.getByLabelText(en("edit.taskTitle")), "touchStart");
+    await waitFor(() => {
+      expect(screen.queryByLabelText(en("composer.dueTime"))).toBeNull();
+    });
+    await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
+    await waitFor(() => {
+      expect(runtime.state.store.getState().tasks.byId[taskId]?.dueAt).toBe(
+        "2026-10-16T07:00:00.000Z",
+      );
+    });
+  });
+
   it("refuses Done and Save while the typed due time cannot be read, and says so (R27-02)", async () => {
     const runtime = await createTestRuntime({ deviceTz: "UTC", now: TRK_NOW });
     const result = await runtime.actions.createTask({

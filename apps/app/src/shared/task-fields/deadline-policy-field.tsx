@@ -9,7 +9,6 @@ import { RadioGroup } from "#app/ui/radio-group.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 
 import { DateChip, DatePanel, type Zoned } from "./date-field.tsx";
-import { useOutsidePress } from "./use-outside-press.ts";
 
 type Resubmission = Extract<DeadlinePolicy, { readonly kind: "resubmission" }>;
 type FinalMode = "fixed" | "none" | "offset";
@@ -52,9 +51,6 @@ const FixedDate = ({
 }) => {
   const t = useT();
   const wrapperRef = useRef<View>(null);
-  useOutsidePress(wrapperRef, isOpen, () => {
-    onOpenChange(false);
-  });
   const date = finalDateOf(value);
   return (
     <View
@@ -89,6 +85,7 @@ const FixedDate = ({
           onClose={() => {
             onOpenChange(false);
           }}
+          region={wrapperRef}
           value={date}
         />
       ) : null}

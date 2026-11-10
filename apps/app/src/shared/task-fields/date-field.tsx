@@ -1,3 +1,5 @@
+import type { RefObject } from "react";
+
 import { Text, View } from "react-native";
 
 import { useSettings, useT } from "#app/app-state.tsx";
@@ -9,6 +11,8 @@ import { Chip } from "#app/ui/chip.tsx";
 import { useRevealOnShow } from "#app/ui/overlay-reveal.ts";
 import { TimeCheckScope, useCheckedSubmit, useTimeChecks } from "#app/ui/time-check.tsx";
 import { TimeInput } from "#app/ui/time-input.tsx";
+
+import { useOutsidePress } from "./use-outside-press.ts";
 
 /** A time a person sets, with the zone it was set in; `null` when not set. */
 export type Zoned = null | { readonly at: string; readonly tz: string };
@@ -103,12 +107,18 @@ export const DatePanel = ({
   kind,
   onChange,
   onClose,
+  region,
   value: due,
 }: {
   readonly kind: DateKind;
   readonly value: Zoned;
   readonly onChange: (value: Zoned) => void;
   readonly onClose: () => void;
+  /**
+  The chip and the panel: a pointer anywhere else (on the web) closes it as Done does, so a time
+  it cannot read keeps it open and says so, and the Save the pointer went to finds it (R28-01).
+  */
+  readonly region: RefObject<null | View>;
 }) => {
   const t = useT();
   const viewer = useViewer();
@@ -121,6 +131,7 @@ export const DatePanel = ({
   // Done keeps the panel open on a time it cannot read, and says so (R27-02); a time handed over
   // by the press closes it in one press (review I3).
   const done = useCheckedSubmit(times, onClose);
+  useOutsidePress(region, true, done);
   // Unfolded in a sheet, the panel scrolls whole into view above the pinned Save (R27-06).
   const panelRef = useRevealOnShow("date-panel");
   const set = (date: string, at: string): void => {

@@ -9,6 +9,7 @@ import { KnownAfterSync } from "#app/ui/empty-state.tsx";
 import { IMPORTANCE_HUES } from "#app/ui/hue.ts";
 import { RadioChips } from "#app/ui/radio-chips.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
+import { TimeCheckScope, useTimeChecks } from "#app/ui/time-check.tsx";
 import { ImportanceSchema, presetLabel } from "@pace/core";
 
 import type { TaskFormOptions, TaskFormValues } from "./task-form-types.ts";
@@ -17,7 +18,6 @@ import { DatePanel } from "./date-field.tsx";
 import { DeadlineAndRepeat, DueBeforeStartNote } from "./deadline-and-repeat.tsx";
 import { EstimateOptions } from "./estimate-field.tsx";
 import { fieldDraftKey, TaskTextFields } from "./task-text-fields.tsx";
-import { useOutsidePress } from "./use-outside-press.ts";
 import { WhenChips } from "./when-chips.tsx";
 
 export type { TaskFormValues } from "./task-form-types.ts";
@@ -28,7 +28,6 @@ type Panel = "due" | "estimate" | "start" | null;
 const WhenFields = ({
   fallback,
   onChange,
-  onClose,
   panel,
   setPanel,
   values,
@@ -39,10 +38,8 @@ const WhenFields = ({
   readonly onChange: (patch: Partial<TaskFormValues>) => void;
   readonly panel: Panel;
   readonly setPanel: (panel: Panel) => void;
-  readonly onClose: () => void;
 }) => {
   const wrapperRef = useRef<View>(null);
-  useOutsidePress(wrapperRef, panel === "due" || panel === "start", onClose);
   const toggle = (next: Exclude<Panel, null>): void => {
     setPanel(panel === next ? null : next);
   };
@@ -66,6 +63,7 @@ const WhenFields = ({
             onChange(panel === "start" ? { start: value } : { due: value });
           }}
           onClose={close}
+          region={wrapperRef}
           value={panel === "start" ? values.start : values.due}
         />
       ) : null}
@@ -233,6 +231,31 @@ const useTitleField = ({
 };
 
 /**
+The open panels (a date, the estimate, the final deadline) and their close by a touch elsewhere in
+the form (Android; the web's pointer is `useOutsidePress`): as their Done does, so a time a panel
+cannot read keeps it open and says so, and one read whole («7») is handed over first (R28-01).
+*/
+const usePanels = () => {
+  const [panel, setPanel] = useState<Panel>(null);
+  const [isFinalOpen, setIsFinalOpen] = useState(false);
+  const panelTimes = useTimeChecks();
+  return {
+    closeAll: (): void => {
+      if (panelTimes.verdict() === "wrong") {
+        return;
+      }
+      setPanel(null);
+      setIsFinalOpen(false);
+    },
+    isFinalOpen,
+    panel,
+    panelTimes,
+    setIsFinalOpen,
+    setPanel,
+  };
+};
+
+/**
 The fields of a task, labelled one by one: title, category, importance, project, start, due,
 estimate, description and link. The composer's form and the task editor both draw it.
 */
@@ -254,53 +277,45 @@ export const TaskFields = ({
   const isUnknown = useIsAccountUnknown();
   const titleRef = useRef<TextInput>(null);
   const title = useTitleField({ isTitleFocused, ref: titleRef, submitTries, title: values.title });
-  const [panel, setPanel] = useState<Panel>(null);
-  const [isFinalOpen, setIsFinalOpen] = useState(false);
+  const { closeAll, isFinalOpen, panel, panelTimes, setIsFinalOpen, setPanel } = usePanels();
   return (
-    <View
-      className="gap-4"
-      onTouchStart={() => {
-        setPanel(null);
-        setIsFinalOpen(false);
-      }}
-    >
-      <TextField
-        draftKey={fieldDraftKey(draftKey, "title")}
-        error={title.isAsked ? t("edit.titleRequired") : null}
-        label={t("edit.taskTitle")}
-        onChangeText={(next) => {
-          title.touch();
-          onChange({ title: next });
-        }}
-        onSubmitEditing={onSubmit}
-        ref={titleRef}
-        returnKeyType={onSubmit === undefined ? "default" : "done"}
-        submitBehavior={onSubmit === undefined ? "blurAndSubmit" : "submit"}
-        value={values.title}
-      />
-      <KnownAfterSync>
-        <ChoiceFields onChange={onChange} options={options} values={values} />
-      </KnownAfterSync>
-      <WhenFields
-        fallback={isUnknown ? null : (options.estimates[values.presetId] ?? null)}
-        onChange={onChange}
-        onClose={() => {
-          setPanel(null);
-        }}
-        panel={panel}
-        setPanel={setPanel}
-        values={values}
-      />
-      <DueBeforeStartNote isStartChosen={isStartChosen} values={values} />
-      <DeadlineAndRepeat
-        isFinalOpen={isFinalOpen}
-        onChange={onChange}
-        onFinalOpenChange={setIsFinalOpen}
-        repeatProblem={repeatProblem}
-        showDeadlineIssue={showDeadlineIssue}
-        values={values}
-      />
-      <TaskTextFields draftKey={draftKey} onChange={onChange} values={values} />
-    </View>
+    <TimeCheckScope checks={panelTimes}>
+      <View className="gap-4" onTouchStart={closeAll}>
+        <TextField
+          draftKey={fieldDraftKey(draftKey, "title")}
+          error={title.isAsked ? t("edit.titleRequired") : null}
+          label={t("edit.taskTitle")}
+          onChangeText={(next) => {
+            title.touch();
+            onChange({ title: next });
+          }}
+          onSubmitEditing={onSubmit}
+          ref={titleRef}
+          returnKeyType={onSubmit === undefined ? "default" : "done"}
+          submitBehavior={onSubmit === undefined ? "blurAndSubmit" : "submit"}
+          value={values.title}
+        />
+        <KnownAfterSync>
+          <ChoiceFields onChange={onChange} options={options} values={values} />
+        </KnownAfterSync>
+        <WhenFields
+          fallback={isUnknown ? null : (options.estimates[values.presetId] ?? null)}
+          onChange={onChange}
+          panel={panel}
+          setPanel={setPanel}
+          values={values}
+        />
+        <DueBeforeStartNote isStartChosen={isStartChosen} values={values} />
+        <DeadlineAndRepeat
+          isFinalOpen={isFinalOpen}
+          onChange={onChange}
+          onFinalOpenChange={setIsFinalOpen}
+          repeatProblem={repeatProblem}
+          showDeadlineIssue={showDeadlineIssue}
+          values={values}
+        />
+        <TaskTextFields draftKey={draftKey} onChange={onChange} values={values} />
+      </View>
+    </TimeCheckScope>
   );
 };
