@@ -75,3 +75,11 @@ separate PR" and "all in a separate PR").
 - Item 6 on Android: the same params drive the native stack; deep links from outside the app
   (`pace://`) are not added in this round. Default: web URLs only, native keeps its stack.
 - Item 7 storage limit: drafts older than 30 days are dropped. Default as stated.
+
+## Decision (2026-11-10): a logged block over another logged block splits it
+
+The owner was asked about R27-05 and chose **always split**. A past activity logged over time that another activity already holds cuts or splits that neighbour «как в календаре» (`context/requirements.md`). This holds whether the neighbour was recorded live or entered by hand. The form says what goes: «Это время уйдёт из «…»».
+
+- **Alternatives that lost:** refusing every overlap (the person moves the neighbour's edge first), and the R26-03 mix (split a live-recorded block, refuse a hand-entered one).
+- **Still refused:** editing an existing block so that it overlaps its neighbour is still refused. The rule above covers only a new past activity logged over occupied time.
+- **Open question, with a default:** a new block that covers its neighbour completely removes that neighbour (revokes it); the form names it the same way.
