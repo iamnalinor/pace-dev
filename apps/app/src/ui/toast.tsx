@@ -11,6 +11,8 @@ import {
 } from "react";
 import { View } from "react-native";
 
+import type { AppState as ClientState } from "@pace/client";
+
 import { clipText, clipWords, isRevokedIn, z } from "@pace/core";
 
 import { useAppState, useT } from "../app-state.tsx";
@@ -32,6 +34,11 @@ export type ToastInput = {
     device), the toast goes, so its Undo never offers what was already done (QA round 26 R26-06).
     */
     readonly undoes?: readonly string[];
+    /**
+    Whether what the Undo takes back still holds: the toast also goes once it does not (a project
+    restored from its page writes no revocation; QA round 28 R28-02).
+    */
+    readonly holds?: (state: ClientState) => boolean;
   };
   /**
   The control the outcome belongs to, when it is still on screen: the toast sits just above it
@@ -91,8 +98,11 @@ export const ToastCard = ({
 }) => {
   const t = useT();
   const undoes = toast.action?.undoes;
+  const holds = toast.action?.holds;
   const isUndone = useAppState(
-    (state) => undoes?.some((eventId) => isRevokedIn(state.log, eventId)) === true,
+    (state) =>
+      undoes?.some((eventId) => isRevokedIn(state.log, eventId)) === true ||
+      (holds !== undefined && !holds(state)),
   );
   useEffect(() => {
     if (isUndone) {

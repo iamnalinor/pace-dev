@@ -13,10 +13,9 @@ export type { InboxActions } from "./actions/inbox-actions.ts";
 export type { InstanceActions } from "./actions/instances.ts";
 export type { PresetActions } from "./actions/preset-actions.ts";
 export {
+  archiveInEffect,
   type ProjectActions,
-  type ProjectDraft,
   projectNameError,
-  type ProjectPatch,
 } from "./actions/project-actions.ts";
 export type { ProjectTarget } from "./actions/projects.ts";
 export type { ReviewActions } from "./actions/review-actions.ts";

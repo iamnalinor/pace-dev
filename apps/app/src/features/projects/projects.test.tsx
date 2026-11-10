@@ -104,6 +104,23 @@ describe("project forms", () => {
     });
   });
 
+  it("takes the archive toast away once the project is restored from its page (QA round 28 R28-02)", async () => {
+    const runtime = await createTestRuntime();
+    await renderScreen(<ProjectScreen id={ALGEBRA_ID} />, runtime);
+    const name = runtime.state.store.getState().projects.byId[ALGEBRA_ID]?.name ?? "";
+    await fireEvent.press(screen.getByRole("button", { name: en("project.edit") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("project.archive") }));
+    expect(await screen.findByText(en("project.archived", { name }))).toBeOnTheScreen();
+    const before = runtime.state.store.getState().log.length;
+    // Restored from its page («Вернуть из архива»): a project.updated, no revocation.
+    await fireEvent.press(screen.getByRole("button", { name: en("project.restore") }));
+    await waitFor(() => {
+      expect(screen.queryByText(en("project.archived", { name }))).toBeNull();
+    });
+    expect(runtime.state.store.getState().log).toHaveLength(before + 1);
+    expect(runtime.state.store.getState().log.at(-1)?.type).toBe("project.updated");
+  });
+
   it("offers the archive only when something is archived, and says «no projects» only when none is shown (QA 27 review M5)", async () => {
     const runtime = await createTestRuntime();
     const list = await renderScreen(<ProjectsScreen />, runtime);

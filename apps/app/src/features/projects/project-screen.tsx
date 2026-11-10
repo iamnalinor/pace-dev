@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { View } from "react-native";
 
-import type { ProjectViewModel } from "@pace/client";
-
 import { useAppState, useLanguage, usePace, useT } from "#app/app-state.tsx";
 import { FoldedSection, TaskRows } from "#app/shared/task-list.tsx";
 import { useBack, useLeave } from "#app/shared/use-back.ts";
@@ -14,6 +12,7 @@ import { Screen } from "#app/ui/screen.tsx";
 import { SectionHeader } from "#app/ui/section-header.tsx";
 import { Text } from "#app/ui/text.tsx";
 import { toastQuote, useToast } from "#app/ui/toast.tsx";
+import { archiveInEffect, type ProjectViewModel } from "@pace/client";
 import { formatCount, projectById } from "@pace/core";
 
 import { ProjectForm } from "./project-form.tsx";
@@ -44,8 +43,10 @@ const useArchive = (project: ProjectViewModel) => {
         ...(archived !== undefined && {
           action: {
             label: t("common.undo"),
-            onPress: () => void run(actions.revoke(archived.id)),
+            // Writes nothing once the archive is no longer the one in effect (R28-02).
+            onPress: () => void run(actions.undoArchive(project.id, archived.id)),
             undoes: [archived.id],
+            holds: (state) => archiveInEffect(state.events, project.id) === archived.id,
           },
         }),
       });

@@ -883,6 +883,35 @@ describe("projects", () => {
     expect(world.state.store.getState().projects.byId[projectId]?.archived).toBe(true);
   });
 
+  it("undoes an archive only while it is the archive in effect (QA round 28 R28-02)", async () => {
+    const world = await setupActions([]);
+    const [created] = unwrap(await world.actions.createProject({ color: "blue", name: "Infra" }));
+    const projectId = created?.type === "project.created" ? created.payload.projectId : "";
+    const [archived] = unwrap(await world.actions.updateProject(projectId, { archived: true }));
+    const archiveId = archived?.id ?? "";
+    const logLength = () => world.state.store.getState().log.length;
+    // Restored from its page: the toast's Undo writes nothing.
+    unwrap(await world.actions.updateProject(projectId, { archived: false }));
+    const before = logLength();
+    await expect(world.actions.undoArchive(projectId, archiveId)).resolves.toEqual({
+      error: "action/nothing-to-do",
+      ok: false,
+    });
+    expect(logLength()).toBe(before);
+    // Archived again: the old toast's Undo is not this archive's.
+    const [again] = unwrap(await world.actions.updateProject(projectId, { archived: true }));
+    await expect(world.actions.undoArchive(projectId, archiveId)).resolves.toMatchObject({
+      ok: false,
+    });
+    // Its own Undo, pressed twice at once, writes one revocation.
+    const results = await Promise.all([
+      world.actions.undoArchive(projectId, again?.id ?? ""),
+      world.actions.undoArchive(projectId, again?.id ?? ""),
+    ]);
+    expect(results.map((result) => result.ok)).toEqual([true, false]);
+    expect(world.state.store.getState().projects.byId[projectId]?.archived).toBe(false);
+  });
+
   it("refuses an empty name and one another active project carries", async () => {
     const world = await setupActions([]);
     const [created] = unwrap(await world.actions.createProject({ color: "blue", name: "Infra" }));

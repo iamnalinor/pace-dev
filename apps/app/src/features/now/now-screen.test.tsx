@@ -253,6 +253,28 @@ describe("NowBoard", () => {
     });
   });
 
+  it("takes the Done toast away once the task is reopened another way (R28-02's class)", async () => {
+    const runtime = await createTestRuntime();
+    await renderScreen(<Board />, runtime);
+    await fireEvent.press(
+      screen.getByRole("checkbox", { name: "Mark Reply to course curator done" }),
+    );
+    const task = () =>
+      Object.values(runtime.state.store.getState().tasks.byId).find(
+        (item) => item.title === "Reply to course curator",
+      );
+    await waitFor(() => {
+      expect(task()?.closed).not.toBeNull();
+    });
+    expect(await screen.findByRole("button", { name: "Undo" })).toBeOnTheScreen();
+    await act(async () => {
+      await runtime.actions.reopen(task()?.id ?? "");
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
+    });
+  });
+
   describe("a checked task whose close is still being written", () => {
     const TITLE = "Reply to course curator";
     const CHECK = { name: `Mark ${TITLE} done` };
