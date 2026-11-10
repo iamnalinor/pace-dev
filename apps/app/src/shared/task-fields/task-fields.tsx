@@ -75,6 +75,9 @@ const WhenFields = ({
             onChange({ estimateMinutes });
             close();
           }}
+          onTyped={(estimateMinutes) => {
+            onChange({ estimateMinutes });
+          }}
         />
       ) : null}
     </View>

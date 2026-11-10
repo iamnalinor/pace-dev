@@ -492,6 +492,17 @@ describe("TaskScreen — work", () => {
     });
   });
 
+  it("saves a typed estimate when Save is tapped without Enter (review of the QA 26 wave, I1's TypedEstimate)", async () => {
+    const runtime = await trkScreen();
+    await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
+    await fireEvent.press(screen.getByRole("button", { name: /^Estimate: /u }));
+    await fireEvent.changeText(screen.getByLabelText(en("form.estimateTyped")), "45");
+    await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
+    await waitFor(() => {
+      expect(runtime.state.store.getState().tasks.byId[TRK_ID]?.estimateMinutes).toBe(45);
+    });
+  });
+
   it("keeps Save off while the last repeat date is before the start, and writes nothing (bug class 32)", async () => {
     const runtime = await trkScreen();
     const eventsBefore = runtime.state.store.getState().events.length;

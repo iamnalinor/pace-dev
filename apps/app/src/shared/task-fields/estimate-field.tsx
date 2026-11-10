@@ -69,8 +69,17 @@ const typedMinutes = (text: string): null | number => {
 /** An Expect or estimate is a day at most. */
 const MAX_MINUTES = 24 * 60;
 
-/** Any other length, typed: Enter sets it. */
-const TypedEstimate = ({ onEstimate }: { readonly onEstimate: (minutes: number) => void }) => {
+/**
+Any other length, typed: Enter sets it. Inside a draft (`onTyped`) each length it reads is handed
+over as it is typed, so a Save tapped without Enter finds it (class 219, the typed estimate).
+*/
+const TypedEstimate = ({
+  onEstimate,
+  onTyped,
+}: {
+  readonly onEstimate: (minutes: number) => void;
+  readonly onTyped: ((minutes: number) => void) | undefined;
+}) => {
   const t = useT();
   const [text, setText] = useState("");
   const minutes = typedMinutes(text);
@@ -79,7 +88,13 @@ const TypedEstimate = ({ onEstimate }: { readonly onEstimate: (minutes: number) 
       inputMode="text"
       isInvalid={text !== "" && minutes === null}
       label={t("form.estimateTyped")}
-      onChangeText={setText}
+      onChangeText={(next) => {
+        setText(next);
+        const typed = typedMinutes(next);
+        if (typed !== null) {
+          onTyped?.(typed);
+        }
+      }}
       onSubmitEditing={() => {
         if (minutes !== null) {
           onEstimate(minutes);
@@ -97,10 +112,13 @@ export const EstimateOptions = ({
   fallback = null,
   minutes,
   onEstimate,
+  onTyped,
 }: {
   readonly minutes: null | number;
   readonly fallback?: null | number;
   readonly onEstimate: (minutes: null | number) => void;
+  /** A draft hears a typed length as it is typed, without the list closing. */
+  readonly onTyped?: (minutes: number) => void;
 }) => {
   const t = useT();
   const language = useLanguage();
@@ -120,7 +138,7 @@ export const EstimateOptions = ({
           {formatDuration(option, language)}
         </Chip>
       ))}
-      <TypedEstimate onEstimate={onEstimate} />
+      <TypedEstimate onEstimate={onEstimate} onTyped={onTyped} />
     </RadioGroup>
   );
 };

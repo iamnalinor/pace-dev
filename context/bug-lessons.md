@@ -2640,3 +2640,9 @@ New bugs go here with their class; a new class gets its own section above.
 - **Missed because.** Class 233's sweep listed `KeyHintRoomContext false` regions by the footer it fixed; the composer's header sets it too, and the description's key is handled in the field (`onKeyPress`), not by a `shortcut` the sweep could find.
 - **Class.** Class 233 again.
 - **Sweep and guard.** Every `KeyHintRoomContext value={false}` region (the task footer, the composer's header in the pane, Day's activity pane, whose sheet buttons have their own hints) names the key in a tooltip and hint; a key handled in a field's `onKeyPress` (the description's Ctrl/⌘+Enter) shows it on its button with `shortcutMode="hint"`. The pane's Done keeps the hint off the button by design review B1 (owner's call). Guards: `composer-pane-hint.test.tsx` (Create's hint names Ctrl+Enter in the pane), `task-footer-pane.test.tsx` (the description's Save shows Ctrl+Enter).
+
+### 248. The typed estimate, the field class 219 left for later
+- **Bug.** In the task sheets and Day's sheet, a length typed into «Другое: 50, 2.5 ч» and Save tapped without Enter was lost: only Enter handed it to the draft (left in class 219, noted in the QA 26 and 27 waves).
+- **Missed because.** The estimate tests picked a chip.
+- **Class.** Class 219 again: a field that hands its value over on an event the person's way of finishing does not send.
+- **Sweep and guard.** Inside a draft (the task fields, Day's sheet) every length the field reads is handed over as it is typed (`onTyped`), without closing the list; Enter still sets it and closes. Settings' category estimates write an event per pick, so they keep Enter. Guard: `task-screen.test.tsx` («45» typed, Save without Enter: 45 saved).

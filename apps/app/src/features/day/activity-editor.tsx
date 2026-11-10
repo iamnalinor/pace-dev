@@ -132,6 +132,7 @@ const ActivityEstimate = ({
             onChange(value);
             setIsOpen(false);
           }}
+          onTyped={onChange}
         />
       ) : null}
     </View>
