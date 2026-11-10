@@ -17,9 +17,12 @@ export type Publishers = {
   readonly setTabBar: Publish;
   readonly setStatus: Publish;
   readonly setRegion: (region: null | Region) => void;
+  /** The width of the column the screen in front keeps to on a wide window (720 or 960). */
+  readonly setColumn: Publish;
 };
 
 const NOBODY: Publishers = {
+  setColumn: () => undefined,
   setFooter: () => undefined,
   setRegion: () => undefined,
   setStatus: () => undefined,
@@ -31,7 +34,9 @@ export const PublishersContext = createContext<Publishers>(NOBODY);
 /**
 Where the bottom stack (the offline pill, then the toast above it) floats: `bottom` clears the
 measured bottom chrome (tab bar, screen footer, the safe area) by `space.3`; `left` and `right`
-keep it inside the content region, never across the sidebar or the rail (R23-13a). `inset` is
+keep it inside the content region, never across the sidebar or the rail (R23-13a), and on a wide
+window inside the screen's own column, which hugs the region's leading edge: centred on the whole
+region it floated beside the column, unattached (QA PR55-1-14, bug-lessons 342). `inset` is
 how much of the content's foot the stack covers right now: a list scrolls that far further.
 */
 export type FloatPlace = {
@@ -108,6 +113,15 @@ export const usePublishStatus = (height: number): void => {
 };
 
 /**
+The screen in front tells the layer how wide its column is on a wide window (`layout.contentMax` or
+`contentMaxWide`), so what floats is centred over the column the person reads, not over the empty
+room to its right. Nothing while it is not in front, or on a window where the column is the region.
+*/
+export const usePublishColumn = (width: number, isActive: boolean): void => {
+  usePublish((publishers) => publishers.setColumn, width, isActive && width > 0);
+};
+
+/**
 The shell's content region tells the layer where it is across the window: what floats is centred
 in it, clear of the sidebar and the rail. Answers the region's `onLayout`; a shell that does not
 publish (a nested one) leaves the root's word standing.
@@ -151,16 +165,21 @@ export const useFloatLayer = ({
   const footers = useHeights();
   const tabBars = useHeights();
   const statuses = useHeights();
+  const columns = useHeights();
   const [region, setRegion] = useState<null | Region>(null);
   const publishers = useMemo<Publishers>(
     () => ({
+      setColumn: columns.publish,
       setFooter: footers.publish,
       setRegion,
       setStatus: statuses.publish,
       setTabBar: tabBars.publish,
     }),
-    [footers.publish, statuses.publish, tabBars.publish],
+    [columns.publish, footers.publish, statuses.publish, tabBars.publish],
   );
+  // The column's trailing edge: the region's, or the column's where it is narrower.
+  const column = columns.tallest > 0 ? columns.tallest : Infinity;
+  const columnRight = region === null ? null : region.x + Math.min(region.width, column);
   const chromeBottom = Math.max(tabBars.tallest, insets.bottom) + footers.tallest + CHROME_GAP;
   const statusLift = statuses.tallest > 0 ? statuses.tallest + STACK_GAP : 0;
   // What the stack covers of the content's foot: the gap under it, the stack, air above it.
@@ -170,9 +189,9 @@ export const useFloatLayer = ({
       bottom: chromeBottom,
       inset: stack > 0 ? stack + 2 * CHROME_GAP : 0,
       left: (region?.x ?? 0) + SIDE_GAP,
-      right: region === null ? SIDE_GAP : areaWidth - region.x - region.width + SIDE_GAP,
+      right: columnRight === null ? SIDE_GAP : areaWidth - columnRight + SIDE_GAP,
     }),
-    [areaWidth, chromeBottom, region, stack],
+    [areaWidth, chromeBottom, columnRight, region, stack],
   );
   return { place, publishers, toastBottom: chromeBottom + statusLift };
 };

@@ -10,6 +10,7 @@ import {
   useContentRegionLayout,
   useFloatPlace,
   useLiftToastAbove,
+  usePublishColumn,
   usePublishStatus,
   usePublishTabBar,
 } from "./float-layer.ts";
@@ -46,6 +47,12 @@ const placeStyle = (): ViewStyle =>
 const Region = () => {
   const onLayout = useContentRegionLayout(true);
   return <View onLayout={onLayout} testID="region" />;
+};
+
+/** A screen in front, keeping to a column of `width`. */
+const Column = ({ width }: { readonly width: number }) => {
+  usePublishColumn(width, true);
+  return null;
 };
 
 /** What the layer tells a list about its foot. */
@@ -156,6 +163,28 @@ describe("where the toast floats (spec §4.1.4, F-CMP-12)", () => {
       nativeEvent: { layout: { height: 900, width: 1192, x: 248, y: 0 } },
     });
     expect(placeStyle().left).toBe(248 + 16);
+  });
+
+  it("keeps to the screen's column on a wide window, not the room beside it (QA PR55-1-14)", async () => {
+    await renderToast(
+      <>
+        <Region />
+        <Column width={720} />
+        <Shows message="Deleted" />
+      </>,
+    );
+    const area = screen.getByTestId("toast-place").parent;
+    if (area === null) {
+      throw new Error("The toast's place has no area around it");
+    }
+    await fireEvent(area, "layout", {
+      nativeEvent: { layout: { height: 900, width: 1440, x: 0, y: 0 } },
+    });
+    await fireEvent(screen.getByTestId("region"), "layout", {
+      nativeEvent: { layout: { height: 900, width: 1192, x: 248, y: 0 } },
+    });
+    // The column runs 248–968: the stack is centred over it, 16 in from each of its edges.
+    expect(placeStyle()).toMatchObject({ left: 248 + 16, right: 1440 - 968 + 16 });
   });
 
   it("tells a list how far it reaches over the content's foot while it shows", async () => {

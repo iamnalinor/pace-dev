@@ -1,11 +1,13 @@
 import { fireEvent, screen } from "@testing-library/react-native";
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, type ViewStyle } from "react-native";
+import { Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
 
 import { renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { withWindowWidth } from "#app/test/window.ts";
 import { space } from "@pace/core";
 
+import { useContentRegionLayout } from "./float-layer.ts";
 import { Screen } from "./screen.tsx";
 import { useToast } from "./toast.tsx";
 
@@ -166,4 +168,52 @@ describe("the header's scroll edge (F-LAY-13)", () => {
     );
     expect(style.paddingBottom).toBe(120 + 2 * space["3"]);
   });
+});
+
+/** Where the toast's box is placed across the window. */
+const placeOfToast = (): ViewStyle =>
+  StyleSheet.flatten(screen.getByTestId("toast-place").props["style"] as ViewStyle);
+
+/** The shell's content region, publishing where it is. */
+const Region = () => {
+  const onLayout = useContentRegionLayout(true);
+  return <View onLayout={onLayout} testID="region" />;
+};
+
+/** The window, then the content region beside a 248 sidebar, as their layouts report them. */
+const layOutWideWindow = async (): Promise<void> => {
+  const area = screen.getByTestId("toast-place").parent;
+  if (area === null) {
+    throw new Error("The toast's place has no area around it");
+  }
+  await fireEvent(area, "layout", {
+    nativeEvent: { layout: { height: 900, width: 1440, x: 0, y: 0 } },
+  });
+  await fireEvent(screen.getByTestId("region"), "layout", {
+    nativeEvent: { layout: { height: 900, width: 1192, x: 248, y: 0 } },
+  });
+};
+
+describe("what floats over a wide screen (QA PR55-1-14)", () => {
+  withWindowWidth(1440);
+
+  it.each([
+    ["content", 720],
+    ["wide", 960],
+  ] as const)(
+    "keeps to the %s column (%d) it hugs, not the whole region",
+    async (anchor, width) => {
+      await renderScreen(
+        <>
+          <Region />
+          <Screen anchor={anchor}>
+            <Shows message="Deleted" />
+          </Screen>
+        </>,
+        await createTestRuntime(),
+      );
+      await layOutWideWindow();
+      expect(placeOfToast()).toMatchObject({ left: 248 + 16, right: 1440 - (248 + width) + 16 });
+    },
+  );
 });
