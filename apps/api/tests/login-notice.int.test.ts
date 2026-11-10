@@ -261,7 +261,7 @@ describe("a sign-in notice in Telegram", () => {
     const messages = sent.filter((entry) => entry.method === "sendMessage");
     expect(messages).toHaveLength(1);
     expect(messages[0]?.body["text"]).toBe(
-      "🔐 You signed in from IP 1.2.3.4 · Germany, Berlin · Chrome on macOS",
+      "🔐 You signed in from IP 1.2.3.4 · Berlin, Germany · Chrome on macOS",
     );
     // Plain text: nothing the client named is read as markup.
     expect(messages[0]?.body).not.toHaveProperty("parse_mode");
@@ -274,7 +274,7 @@ describe("a sign-in notice in Telegram", () => {
     await adminOf("1002", "ru");
     await widgetLogin(1002, fromBerlin(CHROME_MAC));
     const message = sent.find((entry) => entry.method === "sendMessage");
-    expect(message?.body["text"]).toBe("🔐 Вход с IP 1.2.3.4 · Германия, Berlin · Chrome on macOS");
+    expect(message?.body["text"]).toBe("🔐 Вход с IP 1.2.3.4 · Berlin, Германия · Chrome on macOS");
     expect(keyboardOf(message)?.[0]?.[0]?.["text"]).toBe("Это не я — завершить сеанс");
     await setLanguage(await loginAsDev("1002"), "en");
   });
@@ -320,7 +320,7 @@ describe("a deep-link sign-in", () => {
     expect(sent[0]?.body).toMatchObject({
       chat_id: String(ADA),
       message_id: reply?.messageId,
-      text: "🔐 You signed in from IP 1.2.3.4 · Germany, Berlin · Pixel 9a",
+      text: "🔐 You signed in from IP 1.2.3.4 · Berlin, Germany · Pixel 9a",
     });
     expect(keyboardOf(sent[0])).toEqual([
       [returnButton, { callback_data: `nr:${notice.id}`, text: NOT_ME }],
@@ -339,7 +339,7 @@ describe("a deep-link sign-in", () => {
     await json(`/api/auth/nonce/${nonce}`);
     const edit = sent.find((entry) => entry.method === "editMessageText");
     expect(edit?.body["text"]).toBe(
-      "🔐 You signed in from IP 1.2.3.4 · Germany, Berlin · <b>Your</b> *phone* _x_ [ok](https://evil.test)",
+      "🔐 You signed in from IP 1.2.3.4 · Berlin, Germany · <b>Your</b> *phone* _x_ [ok](https://evil.test)",
     );
     expect(edit?.body).not.toHaveProperty("parse_mode");
   });
