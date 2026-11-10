@@ -41,15 +41,15 @@ describe("ScreenHeader (spec §4.2.16, §5.0.2)", () => {
       ).toBeOnTheScreen();
     });
 
-    it("on a phone keeps a 48 top bar above the title, so the title sits at one y with or without actions", async () => {
+    it("on a phone has no bar above the title: the actions sit on its line (owner, 2026-11-10)", async () => {
       await renderHeader(
         <ScreenHeader actions={<NativeText>bell</NativeText>} title="Now" variant="top" />,
       );
-      const bar = screen.getByTestId("screen-header-bar");
-      // At least the target, never a fixed height: a labelled action at 200 % text grows it (F-AND-05).
-      expect(classesOf(bar).split(" ")).toContain("min-h-hit");
-      expect(classesOf(bar).split(" ")).not.toContain("h-hit");
-      expect(within(bar).getByText("bell")).toBeOnTheScreen();
+      expect(screen.queryByTestId("screen-header-bar")).toBeNull();
+      const row = screen.getByTestId("screen-header-title-row");
+      expect(within(row).getByText("bell")).toBeOnTheScreen();
+      // Only the small top inset over the title, not a 48 bar and 8 under it.
+      expect(classesOf(row).split(" ")).toContain("mt-header-top");
     });
 
     it("keeps the gutter: 16 on a phone, 24 on a tablet, 32 on a computer", async () => {
@@ -60,9 +60,9 @@ describe("ScreenHeader (spec §4.2.16, §5.0.2)", () => {
       );
     });
 
-    it("on a phone has the bar even with nothing in it", async () => {
+    it("on a phone has no empty bar above a title without actions", async () => {
       await renderHeader(<ScreenHeader title="Inbox" variant="top" />);
-      expect(screen.getByTestId("screen-header-bar")).toBeOnTheScreen();
+      expect(screen.queryByTestId("screen-header-bar")).toBeNull();
     });
 
     it("pushed from More on a phone, it carries Back in the bar", async () => {
@@ -70,6 +70,7 @@ describe("ScreenHeader (spec §4.2.16, §5.0.2)", () => {
       await renderHeader(
         <ScreenHeader backLabel="Back" onBack={onBack} title="Projects" variant="top" />,
       );
+      expect(screen.getByTestId("screen-header-bar")).toBeOnTheScreen();
       await fireEvent.press(screen.getByRole("button", { name: "Back" }));
       expect(onBack).toHaveBeenCalledTimes(1);
     });
