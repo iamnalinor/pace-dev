@@ -5,6 +5,7 @@ import { Pressable, Text } from "react-native";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 
+import { ScreenActiveContext } from "./screen-active.ts";
 import { TimeInput } from "./time-input.tsx";
 
 const renderTime = async (onTime: (time: string) => void, isEditable = true) =>
@@ -40,6 +41,36 @@ describe("TimeInput (spec §4.2.29)", () => {
     await fireEvent(field, "blur");
     expect(onTime).toHaveBeenCalledTimes(1);
     expect(onTime).toHaveBeenCalledWith("07:00");
+  });
+
+  it("shows the stored time again once its screen is left holding text that is not a time (QA round 28 R28-10)", async () => {
+    const onTime = jest.fn();
+    const Tab = () => {
+      const [isActive, setIsActive] = useState(true);
+      return (
+        <ScreenActiveContext value={isActive}>
+          <TimeInput label="Starts at" onTime={onTime} value="09:00" />
+          <Pressable
+            onPress={() => {
+              setIsActive((active) => !active);
+            }}
+          >
+            <Text>Switch tab</Text>
+          </Pressable>
+        </ScreenActiveContext>
+      );
+    };
+    await renderScreen(<Tab />, await createTestRuntime({ world: "empty" }));
+    const field = screen.getByLabelText("Starts at");
+    await fireEvent.changeText(field, "25:00");
+    await fireEvent(field, "blur");
+    expect(screen.getByText(en("day.badTime"))).toBeOnTheScreen();
+    // Away to another tab and back: the screen stayed mounted.
+    await fireEvent.press(screen.getByText("Switch tab"));
+    await fireEvent.press(screen.getByText("Switch tab"));
+    expect(screen.getByLabelText("Starts at").props["value"]).toBe("09:00");
+    expect(screen.queryByText(en("day.badTime"))).toBeNull();
+    expect(onTime).not.toHaveBeenCalled();
   });
 
   it("says a time it cannot read under itself and keeps the text, as Day's sheet does (R26-05)", async () => {

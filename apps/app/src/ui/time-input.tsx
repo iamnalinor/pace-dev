@@ -7,6 +7,7 @@ import { useT } from "../app-state.tsx";
 import { submitFieldProps } from "../platform/enter-key.ts";
 import { cx } from "./cx.ts";
 import { ErrorMessage } from "./field-error.tsx";
+import { useIsScreenActive } from "./screen-active.ts";
 import { useSheetSubmit } from "./sheet-submit.tsx";
 import { boxClass, FocusRing } from "./text-field.tsx";
 import { useTheme } from "./theme-provider.tsx";
@@ -91,6 +92,23 @@ const useStoredValue = (
 };
 
 /**
+Left behind (another tab; the screen stays mounted) holding text that is not a time, a field that
+writes on its own shows the stored time again: the person comes back to what is stored, not to an
+error they left (QA round 28 R28-10).
+*/
+const useDroppedOnLeave = (isUnsaved: boolean, drop: () => void): void => {
+  const isActive = useIsScreenActive();
+  const [wasActive, setWasActive] = useState(isActive);
+  if (wasActive === isActive) {
+    return;
+  }
+  setWasActive(isActive);
+  if (!isActive && isUnsaved) {
+    drop();
+  }
+};
+
+/**
 The typed text of a `TimeInput` and when it is saved: on leave or Enter (`commit`), as it is typed
 inside a draft, and as the field goes away holding a time it was not left with.
 */
@@ -109,6 +127,11 @@ const useTypedTime = ({
   // so a time changed elsewhere meanwhile is never written back over.
   const [isEdited, setIsEdited] = useState(false);
   useStoredValue(value, isEdited, setText);
+  useDroppedOnLeave(!isDraft && isWrong, () => {
+    setText(value);
+    setIsWrong(false);
+    setIsEdited(false);
+  });
   // What an unmount must still save: the text typed and not yet saved, and who hears it.
   const pendingRef = useRef<null | string>(null);
   // A time handed to `onTime` that the caller has not drawn yet: a Save pressed now waits for it.
