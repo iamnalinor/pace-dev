@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { View } from "react-native";
 import Animated from "react-native-reanimated";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { IS_PHONE } from "#app/platform/device.ts";
 import { ScreenTimeSection } from "#app/shared/activity-usage.tsx";
-import { useZonedDateParam } from "#app/shared/use-search-param.ts";
+import { useSearchParam, useZonedDateParam } from "#app/shared/use-search-param.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { useWhereSat } from "#app/shared/use-where-sat.ts";
 import { EmptyText, FirstSyncBody } from "#app/ui/empty-state.tsx";
@@ -214,6 +214,34 @@ const DayPage = ({
 };
 
 /**
+A block named in the address (`?block=<its key>`, Week's «Edit in Day»; review M3, R26-04) opens
+in the editor once, as if picked; the param is then taken off in place, so closing the editor or
+coming back later does not open it again.
+*/
+const useOpenedBlock = (
+  day: { readonly entries: readonly { readonly key: string; readonly target: SheetTarget }[] },
+  open: (target: SheetTarget) => void,
+): void => {
+  const [block, , forgetBlock] = useSearchParam("block");
+  const [handled, setHandled] = useState<null | string>(null);
+  if (block === null && handled !== null) {
+    setHandled(null);
+  }
+  if (block !== null && block !== handled) {
+    setHandled(block);
+    const entry = day.entries.find((candidate) => candidate.key === block);
+    if (entry !== undefined) {
+      open(entry.target);
+    }
+  }
+  useEffect(() => {
+    if (block !== null && block === handled) {
+      forgetBlock();
+    }
+  }, [block, forgetBlock, handled]);
+};
+
+/**
 One day of the time ledger: totals per category, the timeline on its notebook page with its gaps,
 edits. On a computer the editor opens in the inspector beside the day; on a phone, in a sheet.
 */
@@ -235,6 +263,7 @@ export const DayScreen = () => {
   const setSheet = (target: null | SheetTarget): void => {
     setPicked(target === null ? null : { date: day.date, target });
   };
+  useOpenedBlock(day, setSheet);
   const closeSheet = (): void => {
     setSheet(null);
   };

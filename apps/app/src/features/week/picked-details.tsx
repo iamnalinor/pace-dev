@@ -210,12 +210,12 @@ const BlockFacts = ({
           {t("week.openTask")}
         </Button>
       )}
-      {/* Week only shows a block; its day is where it is edited (QA round 25 R25-07). */}
+      {/* Week only shows a block; its day is where it is edited, with it open (R25-07, R26-04). */}
       <Button
         onPress={() => {
           onLeave();
           router.push({
-            params: { date: formatInZone(block.startAt, week.zone, "yyyy-MM-dd") },
+            params: { block: block.id, date: formatInZone(block.startAt, week.zone, "yyyy-MM-dd") },
             pathname: "/day",
           });
         }}

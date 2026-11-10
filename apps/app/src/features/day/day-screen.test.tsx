@@ -217,6 +217,26 @@ describe("DayScreen", () => {
     expect(paramsSet).not.toHaveBeenCalled();
   });
 
+  it("opens the block the address names in its form once, as Week's «Edit in Day» asks (review M3, R26-04)", async () => {
+    const runtime = await createTestRuntime();
+    await runtime.actions.logPast({
+      category: "work",
+      endAt: addMinutesIso(NOW, -240),
+      label: "Team chat",
+      startAt: addMinutesIso(NOW, -270),
+    });
+    const chat = Object.values(runtime.state.store.getState().time.activities).find(
+      (activity) => activity.label === "Team chat",
+    );
+    setSearchParams({ block: `${chat?.id ?? ""}-${addMinutesIso(NOW, -270)}`, date: "2026-10-06" });
+    await renderScreen(<DayScreen />, runtime);
+    expect(await screen.findByLabelText("What")).toHaveDisplayValue("Team chat");
+    // Read once: the param goes, so a close does not open it again.
+    await waitFor(() => {
+      expect(searchParams()["block"]).toBeUndefined();
+    });
+  });
+
   it("opens the day the address names, and today for one it cannot read, writing nothing back", async () => {
     setSearchParams({ date: "2026-10-01" });
     const page = await renderScreen(<DayScreen />, await createTestRuntime());

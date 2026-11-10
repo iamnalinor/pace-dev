@@ -165,7 +165,7 @@ describe("WeekScreen on a wide window", () => {
     expect(pane()).toBeNull();
   });
 
-  it("offers to edit a block in its day, as Week only shows it (QA round 25 R25-07)", async () => {
+  it("offers to edit a block in its day, naming the block for Day to open (QA round 25 R25-07, R26-04)", async () => {
     const runtime = await createTestRuntime();
     await runtime.actions.logPast({
       category: "study",
@@ -176,7 +176,13 @@ describe("WeekScreen on a wide window", () => {
     await renderScreen(<WeekScreen />, runtime);
     await fireEvent.press(screen.getByRole("button", { name: /, Lecture notes$/u }));
     await fireEvent.press(await screen.findByRole("button", { name: en("week.editInDay") }));
-    expect(router.push).toHaveBeenCalledWith({ params: { date: "2026-10-06" }, pathname: "/day" });
+    const lecture = Object.values(runtime.state.store.getState().time.activities).find(
+      (activity) => activity.label === "Lecture notes",
+    );
+    expect(router.push).toHaveBeenCalledWith({
+      params: { block: `${lecture?.id ?? ""}-${addMinutesIso(NOW, -240)}`, date: "2026-10-06" },
+      pathname: "/day",
+    });
     expect(pane()).toBeNull();
   });
 });
