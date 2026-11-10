@@ -95,3 +95,23 @@ Accept then Undo of one note leaves three correction rows plus three «Отме�
 - Ctrl+Enter in the other editable fields of the task pane (title, subtasks).
 - Dark theme at 390; Projects, Insights, Notifications in dark; EN light screens only glanced at via one contact sheet.
 - Real MCP client, Telegram widget, OAuth consent page (owner's step).
+
+## Fix wave (after round 26, with the review of the QA 25 wave)
+
+| Finding | State |
+|---|---|
+| Review I1 (a deleted hour digit committed «00:30»), M4 («9:30 PM», «12:345», «930»), R26-05 (Settings silent revert, pasted «930») | **fixed in 04dfdfa1.** `typeTime(raw, previous)` fills a one-digit hour only when text came in, keeps a deletion as typed, refuses text after the minutes and more than four digits, reads «930» as 09:30 typed or pasted; `TimeInput` saves on leaving or Enter, only what was typed, and shows «Введите время, например 09:30.» under itself as Day does. Bug lesson 208. |
+| Review I2, R26-03 (overlap only forward; same start erased a block; start moved back shortened the previous one) | **fixed in eafa473a.** `overlapOf` checks every main block both ways, same start included; the spec's case (a logged block in a live block's time) stays and is said under From («Это время уйдёт из «…»»). Bug lesson 209. |
+| Review I3 (alongside block refused against the main line) | **fixed in eafa473a.** Bug lesson 210. |
+| R26-01 (error under «До» behind the pinned footer) | **fixed in 8f3040c3.** Every overlay body reveals a field error or form alert above its footer as it appears (web and phone). Left: the error still sits in its half-width column (the reveal makes it readable; a full-width message under the pair would lose its link to the field). Bug lesson 211. |
+| R26-02 (Ctrl+Enter in the description marked the task Done) | **fixed in 1cd58029.** In-place editors own Escape and ⌘/Ctrl+Enter (`data-pace-keys="edit"`); the description saves on it. Bug lesson 212. |
+| Review M1, M2, R26-06, R26-10 (Undo batching, double revoke, stale toast, three History rows) | **fixed in eec6c4e3.** `revokeAll` (one instant, all or none), `revoke` refuses a revoked target, Restore revokes every archive in effect, History shows a batch as one row, every Undo toast goes once what it undoes is revoked another way. Bug lesson 213. |
+| Review M3, R26-04 («Изменить в Дне» landed on a bare day) | **fixed in 1e78bf5c.** The link names the block; Day opens its form once. Bug lesson 214. |
+| Review M5 (Log past default refused) | **fixed in 36b9219b.** Bug lesson 215. |
+| Review M6 (EN quote marks) | **fixed in 36b9219b.** |
+| R26-07 (deleted preset shows nothing of itself) | **fixed in 36b9219b.** The deleted preset shows its sample task drawn with its settings and its parent. The full rule list stays in the form after Restore. Bug lesson 216. |
+| R26-08 (pasted /decisions goes Back to Now) | **fixed in 36b9219b.** Bug lesson 217. |
+| R26-09 (durations one minute off) | **fixed in 36b9219b.** Minutes between shown clocks. Bug lesson 218. |
+| R25-03 latency | **left**, not part of this wave (documented separately). |
+
+End-of-wave runs: `bun lint` clean; unit 905 (core) + 573 (client); app 1501; api 646; full chromium e2e 246 passed (10.7 min, latency project judged on CI).
