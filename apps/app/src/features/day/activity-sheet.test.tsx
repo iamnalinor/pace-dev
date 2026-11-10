@@ -167,6 +167,23 @@ const logSheet = async (day = "2026-10-06") => {
 };
 
 describe("the log-past sheet's times", () => {
+  it("keeps a deleted hour digit as typed, and reads «930» pasted as 09:30 (QA-25 review I1, R26-05)", async () => {
+    const { onClose, runtime } = await logSheet();
+    const from = screen.getByLabelText("From");
+    expect(from.props["value"]).toBe("12:00");
+    // The caret after the 2, Backspace: half an hour, not a complete 01:00.
+    await fireEvent.changeText(from, "1:00");
+    expect(screen.getByLabelText("From").props["value"]).toBe("1:00");
+    await fireEvent.changeText(screen.getByLabelText("From"), "930");
+    expect(screen.getByLabelText("From").props["value"]).toBe("09:30");
+    await fireEvent.press(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalled();
+    });
+    const [nap] = Object.values(runtime.state.store.getState().time.activities);
+    expect(nap?.startAt).toBe("2026-10-06T06:30:00.000Z");
+  });
+
   it("refuses an end at or well before the start instead of a day-long block", async () => {
     const { onClose } = await logSheet();
     await fireEvent.changeText(screen.getByLabelText("From"), "1000");

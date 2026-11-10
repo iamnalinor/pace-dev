@@ -117,15 +117,18 @@ describe("SettingsScreen", () => {
     expect(insetOf(en("settings.logout"))).toBe("px-row-x");
   });
 
-  it("saves digest times as they are typed, adds and removes one", async () => {
+  it("saves a digest time when the field is left, adds and removes one", async () => {
     const runtime = await createTestRuntime({ world: "empty" });
     await renderScreen(<SettingsScreen />, runtime);
     const settings = () => runtime.state.store.getState().settings;
     const first = screen.getByLabelText(en("settings.digestWindows.time", { index: 1 }));
     await fireEvent.changeText(first, "8");
-    // Half a time is never stored.
+    await fireEvent(first, "blur");
+    // Half a time is never stored: the field says so instead.
     expect(settings().digestWindows[0]).toBe("09:00");
+    expect(screen.getByText(en("day.badTime"))).toBeOnTheScreen();
     await fireEvent.changeText(first, "0830");
+    await fireEvent(first, "blur");
     await waitFor(() => {
       expect(settings().digestWindows[0]).toBe("08:30");
     });
@@ -144,13 +147,34 @@ describe("SettingsScreen", () => {
   it("saves the quiet hours and opens the pages behind the links", async () => {
     const runtime = await createTestRuntime({ world: "empty" });
     await renderScreen(<SettingsScreen />, runtime);
-    await fireEvent.changeText(screen.getByLabelText(en("settings.quietHours.from")), "2230");
+    const from = screen.getByLabelText(en("settings.quietHours.from"));
+    await fireEvent.changeText(from, "2230");
+    await fireEvent(from, "blur");
     await waitFor(() => {
       expect(runtime.state.store.getState().settings.quietHours.from).toBe("22:30");
     });
     const presetsLink = `${en("settings.presets")} ${en("settings.presets.hint")}`;
     await fireEvent.press(screen.getByRole("link", { name: presetsLink }));
     expect(router.navigate).toHaveBeenCalledWith("/presets");
+  });
+
+  it("writes no quiet-hours event while the hour is retyped inside a filled value (QA-25 review I1)", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    await renderScreen(<SettingsScreen />, runtime);
+    const quietHours = () => runtime.state.store.getState().settings.quietHours;
+    const before = quietHours();
+    const from = screen.getByLabelText(en("settings.quietHours.from"));
+    // «23:00», the caret after the 3, Backspace, then «1»: 21:00, never 02:00 on the way.
+    await fireEvent(from, "focus");
+    await fireEvent.changeText(from, "2:00");
+    expect(quietHours()).toEqual(before);
+    expect(from.props["value"]).toBe("2:00");
+    await fireEvent.changeText(from, "21:00");
+    expect(quietHours()).toEqual(before);
+    await fireEvent(from, "blur");
+    await waitFor(() => {
+      expect(quietHours().from).toBe("21:00");
+    });
   });
 
   it("turns Week's night hours on and off", async () => {

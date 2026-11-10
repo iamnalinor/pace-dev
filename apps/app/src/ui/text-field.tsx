@@ -116,7 +116,7 @@ export const FocusRing = () => (
 );
 
 /** The error under the field, with its glyph, announced once (polite). */
-const ErrorMessage = ({ error, id }: { readonly error: string; readonly id: string }) => (
+export const ErrorMessage = ({ error, id }: { readonly error: string; readonly id: string }) => (
   <View className="flex-row items-start gap-1" nativeID={id} testID="text-field-message">
     <Icon name="triangle-alert" size="inline" tone="danger" />
     <Text

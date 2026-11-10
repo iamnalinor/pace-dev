@@ -10,6 +10,7 @@ import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
 import { RadioChips } from "#app/ui/radio-chips.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
+import { TIME_MAX_LENGTH } from "#app/ui/time-input.tsx";
 import {
   type ActivityForm,
   activityFormOf,
@@ -79,11 +80,13 @@ const ActivityTimeFields = ({ draft, faults, isEndEditable, patch }: ActivityFie
           error={said(faults?.from)}
           keyboardType="number-pad"
           label={t("day.from")}
-          maxLength={5}
+          maxLength={TIME_MAX_LENGTH}
           onChangeText={(from) => {
-            const typed = typeTime(from);
+            const typed = typeTime(from, draft.from);
             patch({ from: typed.text });
-            if (typed.isComplete) {
+            // On to the end only when the last minute digit was just typed at the end: a time
+            // finished in the middle of an edit keeps the caret where the person is working.
+            if (typed.isComplete && typed.text.startsWith(draft.from) && draft.from.length === 4) {
               toFieldRef.current?.focus();
             }
           }}
@@ -97,9 +100,9 @@ const ActivityTimeFields = ({ draft, faults, isEndEditable, patch }: ActivityFie
             error={said(faults?.to)}
             keyboardType="number-pad"
             label={t("day.to")}
-            maxLength={5}
+            maxLength={TIME_MAX_LENGTH}
             onChangeText={(to) => {
-              patch({ to: typeTime(to).text });
+              patch({ to: typeTime(to, draft.to).text });
             }}
             placeholder="10:30"
             ref={toFieldRef}
