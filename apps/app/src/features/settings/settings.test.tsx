@@ -160,6 +160,55 @@ describe("SettingsScreen", () => {
     ).toBe(second);
   });
 
+  it("keeps a digest row removed while its field held a typed time (QA 27 wave review I1)", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    await renderScreen(<SettingsScreen />, runtime);
+    const settings = () => runtime.state.store.getState().settings;
+    const before = settings().digestWindows;
+    const last = before.at(-1) ?? "";
+    // Typed, and the row's ✕ pressed without leaving the field (Android): the field unmounts.
+    await fireEvent.changeText(
+      screen.getByLabelText(en("settings.digestWindows.time", { index: before.length })),
+      "2000",
+    );
+    await fireEvent.press(
+      screen.getByRole("button", { name: en("settings.digestWindows.remove", { time: last }) }),
+    );
+    await waitFor(() => {
+      expect(settings().digestWindows).toEqual(before.slice(0, -1));
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(settings().digestWindows).toEqual(before.slice(0, -1));
+  });
+
+  it("keeps a later digest row's typed time when an earlier row is removed (review I1)", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    await renderScreen(<SettingsScreen />, runtime);
+    const settings = () => runtime.state.store.getState().settings;
+    const before = settings().digestWindows;
+    const [first = ""] = before;
+    const lastField = () =>
+      screen.getByLabelText(en("settings.digestWindows.time", { index: before.length }));
+    await fireEvent.changeText(lastField(), "2000");
+    await fireEvent.press(
+      screen.getByRole("button", { name: en("settings.digestWindows.remove", { time: first }) }),
+    );
+    await waitFor(() => {
+      expect(settings().digestWindows).toEqual(before.slice(1));
+    });
+    // The typed row moved up one place and still holds what was typed; leaving it saves it there.
+    const moved = screen.getByLabelText(
+      en("settings.digestWindows.time", { index: before.length - 1 }),
+    );
+    expect(moved.props["value"]).toBe("20:00");
+    await fireEvent(moved, "blur");
+    await waitFor(() => {
+      expect(settings().digestWindows).toEqual([...before.slice(1, -1), "20:00"]);
+    });
+  });
+
   it("saves the quiet hours and opens the pages behind the links", async () => {
     const runtime = await createTestRuntime({ world: "empty" });
     await renderScreen(<SettingsScreen />, runtime);

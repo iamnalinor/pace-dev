@@ -20,6 +20,7 @@ import { Segmented } from "#app/ui/segmented.tsx";
 import { Switch } from "#app/ui/switch.tsx";
 import { TimeInput } from "#app/ui/time-input.tsx";
 import { useToast } from "#app/ui/toast.tsx";
+import { useRowKeys } from "#app/ui/use-row-keys.ts";
 import { isChannelOn, NOTIFICATION_CHANNELS, NOTIFICATION_KINDS } from "@pace/core";
 
 /**
@@ -189,30 +190,29 @@ export const PushStatus = () => {
 
 /**
 The daily digest times (`HH:MM` on the account's zone); a time is saved when its field is left,
-an added or removed one at once.
+an added or removed one at once. Each row writes by its place in the list as it stands when the
+write runs, and keeps its key when a row above it goes (review of the QA 27 wave, I1).
 */
 export const DigestWindows = () => {
   const t = useT();
   const { actions } = usePace();
   const run = useRunAction();
   const { digestWindows } = useSettings();
-  const save = (next: readonly string[]): void => {
-    void run(actions.setDigestWindows(next));
-  };
+  const { keys, removing } = useRowKeys(digestWindows);
   return (
     <View className="gap-2">
       <Text className="font-sans text-footnote text-label-secondary">
         {t("settings.digestWindows.hint")}
       </Text>
       {digestWindows.map((time, index) => (
-        // The row is its position: keyed by value, saving a time with Enter would remount the
-        // input under the caret. An untouched field takes the time its row now holds (review I5).
-        // eslint-disable-next-line @eslint-react/no-array-index-key -- see above
-        <View className="min-h-hit-web flex-row items-center justify-between gap-2" key={index}>
+        <View
+          className="min-h-hit-web flex-row items-center justify-between gap-2"
+          key={keys[index] ?? `new-${String(index)}`}
+        >
           <TimeInput
             label={t("settings.digestWindows.time", { index: index + 1 })}
             onTime={(next) => {
-              save(digestWindows.with(index, next));
+              void run(actions.setDigestTime(index, next));
             }}
             value={time}
           />
@@ -220,14 +220,15 @@ export const DigestWindows = () => {
             icon={"x"}
             label={t("settings.digestWindows.remove", { time })}
             onPress={() => {
-              save(digestWindows.filter((_, position) => position !== index));
+              removing(index);
+              void run(actions.removeDigestTime(index, time));
             }}
           />
         </View>
       ))}
       <Button
         onPress={() => {
-          save([...digestWindows, "12:00"]);
+          void run(actions.setDigestWindows([...digestWindows, "12:00"]));
         }}
         variant="secondary"
       >

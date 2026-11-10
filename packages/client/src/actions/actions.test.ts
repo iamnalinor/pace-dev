@@ -1054,6 +1054,39 @@ describe("settings", () => {
     });
   });
 
+  it("writes one digest time by its row, on the list as it is when the write runs (review I1)", async () => {
+    const world = await setupActions([]);
+    unwrap(await world.actions.setDigestWindows(["09:00", "14:00", "21:00"]));
+    const digest = () => world.state.store.getState().settings.digestWindows;
+    // The third row removed, then its field's late save of «20:00»: the row stays removed.
+    const [removed, late] = await Promise.all([
+      world.actions.removeDigestTime(2, "21:00"),
+      world.actions.setDigestTime(2, "20:00"),
+    ]);
+    expect(unwrap(removed)).toHaveLength(1);
+    expect(unwrap(late)).toEqual([]);
+    expect(digest()).toEqual(["09:00", "14:00"]);
+    // An earlier row removed while a later one is saved: the later one lands on its new place.
+    await Promise.all([
+      world.actions.removeDigestTime(0, "09:00"),
+      world.actions.setDigestTime(0, "15:00"),
+    ]);
+    expect(digest()).toEqual(["15:00"]);
+  });
+
+  it("removes a digest time once for two presses of its ✕ (class 222)", async () => {
+    const world = await setupActions([]);
+    unwrap(await world.actions.setDigestWindows(["09:00", "14:00", "21:00"]));
+    const results = await Promise.all([
+      world.actions.removeDigestTime(1, "14:00"),
+      world.actions.removeDigestTime(1, "14:00"),
+    ]);
+    expect(results.map((result) => unwrap(result).length)).toEqual([1, 0]);
+    expect(world.state.store.getState().settings.digestWindows).toEqual(["09:00", "21:00"]);
+    // A time the row already holds writes nothing.
+    expect(unwrap(await world.actions.setDigestTime(0, "09:00"))).toEqual([]);
+  });
+
   it("stores a manual category estimate as an event and uses it after a specific estimate", async () => {
     const world = await setupActions([]);
     const [setting] = unwrap(await world.actions.setCategoryEstimate("hygiene", 22));
