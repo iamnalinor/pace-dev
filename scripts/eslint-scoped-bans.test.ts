@@ -84,6 +84,27 @@ describe("an action's answer in the app", () => {
   );
 });
 
+const isBanningBareStage = (selectors: readonly string[]): boolean =>
+  selectors.some((selector) => selector.includes("callee.property.name='stage'"));
+
+describe("an action staging past the history loader (bug-lessons 360)", () => {
+  it.each([
+    "packages/client/src/actions/project-actions.ts",
+    "packages/client/src/actions/preset-actions.ts",
+    "packages/client/src/actions/work-actions.ts",
+  ])("is banned in %s", async (file) => {
+    expect(isBanningBareStage(await restrictedSelectors(file))).toBe(true);
+  });
+
+  it.each([
+    "packages/client/src/actions/deps.ts",
+    "packages/client/src/actions/instances.ts",
+    "packages/client/src/actions/actions.test.ts",
+  ])("is allowed in %s (the shared emit path, the system's instances, a test)", async (file) => {
+    expect(isBanningBareStage(await restrictedSelectors(file))).toBe(false);
+  });
+});
+
 /** The `no-restricted-imports` setting for one file: its severity and options, or `undefined`. */
 const restrictedImports = async (file: string): Promise<unknown> => {
   const config = (await eslint.calculateConfigForFile(path.join(ROOT, file))) as {

@@ -1914,6 +1914,8 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-10 | The state's fold threw inside `setState` after the in-memory log had already taken the events: one correction hinted by another tab left every later rebuild throwing (PR 55 review I9) | 303 (new) | yes: every `Memory` change derives the state first; errors cross module boundaries as `SyncError` with a code, never matched by message | `checkpoint-state.test.ts`: another tab's hint on a partial copy |
 | 2026-11-10 | On a checkpoint copy the system's own instances dated before the base's last event were refused with `history/not-loaded` and dropped, on every foreground again | 304 (new) | yes: `appendSystem` was the one caller of `stage` that discarded its refusal; `stageEmit` and the store actions already load the source | `instances-checkpoint.test.ts` |
 | 2026-11-10 | Dropping the phone's empty header bar (owner) moved the tabs' titles but not those under More's Back bar, and centring the title row moved a desktop title with actions by 5 px: `layout.e2e.ts` F-LAY-02 failed in CI | 37 | yes: every `ScreenHeader` caller is a destination in the spec, which now groups a phone's titles (tabs; under Back) | the spec checks each group at one y; the title row stays `items-start` |
+| 2026-11-10 | PR 55 follow-up review, item 1: on a checkpoint copy the archive toast's Undo (`undoArchive`) never loaded the history: it staged with `state.stage` below `stageEmit` and answered a refusal, the copy stayed a checkpoint | 360 (new) | yes: every action that writes `event.revoked` / `event.amended` (revoke, revokeAll, undoLast, deleteTask, discardInbox, unmarkDone, deleteActivity, confirm/undo an automatic outcome, startSeriesForTask, restorePreset, undoArchive); only `undoArchive` called below the shared path | `corrections-checkpoint.test.ts` (each action: one load, success, the same event types as a full copy); ESLint `state.stage(` ban in `actions/` (`eslint-scoped-bans.test.ts`) |
+| 2026-11-10 | PR 55 follow-up review, item 2: `restorePreset` read `state.events` before the history was loaded, so on a checkpoint copy (the archive in the base) it answered `action/nothing-to-do` | 118, 360 | yes: the actions that read the log for a target (deleteTask, discardInbox, deleteActivity, unmarkDone, startSeriesForTask) read it after the wait; `confirmAutoOutcome` checked "confirmed already" only before it and now asks again in the queue | `corrections-checkpoint.test.ts` (restorePreset case; two confirms at once write one amendment) |
 
 ### 125. A live region around a ticking value
 - **Bug.** PR B 4.2 (F-A11Y-10): the running row sat in `accessibilityLiveRegion="polite"` around the
@@ -3292,3 +3294,23 @@ New bugs go here with their class; a new class gets its own section above.
 - **Rule.** A loop that tolerates per-item failure names the failures it tolerates (invalid, known)
   and handles the rest; a refusal that asks for something (the source) is answered, once per call.
 - **Sweep and guard.** `instances-checkpoint.test.ts`, with and without the source to be had.
+
+### 360. A caller that reaches below the shared path and skips the step it adds
+- **Bug.** PR 55 follow-up review, item 1: the archive toast's Undo (`undoArchive`) staged its
+  revocation with `state.stage(…)` to get an in-queue check, below `stageEmit`, which is where the
+  history loader runs. A revocation always needs the source, so on a checkpoint copy it never loaded
+  the history: it answered `action/nothing-to-do` (its check read a log that held no archive) or
+  `history/not-loaded`, and the copy stayed a checkpoint. Item 2 is the same shape seen from the
+  read side: `restorePreset` read `state.events` before any wait (class 118).
+- **Missed because.** Every action test ran on a full copy, where the loader is a no-op; the
+  checkpoint tests covered `stageEmit`, `revoke` and the system's instances, the paths that load, not
+  the actions that call below them.
+- **Rule.** A step every write must take (load the source, check in the queue) lives in the one
+  path the writes share; a caller that needs something extra passes it in (`emit`'s `check`)
+  instead of calling the layer below. An action that reads the log for a correction's target reads
+  it after the history is loaded.
+- **Sweep and guard.** Every action that writes a correction runs on a checkpoint copy in
+  `corrections-checkpoint.test.ts` (one history load, success, the same events as a full copy).
+  The sweep also found `confirmAutoOutcome` checking "confirmed already" only before the wait: it is
+  asked again in the queue now. ESLint bans `state.stage(` in `packages/client/src/actions/`
+  outside `deps.ts` and `instances.ts` (`scripts/eslint-scoped-bans.test.ts` pins the scope).

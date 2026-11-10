@@ -136,6 +136,16 @@ const ACTION_ANSWER_SYNTAX = [
   },
 ];
 
+/**
+An action stages through `emit`/`stageEmit` (actions/deps.ts), which loads the source a checkpoint's
+base needs; a bare `state.stage(` skips that and answers `history/not-loaded` (bug-lessons 360).
+*/
+const ACTION_STAGE_SYNTAX = {
+  message:
+    "An action never stages past the history loader: use emit / stageEmit from actions/deps.ts (or withCompleteHistory first), bug-lessons 360.",
+  selector: "CallExpression[callee.property.name='stage'][callee.object.property.name='state']",
+};
+
 /** React Native's (and gesture-handler's) pressables with no state layer (bug-lessons 122). */
 const BARE_PRESSABLES = [
   "Pressable",
@@ -543,6 +553,17 @@ export default defineConfig([
     files: ["packages/client/src/view-models/**/*.ts"],
     ignores: TESTS,
     rules: { "no-restricted-syntax": ["error", ...RESTRICTED_SYNTAX, ...DISPLAY_TEXT_SYNTAX] },
+  },
+  // The two places that stage on their own: the shared emit path and the system's instances,
+  // which answer a `history/not-loaded` refusal themselves (bug-lessons 304, 360).
+  {
+    files: ["packages/client/src/actions/**/*.ts"],
+    ignores: [
+      ...TESTS,
+      "packages/client/src/actions/deps.ts",
+      "packages/client/src/actions/instances.ts",
+    ],
+    rules: { "no-restricted-syntax": ["error", ...RESTRICTED_SYNTAX, ACTION_STAGE_SYNTAX] },
   },
   {
     files: ["apps/app/src/**/*.{ts,tsx}"],
