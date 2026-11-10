@@ -189,52 +189,60 @@ const labelKeyOf = (event: Event): MessageKey => {
   }
 };
 
-/** The revocations one action wrote together: one device, one instant written and recorded. */
-const isSameBatch = (a: Event, b: Event): boolean =>
-  a.type === "event.revoked" &&
-  b.type === "event.revoked" &&
-  a.deviceId === b.deviceId &&
-  a.occurredAt === b.occurredAt &&
-  a.recordedAt === b.recordedAt;
+/**
+The events one write put in together: one device, one instant recorded (the store records each
+batch at an instant of its own, `batchInstant`). A revocation batch (R26-10), a past block with
+the cut it made into its neighbours (owner R27-05), an Inbox Accept (R28-05).
+*/
+const batchKey = (event: Event): string => `${event.deviceId}|${event.recordedAt}`;
 
 type Row = { readonly event: Event; readonly entry: HistoryEntry };
 
-/** Members of one batch as one row, named by the first that names something. */
+/** Members of one batch as one row: named by its head (the write's first event), or the first that names something. */
 const rowOf = (members: readonly HistoryEntry[]): HistoryEntry | null => {
-  const [first] = members;
-  if (first === undefined) {
+  const [head] = members;
+  if (head === undefined) {
     return null;
   }
-  const named = members.find((member) => member.taskTitle !== null) ?? first;
+  const named =
+    head.taskTitle === null ? members.find((member) => member.taskTitle !== null) : head;
   return {
-    ...first,
+    ...head,
     ids: members.map((member) => member.id),
-    taskId: named.taskId,
-    taskTitle: named.taskTitle,
+    revocable: members.some((member) => member.revocable),
+    taskId: named?.taskId ?? head.taskId,
+    taskTitle: named?.taskTitle ?? head.taskTitle,
   };
 };
 
 /**
-Neighbouring rows of one batch of revocations as one row. A batch partly taken back another way
-(one member revoked alone, by an older client or MCP) is two rows: the members still in effect,
-whose Undo revokes only them, and the ones revoked already, which say so (review I2).
+The events of one write as one row, where its newest member stands. A batch partly taken back
+another way (one member revoked alone, by an older client or MCP) is two rows: the members still
+in effect, whose Undo revokes only them, and the ones revoked already, which say so (review I2).
+`order` is each event's place in the log: a batch's head is its first event.
 */
-const groupBatches = (rows: readonly Row[]): readonly HistoryEntry[] => {
-  const starts = rows
-    .map((row, index) => {
-      const previous = rows[index - 1];
-      return previous === undefined || !isSameBatch(previous.event, row.event) ? index : -1;
-    })
-    .filter((index) => index >= 0);
-  return starts
-    .flatMap((start, position) => {
-      const members = rows
-        .slice(start, starts[position + 1] ?? rows.length)
-        .map((row) => row.entry);
+const groupBatches = (
+  rows: readonly Row[],
+  order: ReadonlyMap<string, number>,
+): readonly HistoryEntry[] => {
+  const batches = Map.groupBy(rows, (row) => batchKey(row.event));
+  // Where each write stands: at its newest member, the first row of it met.
+  const firstAt = new Map(
+    rows.map((row, index) => [batchKey(row.event), index] as const).toReversed(),
+  );
+  return rows
+    .flatMap((row, index) => {
+      const key = batchKey(row.event);
+      if (firstAt.get(key) !== index) {
+        return [];
+      }
+      const members = (batches.get(key) ?? [row])
+        .toSorted((a, b) => (order.get(a.event.id) ?? 0) - (order.get(b.event.id) ?? 0))
+        .map((member) => member.entry);
       const inEffect = members.filter((member) => member.revokedBy === null);
       const revoked = members.filter((member) => member.revokedBy !== null);
       const parts = [rowOf(inEffect), rowOf(revoked)];
-      return members[0]?.revokedBy === null ? parts : parts.toReversed();
+      return row.entry.revokedBy === null ? parts : parts.toReversed();
     })
     .filter((entry) => entry !== null);
 };
@@ -266,7 +274,7 @@ const entries = (state: HistorySource): readonly HistoryEntry[] => {
     };
     return { entry, event };
   });
-  return groupBatches(rows);
+  return groupBatches(rows, new Map(state.log.map((event, index) => [event.id, index])));
 };
 
 export const historyViewModel = (

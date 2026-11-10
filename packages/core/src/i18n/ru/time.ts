@@ -99,6 +99,7 @@ export const ruTime: { readonly [K in keyof typeof enTime]: string } = {
   "day.ahead": "Это ещё впереди: записывайте то, что уже было.",
   "day.overlapsNext": "Это заходит на следующую активность: сначала сдвиньте её начало.",
   "day.overlapsPrevious": "Это заходит на предыдущую активность: сначала сдвиньте её конец.",
+  "day.removes": "Активность «{label}» уйдёт целиком: это время её перекрывает.",
   "day.yieldsFrom": "Это время уйдёт из «{label}».",
   "day.delete": "Удалить активность",
   "day.deleteConfirm": "Удалить активность? Нажмите ещё раз",

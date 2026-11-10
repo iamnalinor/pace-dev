@@ -20,14 +20,8 @@ import {
   type MessageKey,
 } from "@pace/core";
 
-import {
-  type Faults,
-  hasFault,
-  notAhead,
-  notOverlapping,
-  overlapOf,
-  readDraft,
-} from "./activity-draft.ts";
+import { type Faults, hasFault, notAhead, readDraft } from "./activity-draft.ts";
+import { notOverlapping, type Overlap, overlapOf } from "./activity-overlap.ts";
 import { ActivityTaskField } from "./activity-task-field.tsx";
 import {
   type ActivityFieldsProps,
@@ -64,7 +58,7 @@ const ActivityFields = ({
   isEndEditable,
   onLeave,
   patch,
-  yieldsFrom,
+  yieldHint,
 }: ActivityFieldsProps) => {
   const t = useT();
   const said = (key: MessageKey | null | undefined): null | string =>
@@ -108,7 +102,7 @@ const ActivityFields = ({
         isEndEditable={isEndEditable}
         onLeave={onLeave}
         patch={patch}
-        yieldsFrom={yieldsFrom}
+        yieldHint={yieldHint}
       />
     </>
   );
@@ -184,8 +178,22 @@ const leftFaults = (faults: Faults, left: ReadonlySet<TimeSide>): Faults => ({
   to: left.has("to") ? faults.to : null,
 });
 
+/** What a new block takes from the blocks it lands on, in words: the one it removes, the one it cuts. */
+const yieldHintOf = (t: ReturnType<typeof useT>, overlap: null | Overlap): null | string => {
+  if (overlap === null) {
+    return null;
+  }
+  const { removes, yieldsFrom } = overlap;
+  const said = [
+    removes === null ? null : t("day.removes", { label: removes }),
+    yieldsFrom === null ? null : t("day.yieldsFrom", { label: yieldsFrom }),
+  ].filter((line) => line !== null);
+  return said.length === 0 ? null : said.join(" ");
+};
+
 /** The editor's state for one block (or a new past one): the draft, what reads wrong, and Save. */
 export const useActivityEditor = ({ onClose, target, zone }: ActivitySheetProps) => {
+  const t = useT();
   const { actions } = usePace();
   const language = useLanguage();
   const run = useRunAction();
@@ -193,7 +201,7 @@ export const useActivityEditor = ({ onClose, target, zone }: ActivitySheetProps)
   const [hasTriedToSave, setHasTriedToSave] = useState(false);
   const [left, setLeft] = useState<ReadonlySet<TimeSide>>(() => new Set());
   const { now } = useViewer();
-  const read = notAhead(readDraft(draft, target, zone), now);
+  const read = notAhead(readDraft(draft, target, zone), { now, zone });
   const time = useAppState((state) => state.time);
   const overlap = read.range === null ? null : overlapOf(time, { now, range: read.range, target });
   const { faults, range } = overlap === null ? read : notOverlapping(read, overlap, hasEnd(target));
@@ -230,7 +238,7 @@ export const useActivityEditor = ({ onClose, target, zone }: ActivitySheetProps)
     patch,
     range,
     save,
-    yieldsFrom: overlap?.yieldsFrom ?? null,
+    yieldHint: yieldHintOf(t, overlap),
     // Only the times are typed, so the days they fall on are named here: both for a night, and
     // as typed once the times read right (a retyped end moves near where it was).
     subtitle: formatDaySpan(range ?? target, zone, language),
@@ -254,7 +262,7 @@ export const ActivityEditorBody = ({
       isEndEditable={hasEnd(target)}
       onLeave={editor.leave}
       patch={editor.patch}
-      yieldsFrom={editor.yieldsFrom}
+      yieldHint={editor.yieldHint}
     />
     <DayChoices
       draft={editor.draft}

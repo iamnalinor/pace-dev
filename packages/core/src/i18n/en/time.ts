@@ -97,6 +97,7 @@ export const enTime = {
   "day.ahead": "That is still ahead: log what already happened.",
   "day.overlapsNext": "That runs into the next activity: move its start first.",
   "day.overlapsPrevious": "That runs into the activity before: move its end first.",
+  "day.removes": "“{label}” goes entirely: this time covers all of it.",
   "day.yieldsFrom": "This time comes out of “{label}”.",
   "day.delete": "Delete activity",
   "day.deleteConfirm": "Delete activity? Tap again",

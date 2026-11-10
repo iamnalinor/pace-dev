@@ -124,6 +124,34 @@ describe("MCP time tools", () => {
     );
   });
 
+  it("splits a logged block a new past one lies inside, as the app does (owner, R27-05)", async () => {
+    const token = (await obtainToken(ALL)).tokens.access_token;
+    const day1 = yesterday();
+    await ok(token, "log_activity", {
+      category: "study",
+      endAt: day1.at(9),
+      label: "Lecture",
+      startAt: day1.at(6),
+    });
+    await ok(token, "log_activity", {
+      category: "rest",
+      endAt: day1.at(7, 30),
+      label: "Call",
+      startAt: day1.at(7),
+    });
+    const day = await ok(token, "get_day", { date: day1.date });
+    // The account is shared with the other tests: only this test's blocks.
+    expect(
+      (day["segments"] as { label: string; minutes: number }[])
+        .filter((segment) => ["Call", "Lecture"].includes(segment.label))
+        .map((segment) => [segment.label, segment.minutes]),
+    ).toEqual([
+      ["Lecture", 60],
+      ["Call", 30],
+      ["Lecture", 90],
+    ]);
+  });
+
   it("asks for the time scopes", async () => {
     const token = (await obtainToken({ scope: "tasks:read", scopes: ["tasks:read"] })).tokens
       .access_token;

@@ -18,8 +18,8 @@ export type ActivityFieldsProps = FormPartProps<ActivityForm> & {
   /** A time field was left: it reads its text whole and says what is wrong with it (R27-04). */
   readonly onLeave: (side: TimeSide) => void;
   readonly isEndEditable: boolean;
-  /** The live block a logged one takes its time from, said under the start. */
-  readonly yieldsFrom: null | string;
+  /** What a new block takes from the blocks it lands on, said under the start (R27-05). */
+  readonly yieldHint: null | string;
 };
 
 /** From and To, typed as times: From moves on to To once its last minute digit is typed. */
@@ -29,7 +29,7 @@ export const ActivityTimeFields = ({
   isEndEditable,
   onLeave,
   patch,
-  yieldsFrom,
+  yieldHint,
 }: ActivityFieldsProps) => {
   const t = useT();
   const toFieldRef = useRef<TextInput>(null);
@@ -40,7 +40,7 @@ export const ActivityTimeFields = ({
       <View className="flex-1">
         <TextField
           error={said(faults?.from)}
-          {...(yieldsFrom !== null && { hint: t("day.yieldsFrom", { label: yieldsFrom }) })}
+          {...(yieldHint !== null && { hint: yieldHint })}
           keyboardType="number-pad"
           label={t("day.from")}
           maxLength={TIME_MAX_LENGTH}

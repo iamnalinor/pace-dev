@@ -6,7 +6,7 @@ import {
   readTime,
   typeTime,
 } from "@pace/client";
-import { type Activity, addDaysIn, type MessageKey, type TimeState } from "@pace/core";
+import { addDaysIn, type MessageKey } from "@pace/core";
 
 /** What the Day sheet checks before a block is saved, each fault under its own field. */
 type Draft = ActivityForm;
@@ -263,128 +263,47 @@ export const readDraft = (
   };
 };
 
-type Read = { readonly range: ActivityRange | null; readonly faults: Faults };
+export type Read = { readonly range: ActivityRange | null; readonly faults: Faults };
+
+/**
+An end ahead only because it was read past midnight: the same clock reading on the start's day,
+already past, comes before the start. «13» to «1» is an end before the start, not tomorrow's
+01:00 still to come (QA round 28 R28-04).
+*/
+const isReversedPair = (range: ActivityRange, { now, zone }: Clock): boolean => {
+  if (range.endAt === null) {
+    return false;
+  }
+  const start = wallClock(range.startAt, zone);
+  const end = wallClock(range.endAt, zone);
+  const sameDayEnd = fromWallClock({ date: start.date, time: end.time, tz: zone });
+  return (
+    end.date !== start.date &&
+    sameDayEnd !== null &&
+    Date.parse(sameDayEnd) <= Date.parse(range.startAt) &&
+    Date.parse(sameDayEnd) <= Date.parse(now)
+  );
+};
+
+type Clock = { readonly now: string; readonly zone: string };
 
 /** A block is what already happened: a start or an end after now is said under its field. */
-export const notAhead = (read: Read, now: string): Read => {
+export const notAhead = (read: Read, { now, zone }: Clock): Read => {
   const { range } = read;
   if (range === null) {
     return read;
   }
   const isStartAhead = Date.parse(range.startAt) > Date.parse(now);
   const isEndAhead = range.endAt !== null && Date.parse(range.endAt) > Date.parse(now);
-  return isStartAhead || isEndAhead
-    ? {
-        faults: {
-          ...read.faults,
-          ...(isStartAhead && { from: "day.ahead" }),
-          ...(isEndAhead && { to: "day.ahead" }),
-        },
-        range: null,
-      }
-    : read;
-};
-
-/** What saving the draft would do to the other blocks of the main line. */
-export type Overlap = {
-  /** It would cover the start of a later block (or one with the same start): refused. */
-  readonly next: boolean;
-  /** It would cut into a block before it that does not give time up: refused. */
-  readonly previous: boolean;
-  /** The live block it lands in, which gives its time up to a logged one: said, not refused. */
-  readonly yieldsFrom: null | string;
-};
-
-const NO_OVERLAP: Overlap = { next: false, previous: false, yieldsFrom: null };
-
-type Clash = {
-  readonly id: string;
-  readonly label: string;
-  readonly isLater: boolean;
-  readonly isYielding: boolean;
-};
-
-/** The other main blocks a range of the draft shares time with (touching is not sharing). */
-const clashesOf = (
-  others: readonly Activity[],
-  range: ActivityRange,
-  { isLogged, now }: { readonly isLogged: boolean; readonly now: string },
-): readonly Clash[] => {
-  const start = Date.parse(range.startAt);
-  const end = Date.parse(range.endAt ?? now);
-  return others
-    .map((other) => ({
-      end: Date.parse(other.endAt ?? now),
-      other,
-      start: Date.parse(other.startAt),
-    }))
-    .filter((span) => span.start < end && span.end > start)
-    .map(({ end: otherEnd, other, start: otherStart }) => ({
-      id: other.id,
-      // A later start is the next block; with the same start, the next one only when the draft
-      // runs past its end (it would swallow it), else the draft lies inside it: the block before
-      // (QA round 27 R27-05).
-      isLater: otherStart > start || (otherStart === start && otherEnd < end),
-      // A logged block wins over the live time it covers: the live one before it gives it up.
-      isYielding: isLogged && !other.isLogged && otherStart < start,
-      label: other.label,
-    }));
-};
-
-/**
-What the draft's range does to the other blocks of the main line. One rule for every way a block is
-written (the edit form, a gap's Log, Log past; QA round 25 R25-01, review I2, R26-03), in both
-directions: a block may not share time with another one, a later or earlier one, a live or a
-logged one, the same start included, because the timeline would cut one of them back without a
-word (a later start wins among blocks of one kind; with equal starts the shorter one is gone). The
-one exception is the spec's own: a logged block put into the time of a live one that began before
-it takes that time out of it (cut or split, "как в календаре"), and the sheet says so. A block run
-alongside never clashes, nor does what an edit already shared before it (a rename of a live block
-with lunch logged inside it).
-*/
-export const overlapOf = (
-  time: TimeState,
-  {
-    now,
-    range,
-    target,
-  }: { readonly target: SheetTarget; readonly range: ActivityRange; readonly now: string },
-): Overlap => {
-  const self = target.kind === "edit" ? time.activities[target.activityId] : undefined;
-  if (self?.isAlongside === true) {
-    return NO_OVERLAP;
-  }
-  const others = Object.values(time.activities).filter(
-    (activity) => !activity.isAlongside && activity.id !== self?.id,
-  );
-  const how = { isLogged: self === undefined || self.isLogged, now };
-  const shared = new Set(
-    target.kind === "edit" ? clashesOf(others, target, how).map((clash) => clash.id) : [],
-  );
-  const clashes = clashesOf(others, range, how);
-  const fresh = clashes.filter((clash) => !clash.isYielding && !shared.has(clash.id));
-  return {
-    next: fresh.some((clash) => clash.isLater),
-    previous: fresh.some((clash) => !clash.isLater),
-    yieldsFrom: clashes.find((clash) => clash.isYielding)?.label ?? null,
-  };
-};
-
-/**
-The draft refused where it would overlap: covering a later block is said under the end (under the
-start for a running block, which has no end to type), cutting into an earlier one under the start.
-*/
-export const notOverlapping = (read: Read, overlap: Overlap, hasEndField: boolean): Read => {
-  if (!overlap.next && !overlap.previous) {
+  if (!isStartAhead && !isEndAhead) {
     return read;
   }
-  const isNextUnderEnd = overlap.next && hasEndField;
+  const endFault = isReversedPair(range, { now, zone }) ? "day.badRange" : "day.ahead";
   return {
     faults: {
       ...read.faults,
-      ...(overlap.previous && { from: "day.overlapsPrevious" }),
-      ...(overlap.next && !isNextUnderEnd && { from: "day.overlapsNext" }),
-      ...(isNextUnderEnd && { to: "day.overlapsNext" }),
+      ...(isStartAhead && { from: "day.ahead" }),
+      ...(isEndAhead && { to: endFault }),
     },
     range: null,
   };

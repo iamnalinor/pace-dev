@@ -6,6 +6,8 @@ import {
   newId,
   ok,
   taskById,
+  yieldEvents,
+  yieldsTo,
 } from "@pace/core";
 
 import type { ActivityEntry, ActivityTarget } from "./activity-edit-types.ts";
@@ -17,6 +19,8 @@ import {
   type ActionResult,
   emit,
   fromStore,
+  serially,
+  stageEmit,
   stamp,
 } from "./deps.ts";
 
@@ -65,6 +69,12 @@ const hasUnknownTask = (deps: ActionDeps, taskId: null | string | undefined): bo
 const isAhead = (deps: ActionDeps, at: string | undefined): boolean =>
   at !== undefined && Date.parse(at) > Date.parse(deps.clock.now());
 
+/**
+Logs a past block. The blocks it lands on give that time up «как в календаре» (owner, R27-05): a
+logged one is cut, split or revoked by events written in the same batch (one Undo takes all of it
+back), a live one by the timeline. Planned in the action queue, on the state every earlier write
+left (class 222).
+*/
 export const logPast = async (deps: ActionDeps, activity: PastActivity): ActionResult => {
   const label = activityLabel(activity.label);
   if (label === "" || Date.parse(activity.endAt) <= Date.parse(activity.startAt)) {
@@ -76,25 +86,32 @@ export const logPast = async (deps: ActionDeps, activity: PastActivity): ActionR
   if (hasUnknownTask(deps, activity.taskId)) {
     return err("task/unknown");
   }
-  return await emit(deps, [
-    stamp(
-      deps,
-      {
-        payload: {
-          activityId: newId(),
-          category: activity.category,
-          endAt: activity.endAt,
-          label,
-          startAt: activity.startAt,
-          ...(activity.expectMinutes !== null &&
-            activity.expectMinutes !== undefined && { expectMinutes: activity.expectMinutes }),
-          ...(activity.taskId !== undefined && { taskId: activity.taskId }),
+  const when = { at: activity.endAt };
+  return await serially(deps, async () => {
+    const yields = yieldsTo(timeOf(deps), activity, deps.clock.now());
+    return await stageEmit(deps, [
+      stamp(
+        deps,
+        {
+          payload: {
+            activityId: newId(),
+            category: activity.category,
+            endAt: activity.endAt,
+            label,
+            startAt: activity.startAt,
+            ...(activity.expectMinutes !== null &&
+              activity.expectMinutes !== undefined && { expectMinutes: activity.expectMinutes }),
+            ...(activity.taskId !== undefined && { taskId: activity.taskId }),
+          },
+          type: "activity.logged",
         },
-        type: "activity.logged",
-      },
-      { at: activity.endAt },
-    ),
-  ]);
+        when,
+      ),
+      // The cut is a correction made now: stamped at the block's end it could come before the
+      // neighbour it corrects (a block logged earlier ends later), and be applied to nothing.
+      ...yieldEvents(yields, activity, newId).map((body) => stamp(deps, body)),
+    ]);
+  });
 };
 
 /** Corrections of a block already on the ledger: its boundaries and its name. */

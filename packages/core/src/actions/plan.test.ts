@@ -422,6 +422,25 @@ describe("planAction: activity.log", () => {
     expect(logBlock(minutes(-20), ahead)).toEqual({ error: "retro/future", ok: false });
   });
 
+  it("cuts a logged block it lands on in the same plan, as the app's Log past does (owner, R27-05)", () => {
+    // Lunch is logged −170…−150: a block from −160 to −100 ends it at −160, stamped now.
+    const result = plan(
+      {
+        category: "other",
+        end: minutes(-100),
+        kind: "activity.log",
+        label: "Военкомат",
+        start: minutes(-160),
+      },
+      tracked(),
+    );
+    expect(bodies(result)).toEqual([
+      expect.objectContaining({ type: "activity.logged" }),
+      { payload: { activityId: LOGGED, endAt: minutes(-160) }, type: "activity.adjusted" },
+    ]);
+    expect(occurred(result)).toEqual([minutes(-100), NOW]);
+  });
+
   it("refuses a block that ends before it starts", () => {
     expect(logBlock(minutes(-20), minutes(-20))).toEqual({ error: "action/invalid", ok: false });
     expect(logBlock(minutes(-20), minutes(-40))).toEqual({ error: "action/invalid", ok: false });

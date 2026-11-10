@@ -3,7 +3,8 @@ import type { Activity, TimeState } from "@pace/core";
 import { clockTime, fromWallClock, wallClock } from "#app/format/time.ts";
 import { activityFormOf, type ActivityTarget } from "@pace/client";
 
-import { dayChoicesOf, overlapOf, readDraft } from "./activity-draft.ts";
+import { dayChoicesOf, notAhead, readDraft } from "./activity-draft.ts";
+import { overlapOf } from "./activity-overlap.ts";
 
 const MOSCOW = "Europe/Moscow";
 const BERLIN = "Europe/Berlin";
@@ -454,36 +455,29 @@ const range = (from: string, to: null | string) => ({
   endAt: to === null ? null : at(to),
   startAt: at(from),
 });
-const CLEAR = { next: false, previous: false, yieldsFrom: null };
+const CLEAR = { next: false, previous: false, removes: null, yieldsFrom: null };
 
-describe("overlapOf: a block may not overlap another, in either direction (review I2, I3, R26-03)", () => {
+describe("overlapOf: a new block takes its time from its neighbours, an edit may not overlap (owner R27-05, review I2, I3)", () => {
   const logged = activity("logged", [at("10:00"), at("10:30")]);
 
-  it("refuses a new block with the same start as a logged one (it would vanish from the line)", () => {
-    expect(
-      overlapOf(timeOf(logged), { now: NOW_AT, range: range("10:00", "11:00"), target: logTarget }),
-    ).toEqual({
-      ...CLEAR,
-      next: true,
-    });
-  });
-
-  it("names the block a same-start draft lies inside as the one before it (QA round 27 R27-05)", () => {
-    // 10:00–10:15 and 10:00–10:30 inside the logged 10:00–10:30: it is that block's time.
-    for (const end of ["10:15", "10:30"]) {
+  it("removes a logged block a new one covers whole, and names it (owner, R27-05)", () => {
+    for (const end of ["10:30", "11:00"]) {
       expect(
         overlapOf(timeOf(logged), { now: NOW_AT, range: range("10:00", end), target: logTarget }),
-      ).toEqual({ ...CLEAR, previous: true });
+      ).toEqual({ ...CLEAR, removes: "logged" });
     }
   });
 
-  it("refuses a new block that starts inside a logged one before it", () => {
-    expect(
-      overlapOf(timeOf(logged), { now: NOW_AT, range: range("10:15", "11:00"), target: logTarget }),
-    ).toEqual({
-      ...CLEAR,
-      previous: true,
-    });
+  it("cuts a logged block a new one starts or lies inside, and names it (owner, R27-05)", () => {
+    for (const [from, to] of [
+      ["10:00", "10:15"],
+      ["10:15", "11:00"],
+      ["10:10", "10:20"],
+    ] as const) {
+      expect(
+        overlapOf(timeOf(logged), { now: NOW_AT, range: range(from, to), target: logTarget }),
+      ).toEqual({ ...CLEAR, yieldsFrom: "logged" });
+    }
   });
 
   it("takes a block that only touches its neighbours", () => {
@@ -517,7 +511,7 @@ describe("overlapOf: a block may not overlap another, in either direction (revie
     });
   });
 
-  it("still refuses a logged block over the start of a live one after it (R25-01)", () => {
+  it("takes the start of a live block after it, and says so (owner R27-05; R25-01 refused it)", () => {
     const lecture = activity("lecture", [at("13:00"), null], { isLogged: false });
     expect(
       overlapOf(timeOf(lecture), {
@@ -525,10 +519,7 @@ describe("overlapOf: a block may not overlap another, in either direction (revie
         range: range("12:00", "13:30"),
         target: logTarget,
       }),
-    ).toEqual({
-      ...CLEAR,
-      next: true,
-    });
+    ).toEqual({ ...CLEAR, yieldsFrom: "lecture" });
   });
 
   it("refuses nothing for a block run alongside, renamed across a switch of the main line (I3)", () => {
@@ -578,5 +569,32 @@ describe("overlapOf: a block may not overlap another, in either direction (revie
       ...CLEAR,
       next: true,
     });
+  });
+});
+
+describe("notAhead: an end read past midnight into the future (QA round 28 R28-04)", () => {
+  // Now is 15:00 UTC on 2026-10-06; a new block typed From 13, To 1 on today.
+  const now = "2026-10-06T15:00:00.000Z";
+  const target: ActivityTarget = {
+    endAt: "2026-10-06T14:00:00.000Z",
+    kind: "log",
+    startAt: "2026-10-06T13:00:00.000Z",
+  };
+  /** From «13» and `to`, as typed. */
+  const faultsOf = (to: string) =>
+    notAhead(
+      readDraft({ ...opened(target, "UTC"), from: "13", label: "Lunch", to }, target, "UTC"),
+      {
+        now,
+        zone: "UTC",
+      },
+    ).faults;
+
+  it("says the end is before the start, not that it is still ahead", () => {
+    expect(faultsOf("1")).toMatchObject({ from: null, to: "day.badRange" });
+  });
+
+  it("still says «ahead» for a time today that has not come", () => {
+    expect(faultsOf("16")).toMatchObject({ to: "day.ahead" });
   });
 });

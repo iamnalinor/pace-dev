@@ -59,7 +59,7 @@ describe("DayScreen on a wide window", () => {
     expect(inspector()).toBeOnTheScreen();
   });
 
-  it("refuses a gap's Log over the next activity in the inspector too (QA round 25 R25-01)", async () => {
+  it("logs a gap's block over the next activity's start in the inspector too, and says so (owner R27-05)", async () => {
     const runtime = await createTestRuntime();
     await runtime.actions.logPast({
       category: "food",
@@ -75,10 +75,8 @@ describe("DayScreen on a wide window", () => {
     await fireEvent.press(screen.getByRole("button", { name: /2h not logged/u }));
     await fireEvent.changeText(screen.getByLabelText("What"), "Reading");
     await fireEvent.changeText(screen.getByLabelText("To"), "13:30");
+    expect(screen.getByText("This time comes out of “Lecture”.")).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("button", { name: "Save" }));
-    expect(
-      await screen.findByText("That runs into the next activity: move its start first."),
-    ).toBeOnTheScreen();
-    expect(inspector()).toBeOnTheScreen();
+    expect(await screen.findByText("Reading")).toBeOnTheScreen();
   });
 });

@@ -7,7 +7,6 @@ type Revocations = {
 
 type RevocationInput = {
   readonly occurredAt: string;
-  readonly recordedAt: string;
   readonly payload: { readonly targetId: string };
   readonly type: "event.revoked";
 };
@@ -70,7 +69,7 @@ export const createRevocations = ({
       ids.map((id) => ({
         occurredAt: at,
         payload: { targetId: id },
-        recordedAt: at,
+        // The store records a batch at one instant of its own (`batchInstant`).
         type: "event.revoked" as const,
       })),
       () => refusalOf(ids),

@@ -36,6 +36,38 @@ describe("historyViewModel", () => {
     expect(new Set(rows[0]?.ids)).toEqual(new Set(batch.map((event) => event.id)));
   });
 
+  it("shows one write of several events as one row whose Undo takes all of it back (owner R27-05, QA round 28 R28-05)", async () => {
+    const world = await setupActions([]);
+    unwrap(
+      await world.actions.logPast({
+        category: "study",
+        endAt: addMinutesIso(NOW, -60),
+        label: "Lecture",
+        startAt: addMinutesIso(NOW, -180),
+      }),
+    );
+    // Logged inside the lecture: one write of three events (the block, the cut, the rest of it).
+    const written = unwrap(
+      await world.actions.logPast({
+        category: "rest",
+        endAt: addMinutesIso(NOW, -120),
+        label: "Call",
+        startAt: addMinutesIso(NOW, -150),
+      }),
+    );
+    const rows = () =>
+      historyViewModel(world.state.store.getState(), { atIso: NOW, deviceTz: MOSCOW }).events;
+    const row = rows().find((entry) => entry.ids.includes(written[0]?.id ?? ""));
+    expect(row).toMatchObject({ revocable: true, type: "activity.logged" });
+    expect(new Set(row?.ids)).toEqual(new Set(written.map((event) => event.id)));
+    // The earlier write, recorded at the same clock reading, stays a row of its own.
+    expect(rows().filter((entry) => entry.type === "activity.logged")).toHaveLength(2);
+    unwrap(await world.actions.revokeAll(row?.ids ?? []));
+    expect(
+      Object.values(world.state.store.getState().time.activities).map((item) => item.label),
+    ).toEqual(["Lecture"]);
+  });
+
   it("undoes what is still in effect of a batch partly taken back another way (review I2)", async () => {
     const world = await setupActions();
     const [done] = unwrap(await world.actions.closeTask({ outcome: "done", taskId: TRK_ID }));

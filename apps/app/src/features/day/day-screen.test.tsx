@@ -390,8 +390,9 @@ describe("DayScreen", () => {
     expect(screen.getByLabelText("To")).toHaveProp("value", "13:00");
   });
 
-  describe("a block written over the next one is refused from every way in (QA round 25 R25-01)", () => {
+  describe("a new block takes the start of the next one, and says so; an edit is refused (owner R27-05, R25-01)", () => {
     const overlap = "That runs into the next activity: move its start first.";
+    const yields = "This time comes out of “Lecture”.";
 
     it("from a gap's Log", async () => {
       const runtime = await overlapWorld();
@@ -399,10 +400,12 @@ describe("DayScreen", () => {
       await fireEvent.press(screen.getByRole("button", { name: /2h not logged/u }));
       await fireEvent.changeText(await screen.findByLabelText("What"), "Reading");
       await fireEvent.changeText(screen.getByLabelText("To"), "13:30");
+      expect(screen.getByText(yields)).toBeOnTheScreen();
       await fireEvent.press(screen.getByRole("button", { name: "Save" }));
-      expect(await screen.findByText(overlap)).toBeOnTheScreen();
+      expect(await screen.findByText("Reading")).toBeOnTheScreen();
+      // The live block keeps its events; the timeline takes the time out of it.
       expect(lectureStart(runtime)).toBe(addMinutesIso(NOW, -120));
-      expect(screen.queryByText("Reading")).toBeNull();
+      expect(screen.queryByText(overlap)).toBeNull();
     });
 
     it("from Log past activity", async () => {
@@ -412,14 +415,9 @@ describe("DayScreen", () => {
       await fireEvent.changeText(await screen.findByLabelText("What"), "Reading");
       await fireEvent.changeText(screen.getByLabelText("From"), "12:00");
       await fireEvent.changeText(screen.getByLabelText("To"), "13:30");
-      await fireEvent.press(screen.getByRole("button", { name: "Save" }));
-      expect(await screen.findByText(overlap)).toBeOnTheScreen();
-      expect(lectureStart(runtime)).toBe(addMinutesIso(NOW, -120));
-      // Up to the next one's start is fine.
-      await fireEvent.changeText(screen.getByLabelText("To"), "13:00");
+      expect(screen.getByText(yields)).toBeOnTheScreen();
       await fireEvent.press(screen.getByRole("button", { name: "Save" }));
       expect(await screen.findByText("Reading")).toBeOnTheScreen();
-      expect(lectureStart(runtime)).toBe(addMinutesIso(NOW, -120));
     });
 
     it("from a block's own form, into a logged block after it", async () => {
@@ -447,31 +445,33 @@ describe("DayScreen", () => {
   describe("a block is refused over an earlier one or one with the same start, from every way in (review I2, R26-03)", () => {
     const before = "That runs into the activity before: move its end first.";
 
-    it("from a gap's Log, its start moved back into the logged block before", async () => {
+    it("from a gap's Log, its start moved back into the logged block before: that block ends there (owner R27-05)", async () => {
       const runtime = await overlapWorld();
       await renderScreen(<DayScreen />, runtime);
       await fireEvent.press(screen.getByRole("button", { name: /2h not logged/u }));
       await fireEvent.changeText(await screen.findByLabelText("What"), "Reading");
       await fireEvent.changeText(screen.getByLabelText("From"), "10:45");
+      expect(screen.getByText("This time comes out of “Breakfast”.")).toBeOnTheScreen();
       await fireEvent.press(screen.getByRole("button", { name: "Save" }));
-      expect(await screen.findByText(before)).toBeOnTheScreen();
-      expect(breakfast(runtime)?.endAt).toBe(addMinutesIso(NOW, -240));
-      expect(screen.queryByText("Reading")).toBeNull();
+      expect(await screen.findByText("Reading")).toBeOnTheScreen();
+      expect(breakfast(runtime)?.endAt).toBe(addMinutesIso(NOW, -255));
+      expect(screen.queryByText(before)).toBeNull();
     });
 
-    it("from Log past, with the same start as a logged block (which would vanish)", async () => {
+    it("from Log past, over the whole of a logged block: it goes, and the form names it (owner R27-05)", async () => {
       const runtime = await overlapWorld();
       await renderScreen(<DayScreen />, runtime);
       await fireEvent.press(screen.getByRole("button", { name: "Log past activity" }));
       await fireEvent.changeText(await screen.findByLabelText("What"), "Reading");
       await fireEvent.changeText(screen.getByLabelText("From"), "10:30");
       await fireEvent.changeText(screen.getByLabelText("To"), "12:00");
-      await fireEvent.press(screen.getByRole("button", { name: "Save" }));
       expect(
-        await screen.findByText("That runs into the next activity: move its start first."),
+        screen.getByText("“Breakfast” goes entirely: this time covers all of it."),
       ).toBeOnTheScreen();
-      expect(screen.getByText("Breakfast")).toBeOnTheScreen();
-      expect(screen.queryByText("Reading")).toBeNull();
+      await fireEvent.press(screen.getByRole("button", { name: "Save" }));
+      expect(await screen.findByText("Reading")).toBeOnTheScreen();
+      expect(breakfast(runtime)).toBeUndefined();
+      expect(screen.queryByText("Breakfast")).toBeNull();
     });
 
     it("from a block's own form, its start moved back into the live block before", async () => {
