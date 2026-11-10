@@ -5,6 +5,7 @@ import Animated from "react-native-reanimated";
 import { usePace, useT } from "#app/app-state.tsx";
 import { IS_PHONE } from "#app/platform/device.ts";
 import { ScreenTimeSection } from "#app/shared/activity-usage.tsx";
+import { useBlockRetry } from "#app/shared/use-block-retry.ts";
 import { useSearchParam, useZonedDateParam } from "#app/shared/use-search-param.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { useWhereSat } from "#app/shared/use-where-sat.ts";
@@ -176,6 +177,7 @@ const DayPage = ({
   const openingKeys = useOpeningKeys(day.date, day.entries);
   // One read of the day's usage for every part that shows it (QA round 21 L5).
   const usageRead = useUsageRead(api, day.date, nextDayStartIn(day.date, day.zone));
+  const usageRetry = useBlockRetry(usageRead);
   const sat = useWhereSat(usageRead.rows);
   return (
     <FirstSyncBody>
@@ -202,13 +204,19 @@ const DayPage = ({
       {IS_PHONE ? (
         <Phone.CalendarSection entries={day.entries} phone={phone} zone={day.zone} />
       ) : null}
-      <ScreenTimeSection
-        date={day.date}
-        key={day.date}
-        onRetry={usageRead.isFailed ? usageRead.retry : null}
-        usage={usageRead.rows}
-        zone={day.zone}
-      />
+      {/* The web records no screen time: the section shows there only for what a phone or a
+          computer sent (QA PR55-1-08: «0 мин · Нет данных» on every day, and a failure to load
+          what was never there). */}
+      {IS_PHONE || usageRead.rows.length > 0 ? (
+        <ScreenTimeSection
+          date={day.date}
+          isFailed={usageRead.isFailed}
+          key={day.date}
+          onRetry={usageRetry}
+          usage={usageRead.rows}
+          zone={day.zone}
+        />
+      ) : null}
     </FirstSyncBody>
   );
 };

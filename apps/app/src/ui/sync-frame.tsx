@@ -22,6 +22,7 @@ import { Icon, type IconName } from "./icon.tsx";
 import { Pressable } from "./pressable.tsx";
 import { Skeleton } from "./skeleton.tsx";
 import { Text } from "./text.tsx";
+import { useBreakpoint } from "./use-breakpoint.ts";
 
 /**
 How long the first sync may hide the app. A pull that never answers (a stalled connection, a
@@ -237,18 +238,41 @@ const HIDDEN = { display: "none" } as const;
 Grey rows where the screen will be, under one line that says what is happening (QA round 18 M5:
 a bare skeleton said nothing, and a reader heard nothing). The account's language is not known
 yet, so the line is in the device's (`useT` before the first sync); no screen's own words show.
+Beside a tablet's or a computer's window it is drawn in the shell's own frame: the navigation's
+column, empty (its labels would be in the device's language), and the rows where the screen's
+column starts, so nothing jumps when the app is shown (QA PR55-1-13: no sidebar, and the rows
+80 px right of the content).
 */
 const FirstSyncPlaceholder = () => {
   const t = useT();
   const insets = useSafeAreaInsets();
-  return (
-    <View className="flex-1 items-center bg-app px-4" style={{ paddingTop: insets.top + 32 }}>
-      <View className="w-full max-w-content gap-4">
-        <Text role="callout" tone="secondary">
-          {t("sync.firstSyncLine")}
-        </Text>
-        <Skeleton label={t("sync.firstSync")} rows={6} />
-      </View>
+  const breakpoint = useBreakpoint();
+  const rows = (
+    <View
+      className={cx(
+        "w-full gap-4 px-gutter md:px-gutter-pane lg:px-gutter-lg",
+        breakpoint === "compact" ? "max-w-content-wide self-center" : "max-w-content self-start",
+      )}
+      style={{ paddingTop: insets.top + 32 }}
+    >
+      <Text role="callout" tone="secondary">
+        {t("sync.firstSyncLine")}
+      </Text>
+      <Skeleton label={t("sync.firstSync")} rows={6} />
+    </View>
+  );
+  return breakpoint === "compact" ? (
+    <View className="flex-1 bg-app">{rows}</View>
+  ) : (
+    <View className="flex-1 flex-row bg-app" testID="first-sync-shell">
+      <View
+        className={cx(
+          "border-r border-separator bg-sidebar",
+          breakpoint === "expanded" ? "w-sidebar" : "w-rail",
+        )}
+        testID="first-sync-navigation"
+      />
+      <View className="min-w-0 flex-1">{rows}</View>
     </View>
   );
 };
@@ -256,6 +280,27 @@ const FirstSyncPlaceholder = () => {
 const useIsOfflineStatus = (status: ReturnType<typeof useAuth>["status"]): boolean => {
   const isDeviceOffline = useIsDeviceOfflineWithReconnect();
   return useIsOffline() || (status === "signed-in" && isDeviceOffline);
+};
+
+const NO_RECONNECT = (): void => undefined;
+
+/**
+Why the sync line offers its Retry, if it does: offline, or a first sync that ended without
+success on an empty copy (`not-loaded`). A screen's own failed read in the same moment says what
+failed with no Retry of its own: the line's is the one control for the job (QA PR55-1-09), and the
+read is made again once the line goes (`useBlockRetry`). Read anywhere under the frame; the
+reconnect itself stays the frame's.
+*/
+export const useSyncRetryReason = (): "not-loaded" | "offline" | null => {
+  const { status } = useAuth();
+  const isDeviceOffline = useIsDeviceOffline(NO_RECONNECT);
+  const isOffline = useIsOffline() || (status === "signed-in" && isDeviceOffline);
+  const isFirstSync = useIsFirstSync();
+  const isUnknown = useIsAccountUnknown();
+  if (isOffline) {
+    return "offline";
+  }
+  return isUnknown && !isFirstSync ? "not-loaded" : null;
 };
 
 const useSyncPresentation = (isBare: boolean, serverProblem: null | ServerProblem) => {

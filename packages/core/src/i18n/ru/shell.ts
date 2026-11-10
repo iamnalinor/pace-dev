@@ -152,6 +152,8 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "settings.export.action": "Экспорт данных",
   "settings.export.failed": "Не удалось скачать экспорт. Попробуйте снова.",
   "settings.export.done": "Скачан файл {file}",
+  "settings.export.notSynced":
+    "Данные ещё не загрузились с сервера, выгружать пока нечего. Попробуйте, когда загрузятся.",
   "settings.digestWindows": "Время сводок",
   "settings.quietHours": "Тихие часы",
   "settings.categoryEstimates": "Оценки активностей",

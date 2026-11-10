@@ -4,6 +4,7 @@ import { ScrollView, View } from "react-native";
 
 import { useIsAccountUnknown, usePace, useSettings, useT } from "#app/app-state.tsx";
 import { useBack } from "#app/shared/use-back.ts";
+import { useBlockRetry } from "#app/shared/use-block-retry.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useSearchParam, useZonedDateParam } from "#app/shared/use-search-param.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
@@ -74,17 +75,22 @@ const NightHoursToggle = () => {
   );
 };
 
-/** The calendar layer could not be read: a line under the day strip's header, with a way to retry. */
-const CalendarFailed = ({ onRetry }: { readonly onRetry: () => void }) => {
+/**
+The calendar layer could not be read: a line under the day strip's header, with a way to retry
+unless the sync line offers it already (QA PR55-1-09).
+*/
+const CalendarFailed = ({ onRetry }: { readonly onRetry: (() => void) | null }) => {
   const t = useT();
   return (
     <View className="flex-row items-center gap-2 px-gutter" role="alert">
       <Text className="flex-1" role="footnote" tone="secondary">
         {t("week.calendarFailed")}
       </Text>
-      <Button onPress={onRetry} size="small" variant="plain">
-        {t("common.retry")}
-      </Button>
+      {onRetry === null ? null : (
+        <Button onPress={onRetry} size="small" variant="plain">
+          {t("common.retry")}
+        </Button>
+      )}
     </View>
   );
 };
@@ -167,6 +173,7 @@ const WeekPage = ({
   const { language, now } = useViewer();
   const calendarRead = useCalendarRange(api, week.weekStart, week.weekEnd);
   const calendar = calendarRead.rows;
+  const calendarRetry = useBlockRetry(calendarRead);
   const usage = useUsage(api, week.weekStart, week.weekEnd);
   const isEmpty =
     week.days.every((day) => day.blocks.length === 0) &&
@@ -197,7 +204,7 @@ const WeekPage = ({
       }
     >
       <FirstSyncBody>
-        {calendarRead.isFailed ? <CalendarFailed onRetry={calendarRead.retry} /> : null}
+        {calendarRead.isFailed ? <CalendarFailed onRetry={calendarRetry} /> : null}
         {isEmpty && !calendarRead.isFailed ? <EmptyWeek /> : null}
         <FittedGrid
           calendar={calendar}

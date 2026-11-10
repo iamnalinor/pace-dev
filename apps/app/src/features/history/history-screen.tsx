@@ -1,12 +1,13 @@
-import type { HistoryEntry, HistoryViewModel, NowRow } from "@pace/client";
+import type { HistoryEntry, HistoryError, HistoryViewModel, NowRow } from "@pace/client";
 import type { HistoryResource } from "@pace/client/react";
 
-import { usePace, useT } from "#app/app-state.tsx";
+import { useIsAccountUnknown, usePace, useT } from "#app/app-state.tsx";
 import { errorText } from "#app/format/action-error.ts";
 import { zonedText } from "#app/format/time.ts";
 import { PeriodStepper } from "#app/shared/period-stepper.tsx";
 import { useOpenTask } from "#app/shared/task-opener.tsx";
 import { useBack } from "#app/shared/use-back.ts";
+import { useBlockRetry } from "#app/shared/use-block-retry.ts";
 import { instantParam, useSearchParam } from "#app/shared/use-search-param.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
@@ -15,6 +16,7 @@ import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
 import { type ListSection, SectionedList } from "#app/ui/sectioned-list.tsx";
 import { Skeleton } from "#app/ui/skeleton.tsx";
+import { useSyncRetryReason } from "#app/ui/sync-frame.tsx";
 import { addMinutesIso } from "@pace/core";
 
 import { EventRow } from "./event-row.tsx";
@@ -44,28 +46,57 @@ const withLatest = (events: readonly HistoryEntry[]): readonly Row[] => {
   });
 };
 
+type Pending =
+  | { readonly status: "failed"; readonly error: HistoryError; readonly retry: () => void }
+  | { readonly status: "loading" };
+
 /**
 The complete source is still loading, or its load failed: never an empty board in its place, since
-a partial copy (a checkpoint and its tail) cannot say what the board was.
+a partial copy (a checkpoint and its tail) cannot say what the board was. A failure says so at once;
+its Retry is the sync line's while that offers one (QA PR55-1-09), and the load runs again when
+the line goes.
 */
-const HistoryPending = ({
-  resource,
-}: {
-  readonly resource: Exclude<HistoryResource, { readonly status: "ready" }>;
-}) => {
+const HistoryPending = ({ resource }: { readonly resource: Pending }) => {
   const t = useT();
+  const retry = useBlockRetry({
+    isFailed: resource.status === "failed",
+    retry: resource.status === "failed" ? resource.retry : NOTHING,
+  });
   return resource.status === "loading" ? (
     <Skeleton label={t("history.loading")} rows={6} />
   ) : (
     <EmptyState
       action={
-        <Button onPress={resource.retry} size="small" variant="secondary">
-          {t("common.retry")}
-        </Button>
+        retry === null ? null : (
+          <Button onPress={retry} size="small" variant="secondary">
+            {t("common.retry")}
+          </Button>
+        )
       }
+      isKnown
       title={errorText(t, resource.error)}
     />
   );
+};
+
+const NOTHING = (): void => undefined;
+
+/**
+What the page shows of the history: a copy whose first sync ended without success holds none of the
+account, so its empty history is no answer; the page says the history did not load, not grey rows
+for good (QA PR55-1-02). The sync line's Retry loads it; once a pull succeeds, the history shows.
+*/
+const usePageHistory = (history: HistoryResource): HistoryResource | Pending => {
+  const isUnknown = useIsAccountUnknown();
+  const reason = useSyncRetryReason();
+  if (!isUnknown || reason === null || history.status !== "ready") {
+    return history;
+  }
+  return {
+    error: reason === "offline" ? "history/offline" : "history/unavailable",
+    retry: NOTHING,
+    status: "failed",
+  };
 };
 
 /** The snapshot of the board at the moment, then the events up to `at` (all of them at "now"). */
@@ -156,7 +187,7 @@ export const HistoryScreen = () => {
   const [atParam, setAt] = useSearchParam("at");
   const at = momentOf(atParam, now);
   const instant = at ?? now;
-  const history = hooks.useHistory(instant);
+  const history = usePageHistory(hooks.useHistory(instant));
   const when = zonedText({ at: instant, mode: "datetime", tz: viewer.deviceTz }, viewer);
   const shortWhen = new Intl.DateTimeFormat(viewer.language, {
     day: "numeric",

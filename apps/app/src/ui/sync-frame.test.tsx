@@ -1,8 +1,9 @@
-import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 import { AppState, Text } from "react-native";
 
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { withWindowWidth } from "#app/test/window.ts";
 import { FAKE_STORE_ID, fakeUser, problem } from "@pace/client/testing";
 
 import { EmptyState, EmptyText } from "./empty-state.tsx";
@@ -124,6 +125,32 @@ const Screens = () => (
     <EmptyText className="">{en("day.empty")}</EmptyText>
   </SyncFrame>
 );
+
+describe("the first-sync cover beside a computer's window (QA PR55-1-13)", () => {
+  withWindowWidth(1440);
+
+  it("is drawn in the shell's frame: the navigation's column, then the rows where the screen starts", async () => {
+    const pull = heldPull();
+    const runtime = await createTestRuntime({
+      routes: { ...DEV_LOGIN, "GET /api/sync/pull": pull.route },
+      world: "empty",
+    });
+    await runtime.auth.loginWithDev("1");
+    await renderScreen(<App />, runtime);
+    const frame = screen.getByTestId("first-sync-shell");
+    expect(String(screen.getByTestId("first-sync-navigation").props["className"])).toContain(
+      "w-sidebar",
+    );
+    expect(
+      within(frame).getByRole("progressbar", { name: en("sync.firstSync") }),
+    ).toBeOnTheScreen();
+    await act(async () => {
+      pull.answer(EMPTY_PAGE);
+      await Promise.resolve();
+    });
+    expect(await screen.findByText(en("now.empty"))).toBeOnTheScreen();
+  });
+});
 
 describe("a first sync that failed on an empty copy (QA round 21 M4)", () => {
   it.each([

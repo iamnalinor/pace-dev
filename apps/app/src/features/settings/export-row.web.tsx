@@ -1,10 +1,18 @@
 import { useState } from "react";
 
 import { usePace, useT } from "#app/app-state.tsx";
-import { exportData } from "#app/features/settings/export-data.web.ts";
+import { exportData, type ExportError } from "#app/features/settings/export-data.web.ts";
 import { errorText } from "#app/format/action-error.ts";
 import { Button } from "#app/ui/button.tsx";
 import { useToast } from "#app/ui/toast.tsx";
+
+/** What a refused export says: its own two codes, else the history's. */
+const exportErrorText = (t: ReturnType<typeof useT>, error: ExportError): string => {
+  if (error === "export/unavailable") {
+    return t("settings.export.failed");
+  }
+  return error === "export/not-synced" ? t("settings.export.notSynced") : errorText(t, error);
+};
 
 /**
 "Export data": downloads the whole account as a spreadsheet, built from the local copy of the log,
@@ -26,12 +34,7 @@ export const ExportRow = () => {
             toast.show({ message: t("settings.export.done", { file: result.value }) });
             return;
           }
-          toast.show({
-            message:
-              result.error === "export/unavailable"
-                ? t("settings.export.failed")
-                : errorText(t, result.error),
-          });
+          toast.show({ message: exportErrorText(t, result.error) });
         } finally {
           setIsBusy(false);
         }

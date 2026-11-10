@@ -3316,6 +3316,47 @@ New bugs go here with their class; a new class gets its own section above.
   code's sentence. The bot flow's `network` stays «Не удалось войти»: it stands for any throw there,
   not only an unreachable server.
 
+### 321. A copy that never reached the server read as the account
+- **Bug.** A fresh tab whose first pull failed exported an all-empty workbook, with no request, and
+  said «Скачан файл …» (QA PR55-1-01); its History stayed grey rows for good with no word on the
+  page (PR55-1-02). On the legacy path an empty copy has full coverage, so `completeHistoryOf`
+  accepted it as a complete history of nothing.
+- **Missed because.** Every export and History test ran on a copy seeded as synced (the artboard
+  world) or on a checkpoint copy, whose history load does go to the server; none on an empty copy
+  whose first sync failed.
+- **Rule.** "Complete" is a claim about the account, not about the device: a copy with no server
+  store (`storeId` null) holds none of it, whatever its coverage says. A consumer of the whole
+  account syncs first or refuses with the reason (offline, not loaded yet); a screen says the load
+  failed instead of keeping placeholders for good.
+- **Sweep and guard.** Export (`reachedServer`: a sync, then `export/not-synced` or
+  `history/offline`, never a file); History (`usePageHistory`: the error in the page, the sync
+  line's Retry loads it). The other whole-account readers are server-side (MCP `export_all`) or
+  wait for a successful sync already (the zone, class 62). `export-row.web.test.tsx` and
+  `history-first-sync.test.tsx` run the empty-copy-failed-pull world.
+
+### 322. Two controls for one job when a screen's own failure and the app's line say the same
+- **Bug.** Day and Week offline showed the section's «Попробовать снова» under «Календарь не
+  загрузился» / «Не удалось загрузить экранное время» and the sync line's own (QA PR55-1-09); the
+  section's read was never made again when the line's Retry worked.
+- **Missed because.** The section tests rendered the screen alone, without the sync frame, so the
+  second Retry was never on the screen with the first.
+- **Rule.** While the sync line offers Retry, a section's failed read says what did not load with
+  no button of its own, and reads again as soon as the line goes (`useBlockRetry` over
+  `useSyncRetryReason`).
+- **Sweep and guard.** Day's screen time, Week's calendar, History's load failure. Notifications'
+  own Retry stays: its list is the screen, not a section beside the sync line's job.
+  `block-retry.test.tsx` renders the screens inside `SyncFrame` and counts the Retry buttons.
+
+### 323. A section for data the platform can never produce
+- **Bug.** The web's Day showed «Экранное время · 0 мин · Нет данных» on every day, and offline a
+  failure with Retry for something never asked for (QA PR55-1-08).
+- **Missed because.** Day's tests run as the phone (jest-expo's platform), where the section is real.
+- **Rule.** A section shows on a platform only for data that platform can have: the web records
+  no screen time, so it shows the section only for what a phone or a computer sent. Hiding it
+  outright would hide a computer's or a phone's real data, so it is not done.
+- **Sweep and guard.** The phone-only sections already ask `IS_PHONE` (usage access, calendar);
+  `day-web.test.tsx` runs Day as the web build.
+
 ### 326. The same read made twice because each caller fetches for itself
 - **Bug.** Every load sent `/api/instance` twice (the app's server check and the checkpoint
   negotiation), `/api/notifications` twice on the Notifications route (the screen's mount and the
@@ -3331,6 +3372,16 @@ New bugs go here with their class; a new class gets its own section above.
 - **Sweep and guard.** Instance, notifications, the socket's catch-up (load and reconnect). A
   check that must be current (a return to the app, Retry) still asks. `load-requests.e2e.ts` loads
   `/` and `/notifications` and goes offline and back, and fails on any read made twice.
+
+### 327. A placeholder drawn outside the frame the content lands in
+- **Bug.** The first-sync cover at 1440 was a centred column with no sidebar, 80 px right of where
+  the screen's column then appeared: everything jumped as the app showed (QA PR55-1-13).
+- **Missed because.** The cover's tests ran at phone width, where the two frames are the same.
+- **Rule.** A stand-in takes the geometry of what replaces it: the cover draws the navigation's
+  column (empty: its words would be in the device's language) and its rows where the screen's
+  column starts.
+- **Sweep and guard.** The configuration strip's placement is PR55-1-14 (layout, not in this change).
+  `sync-frame.test.tsx` renders the cover at 1440.
 
 ### 360. A caller that reaches below the shared path and skips the step it adds
 - **Bug.** PR 55 follow-up review, item 1: the archive toast's Undo (`undoArchive`) staged its

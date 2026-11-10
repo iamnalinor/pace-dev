@@ -8,6 +8,7 @@ import { downloadXlsx } from "#app/platform/xlsx.web.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { createMemoryEventStore } from "@pace/client";
+import { problem } from "@pace/client/testing";
 
 jest.mock("#app/platform/xlsx.web.ts", () => ({ downloadXlsx: jest.fn(async () => undefined) }));
 const download = jest.mocked(downloadXlsx);
@@ -139,4 +140,51 @@ it("does not download another owner's copy after full-history readiness awaited"
   });
   expect(download).not.toHaveBeenCalled();
   expect(screen.getByRole("button", { name: en("settings.export.action") })).toBeEnabled();
+});
+
+describe("a copy that never reached the server (QA PR55-1-01)", () => {
+  it.each([
+    [
+      "cannot reach it",
+      () => {
+        throw new TypeError("Failed to fetch");
+      },
+      "actionError.history/offline",
+    ],
+    ["answers with an error", () => problem(500, "internal"), "settings.export.notSynced"],
+  ] as const)(
+    "downloads nothing when the server %s, and says why",
+    async (_name, pull, message) => {
+      const runtime = await createTestRuntime({
+        world: "empty",
+        routes: { "GET /api/sync/pull": pull },
+      });
+      await renderScreen(<ExportRow />, runtime);
+      await fireEvent.press(screen.getByRole("button", { name: en("settings.export.action") }));
+      expect(await screen.findByText(en(message))).toBeOnTheScreen();
+      expect(download).not.toHaveBeenCalled();
+      expect(screen.queryByText(/pace-.*\.xlsx/u)).toBeNull();
+    },
+  );
+
+  it("loads the account first, then exports what it holds", async () => {
+    const runtime = await createTestRuntime({
+      world: "empty",
+      routes: {
+        "GET /api/sync/pull": () => ({
+          events: [baseEvent],
+          more: false,
+          seq: 1,
+          storeId: "store-a",
+        }),
+      },
+    });
+    await renderScreen(<ExportRow />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.export.action") }));
+    await waitFor(() => {
+      expect(download).toHaveBeenCalledTimes(1);
+    });
+    const eventRows = download.mock.calls[0]?.[0].find((sheet) => sheet.name === "events");
+    expect(eventRows?.rows.some((row) => row.includes(baseEvent.id))).toBe(true);
+  });
 });

@@ -151,6 +151,8 @@ export const enShell = {
   "settings.export.action": "Export data",
   "settings.export.failed": "Could not download the export. Try again.",
   "settings.export.done": "Downloaded {file}",
+  "settings.export.notSynced":
+    "Your data has not loaded from the server yet, so there is nothing to export. Try again once it has.",
   "settings.digestWindows": "Digest times",
   "settings.quietHours": "Quiet hours",
   "settings.categoryEstimates": "Activity estimates",

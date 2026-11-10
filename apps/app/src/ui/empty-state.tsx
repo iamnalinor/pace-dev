@@ -21,16 +21,22 @@ export const EmptyState = ({
   action,
   body,
   icon,
+  isKnown = false,
   title,
 }: {
   readonly title: string;
+  /**
+  What it says holds before the account is known (a load that failed says so at once; QA
+  PR55-1-02: a History whose first pull failed kept grey rows for good).
+  */
+  readonly isKnown?: boolean;
   readonly body?: string | undefined;
   readonly icon?: IconName | undefined;
   /** One action (a small secondary `Button` or a `Link`). */
   readonly action?: ReactNode;
 }) => {
   const t = useT();
-  const isUnknown = useIsAccountUnknown();
+  const isUnknown = useIsAccountUnknown() && !isKnown;
   return isUnknown ? (
     <View className="w-full px-gutter lg:px-gutter-lg">
       <Skeleton label={t("sync.loadingData")} />

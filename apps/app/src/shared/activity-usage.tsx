@@ -99,8 +99,11 @@ export const ActivityApps = ({
   );
 };
 
-/** A failed read is not "nothing recorded" (QA round 23 R23-08): no total, a way to ask again. */
-const ScreenTimeFailed = ({ onRetry }: { readonly onRetry: () => void }) => {
+/**
+A failed read is not "nothing recorded" (QA round 23 R23-08): no total, and a way to ask again
+unless the sync line offers it already (QA PR55-1-09).
+*/
+const ScreenTimeFailed = ({ onRetry }: { readonly onRetry: (() => void) | null }) => {
   const t = useT();
   return (
     <View className="pb-8">
@@ -110,11 +113,13 @@ const ScreenTimeFailed = ({ onRetry }: { readonly onRetry: () => void }) => {
           <KitText role="footnote" tone="secondary">
             {t("day.screenTimeFailed")}
           </KitText>
-          <View className="-ml-4">
-            <Button onPress={onRetry} variant="plain">
-              {t("common.retry")}
-            </Button>
-          </View>
+          {onRetry === null ? null : (
+            <View className="-ml-4">
+              <Button onPress={onRetry} variant="plain">
+                {t("common.retry")}
+              </Button>
+            </View>
+          )}
         </View>
       </Group>
     </View>
@@ -130,13 +135,15 @@ type ScreenTimeProps = {
 
 /** Day footer: all devices, then apps ordered by time in the account's local day. */
 export const ScreenTimeSection = ({
+  isFailed = false,
   onRetry = null,
   ...report
 }: ScreenTimeProps & {
-  /** Set when the day's usage could not be read: the section says so with Try again, no zero. */
+  /** The day's usage could not be read: the section says so, no zero. */
+  readonly isFailed?: boolean;
+  /** Its Try again; `null` while the sync line offers one. */
   readonly onRetry?: (() => void) | null;
-}) =>
-  onRetry === null ? <ScreenTimeReport {...report} /> : <ScreenTimeFailed onRetry={onRetry} />;
+}) => (isFailed ? <ScreenTimeFailed onRetry={onRetry} /> : <ScreenTimeReport {...report} />);
 
 /** "First 09:12, last 21:40": when the day's apps were first and last used. */
 const FirstLast = ({
