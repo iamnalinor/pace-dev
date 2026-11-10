@@ -450,6 +450,7 @@ test("the phone's activity sheet scrolls an error under To into view above the p
   await page.getByRole("button", { name: "Log past activity" }).click();
   await page.getByLabel("What", { exact: true }).fill("Nap");
   await page.getByLabel("From", { exact: true }).fill("10:00");
+  await page.getByLabel("To", { exact: true }).fill("12:00");
   const body = page.getByTestId("overlay-body");
   expect(await body.evaluate((element) => element.scrollTop)).toBe(0);
   await save.click();

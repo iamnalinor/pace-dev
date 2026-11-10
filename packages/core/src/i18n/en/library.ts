@@ -112,7 +112,7 @@ export const enLibrary = {
   "presets.moveUp": "Move {name} up",
   "presets.moveDown": "Move {name} down",
   "presets.deleteConfirm":
-    "Delete “{name}”? Its tasks keep it, and Show deleted can bring it back.",
+    "Delete “{name}”? Its tasks keep it, and “Show deleted” can bring it back.",
   "presets.deleted": "Preset deleted: {name}",
   "presets.restore": "Restore preset",
   "presets.archivedNote":

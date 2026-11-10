@@ -43,6 +43,15 @@ type Piece = { readonly activity: Activity; readonly start: number; readonly end
 
 const toIso = (ms: number): string => new Date(ms).toISOString();
 
+/**
+Whole minutes between two instants as their clocks read (seconds dropped from each end): a row
+from 00:00 to 10:30:40 is 10 h 30 min, as its 00:00 – 10:30 says, and neighbours that share a
+boundary with seconds add up to the day's total (QA round 26 R26-09: 10 h 31 min beside a block
+one minute short).
+*/
+export const clockMinutes = (start: number, end: number): number =>
+  Math.floor(end / MS_PER_MINUTE) - Math.floor(start / MS_PER_MINUTE);
+
 /** Total minutes of a list of rows. */
 export const sumMinutes = (rows: readonly { readonly minutes: number }[]): number =>
   rows.reduce((sum, row) => sum + row.minutes, 0);
@@ -93,7 +102,7 @@ const toSegment = (piece: Piece, now: number): Segment => ({
   isRunning: !piece.activity.isLogged && piece.activity.endAt === null && piece.end === now,
   isAlongside: piece.activity.isAlongside,
   label: piece.activity.label,
-  minutes: Math.round((piece.end - piece.start) / MS_PER_MINUTE),
+  minutes: clockMinutes(piece.start, piece.end),
   startAt: toIso(piece.start),
   taskId: piece.activity.taskId,
 });
@@ -106,7 +115,7 @@ const gapsBetween = (pieces: readonly Piece[], from: number, until: number): rea
       const previousEnd = bounds[index]?.end ?? from;
       return {
         endAt: toIso(piece.start),
-        minutes: Math.floor((piece.start - previousEnd) / MS_PER_MINUTE),
+        minutes: clockMinutes(previousEnd, piece.start),
         startAt: toIso(previousEnd),
       };
     })

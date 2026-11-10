@@ -220,3 +220,38 @@ describe("trackedDates", () => {
     ).toEqual(["2026-10-04", "2026-10-05"]);
   });
 });
+
+describe("dayModel's Log past default (review M5)", () => {
+  const spec = { category: "other" as const, label: "x" };
+
+  it("is the last half hour when nothing else is in it", () => {
+    expect(dayModel(withActivities([]), null, ctx()).logTarget).toEqual({
+      endAt: NOW,
+      kind: "log",
+      startAt: minutesBefore(30),
+    });
+  });
+
+  it("ends where an activity started within the last half hour begins, so it fits", () => {
+    const state = withActivities([
+      activity({ ...spec, endAt: null, id: "run", startAt: minutesBefore(10) }),
+    ]);
+    expect(dayModel(state, null, ctx()).logTarget).toEqual({
+      endAt: minutesBefore(10),
+      kind: "log",
+      startAt: minutesBefore(40),
+    });
+  });
+
+  it("steps back past logged blocks: ends at the later one's start, starts at the earlier one's end", () => {
+    const state = withActivities([
+      activity({ ...spec, endAt: minutesBefore(5), id: "late", startAt: minutesBefore(20) }),
+      activity({ ...spec, endAt: minutesBefore(45), id: "early", startAt: minutesBefore(60) }),
+    ]);
+    expect(dayModel(state, null, ctx()).logTarget).toEqual({
+      endAt: minutesBefore(20),
+      kind: "log",
+      startAt: minutesBefore(45),
+    });
+  });
+});

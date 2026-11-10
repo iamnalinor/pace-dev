@@ -1,7 +1,7 @@
 import { act, fireEvent, screen } from "@testing-library/react-native";
 
 import { en, renderScreen } from "#app/test/render.tsx";
-import { router } from "#app/test/router.ts";
+import { navigatorState, router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { REQUEST_DEADLINE_MS } from "@pace/client";
 import { BOOKS_ID } from "@pace/core/testing";
@@ -60,6 +60,18 @@ const moved = {
 };
 
 describe("DecisionsScreen", () => {
+  it("goes back to Notifications when opened from a pasted link, not to Now (QA round 26 R26-08)", async () => {
+    const runtime = await createTestRuntime({
+      routes: { "GET /api/decisions": () => ({ decisions: [] }) },
+    });
+    // On a phone, More's list is the only screen under it.
+    navigatorState.current = { index: 1, routes: [{ name: "more" }, { name: "decisions" }] };
+    await renderScreen(<DecisionsScreen />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("common.back") }));
+    expect(router.replace).toHaveBeenCalledWith("/notifications");
+    expect(router.back).not.toHaveBeenCalled();
+  });
+
   it("lists the decision log and searches it", async () => {
     const runtime = await createTestRuntime({
       routes: {

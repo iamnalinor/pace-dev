@@ -4,7 +4,6 @@ import {
   type ActivityCategory,
   activityLabel,
   addDaysIn,
-  addMinutesIso,
   CATEGORY_HUES,
   type CoreState,
   formatInZone,
@@ -17,6 +16,7 @@ import {
   t,
   taskById,
   timeline,
+  type TimeState,
 } from "@pace/core";
 
 import type { ActivityTarget } from "../actions/time-actions.ts";
@@ -142,6 +142,48 @@ export type DayModel = {
 /** How long a block "Log past activity" proposes. */
 const LOG_MINUTES = 30;
 
+const MS_PER_MINUTE = 60_000;
+
+/** The end of the default: before every main activity that starts within the half hour before it. */
+const fittingEnd = (starts: readonly number[], end: number): number => {
+  const inside = starts.filter(
+    (start) => start >= end - LOG_MINUTES * MS_PER_MINUTE && start < end,
+  );
+  return inside.length === 0 ? end : fittingEnd(starts, Math.min(...inside));
+};
+
+/**
+"Log past activity"'s default: the half hour before `until`, moved back so the overlap rule takes it
+(review M5): it ends where a main activity starting within it begins, and starts after a logged
+block it would cut into. A live block it lands in gives the time up, as the spec has it.
+*/
+const logTargetOf = (time: TimeState, until: string): ActivityTarget => {
+  const main = Object.values(time.activities).filter((activity) => !activity.isAlongside);
+  const end = fittingEnd(
+    main.map((activity) => Date.parse(activity.startAt)),
+    Date.parse(until),
+  );
+  const halfHourBefore = end - LOG_MINUTES * MS_PER_MINUTE;
+  const start = Math.max(
+    halfHourBefore,
+    ...main
+      .filter((activity) => activity.isLogged && activity.endAt !== null)
+      .map((activity) => ({
+        end: Date.parse(activity.endAt ?? ""),
+        start: Date.parse(activity.startAt),
+      }))
+      .filter(
+        (block) => block.start < halfHourBefore && block.end > halfHourBefore && block.end < end,
+      )
+      .map((block) => block.end),
+  );
+  return {
+    endAt: new Date(end).toISOString(),
+    kind: "log",
+    startAt: new Date(start).toISOString(),
+  };
+};
+
 /** One day of the ledger in the account zone: activities and the gaps between them, in order. */
 export const dayModel = (state: CoreState, date: null | string, ctx: QueryContext): DayModel => {
   const zone = accountTz(state, ctx);
@@ -182,7 +224,7 @@ export const dayModel = (state: CoreState, date: null | string, ctx: QueryContex
   const until = Date.parse(to) > Date.parse(ctx.now) ? ctx.now : to;
   return {
     date: from,
-    logTarget: { endAt: until, kind: "log", startAt: addMinutesIso(until, -LOG_MINUTES) },
+    logTarget: logTargetOf(state.time, until),
     entries: [...rows, ...gaps].toSorted((a, b) => Date.parse(startOf(a)) - Date.parse(startOf(b))),
     isToday: from === today,
     next: from >= today ? null : addDaysIn(from, 1, zone),

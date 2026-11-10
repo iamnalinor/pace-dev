@@ -2442,3 +2442,27 @@ New bugs go here with their class; a new class gets its own section above.
 - **Missed because.** The R25-07 test checked where the button went (`/day?date=…`), not what the person sees on arrival.
 - **Class.** A cross-screen link tested by its route, while its label names an action at the destination.
 - **Sweep and guard.** The link carries the block (`?block=<the row's key>`, Week's block id and Day's row key are one form) and Day opens that row's editor once, then takes the param off in place, so a close or a later visit does not reopen it. Swept the other links that name an action at the end: Week's «Open task» opens the task itself; Now's and Inbox's deep links (`?task=`, `?open=`) already open the item. Guards: `week-wide.test.tsx` (the link names the block), `day-screen.test.tsx` (the block opens in its form, once).
+
+### 215. A default value that the form's own rule refuses
+- **Bug.** Log past proposes the last 30 minutes; with a live activity started within them (or a block logged a moment ago), Save refused the proposal with an overlap sentence about times the person never typed (review M5).
+- **Missed because.** The overlap rule (203, 209) was tested on typed values; the default was tested on an empty day.
+- **Class.** A form's default computed apart from the validation it must pass.
+- **Sweep and guard.** `dayModel`'s `logTarget` steps the half hour back before every main activity that starts within it and starts after a logged block it would cut into; a live block it lands in gives the time up (said in the sheet). A gap's Log takes the gap itself, which fits by construction. Guard: `day.test.ts` (empty, running inside the half hour, logged blocks on both sides).
+
+### 216. A read-only state that hides what it is about
+- **Bug.** A deleted preset opened on «Удалён», one sentence and Restore: no colour, rules or parent, so a person could not tell what Restore would bring back (QA round 26 R26-07).
+- **Missed because.** The R25-02 test checked that nothing is editable, not that anything is shown.
+- **Class.** Making a screen read-only by removing its content rather than disabling it.
+- **Sweep and guard.** The deleted preset shows its sample task drawn with its settings (`PresetPreview`, which now previews an archived preset as restored) and the preset it inherits from. Other read-only states: a closed task keeps its fields; a revoked event in History keeps its row. Guard: `presets.test.tsx` (the deleted preset shows its sample task).
+
+### 217. A second-level screen left on the default way back
+- **Bug.** «Решения» (reached from Notifications) opened from a pasted link went Back to Now on a computer and to More on a phone, not to Notifications (QA round 26 R26-08).
+- **Missed because.** Class 207's sweep gave a parent to the screens under a list (presets, projects) and left the rest on the default; Decisions sits one level deeper, under Notifications.
+- **Class.** Class 207 again: the parent of a screen taken from the app's top level rather than from where the screen is reached.
+- **Sweep and guard.** `DecisionsScreen` uses `useBack("/notifications")`. The other screens on `useBack()` (Projects, History, Week, Notifications) are first-level destinations whose parent is the top. Guard: `decisions-screen.test.tsx` (on More's anchor, Back replaces with Notifications).
+
+### 218. Durations rounded per row while their times are shown truncated
+- **Bug.** With a neighbouring block that started live (seconds in its start), a gap logged 00:00–10:30 showed «10 ч 31 мин» and the block after it one minute short, so the rows did not add up to «Учтено» (QA round 26 R26-09).
+- **Missed because.** Every fixture's boundary fell on a whole minute.
+- **Class.** Two readings of one instant: the clock shown drops the seconds, the duration rounds them.
+- **Sweep and guard.** `clockMinutes` counts the minutes between two instants as their clocks read; segments and gaps use it, so neighbours telescope to the total (Day, Week, the totals and Insights read the segments). Guard: `tracking.test.ts` (a boundary at 10:30:40: 150 + 20 = 170).

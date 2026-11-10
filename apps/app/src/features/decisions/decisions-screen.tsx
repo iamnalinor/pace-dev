@@ -182,7 +182,8 @@ const useDaySections = (
 export const DecisionsScreen = () => {
   const t = useT();
   const { api } = usePace();
-  const back = useBack();
+  // Reached from Notifications: a pasted link goes back there, not to Now (R26-08).
+  const back = useBack("/notifications");
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
   // It searches while typing, once the typing pauses; Enter searches at once.

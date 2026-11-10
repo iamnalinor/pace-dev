@@ -44,7 +44,11 @@ const withDraft = (
     return {
       id: draft.id,
       state: {
-        byId: { ...presets.byId, [draft.id]: { ...current, definition: draft.definition } },
+        // A deleted preset previews what Restore would bring back (R26-07).
+        byId: {
+          ...presets.byId,
+          [draft.id]: { ...current, archived: false, definition: draft.definition },
+        },
       },
     };
   }

@@ -190,6 +190,8 @@ describe("PresetScreen", () => {
     expect(screen.queryByRole("button", { name: en("common.save") })).toBeNull();
     expect(screen.queryByRole("button", { name: en("presets.archive") })).toBeNull();
     expect(screen.queryByLabelText(en("presets.name"))).toBeNull();
+    // What would come back, read-only: its sample task, drawn with its settings (R26-07).
+    expect(screen.getByText(en("presets.sampleTitle"))).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("button", { name: en("presets.restore") }));
     await waitFor(() => {
       expect(presetOf(runtime, "deferred")?.archived).toBe(false);
