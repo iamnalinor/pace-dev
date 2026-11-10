@@ -92,7 +92,7 @@ const TitleRow = ({
   readonly variant: HeaderVariant;
 }) => (
   <View
-    className={cx("flex-row items-center gap-3", isPhoneTop && "mt-header-top")}
+    className={cx("flex-row items-start gap-3", isPhoneTop && "mt-header-top")}
     testID="screen-header-title-row"
   >
     <Text className="flex-1" level={1} role={variant === "top" ? "largeTitle" : "title1"}>
