@@ -29,6 +29,8 @@ export type ToolFailure = {
 };
 
 const CODE_MESSAGES: Readonly<Record<string, string>> = {
+  "action/nothing-to-do":
+    "The event is revoked already; nothing was written (a repeated call is harmless).",
   "event/invalid": "The event would not pass the event schema.",
   "event/not-found": "No event with this id is in the log.",
   "fetch/not-found": "No task or project with this id.",

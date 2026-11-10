@@ -563,9 +563,10 @@ describe("editing", () => {
     const solveId = String(rows(marked["events"])[0]?.["id"]);
     const first = await okTool(token, "revoke_event", { eventId: solveId });
     const revocationId = String(rows(first["events"])[0]?.["id"]);
-    expect(await errorText(token, "revoke_event", { eventId: solveId })).toContain(
-      "action/nothing-to-do",
-    );
+    const repeated = await errorText(token, "revoke_event", { eventId: solveId });
+    expect(repeated).toContain("action/nothing-to-do");
+    // Said as a harmless repeat, not the bare code twice (QA 27 wave review M1).
+    expect(repeated).toContain("revoked already; nothing was written");
     // No second revocation stands behind the first: undoing the undo brings the mark back, and
     // then the mark can be revoked again.
     await okTool(token, "revoke_event", { eventId: revocationId });
