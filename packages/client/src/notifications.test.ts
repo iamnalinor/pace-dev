@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_SETTINGS, type PoolNotification } from "@pace/core";
 
@@ -122,6 +122,23 @@ describe("createNotificationFeed", () => {
     clock += FEED_FRESH_MS;
     await feed.refreshUnlessFresh();
     expect(fake.calls).toHaveLength(3);
+  });
+
+  it("drops a page that lands after a reset: it was the last session's (class 372)", async () => {
+    const page = Promise.withResolvers<unknown>();
+    const { fake, feed } = feedWith({ "GET /api/notifications": async () => await page.promise });
+    const late = feed.refresh();
+    await vi.waitFor(() => {
+      expect(fake.calls).toHaveLength(1);
+    });
+    feed.reset();
+    page.resolve({
+      deliveries: {},
+      items: [login("old", "2026-10-07T09:00:00.000Z")],
+      more: false,
+    });
+    await late;
+    expect(feed.store.getState()).toEqual({ deliveries: {}, items: [], status: "idle" });
   });
 
   it("does not take a failed page for a fresh one", async () => {

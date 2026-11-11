@@ -75,6 +75,18 @@ const oneSocket = (): {
   };
 };
 
+/** A sign-in notice with this id. */
+const notice = (id: string) => ({
+  createdAt: "2026-10-06T11:00:00.000Z",
+  id,
+  kind: "login",
+  // eslint-disable-next-line sonarjs/no-hardcoded-ip -- the address a sign-in notice shows
+  payload: { country: "Germany", ip: "1.2.3.4", kind: "web", name: "Chrome", sessionId: "s" },
+  readAt: null,
+  resolution: null,
+  resolvedAt: null,
+});
+
 describe("createPaceClient", () => {
   it("counts the changes that have not reached the server, for Log out to ask (QA round 23 R23-02)", async () => {
     const { client } = await setup({}, "tok");
@@ -200,6 +212,30 @@ describe("createPaceClient", () => {
     expect(api.calls.slice(before).map((call) => call.path)).toEqual(["/api/auth/logout"]);
     expect(client.auth.store.getState()).toEqual({ status: "signed-out", user: null });
     client.live.stop();
+  });
+
+  it("never shows the last account's notifications to the next one signed in on this device (class 372)", async () => {
+    const { api, client } = await setup(
+      {
+        "GET /api/notifications": ({ headers }) => ({
+          deliveries: {},
+          items: [notice(headers["authorization"] === "Bearer tok-a" ? "a1" : "b1")],
+          more: false,
+        }),
+        "POST /api/auth/dev": () => ({ token: "tok-b", user: fakeUser }),
+        "POST /api/auth/logout": () => ({ ok: true }),
+      },
+      "tok-a",
+    );
+    await expect.poll(() => client.auth.store.getState().user).not.toBeNull();
+    await client.notifications.refreshUnlessFresh();
+    expect(client.notifications.store.getState().items.map((item) => item.id)).toEqual(["a1"]);
+    await client.auth.logout();
+    expect(client.notifications.store.getState()).toMatchObject({ items: [], status: "idle" });
+    await client.auth.loginWithDev("2");
+    await client.notifications.refreshUnlessFresh();
+    expect(client.notifications.store.getState().items.map((item) => item.id)).toEqual(["b1"]);
+    expect(api.pathsCalled("/api/notifications")).toHaveLength(2);
   });
 
   it("opens the live socket again when its close was not the end of the session", async () => {

@@ -286,6 +286,25 @@ const apiAndAuth = (
   return { api, auth, checks };
 };
 
+/**
+The notification feed belongs to the session that fetched it: once this device's token changes
+(a sign-out, another account signed in) the page and its freshness go, so the next account never
+sees the last one's pool, even within `FEED_FRESH_MS` (class 372).
+*/
+const feedFollowsSession = (auth: Auth, feed: NotificationFeed): void => {
+  // Which session the feed was read for: a change of session, not a credential check.
+  let readFor = auth.token();
+  auth.store.subscribe(() => {
+    const current = auth.token();
+    if (current === readFor) {
+      return;
+    }
+
+    readFor = current;
+    feed.reset();
+  });
+};
+
 /** The server's instance, read with no session (the route is public and names no one). */
 const instanceReaderOf = (options: PaceClientOptions): InstanceReader => {
   const publicApi = createApiClient({
@@ -308,6 +327,7 @@ export const createPaceClient = (options: PaceClientOptions): PaceClient => {
   const { now } = clock;
   const { api, auth, checks } = apiAndAuth(options);
   const notices = noticeRouter(createNotificationFeed({ api, source: options.source }));
+  feedFollowsSession(auth, notices.feed);
   const instance = instanceReaderOf(options);
   const { closePeers, live, state, sync, history } = liveAndSync(options, {
     api,

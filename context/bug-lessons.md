@@ -1926,6 +1926,7 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-11 | The opt-in checkpoint e2e seeded "a copy that never pulled" with the server's store id at cursor 0, which since class 363 is a copy that has pulled (a full one), so no bootstrap ran; once seeded right, its year of settings rows shared the creation's device and instant and History folded the creation into one write (owner R27-05) | 363, 137 | yes: the other e2e seeds that write a local copy (`preparePendingCopy` is the only one) | the seed writes no store id, and the settings rows sit an hour after the creation; the opt-in step runs in CI on every push |
 | 2026-11-11 | Wave review, item 1: a connect's hello judged the copy while a direct `syncNow()` hung; the run then failed with no backoff and the offline line stayed up beside a live socket until the 5-min poll (or an empty second pull went out) | 370 (new) | yes: `firstTickIn` waits through `isFresh`; no other reader decides on the run's state before it settles | `sync-client.test.ts`: a hello during a run that fails leads to a run; one during a run that reaches the head asks no second pull |
 | 2026-11-11 | Wave review, item 2: on the web Day showed screen time only for rows, and a failed read has none, so a 503 was silent (R23-08 again) | 371 (new), 62 | yes: Week's calendar shows its failure whatever its rows; the usage marks on blocks show no total | `day-web.test.tsx`: the failed read says so with Try again; one Retry beside the offline sync line; an empty answer stays silent |
+| 2026-11-11 | Wave review, item 3: the notification feed's page and freshness outlived a sign-out; another account signed in within 5 s saw the previous account's pool | 372 (new), 103 | yes: the instance reader is public; the sync's success record only times the loop's first tick after the start's own pull | `create-client.test.ts` (sign-out empties the feed, the next account fetches its own); `notifications.test.ts` (a page landing after `reset` is dropped) |
 
 ### 125. A live region around a ticking value
 - **Bug.** PR B 4.2 (F-A11Y-10): the running row sat in `accessibilityLiveRegion="polite"` around the
@@ -3786,3 +3787,20 @@ New bugs go here with their class; a new class gets its own section above.
   whatever its rows; Week's and the activity sheet's usage draw marks on blocks with no total or
   "none". `day-web.test.tsx`: a 503 shows the sentence and its Try again reads again; offline
   beside the sync line there is one Retry; an empty answer shows nothing.
+
+### 372. A cache of an account's data that outlives the session it was read for
+- **Bug.** Wave review, item 3: the notification feed's page and its `fetchedAt` were not cleared
+  on a sign-out, and the signed-in start now asks `refreshUnlessFresh`; another account signed in
+  within `FEED_FRESH_MS` (5 s) was shown the last account's pool. A fetch still out at the
+  sign-out could also land on the next session's screen.
+- **Missed because.** The freshness tests ran one session; the sign-out tests looked at the local
+  copy and the drafts (class 103), not at the client's in-memory caches.
+- **Rule.** Anything the client keeps of an account (a page, its freshness, a fetch still out)
+  is keyed to the session: a token change empties it and drops what is in flight. A freshness
+  window never spans two sessions.
+- **Sweep and guard.** The other memory the client keeps: the instance reader is public and names
+  no one; the sync's last-success record decides only the loop's first tick, and the signed-in start
+  runs its own pull before the loop; `markRead`'s asked ids are unique across accounts.
+  `createPaceClient` resets the feed on every token change (`feedFollowsSession`).
+  `create-client.test.ts` "never shows the last account's notifications…"; `notifications.test.ts`
+  "drops a page that lands after a reset".
