@@ -1929,6 +1929,7 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-11 | Wave review, item 3: the notification feed's page and freshness outlived a sign-out; another account signed in within 5 s saw the previous account's pool | 372 (new), 103 | yes: the instance reader is public; the sync's success record only times the loop's first tick after the start's own pull | `create-client.test.ts` (sign-out empties the feed, the next account fetches its own); `notifications.test.ts` (a page landing after `reset` is dropped) |
 | 2026-11-11 | Wave review, item 4: a v2 hello out of shape went to the notices' reader: no catch-up pull and v2 off until the 5-min poll | 373 (new) | yes: `pushed` and `error` answers out of shape left their request waiting for its timeout; fixed with it | `live.test.ts` raw frames: broken hellos pull and turn v2 on; broken `pushed`/`error` fail their request at once |
 | 2026-11-11 | Wave review, item 5: Skip kept its in-flight keys in state; two presses before the hide rendered sent two requests and two dismiss writes | 374 (new), 36 | yes: History's Undo confirm, Export, the account's Telegram ask and the dev sign-in were guarded by state only; all fixed | two presses in one `act`, one request: `use-phone-answers.test.ts`, `history-screen.test.tsx`, `export-row.web.test.tsx`, `login-screen.test.tsx`, `settings.test.tsx` |
+| 2026-11-11 | Wave review, item 6: checking off the last row left focus on the page (the heading's-neighbour fallback was documented, not built), and the wait was exactly two frames | 375 (new), 5 | yes: the other focus helpers poll or run after the removal | `focus-place.web.test.ts` (jsdom): next row, heading's neighbour, a slow row, focus moved meanwhile |
 
 ### 125. A live region around a ticking value
 - **Bug.** PR B 4.2 (F-A11Y-10): the running row sat in `accessibilityLiveRegion="polite"` around the
@@ -3838,3 +3839,18 @@ New bugs go here with their class; a new class gets its own section above.
   ref-guarded ones (`add-computer`, the assistant's approve, the server sheets) were already right.
   Tests: `use-phone-answers.test.ts`, `history-screen.test.tsx`, `export-row.web.test.tsx`,
   `login-screen.test.tsx`, `settings.test.tsx` (each "… (class 374)": two presses, one request).
+
+### 375. A fallback the doc promises and the code leaves out, behind a wait of fixed frames
+- **Bug.** Wave review, item 6: `focusRowPlace` said focus goes to "the list's heading's neighbour
+  when none is left", but with no row left it did nothing and focus fell to the page; and it
+  waited exactly two frames for the checked row to leave, so a row slower to go was still there
+  (or focus was still on it) and the wait ended with nothing done.
+- **Missed because.** No test ran the web helper at all: the list tests run as the phone, where
+  it is a no-op, and the QA round checked a list with rows left below.
+- **Rule.** Each branch a focus helper's doc names has a test on a real DOM (`@jest-environment
+  jsdom`), the empty case first. A wait for something to leave polls a bounded number of frames
+  for that thing (`isConnected`), never a fixed count.
+- **Sweep and guard.** `focusPlaceById` already polls; `focusPlace` and `useFocusBack` run from
+  the unmount, after the field is gone, so one frame is enough; the sheet, claim and toast helpers
+  poll. `focus-place.web.test.ts`: the next row, the heading's neighbour (list emptied or gone), a
+  row that takes six frames, and focus the person moved meanwhile.

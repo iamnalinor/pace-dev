@@ -14,13 +14,6 @@ const focusInside = (element: HTMLElement): void => {
   }
 };
 
-/** Runs `step` once the frame after next has drawn: the row or editor that went is gone by then. */
-const afterRemoval = (step: () => void): void => {
-  requestAnimationFrame(() => {
-    requestAnimationFrame(step);
-  });
-};
-
 /**
 After an editor in place closes (Escape, Cancel, Save), keyboard focus goes to the place it stood
 in, a frame later once the field is gone and only where nothing else took it: the control there
@@ -69,38 +62,97 @@ export const focusPlaceById = (id: string): void => {
   wait(CLOSING_FRAMES);
 };
 
-/** Where the focused row of a list stands: its list and its place in it, read before it leaves. */
-export type RowPlace = null | { readonly list: HTMLElement; readonly index: number };
+/**
+Where the focused row of a list stands, read before it leaves: its list, its place in it, the row
+itself (to wait for it to go), and the heading the list stands under (for when none is left).
+*/
+export type RowPlace = null | {
+  readonly list: HTMLElement;
+  readonly index: number;
+  readonly item: HTMLElement;
+  readonly heading: HTMLElement | null;
+};
 
 const itemsOf = (list: HTMLElement): readonly HTMLElement[] =>
   [...list.querySelectorAll<HTMLElement>('[role="listitem"]')].filter(
     (item) => item.closest('[role="list"]') === list,
   );
 
+const isAfter = (from: Node, other: Node): boolean =>
+  (from.compareDocumentPosition(other) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
+/** The last heading before the list on the page: the one it stands under. */
+const headingOf = (list: HTMLElement): HTMLElement | null =>
+  [...document.querySelectorAll<HTMLElement>('[role="heading"], h1, h2, h3, h4, h5, h6')].findLast(
+    (heading) => !list.contains(heading) && isAfter(heading, list),
+  ) ?? null;
+
+const FOCUSABLE =
+  'button, a[href], input, textarea, select, [role="button"], [role="checkbox"], [tabindex]:not([tabindex="-1"])';
+
+/** The heading's neighbour: the first control after it on the page, else the heading itself. */
+const focusAfterHeading = (heading: HTMLElement): void => {
+  const neighbour = [...document.querySelectorAll<HTMLElement>(FOCUSABLE)].find((control) =>
+    isAfter(heading, control),
+  );
+  if (neighbour === undefined) {
+    heading.setAttribute("tabindex", "-1");
+    heading.focus();
+  } else {
+    neighbour.focus();
+  }
+};
+
 export const focusedRowPlace = (): RowPlace => {
   const active = document.activeElement;
   const item = active === null ? null : active.closest<HTMLElement>('[role="listitem"]');
   const list = item === null ? null : item.closest<HTMLElement>('[role="list"]');
-  return item === null || list === null ? null : { index: itemsOf(list).indexOf(item), list };
+  return item === null || list === null
+    ? null
+    : { heading: headingOf(list), index: itemsOf(list).indexOf(item), item, list };
+};
+
+/** How many frames a checked row may take to leave before the wait gives up (a refused close). */
+const LEAVING_FRAMES = 30;
+
+/** Focus where the row stood: the row that took its place, the last one, or the heading's neighbour. */
+const focusInPlace = (place: NonNullable<RowPlace>): void => {
+  const items = place.list.isConnected ? itemsOf(place.list) : [];
+  const next = items[Math.min(place.index, items.length - 1)];
+  if (next !== undefined) {
+    focusInside(next);
+  } else if (place.heading?.isConnected === true) {
+    focusAfterHeading(place.heading);
+  }
 };
 
 /**
 A row that held focus left its list (checked off): focus goes to the row that took its place, the
 last one when it was last, the list's heading's neighbour when none is left, never to the top of
-the page (QA PR55-1-10).
+the page (QA PR55-1-10, class 375). It waits for the row to go (a few frames, as `focusPlaceById`
+does), and only where nothing else took focus meanwhile.
 */
 export const focusRowPlace = (place: RowPlace): void => {
   if (place === null) {
     return;
   }
-  afterRemoval(() => {
-    if (!isFocusLost()) {
-      return;
-    }
-    const items = place.list.isConnected ? itemsOf(place.list) : [];
-    const next = items[Math.min(place.index, items.length - 1)];
-    if (next !== undefined) {
-      focusInside(next);
-    }
-  });
+  const holder = document.activeElement;
+  const wait = (frames: number): void => {
+    requestAnimationFrame(() => {
+      // Focus the person moved meanwhile stays.
+      if (document.activeElement !== holder && !isFocusLost()) {
+        return;
+      }
+      if (place.item.isConnected) {
+        if (frames > 0) {
+          wait(frames - 1);
+        }
+        return;
+      }
+      if (isFocusLost()) {
+        focusInPlace(place);
+      }
+    });
+  };
+  wait(LEAVING_FRAMES);
 };
