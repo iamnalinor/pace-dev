@@ -300,7 +300,7 @@ what landed on the disk is ever pushed.
 |---|---|---|---|
 | `POST /api/sync/push` | `{ events: Event[] (≤ 500), storeId }` | `{ accepted: id[], rejected: { id, reason }[], seq }` | a `storeId` that is not the store's current one refuses the whole batch with `409 store/changed`; each envelope is validated with the core schema (`user-store/event-log.ts`); a rejected one is reported and the rest still goes in; a known id is accepted again without a second copy; a `recordedAt` after the server clock is clamped to it |
 | `GET /api/sync/pull?since=&limit=` | cursor `since` (default 0), `limit` 1–500 (default 200) | `{ events, seq, more, storeId }` | events after `since` in **sequence** order; `seq` is the cursor for the next call; `more` says whether to call again; `storeId` names the store they came from (below) |
-| `GET /api/sync/live` (WebSocket) | subprotocols `pace.v2, pace.v1, pace.auth.<token>` (`pace.v2` only when offered), `?device=<deviceId>&protocol=<n>` | v1: `{"type":"changed","seq":n}`; v2: `hello` first, then `events`; both: the notification pool's notices (`notification`, `dismiss`, `read`, `push-methods-changed`) | the user's Durable Object keeps it as a hibernating socket tagged with its subprotocol, device and session (id and expiry, set by the Worker; no duration billed while quiet; `ping` → `pong` without waking it). Revoking the session (Settings, logout, "Not me", account deletion: all through `deleteSession`) closes its sockets with code `4401` (`LIVE_SESSION_ENDED`); an expired one is closed instead of served, and the app checks its session rather than reconnecting. Whenever its log grows it tells every socket but the writing device's: v1 hears `changed`, v2 gets the new events (below). Not an `endpoint()`: an upgrade is not a JSON call. |
+| `GET /api/sync/live` (WebSocket) | subprotocols `pace.v2, pace.v1, pace.auth.<token>` (`pace.v2` only when offered), `?device=<deviceId>&protocol=<n>` | v1: `{"type":"changed","seq":n}`; v2: `hello` first (`{ type, protocol, seq, storeId }`: where the log stands), then `events`; both: the notification pool's notices (`notification`, `dismiss`, `read`, `push-methods-changed`) | the user's Durable Object keeps it as a hibernating socket tagged with its subprotocol, device and session (id and expiry, set by the Worker; no duration billed while quiet; `ping` → `pong` without waking it). Revoking the session (Settings, logout, "Not me", account deletion: all through `deleteSession`) closes its sockets with code `4401` (`LIVE_SESSION_ENDED`); an expired one is closed instead of served, and the app checks its session rather than reconnecting. Whenever its log grows it tells every socket but the writing device's: v1 hears `changed`, v2 gets the new events (below). Not an `endpoint()`: an upgrade is not a JSON call. |
 
 **`pace.v2`** (`packages/core/src/api/live-protocol.ts`) carries the sync hot path over the same
 socket; everything else stays HTTP, which also stays the fallback (a closed socket, or no answer
@@ -310,6 +310,7 @@ served as before. Requests are strict, answers loose (an unknown `type` reads as
 
 | Client sends | Server answers |
 |---|---|
+| — (as the socket opens) | `{ type: "hello", protocol: "pace.v2", seq, storeId }`: the server speaks v2, and its log's head (`LogHead` in `@pace/core`, read by the Durable Object's `logHead()`) as the socket opened. `seq` and `storeId` are optional on the wire: an older server sends neither |
 | `{ type: "push", id, storeId, events }` (the HTTP push body, `SyncPushBodySchema`, under a request id of 1–64 characters) | `{ type: "pushed", id, accepted, rejected, seq }` (the HTTP push answer), or `{ type: "error", id, code: "store/changed" }`; the store's same `push` runs, so a known id is accepted again without a second copy |
 | `{ type: "pull", id, since, limit? }` (`limit` 1–500, default `LIVE_PAGE` = 200) | `{ type: "events", id, since, seq, storeId, events, more }`: the HTTP pull's page |
 | anything else (invalid JSON, an unknown type, a bad field) | `{ type: "error", id, code: "bad-request" }` (`id` when one was readable, else empty); the socket stays open |
@@ -319,6 +320,14 @@ The client sends a local change within 0.8 s of writing it (and what is unsent w
 is hidden or the app goes to the background), pulls on every `changed` and on every
 reconnect of the live socket (back after 1 s, 2 s, … 60 s), and polls as a safety net: every
 5 minutes while the socket is up, every 30 s while it is down.
+
+**Skip the pull on connect** (`SyncClient.catchUpTo`, QA PR55-1-12). A v1 socket, or one that
+does not say its protocol, pulls as it opens. A v2 socket waits for its `hello` instead: one that
+names its head goes to `catchUpTo`, which first waits for a run in flight (a direct `syncNow()` on
+a return to the app) and then pulls only when the copy is not there yet (another `storeId`, a
+cursor below `seq`), holds writes to send, or the last run failed (its success is what clears the
+offline line). A copy the start's pull just brought to the head asks nothing. A `hello` that names
+no head (an older server) or fails the schema pulls as v1 does, and still turns v2 on.
 
 **One sync, two transports** (`packages/client/src/sync-transport.ts`). The sync client runs
 one pull loop, one outbox push and one `applyPage` over a `SyncTransport` and never knows
