@@ -1,20 +1,21 @@
 # Technical continuation: handoff
 
-Current as of 2026-11-10. This is the one status record for the technical continuation; the
+Current as of 2026-11-11. This is the one status record for the technical continuation; the
 per-task reports, reviews, ledgers and earlier handoffs are in [archive/](archive/) and are
 historical (their counts and "based on main" statements predate the rebase below).
 
 ## State now
 
 - PR #55 "Technical continuation" (Codex, branch `codex/technical-continuation`, head `a403eaa`)
-  was squashed onto the redesign PR #54 (`claude/pace-design-overhaul-b`, `5b1e883`) as commit
-  `8cf29c4a` on branch `ccr-360ee3f0-hebtg7`: a stacked PR on top of #54, not on main. Merge
-  resolutions are in that commit's message (the redesign's D1 0009 and DO 0006 stay; the account
-  cleanup table is D1 `0010`, the continuation's two DO migrations are one regenerated `0007`).
-- The full history of the Codex work stays on `codex/technical-continuation`.
-- A review of the stacked PR is being worked through in fix waves on branches off
-  `ccr-360ee3f0-hebtg7` (the tooling/CI/docs slice on `fix/t-tooling`). Earlier green CI runs of
-  PR #55 do not cover the rebased head; its own CI is the authority.
+  landed through PR #56 (branch `ccr-360ee3f0-hebtg7`), squash-merged into `main` on 2026-11-11
+  after the redesign (#54). The full history of the Codex work stays on
+  `codex/technical-continuation`; the pre-main history of #56 is on the local `backup/pr56-pre-main`.
+- #56 also carries: checkpoint correctness (classes 300–304, 360–364), the owner's 2026-11-10
+  feedback (no bar above a phone's top-level title, tap latency, Skip at the press), the local QA
+  round PR55-1 fixes (classes 320–327, 340–355) and two review waves (370–376). Its PR description
+  lists every change.
+- Last green CI: `1e0c86ff` (checks and the full e2e). The handoff commit after it was merged
+  without waiting for CI (owner's call, 2026-11-11).
 
 ## Delivered (all behind defaults that keep production as it was)
 
@@ -59,6 +60,35 @@ historical (their counts and "based on main" statements predate the rebase below
 - Minor: the Week grid wall-clock positioning issue (older than this work). Telegram cleanup
   replies now keep the request's language (stored on the confirmation).
 - Account cleanup recovery: a cron (`*/15 * * * *` in `wrangler.jsonc`, owner's decision 2026-11-10) runs the Worker's `scheduled` handler (`sweepAccountCleanups`), which resumes cleanups left `pending` (an outage, a crash, more than 100 archive objects) and settles confirmations still processing. Confirm again in Telegram or the app's status poll still resume one at once; while it waits the store is fenced and store calls answer `503 cleanup/busy`.
+
+## Left undone from PR #56 (owner feedback and QA, 2026-11-11)
+
+- **Tap latency, the rest.** Day did not get faster (its rows are not memoised: props rebuilt every
+  render, so the catch-up render of a screen that was hidden lands on the tab tap); Inbox's rows
+  likewise. The root `Navigator` reads `usePathname`, so the tab bar and the toast provider
+  re-render on every navigation (about 250–700 components per tap). Opening a task mounts about
+  520 components inside the tap. `e2e/latency.e2e.ts` ceilings were not lowered. Every number is
+  from the web build at 4× CPU; nothing was measured on an Android device, where the owner felt
+  the lag. Measurement scripts: `measure.mjs` in the session's scratchpad (not kept); the method
+  is in bug-lessons class 310.
+- **Skip from the notification feed** (Attend/Skip on a feed item) still waits for the server;
+  only the calendar card on Now and Day hides at the press.
+- **Check-off** still leaves the list only after the 750 ms dust animation (the close is staged
+  then); left as designed, worth asking the owner.
+- **QA leftovers:** R27-11 (Week block text cut with the pane open, two activities splitting a
+  ~100 px column); city names stay in English (Cloudflare reports them so); the calendar
+  "attended" log does not cut logged neighbours (needs the action path and the server's
+  `pool-answers`); the offline line says «изменения отправятся позже» when nothing is waiting; the
+  Close sheet's fixed example date «2026-10-07»; the Inbox selected-row highlight stops at the
+  button column (needs a colour pair); R28-05/07/08/09 remainders not re-checked.
+- **Review minors not done:** write instants follow prepare order across a history load on a
+  checkpoint copy (review item 4: re-prepare after `ensureHistory`); the `acceptSource` /
+  `sourceBootstrap` paths of the unreadable-source conversion have no test of their own.
+- **Flaky wall-clock tests:** `packages/client/src/state-cost.test.ts` and
+  `packages/core/.../materialize-cost.test.ts` fail now and then under load.
+- **No full QA round** ran on the merged result (owner: local checks only). The next release
+  needs the full round from [docs/qa.md](../../docs/qa.md), with one explicit check: a return to
+  the app on a flaky network (the offline line must clear, class 370).
 
 ## Removed
 
