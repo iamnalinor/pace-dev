@@ -2,8 +2,8 @@ import { Text, View } from "react-native";
 
 import { useAppState, usePace, useSettings, useT } from "#app/app-state.tsx";
 import { MetaLine } from "#app/shared/meta-line.tsx";
-import { cx } from "#app/ui/cx.ts";
 import { ProgressBar } from "#app/ui/progress-bar.tsx";
+import { Text as KitText } from "#app/ui/text.tsx";
 import { type PresetDraft, presetPreview, PREVIEW_SAMPLE } from "@pace/client";
 
 /** A sample task of this preset drawn like a Now row: its color, importance, due and progress. */
@@ -32,15 +32,13 @@ export const PresetPreview = ({ draft }: { readonly draft: PresetDraft }) => {
       <View className="flex-row gap-3">
         <View className="mt-0.5 h-6 w-6 rounded-pill border-stroke border-outline" />
         <View className="min-w-0 flex-1 gap-1">
-          <Text
-            className={cx(
-              "font-sans text-callout text-label-primary",
-              preview.importance === "nice_to_have" ? "font-normal" : "font-medium",
-            )}
-            numberOfLines={1}
+          <KitText
+            className={preview.importance === "nice_to_have" ? "font-normal" : "font-medium"}
+            policy="truncate"
+            role="callout"
           >
             {t("presets.sampleTitle")}
-          </Text>
+          </KitText>
           <MetaLine
             parts={preview.meta}
             tag={name === "" ? null : { color: preview.color, tag: { kind: "project", name } }}

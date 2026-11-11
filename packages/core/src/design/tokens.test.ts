@@ -269,6 +269,7 @@ describe("scales", () => {
     expect(motion.spring.thumb).toEqual({ damping: 24, stiffness: 420 });
     expect(motion.reduced.fade).toBe(motion.duration.sm);
     expect(motion.highlight).toBe(600);
+    expect(motion.breath * 2).toBe(1200);
   });
 
   it("has the z layers in order", () => {

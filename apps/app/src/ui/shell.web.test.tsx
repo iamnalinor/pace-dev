@@ -19,6 +19,15 @@ describe("Shell on the web (spec §4.2.18: main landmark and skip link, F-A11Y-1
     expect(main).toBeOnTheScreen();
   });
 
+  it("the app's shell on a phone (no navigation region) is still main, with the skip link", async () => {
+    await renderScreen(
+      <Shell content={<Text>List</Text>} isRoot />,
+      await createTestRuntime({ world: "empty" }),
+    );
+    expect(screen.getByTestId("shell-content").props["role"]).toBe("main");
+    expect(screen.getByRole("link", { name: en("nav.skipToContent") })).toBeOnTheScreen();
+  });
+
   it("a nested shell (a screen's inspector) is no second landmark and has no skip link", async () => {
     await renderScreen(
       <Shell content={<Text>Grid</Text>} />,

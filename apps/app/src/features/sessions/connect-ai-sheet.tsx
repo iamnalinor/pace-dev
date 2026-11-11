@@ -65,6 +65,7 @@ const ConnectSteps = ({
         <View className="gap-1" key={client.name}>
           <Text
             accessibilityRole="header"
+            aria-level={3}
             className="font-sans text-callout font-semibold text-label-primary"
           >
             {t(client.name)}

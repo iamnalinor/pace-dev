@@ -3,7 +3,7 @@ import type { ParamListBase } from "expo-router/react-navigation";
 import { Stack, type StackNavigationState } from "expo-router";
 import { type ReactNode, useEffect } from "react";
 
-import { sceneLayout } from "./screen-scene.tsx";
+import { pushedSceneLayout } from "./screen-scene.tsx";
 import { useTheme } from "./theme-provider.tsx";
 
 /** The More tab's own list: the first screen of its stack. */
@@ -63,7 +63,7 @@ export const MoreStack = () => {
           {children}
         </MoreAnchor>
       )}
-      screenLayout={sceneLayout}
+      screenLayout={pushedSceneLayout}
       screenOptions={{ contentStyle: { backgroundColor: palette["bg.app"] }, headerShown: false }}
     />
   );

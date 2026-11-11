@@ -130,10 +130,12 @@ phone's, a 4 high `fill.4` track filled in `label.primary` up to the thumb (`--p
 /*
 The shell's skip link (ui/shell.web.tsx; spec §4.2.18, F-A11Y-12): above the top edge of the page,
 whole (nothing clipped, nothing under the pointer), until the keyboard reaches it; then it comes
-down to where it sits, the first stop of the page.
+down to where it sits, the first stop of the page. Off by the viewport's height plus its own, not
+by a multiple of its own: the shell can start lower than the page's top (the update strip above it),
+and a link moved up by its own height alone would show over that strip (bug-lessons 381).
 */
 [data-skip-link]:not(:focus-within) {
-  transform: translateY(-200%);
+  transform: translateY(calc(-100vh - 100%));
 }
 
 /*
@@ -230,6 +232,76 @@ targets, and the browser fires no click (bug-lessons class 138).
 [data-pace-inner]:focus-visible > [data-pace-visual] {
   outline: 2px solid var(--pace-focus);
   outline-offset: 2px;
+}
+
+/*
+The mobile-web baseline (spec §7). The page is an app, not a document: pulling down at the top
+does not reload it (F-WEB-06), and a scroller inside a sheet or a pane does not hand its scroll to
+the page under it.
+*/
+html,
+body {
+  overscroll-behavior-y: none;
+}
+
+[data-pace-surface],
+[data-pace-surface] * {
+  overscroll-behavior: contain;
+}
+
+/* The selection, the caret and the scrollbars are the app's colours, in both themes (F-WEB-14). */
+::selection {
+  background-color: var(--pace-selection);
+}
+
+input,
+textarea {
+  caret-color: var(--pace-accent);
+}
+
+* {
+  scrollbar-color: var(--pace-label-quaternary) transparent;
+}
+
+/*
+A stack's screen coming to the front (spec §6 "route push / pop"; `ui/screen-scene.web.tsx` sets
+the mark): a pushed screen slides in 12 px and fades on the enter curve, the screen under a popped
+one comes back from the other side in the exit's time. The transform is gone once the animation
+ends, so a fixed footer inside the screen is positioned by the window again. Reduced motion keeps
+a fade (never nothing: the change still shows).
+*/
+@keyframes pace-route-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+}
+
+@keyframes pace-route-back {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+}
+
+@keyframes pace-route-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+[data-pace-route="in"] {
+  animation: pace-route-in 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+[data-pace-route="back"] {
+  animation: pace-route-back 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-pace-route] {
+    animation: pace-route-fade 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
 }
 
 /*

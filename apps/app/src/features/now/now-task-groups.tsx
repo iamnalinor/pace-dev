@@ -13,7 +13,6 @@ export const NowTaskGroups = ({ rows }: { readonly rows: readonly NowRow[] }) =>
   const undatedIds = new Set(undated.map((row) => row.id));
   return (
     <TaskRows
-      animateLayout={false}
       boundary={{ isAfter: (row) => undatedIds.has(row.id), label: t("now.withoutDeadline") }}
       label={t("now.tasks")}
       rows={[...dated, ...undated]}

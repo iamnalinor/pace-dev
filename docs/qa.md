@@ -241,6 +241,19 @@ control and the script needs the new label. `DESIGN_SHOTS_ONLY=states` and
 `DESIGN_SHOTS_STATES=day-gap-log,day-block-edit` re-shoot part of it. Shoot into `.cache/`
 (git-ignored); only a new baseline is committed under `context/design/baseline/`.
 
+What a design pass looks for with its eyes, on every changed screen (the guard lines of the
+overhaul's bug-lessons sweep, Task 8.6; a script cannot judge these):
+
+- **Colour budget**: neutrals carry the screen; a category hue or a status colour appears only
+  where it means something, and never two tinted grounds side by side.
+- **One filled accent per view**: one primary action is filled; everything else is tonal or plain.
+- **The title's height is constant**: every top-level screen's title sits at the same y, with or
+  without a subtitle, a stepper or a badge beside it.
+- **Sheets leave the way they came**: a sheet slides down, a dialog scales out, a popover fades at
+  its anchor; nothing appears with motion and vanishes without it, and reduced motion still fades.
+- **Russian at 390 px**: every changed screen is read in Russian on the phone viewport: no word
+  broken across lines, no label cut, no button that grew a second line beside a one-line twin.
+
 ## Limits
 
 - The LLM is the fake provider: parsing findings need a check against the real model.

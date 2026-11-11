@@ -26,6 +26,7 @@ const Section = ({ children, title }: { readonly children: ReactNode; readonly t
   >
     <Text
       accessibilityRole="header"
+      aria-level={2}
       className="pb-1 pt-3 font-sans text-caption2 font-normal uppercase tabular-nums text-label-tertiary"
     >
       {title}

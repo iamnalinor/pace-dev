@@ -41,14 +41,15 @@ const SkipLink = ({ onSkip }: { readonly onSkip: () => void }) => {
 };
 
 /**
-The web's shell (see `shell.tsx`): the same three regions; the shell that carries the navigation
-also makes the content the page's `main` landmark, with the skip link before everything.
+The web's shell (see `shell.tsx`): the same three regions; the app's own shell (`isRoot`, or the
+one that carries the navigation) also makes the content the page's `main` landmark, with the skip
+link before everything. A phone's root shell has no navigation region and is `main` all the same.
 */
-export const Shell = ({ content, navigation, ...inspector }: ShellProps) => {
+export const Shell = ({ content, isRoot = false, navigation, ...inspector }: ShellProps) => {
   const mainRef = useRef<View>(null);
   const insets = useShellInsets();
-  const isTopLevel = navigation !== undefined;
-  const region = useRegionLayout(isTopLevel);
+  const isTopLevel = isRoot || navigation !== undefined;
+  const region = useRegionLayout(navigation !== undefined);
   return (
     <View className="flex-1 flex-row bg-app" style={insets} testID="shell">
       {isTopLevel ? (

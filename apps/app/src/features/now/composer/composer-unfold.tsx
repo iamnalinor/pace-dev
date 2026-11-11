@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import Animated, {
+  ReduceMotion,
   type SharedValue,
   useAnimatedStyle,
   useSharedValue,
@@ -69,7 +70,7 @@ const animate = (
   then: () => void,
 ): void => {
   value.set(
-    withTiming(to, { duration, easing }, (isFinished) => {
+    withTiming(to, { duration, easing, reduceMotion: ReduceMotion.Never }, (isFinished) => {
       if (isFinished === true) {
         scheduleOnRN(then);
       }

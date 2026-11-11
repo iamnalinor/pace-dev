@@ -32,7 +32,11 @@ const IncompatibleScreen = () => {
       {/* A centred column on a computer, as the login card is, not the window's left edge. */}
       <View className="w-full max-w-message gap-8 self-center">
         <View className="gap-3">
-          <Text accessibilityRole="header" className="font-sans text-title1 text-label-primary">
+          <Text
+            accessibilityRole="header"
+            aria-level={1}
+            className="font-sans text-title1 text-label-primary"
+          >
             {t("server.mismatch")}
           </Text>
           <Text className="font-sans text-callout text-label-secondary">

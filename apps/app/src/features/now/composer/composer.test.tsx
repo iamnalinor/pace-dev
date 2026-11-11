@@ -246,8 +246,13 @@ describe("Composer", () => {
     // Pending: the chosen answer is marked, nothing else can be pressed, nothing was written.
     expect(within(question).getByRole("button", { name: "Today" })).toBeDisabled();
     expect(within(question).getByRole("button", { name: "Tomorrow" })).toBeDisabled();
-    expect(within(question).getByRole("button", { name: "Tomorrow" })).toBeSelected();
-    expect(within(question).getByRole("button", { name: "Today" })).not.toBeSelected();
+    // A pressed toggle, the button's own state (a button may not say `aria-selected`).
+    expect(within(question).getByRole("button", { name: "Tomorrow" }).props["aria-pressed"]).toBe(
+      true,
+    );
+    expect(within(question).getByRole("button", { name: "Today" }).props["aria-pressed"]).toBe(
+      false,
+    );
     expect(button("assistant.approve")).toBeDisabled();
     expect(screen.getByLabelText(en("assistant.correct"))).toBeDisabled();
     expect(created(runtime, "разобрать почту")).toBeUndefined();

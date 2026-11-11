@@ -25,6 +25,16 @@ export const DIALOG_SCALE = { enter: 0.96, exit: 0.98 } as const;
 /** A popover grows in from 98 % at its anchor's edge. */
 export const POPOVER_SCALE = 0.98;
 
+/**
+The scale at a step of an enter (0 → 1) that starts at `from`. The step is held inside 0…1: on the
+web the first frame can land a few ms before the animation's start, where the ease-out curve
+answers below 0, and the dialog was drawn at 94 % (F-MOT-06).
+*/
+export const grownScale = (from: number, step: number): number => {
+  "worklet";
+  return from + (1 - from) * Math.min(Math.max(step, 0), 1);
+};
+
 /** Past this share of its height, a dragged sheet goes (spec §4.2.21). */
 const DISMISS_SHARE = 0.3;
 

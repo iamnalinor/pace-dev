@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 import { useRouter } from "expo-router";
-import { Linking, ScrollView, Text, View } from "react-native";
+import { Linking, Text, View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
@@ -10,7 +10,6 @@ import { useOpenTask } from "#app/shared/task-opener.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
 import { Group } from "#app/ui/group.tsx";
-import { IconButton } from "#app/ui/icon-button.tsx";
 import { Icon, type IconName } from "#app/ui/icon.tsx";
 import { ListRow } from "#app/ui/list-row.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
@@ -48,7 +47,7 @@ const whenText = (
 };
 
 /** The pick's title and its day and hours, for the pane's header or the sheet's title. */
-const useHeading = (
+export const useHeading = (
   picked: Picked,
   zone: string,
 ): { readonly title: string; readonly when: string } => {
@@ -260,7 +259,7 @@ const GroupList = ({
 };
 
 /** The facts of a pick, the same in the pane and in the sheet. */
-const PickedFacts = ({
+export const PickedFacts = ({
   onLeave,
   onPick,
   picked,
@@ -286,7 +285,7 @@ const PickedFacts = ({
 };
 
 /** A pick, the week it is on, and how to let it go. */
-type PickedProps = {
+export type PickedProps = {
   readonly picked: Picked;
   /** Opens one of a folded run's items in its place. */
   readonly onPick: (picked: Picked) => void;
@@ -309,31 +308,5 @@ export const PickedSheet = ({ onClose, onPick, picked, week }: PickedProps) => {
     >
       <PickedFacts onLeave={onClose} onPick={onPick} picked={picked} week={week} />
     </Sheet>
-  );
-};
-
-/**
-A wide window's details beside the grid, in the shell's inspector: it is there only while
-something is picked (F-LAY-03).
-*/
-export const PickedPane = ({ onClose, onPick, picked, week }: PickedProps) => {
-  const t = useT();
-  const { title, when } = useHeading(picked, week.zone);
-  return (
-    <ScrollView className="flex-1" contentContainerClassName="gap-4 px-6 pb-10 pt-6">
-      <View className="flex-row items-start gap-2">
-        <View className="min-w-0 flex-1">
-          <Text accessibilityRole="header" className="font-sans text-title2 text-label-primary">
-            {title}
-          </Text>
-          <Text className="mt-1 font-sans text-footnote text-label-secondary">{when}</Text>
-        </View>
-        {/* The cross's middle on the title's first line, as in the sheets (QA round 16 L10). */}
-        <View className="-mr-2 h-6 justify-center">
-          <IconButton icon={"x"} label={t("common.close")} onPress={onClose} />
-        </View>
-      </View>
-      <PickedFacts onLeave={onClose} onPick={onPick} picked={picked} week={week} />
-    </ScrollView>
   );
 };

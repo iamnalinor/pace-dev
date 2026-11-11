@@ -10,7 +10,7 @@ only on an `expanded` window and only while something is selected; a `medium` or
 shows the selection in a sheet instead, so the shell draws no pane there. The web build swaps in
 `shell.web.tsx`, which adds the `main` landmark and the skip link.
 */
-export const Shell = ({ content, navigation, ...inspector }: ShellProps) => {
+export const Shell = ({ content, isRoot: _isRoot, navigation, ...inspector }: ShellProps) => {
   const insets = useShellInsets();
   return (
     <View className="flex-1 flex-row bg-app" style={insets} testID="shell">

@@ -13,7 +13,6 @@ import { en, renderScreen } from "#app/test/render.tsx";
 import { paramsSet, router, searchParams, setSearchParams } from "#app/test/router.ts";
 import { createTestRuntime, pulledInto } from "#app/test/runtime.ts";
 import { rowsInFlattenableBoxes } from "#app/test/sliding-rows.ts";
-import { DISSOLVE_MS } from "#app/ui/dissolve.tsx";
 import { createMemoryEventStore } from "@pace/client";
 import { addMinutesIso, calendarEventKey } from "@pace/core";
 import { HW_ID, NOW, rentSeriesEvents } from "@pace/core/testing";
@@ -234,13 +233,11 @@ describe("NowBoard", () => {
     await renderScreen(<Board />, runtime);
     const check = screen.getByRole("checkbox", { name: "Mark Reply to course curator done" });
     await fireEvent.press(check);
-    // Checked at once while it turns to dust; written once the dust has gone.
-    expect(check).toBeChecked();
     const closed = () =>
       Object.values(runtime.state.store.getState().tasks.byId).find(
         (task) => task.title === "Reply to course curator",
       )?.closed;
-    expect(closed()).toBeNull();
+    // Written from the press: the fade does not hold the close back (spec §6, bug-lessons 3).
     await waitFor(() => {
       expect(closed()).not.toBeNull();
     });
@@ -279,7 +276,7 @@ describe("NowBoard", () => {
     const TITLE = "Reply to course curator";
     const CHECK = { name: `Mark ${TITLE} done` };
 
-    /** Checks the row, lets the dust run out, and holds the close until the test settles it. */
+    /** Checks the row, lets the row leave, and holds the close until the test settles it. */
     const checkAndHold = async () => {
       jest.useFakeTimers();
       const runtime = await createTestRuntime();
@@ -288,7 +285,7 @@ describe("NowBoard", () => {
       await renderScreen(<Board />, runtime);
       await fireEvent.press(screen.getByRole("checkbox", CHECK));
       await act(async () => {
-        await jest.advanceTimersByTimeAsync(DISSOLVE_MS + 50);
+        await jest.advanceTimersByTimeAsync(50);
       });
       return { close, closeTask };
     };
@@ -297,7 +294,7 @@ describe("NowBoard", () => {
       jest.useRealTimers();
     });
 
-    it("stays gone while the close is pending: the dust does not hand it back", async () => {
+    it("stays gone while the close is pending: the finished fade does not hand it back", async () => {
       const { close, closeTask } = await checkAndHold();
       expect(closeTask).toHaveBeenCalledTimes(1);
       // The store has not dropped the row yet, but it must not show again, checked or not.
@@ -346,7 +343,7 @@ describe("NowBoard", () => {
       const title = "Reply to course curator";
       await fireEvent.press(screen.getByRole("checkbox", { name: `Mark ${title} done` }));
       await act(async () => {
-        await jest.advanceTimersByTimeAsync(DISSOLVE_MS + 50);
+        await jest.advanceTimersByTimeAsync(50);
       });
       expect(screen.getByText(en("actionError.persist_failed"))).toBeOnTheScreen();
       expect(screen.getByRole("checkbox", { name: `Mark ${title} done` })).not.toBeChecked();
@@ -372,7 +369,7 @@ describe("NowBoard", () => {
       await renderScreen(<Board />, runtime);
       await fireEvent.press(screen.getByRole("checkbox", { name: "Mark Algebra HW 6 done" }));
       await act(async () => {
-        await jest.advanceTimersByTimeAsync(DISSOLVE_MS + 50);
+        await jest.advanceTimersByTimeAsync(50);
       });
       expect(router.push).not.toHaveBeenCalled();
       expect(runtime.state.store.getState().tasks.byId[HW_ID]?.closed?.outcome).toBe("done");

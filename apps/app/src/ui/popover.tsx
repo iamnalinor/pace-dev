@@ -7,7 +7,7 @@ import { layout, shadow } from "@pace/core";
 import { useFocusBack } from "../platform/focus-back.ts";
 import { paletteVars } from "../platform/theme.ts";
 import { FILL, OverlayLayer, useOverlayProgress } from "./overlay-frame.tsx";
-import { placePopover, POPOVER_SCALE } from "./overlay-motion.ts";
+import { grownScale, placePopover, POPOVER_SCALE } from "./overlay-motion.ts";
 import { useOverlayPhase } from "./overlay-presence.tsx";
 import { useSheetFocusRef } from "./sheet-focus.ts";
 import { useTheme } from "./theme-provider.tsx";
@@ -51,7 +51,7 @@ const usePopoverMotion = (isOpen: boolean, letGo: () => void) => {
     const step = progress.get();
     return isReduced
       ? { opacity: step }
-      : { opacity: step, transform: [{ scale: POPOVER_SCALE + (1 - POPOVER_SCALE) * step }] };
+      : { opacity: step, transform: [{ scale: grownScale(POPOVER_SCALE, step) }] };
   }, [isReduced]);
 };
 

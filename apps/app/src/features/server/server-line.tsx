@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Pressable, Text } from "react-native";
+import { Text } from "react-native";
 import { useStore } from "zustand";
 
 import { useT } from "#app/app-state.tsx";
 import { serverHost, serverStore } from "#app/platform/server-store.ts";
 import { OverlayPresence } from "#app/ui/overlay-presence.tsx";
+import { Pressable } from "#app/ui/pressable.tsx";
 
 import { ChangeServerSheet } from "./change-server-sheet.tsx";
 
@@ -19,12 +20,12 @@ export const ServerLine = () => {
   return (
     <>
       <Pressable
-        accessibilityLabel={t("server.changeLabel", { host })}
-        accessibilityRole="button"
-        className="min-h-hit-web items-center justify-center self-center px-3 active:opacity-70"
+        className="min-h-hit-web items-center justify-center self-center px-3"
+        label={t("server.changeLabel", { host })}
         onPress={() => {
           setIsOpen(true);
         }}
+        role="button"
       >
         <Text className="text-center font-sans text-footnote text-label-secondary">
           {t("server.line", { host })}

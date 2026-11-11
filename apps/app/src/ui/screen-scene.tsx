@@ -19,3 +19,9 @@ export const ScreenScene = ({ children, route }: SceneProps) => (
 export const sceneLayout = ({ children, route }: SceneProps): ReactElement => (
   <ScreenScene route={route}>{children}</ScreenScene>
 );
+
+/**
+A stack's `screenLayout`: the same scene; the route transition is the native stack's own here
+(the web build marks a pushed screen for its CSS transition, `screen-scene.web.tsx`).
+*/
+export const pushedSceneLayout = (props: SceneProps): ReactElement => sceneLayout(props);

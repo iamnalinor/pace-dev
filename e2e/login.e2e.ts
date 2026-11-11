@@ -39,6 +39,9 @@ test("dev login → Now → tabs → Russian → logout", async ({ page }) => {
 
   await page.getByRole("radio", { name: "Русский" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Настройки" })).toBeVisible();
+  // Sent before the reload: the first paint now shows the kept language at once (F-DAT-04), so the
+  // heading no longer waits for the account's copy, and a Log out over an unsent change asks first.
+  await outboxSent(page);
 
   // The language is an account setting: it survives a reload (IndexedDB) and the sync round trip.
   await page.reload();

@@ -6,6 +6,42 @@ full decision log is [`overhaul-ledger.md`](overhaul-ledger.md) (a copy of the p
 working ledger; its last lines are the most recent rulings).
 
 
+## 0000. Session 2026-11-10/11: PR C "Polish" (PR #57, stacked on #56)
+
+**Owner's rules for this run:** take stage C; no QA round and no long post-mortems (usage limits); review is allowed; the controller builds the features itself, mechanical migrations go to Sonnet, test wrangling (e2e) to Opus; branch off PR #56 (`ccr-360ee3f0-hebtg7`) so there are no conflicts later; a PR as soon as something is pushed.
+
+**Branch / PR:** `claude/confident-rubin-gvoy1r`, PR #57 (draft), base `ccr-360ee3f0-hebtg7`. Retarget to `main` once #56 merges.
+
+**Done:**
+- 5.1 + 5.2 check-off: `ui/dissolve.tsx` is a 160 ms fade plus the row's own height closing up in 220 ms, done on the animation's completion; the close is written on the press; `shared/task-list.tsx` keeps a leaving row until its animation ends. Task rows have no entering/exiting/layout motion (mount and filter change are instant). Bug-lessons 365.
+- 5.3: `motion-presets.ts` `timing()` sets `ReduceMotion.Never` for every kit animation (the reduced fades never played before: bug-lessons 366); web route push/pop (`ui/screen-scene.web.tsx`, `scene-motion.ts`, `global.css` `[data-pace-route]`); the dialog's scale is clamped (bug-lessons 368); the close sheet's reason is a `Collapse` (QA21 L2); the toast leaves with a 4 px drop.
+- 6.1: language at first paint (`platform/language-stored.web.ts`, `theme-boot.js`, `useLanguage`); a phone's root shell is `main` with the skip link (`Shell isRoot`). Titles were already built (`document-head.web.tsx`).
+- 6.2: `global.css` baseline (overscroll, selection, caret, scrollbars), viewport `interactive-widget=resizes-content`, `platform/keyboard.web.ts`. Bug-lessons 367.
+- 6.3: the update notice is an overlay card (`update-banner.web.tsx`); manifest `id`, `lang`, separate maskable icon, shortcuts; the favicon follows the tab strip's scheme.
+- 6.4 (part): `scripts/serve-web.ts` applies `_headers` (`scripts/web-headers.ts`).
+- 8.1: the three lint ratchets are 0 and the rules are errors (`scripts/eslint-ratchet.ts` is gone).
+- 8.5: already true in `CLAUDE.md` (the Design bullet names impeccable as the one direction source).
+- 8.6: `docs/qa.md` got the design pass's guard lines.
+- 8.4: `DESIGN.md` / `.impeccable/design.json` regenerated from the shipped code.
+- e2e: `e2e/motion.e2e.ts` (frame sampler), `e2e/web-baseline.e2e.ts`, `e2e/a11y.e2e.ts`.
+
+**Resumed 2026-11-11 06:05 MSK and finished:** PR #56's branch merged in (8 conflicts); `e2e/web-baseline.e2e.ts` and `e2e/a11y.e2e.ts` written (they found and this run fixed: the time bar scrolls with content on short windows, zod's eval probe under the CSP, headings without a level; bug-lessons 377–379); `DESIGN.md` / `.impeccable/design.json` regenerated from the code (8.4); one code review of the branch, its findings fixed (check-off: a double tap, rows checked in a run, a stale mark after a refusal; bug-lessons 369; and the answer buttons' ARIA state, 380). Open for the owner: the update card covers the top bar on a phone and cannot be dismissed (move it to the bottom above the tab bar, or collapse it to a pill?), and its copy (spec: "A new version of Pace · Refresh page", code: "A new version of Pace is ready."). Known flaky: `sheet-focus.e2e.ts:369` under 4 workers.
+
+**Not done, with the reason (each is a task of its own):**
+| Item | Why | What to do |
+|---|---|---|
+| 5.6 tap latency ≤ 100 ms | owner deferred it to a separate task (HANDOFF §7) | profile at 4× CPU; the check-off no longer mounts the dust, so re-measure and lower `CEILINGS.check` first |
+| 6.2 "the window scrolls on desktop" | a structural change of every scene (hidden scenes, fixed footers, virtualised lists) with no QA round to catch regressions; F-WEB-05's visible defect (wheel over the gutters, scrollbar at the region's edge) is already fixed by the region scroller | decide whether browser scroll restoration / find-in-page / Space from `body` are worth it; if yes, its own PR with a QA round |
+| 6.3 draft guard on Refresh and `beforeunload` | obsolete: drafts are kept on the device since feedback 5 item 7, a reload loses no typing | nothing |
+| 6.3 manifest `screenshots`, light/dark splash | screenshots need committed images from the shot matrix; the manifest has one `background_color` (no standard light/dark pair) | add screenshots with 8.3's images |
+| 6.4 bundle ≤ 450 KB gz | the entry is ≈ 950 KB gz; route splitting of four screens cannot halve it, it needs a bundle analysis (reanimated, react-native-web, zod, the client) | its own task; `e2e/web-baseline.e2e.ts` holds a ratchet so it does not grow |
+| 8.2 visual goldens | pixel goldens made in this sandbox would not match the CI runner's font rasterisation; they must be produced by the CI job itself | add a `workflow_dispatch` job that writes the goldens on the runner, commit its artefact |
+| 8.3 README screenshots | not re-shot in this run | `README_SHOTS=docs/screenshots bun test:e2e e2e/readme-shots.e2e.ts`, review, commit |
+| 8.7 final QA rounds | owner: no QA in this run | one round per `docs/qa.md` before the release, with `../stage-8/recheck-after-freeze.md` |
+| 5.3 inspector content cross-fade when already open; route "pop" exit of the leaving screen | minor; the leaving screen is removed from the page by the navigator, only the revealed one animates | — |
+
+**Verify on hardware (Android), new in C:** the check-off (fade, rows close up; with "Remove animations": fade, then gone, no blank gap); every sheet, dialog, toast and fold still animates and, with "Remove animations", fades instead of jumping (the library switch is off now: check nothing stutters); the close sheet's reason field grows in when Cancelled or Skipped is chosen.
+
 ## 000. Session 2026-11-09/10: finish of PR #54, then a freeze
 
 - **What was done.** Feedback round 5 was implemented. QA rounds 24–28 ran, each with a code review alongside, and every round's mediums and highs were fixed. There was no blocker or high from round 24 onwards. Bug lessons run up to 249; 250+ belongs to PR #55.

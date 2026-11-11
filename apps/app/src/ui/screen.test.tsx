@@ -1,4 +1,4 @@
-import { fireEvent, screen } from "@testing-library/react-native";
+import { fireEvent, screen, within } from "@testing-library/react-native";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
 
@@ -216,4 +216,51 @@ describe("what floats over a wide screen (QA PR55-1-14)", () => {
       expect(placeOfToast()).toMatchObject({ left: 248 + 16, right: 1440 - (248 + width) + 16 });
     },
   );
+});
+
+/** Whether the footer is laid out inside the scrolling body (it scrolls with the content). */
+const isFooterInBody = (): boolean =>
+  within(screen.getByTestId("screen-body")).queryByTestId("screen-footer") !== null;
+
+describe("the footer on a short window (spec §5.1, Q12: at 320 px and 200 % the bar scrolls with content)", () => {
+  describe("a phone of usual height", () => {
+    it("keeps the footer fixed under the content", async () => {
+      await renderScreen(
+        <Screen footer={<Text>Time bar</Text>}>
+          <Text>List</Text>
+        </Screen>,
+        await createTestRuntime({ world: "empty" }),
+      );
+      expect(isFooterInBody()).toBe(false);
+    });
+  });
+
+  describe("a short window (320 × 568)", () => {
+    withWindowWidth(320, 568);
+
+    it("lays the footer at the end of the content, so the list keeps the window", async () => {
+      await renderScreen(
+        <Screen footer={<Text>Time bar</Text>}>
+          <Text>List</Text>
+        </Screen>,
+        await createTestRuntime({ world: "empty" }),
+      );
+      expect(isFooterInBody()).toBe(true);
+      expect(screen.getByText("Time bar")).toBeOnTheScreen();
+    });
+  });
+
+  describe("a computer at 200 % zoom (640 × 450)", () => {
+    withWindowWidth(640, 450);
+
+    it("lays the footer at the end of the content too", async () => {
+      await renderScreen(
+        <Screen footer={<Text>Time bar</Text>}>
+          <Text>List</Text>
+        </Screen>,
+        await createTestRuntime({ world: "empty" }),
+      );
+      expect(isFooterInBody()).toBe(true);
+    });
+  });
 });

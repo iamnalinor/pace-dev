@@ -14,6 +14,7 @@ describe("generate-icons", () => {
     const byPath = new Map(ICONS.map((icon) => [icon.path, icon.size]));
     expect(byPath.get("apps/app/public/icon-192.png")).toBe(192);
     expect(byPath.get("apps/app/public/icon-512.png")).toBe(512);
+    expect(byPath.get("apps/app/public/icon-maskable-512.png")).toBe(512);
     expect(byPath.get("apps/app/public/apple-touch-icon.png")).toBe(180);
     expect(byPath.get("apps/app/assets/icon.png")).toBe(1024);
     expect(byPath.get("apps/app/assets/adaptive-icon.png")).toBe(1024);
@@ -66,7 +67,18 @@ describe("generate-icons", () => {
     expect(everything).not.toContain("#4263eb");
     expect(everything).not.toContain("#91a7ff");
     expect(svg["assets/logo/favicon.svg"]).not.toContain("<circle");
-    expect(svg["apps/app/public/favicon.svg"]).toBe(svg["assets/logo/favicon.svg"]);
+  });
+
+  it("draws the tab's favicon in the lime of the tab strip's scheme (F-WEB-15; owner, round 2)", () => {
+    const svg = Object.fromEntries(LOGO_FILES.map((file) => [file.path, file.svg]));
+    const favicon = svg["apps/app/public/favicon.svg"] ?? "";
+    expect(color("light", "logo").toLowerCase()).toBe("#5e8c00");
+    expect(color("dark", "logo").toLowerCase()).toBe("#c8f03c");
+    expect(favicon).toContain(`.tile { fill: ${color("light", "logo")}; }`);
+    expect(favicon).toContain(
+      `@media (prefers-color-scheme: dark) { .tile { fill: ${color("dark", "logo")}; } }`,
+    );
+    expect(favicon).toContain(`stroke="${color("dark", "bg.app")}"`);
   });
 
   it("parses PNG headers", () => {

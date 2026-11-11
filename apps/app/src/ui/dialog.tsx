@@ -15,7 +15,7 @@ import {
   Scrim,
   useOverlayProgress,
 } from "./overlay-frame.tsx";
-import { DIALOG_SCALE } from "./overlay-motion.ts";
+import { DIALOG_SCALE, grownScale } from "./overlay-motion.ts";
 import { useOverlayPhase } from "./overlay-presence.tsx";
 import { useScrim } from "./scrim.ts";
 import { useSheetFocusRef } from "./sheet-focus.ts";
@@ -53,7 +53,7 @@ const useDialogMotion = (isOpen: boolean, letGo: () => void) => {
       return { opacity: step };
     }
     const from = isOpen ? DIALOG_SCALE.enter : DIALOG_SCALE.exit;
-    return { opacity: step, transform: [{ scale: from + (1 - from) * step }] };
+    return { opacity: step, transform: [{ scale: grownScale(from, step) }] };
   }, [isOpen, isReduced]);
   return { progress, style };
 };

@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { Icon } from "#app/ui/icon.tsx";
+import { DISABLED } from "#app/ui/pressable-props.ts";
+import { Pressable } from "#app/ui/pressable.tsx";
 import { answerText, type MessageKey, type ParseQuestion } from "@pace/core";
 
 /**
@@ -33,18 +35,17 @@ const QuestionBlock = ({
       <View className="flex-row flex-wrap gap-x-2">
         {question.options.map((option) => (
           <Pressable
-            accessibilityLabel={option}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: busy, selected: option === chosen }}
-            className={cx(
-              "h-hit-web justify-center active:opacity-80",
-              busy && option !== chosen && "opacity-50",
-            )}
+            // The tapped answer is a pressed toggle: a button may not say `aria-selected` (axe
+            // aria-allowed-attr, critical); `aria-pressed` is the button's own state.
+            aria-pressed={option === chosen}
+            className="h-hit-web justify-center"
             disabled={busy}
             key={option}
+            label={option}
             onPress={() => {
               onAnswer(option);
             }}
+            role="button"
           >
             <View
               className={cx(
@@ -54,7 +55,14 @@ const QuestionBlock = ({
                   : "border border-outline bg-app",
               )}
             >
-              <Text className="font-sans text-footnote text-label-primary">{option}</Text>
+              <Text
+                className={cx(
+                  "font-sans text-footnote",
+                  busy && option !== chosen ? DISABLED.label : "text-label-primary",
+                )}
+              >
+                {option}
+              </Text>
             </View>
           </Pressable>
         ))}

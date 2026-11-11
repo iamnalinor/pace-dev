@@ -1,4 +1,4 @@
-import { Easing } from "react-native-reanimated";
+import { Easing, ReduceMotion } from "react-native-reanimated";
 
 import { motion, space } from "@pace/core";
 
@@ -13,11 +13,20 @@ export const EASING = {
 } as const;
 
 /**
+A timed animation's settings. The kit picks its reduced variant itself (a fade of
+`reduced.fade` in place of travel and scale, spec §3.8), so Reanimated must not skip the animation
+on its own: its default (`ReduceMotion.System`) jumps to the end under reduced motion, and the
+fade that was to stand in for the motion never showed (bug-lessons 366).
+*/
+export const timing = (duration: number, curve: keyof typeof EASING) =>
+  ({ duration, easing: EASING[curve], reduceMotion: ReduceMotion.Never }) as const;
+
+/**
 How a `Presence` comes and goes (spec §6): `fade`; `lift` (4 up + fade, the assistant's preview);
-`rise` (8 up + fade, the toast); `scale` (0.96 → 1 + fade, a dialog); `slide` (16 in from the
+`rise` (8 up + fade, the toast's enter); `drop` (4 + fade on the long timing, the toast's exit); `scale` (0.96 → 1 + fade, a dialog); `slide` (16 in from the
 trailing edge + fade, the inspector).
 */
-export type PresencePreset = "fade" | "lift" | "rise" | "scale" | "slide";
+export type PresencePreset = "drop" | "fade" | "lift" | "rise" | "scale" | "slide";
 
 /** Where a preset starts its enter (and ends its exit): fully transparent, moved or shrunk by this much. */
 export type PresenceFrom = {
@@ -31,6 +40,7 @@ export type PresenceFrom = {
 const SCALE_FROM = 0.96;
 
 const FROM: Readonly<Record<PresencePreset, PresenceFrom>> = {
+  drop: { opacity: 0, translateY: space["2"] },
   fade: { opacity: 0 },
   lift: { opacity: 0, translateY: space["2"] },
   rise: { opacity: 0, translateY: space["3"] },

@@ -45,11 +45,7 @@ export const OverrideRow = ({
           onChange={onToggle}
         />
       </View>
-      <View
-        aria-disabled={isDisabled}
-        className={isDisabled ? "opacity-60" : ""}
-        style={{ pointerEvents: isDisabled ? "none" : "auto" }}
-      >
+      <View aria-disabled={isDisabled} style={{ pointerEvents: isDisabled ? "none" : "auto" }}>
         {children({ disabled: isDisabled, invalid })}
       </View>
       {isDisabled ? (

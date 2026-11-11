@@ -16,6 +16,7 @@ import { useCrashNotice } from "#app/platform/crash-notice.ts";
 import { DocumentHead } from "#app/platform/document-head.tsx";
 import { DocumentLanguage } from "#app/platform/document-language.tsx";
 import { DocumentTheme } from "#app/platform/document-theme.tsx";
+import { KeyboardScroll } from "#app/platform/keyboard.ts";
 import { NotificationLinks } from "#app/platform/notification-links.ts";
 import { OtaProvider } from "#app/platform/ota-provider.tsx";
 import { UpdateBanner } from "#app/platform/update-banner.tsx";
@@ -24,7 +25,7 @@ import "#app/platform/push-task.ts";
 import { useCrashContext } from "#app/platform/use-crash-context.ts";
 import { CrashScreen } from "#app/screens/crash-screen.tsx";
 import { Navigation } from "#app/ui/navigation.tsx";
-import { sceneLayout } from "#app/ui/screen-scene.tsx";
+import { pushedSceneLayout } from "#app/ui/screen-scene.tsx";
 import { useIsScrimUp } from "#app/ui/scrim.ts";
 import { Shell } from "#app/ui/shell.tsx";
 import { SyncFrame } from "#app/ui/sync-frame.tsx";
@@ -76,6 +77,7 @@ const Navigator = () => {
           <CrashContext />
           <DocumentLanguage />
           <DocumentHead />
+          <KeyboardScroll />
           <AppDocumentTheme />
           <Shell
             content={
@@ -92,7 +94,7 @@ const Navigator = () => {
                       </RouteGate>
                     </IncompatibleGate>
                   )}
-                  screenLayout={sceneLayout}
+                  screenLayout={pushedSceneLayout}
                   screenOptions={{
                     contentStyle: { backgroundColor: palette["bg.app"] },
                     headerShown: false,
@@ -111,6 +113,7 @@ const Navigator = () => {
                 </Stack>
               </NavigatorHold>
             }
+            isRoot
             {...(hasNavigation && { navigation: <Navigation /> })}
           />
           <StatusBar style={scheme === "dark" ? "light" : "dark"} />

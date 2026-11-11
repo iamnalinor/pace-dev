@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Text, TextInput, View } from "react-native";
 
 import type { Unread } from "@pace/client";
 
@@ -10,6 +10,8 @@ import { KeyHint } from "#app/ui/button.tsx";
 import { Chip } from "#app/ui/chip.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { HOTKEYS } from "#app/ui/hotkeys.ts";
+import { DISABLED } from "#app/ui/pressable-props.ts";
+import { Pressable } from "#app/ui/pressable.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { useHotkey } from "#app/ui/use-hotkey.tsx";
 import { type Action, detailText, type ParseQuestion, summaryDetails } from "@pace/core";
@@ -104,10 +106,13 @@ const CorrectionRow = ({
     onFollowup(text);
   };
   return (
-    <View className={cx("flex-row gap-2", busy && "opacity-50")}>
+    <View className="flex-row gap-2">
       <TextInput
         accessibilityLabel={t("assistant.correct")}
-        className="min-h-hit-web flex-1 rounded-lg border border-outline bg-app px-3 font-sans text-label-primary"
+        className={cx(
+          "min-h-hit-web flex-1 rounded-lg border border-outline px-3 font-sans",
+          busy ? cx(DISABLED.fill, DISABLED.label) : "bg-app text-label-primary",
+        )}
         editable={!busy}
         onChangeText={setCorrection}
         onSubmitEditing={send}
@@ -116,13 +121,14 @@ const CorrectionRow = ({
         value={correction}
       />
       <Pressable
-        accessibilityLabel={t("assistant.sendCorrection")}
-        accessibilityRole="button"
-        className="min-h-hit-web items-center justify-center rounded-lg border border-outline px-3"
+        className="min-h-hit-web items-center justify-center border border-outline px-3"
         disabled={busy || correction.trim() === ""}
+        label={t("assistant.sendCorrection")}
         onPress={send}
+        role="button"
+        shape="lg"
       >
-        <Text className="font-sans text-label-primary">↵</Text>
+        <Text className={cx("font-sans", busy ? DISABLED.label : "text-label-primary")}>↵</Text>
       </Pressable>
     </View>
   );
@@ -144,29 +150,37 @@ const CardButtons = ({
   return (
     <View className="flex-row gap-2">
       <Pressable
-        accessibilityLabel={t("assistant.approve")}
-        accessibilityRole="button"
         className={cx(
-          "min-h-hit-web flex-1 flex-row items-center justify-center gap-2 rounded-lg bg-accent px-3",
-          !canApprove && "opacity-50",
+          "min-h-hit-web flex-1 flex-row items-center justify-center gap-2 px-3",
+          canApprove ? "bg-accent" : DISABLED.fill,
         )}
         disabled={!canApprove}
+        label={t("assistant.approve")}
         onPress={onApprove}
+        role="button"
+        shape="lg"
       >
-        <Text className="font-sans font-medium text-accent-on">{t("assistant.approve")}</Text>
+        <Text
+          className={cx("font-sans font-medium", canApprove ? "text-accent-on" : DISABLED.label)}
+        >
+          {t("assistant.approve")}
+        </Text>
         <KeyHint hotkey={HOTKEYS.enter} variant="primary" />
       </Pressable>
       <Pressable
-        accessibilityLabel={t("common.cancel")}
-        accessibilityRole="button"
         className={cx(
-          "min-h-hit-web flex-row items-center justify-center gap-2 rounded-lg border border-outline px-3",
-          busy && "opacity-50",
+          "min-h-hit-web flex-row items-center justify-center gap-2 border border-outline px-3",
+          busy && DISABLED.fill,
         )}
         disabled={busy}
+        label={t("common.cancel")}
         onPress={onCancel}
+        role="button"
+        shape="lg"
       >
-        <Text className="font-sans text-label-primary">{t("common.cancel")}</Text>
+        <Text className={cx("font-sans", busy ? DISABLED.label : "text-label-primary")}>
+          {t("common.cancel")}
+        </Text>
         <KeyHint hotkey={HOTKEYS.escape} variant="secondary" />
       </Pressable>
     </View>

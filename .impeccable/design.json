@@ -1,8 +1,7 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-11-01T21:40:20+00:00",
+  "generatedAt": "2026-11-11T03:31:10+00:00",
   "title": "Design System: Pace",
-  "status": "TARGET system — not yet shipped. Source: context/design/redesign-spec.md (direction A · Тетрадь, approved 2026-11-01). Regenerated from the shipped code at the end of the overhaul (plan Task 8.4).",
   "extensions": {
     "colorMeta": {
       "light-bg-app": {
@@ -1796,7 +1795,7 @@
       },
       "headline": {
         "displayName": "Headline",
-        "purpose": "Group headers that are headings, emphasised row titles, period label.",
+        "purpose": "Headings inside content, the running activity's name, «Pace» in the sidebar header.",
         "desktop": "15/20 · 600"
       },
       "body": {
@@ -1806,7 +1805,7 @@
       },
       "callout": {
         "displayName": "Callout",
-        "purpose": "Button labels (600), secondary paragraphs, trailing values, subtitles.",
+        "purpose": "Button labels (600), toast message, empty states, sheet subtitles, nav-item labels.",
         "desktop": "14/19 · 400"
       },
       "subhead": {
@@ -1816,27 +1815,27 @@
       },
       "footnote": {
         "displayName": "Footnote",
-        "purpose": "Meta lines, field labels and messages, tooltips, key hints.",
+        "purpose": "Meta lines, field labels, hints and messages, tooltips, key hints, the Expect.",
         "desktop": "12/17 · 400"
       },
       "caption": {
         "displayName": "Caption",
-        "purpose": "Tags, tab labels, chart labels, time-bar button labels.",
-        "desktop": "12/16 · 500"
+        "purpose": "Tags, tab labels, time-bar tile labels, chart labels.",
+        "desktop": "12/16 · 500 · 0em"
       },
       "caption2": {
         "displayName": "Caption2",
-        "purpose": "Badges only; the 11 px floor.",
-        "desktop": "11/14 · 600"
+        "purpose": "Count badges only; the 11 px floor.",
+        "desktop": "11/14 · 600 · 0em"
       },
       "numeric-live": {
         "displayName": "Numeric Live",
-        "purpose": "The running activity's elapsed time.",
+        "purpose": "Token role with no shipped use (the running card uses Numeric Value since 2026-11-10).",
         "desktop": "20/24 · 600 · tnum"
       },
       "numeric-value": {
         "displayName": "Numeric Value",
-        "purpose": "Durations, times and counts in rows.",
+        "purpose": "Durations, times and counts in rows; the running time so far.",
         "desktop": "15/21 · 500 · tnum"
       },
       "numeric-stat": {
@@ -1846,15 +1845,18 @@
       }
     },
     "typographyRules": {
-      "family": "Inter only (Latin + Cyrillic); weights 400/500/600/700; web keeps the self-hosted variable font with font-optical-sizing: auto",
-      "androidScaling": "sp with allowFontScaling; maxFontSizeMultiplier 1.6 on chrome only",
+      "family": "Inter only (Latin + Cyrillic); weights 400/500/600/700; the web self-hosts four variable woff2 files (latin, latin-ext, cyrillic, cyrillic-ext) with font-display: swap, the phone embeds the TTFs",
+      "desktop": "every role switches to its desktop column at >= 1024px through the same class (tailwind plugin over typeDesktop)",
+      "androidScaling": "sp with allowFontScaling; maxFontSizeMultiplier 1.6 on chrome only (tab labels, badges, bar tiles)",
+      "numeric": "tabular-nums on the numeric roles or the numeric flag",
+      "policy": "wrap (default, the only one for UI strings) | truncate (web title keeps the full value) | clamp(n)",
       "floor": "nothing functional below 11 px"
     },
     "shadows": [
       {
         "name": "overlay-light",
         "value": "0 12px 32px rgba(20, 28, 70, 0.14), 0 2px 6px rgba(20, 28, 70, 0.06)",
-        "purpose": "Sheets, dialogs, popovers, toasts, tooltips in light."
+        "purpose": "Sheets, dialogs, popovers, toasts, sync and update banners in light."
       },
       {
         "name": "overlay-dark",
@@ -1862,76 +1864,101 @@
         "purpose": "The same floating layers in dark: inner hairline + deep drop."
       },
       {
-        "name": "card-light",
-        "value": "0 1px 2px rgba(20, 28, 70, 0.05)",
-        "purpose": "Only the desktop running card; none in dark."
+        "name": "card",
+        "value": "0 1px 2px rgba(20, 28, 70, 0.05) (dark: none)",
+        "purpose": "Token with no shipped use; the running card is flat."
       },
       {
         "name": "focus-ring",
-        "value": "0 0 0 2px <bg>, 0 0 0 4px #2E4AD6 (dark #ACBAFF)",
-        "purpose": "Focus-visible ring: 2 px with a 2 px offset following the element's radius; Highlight in forced colours."
+        "value": "outline: 2px solid var(--pace-focus); outline-offset: 2px",
+        "purpose": "Focus-visible ring on every control (on the small visual when there is one); text fields draw a 2 px focus border 2 px outside on any focus; Highlight in forced colours."
       }
     ],
     "motion": [
       {
         "name": "duration-xs",
         "value": "100ms",
-        "purpose": "Press, hover, tooltip exit, check-circle fill."
+        "purpose": "Press and hover; the web pressed overlay goes out in 100ms on easing-exit."
       },
       {
         "name": "duration-sm",
         "value": "160ms",
-        "purpose": "Fades, tooltip, segmented/switch thumb, check-off row fade, reduced-motion fade."
+        "purpose": "Fades, popover enter, presence fade/lift, row enter, check-off row fade, reduced-motion fade."
       },
       {
         "name": "duration-md",
         "value": "220ms",
-        "purpose": "Disclosure height, toast, row close-up, dialog."
+        "purpose": "Dialog, toast, presence rise/scale/slide, the rows closing up."
       },
       {
         "name": "duration-lg",
         "value": "280ms",
-        "purpose": "Sheet enter, route push."
+        "purpose": "Sheet enter, web route push."
       },
       {
         "name": "exit-durations",
         "value": "70ms / 110ms / 160ms / 200ms",
-        "purpose": "Exits run at 0.7 × enter."
+        "purpose": "Exits of xs / sm / md / lg: popover 110, dialog and toast 160, sheet and the revealed route 200."
       },
       {
         "name": "easing-enter",
-        "value": "cubic-bezier(.2,.8,.2,1)",
-        "purpose": "Strong ease-out for things appearing."
+        "value": "cubic-bezier(0.2,0.8,0.2,1)",
+        "purpose": "Things appearing; also the web route animations."
       },
       {
         "name": "easing-exit",
-        "value": "cubic-bezier(.4,0,1,1)",
-        "purpose": "Ease-in for things leaving."
+        "value": "cubic-bezier(0.4,0,1,1)",
+        "purpose": "Things leaving; the check-off row fade."
       },
       {
         "name": "easing-move",
-        "value": "cubic-bezier(.3,0,0,1)",
-        "purpose": "In-place change (close-up, thumbs, progress)."
+        "value": "cubic-bezier(0.3,0,0,1)",
+        "purpose": "In-place change: the rows closing up, layout shifts."
       },
       {
         "name": "spring-sheet",
-        "value": "{ damping: 30, stiffness: 320, mass: 1 } (CSS: 280ms easing-enter)",
-        "purpose": "Sheet drag release."
+        "value": "{ damping: 30, stiffness: 320, mass: 1 }",
+        "purpose": "Sheet drag release; a drag past 30% of its height or a flick >= 800 dp/s dismisses."
       },
       {
         "name": "spring-thumb",
-        "value": "{ damping: 24, stiffness: 420 } (CSS: 160ms easing-move)",
-        "purpose": "Switch/segmented thumb, tab indicator pill on Android."
+        "value": "{ damping: 24, stiffness: 420 }",
+        "purpose": "Switch and segmented thumbs."
       },
       {
         "name": "reduced",
-        "value": "opacity fade duration-sm",
-        "purpose": "Replaces travel and scale under prefers-reduced-motion; never 0 for a change that carries meaning."
+        "value": "opacity fade 160ms",
+        "purpose": "Replaces travel and scale everywhere; never nothing (the kit sets ReduceMotion.Never and picks the fade itself)."
       },
       {
         "name": "check-off",
-        "value": "circle fill 100ms enter · row fade 1→0 160ms exit · rows close up 220ms move · Undo toast 220/160",
-        "purpose": "Owner's choice Q2: plain fade, no dissolve, no strike-through before leaving; ≤ 300 ms total."
+        "value": "circle fills on press-in · content fades 1→0 160ms easing-exit · box closes up 220ms easing-move · onDone from completion",
+        "purpose": "Owner Q2: a plain fade, no dissolve; reduced motion fades 160 then closes at once."
+      },
+      {
+        "name": "presence-presets",
+        "value": "fade · lift 4px up · rise 8px up · drop 4px · scale 0.96 · slide 16px from trailing; fade/lift 160/110, the rest 220/160",
+        "purpose": "Presence enter/exit; the toast rises 8px in and drops 4px out."
+      },
+      {
+        "name": "overlays",
+        "value": "sheet 280/200 own-height travel + scrim fade · dialog 0.96→1 220 / →0.98 160 · popover 0.98→1 160/110 from the anchor edge",
+        "purpose": "Each overlay leaves the way it came."
+      },
+      {
+        "name": "route-web",
+        "value": "push: translateX 12px + fade 280ms easing-enter · revealed screen: -12px + fade 200ms · reduced: fade 160ms",
+        "purpose": "CSS keyframes on [data-pace-route]; tab switches have none."
+      },
+      {
+        "name": "skeleton-breath",
+        "value": "opacity 1 ↔ 0.7, 600ms each way (1.2s period), after a 300ms delay",
+        "purpose": "Loading placeholders; still under reduced motion."
+      },
+      {
+        "name": "tooltip-delay",
+        "value": "400ms hover, 0 on focus",
+        "purpose": "Web tooltips."
       }
     ],
     "breakpoints": [
@@ -1993,13 +2020,19 @@
       },
       "rail": 80,
       "navBar": 64,
-      "dialog": 560,
+      "dialog": {
+        "form": 560,
+        "confirm": 400,
+        "maxHeight": "85%"
+      },
       "popover": {
         "default": 360,
         "min": 280,
         "max": 400
       },
-      "regionBudget": "fixed bottom chrome <= 40% of viewport height"
+      "regionBudget": "fixed bottom chrome (time bar + nav bar) <= 40% of viewport height, also with two activities and the past-expected question (e2e/time.e2e.ts)",
+      "breakpoints.note": "compact < 600 (nav bar, sheets) · medium 600–1023 (rail, sheets) · expanded >= 1024 (sidebar, dialogs, inspector, desktop type)",
+      "toast.max": 480
     },
     "sizes": {
       "hit": 48,
@@ -2010,14 +2043,39 @@
         "bar": 24
       },
       "stroke": 1.75,
-      "chip.max": 180,
       "tooltip.max": 280,
       "switch": {
         "track": "52x32",
         "knobOff": 16,
         "knobOn": 24
       },
-      "checkCircle": 24
+      "checkCircle": 24,
+      "barTile": 56,
+      "hueTile": 32,
+      "selectionBar": 4,
+      "inkLine": 2,
+      "progressTrack": 4,
+      "countBadge": 20,
+      "chip": {
+        "height": 32,
+        "tall": 40,
+        "max": 180
+      },
+      "button": {
+        "phone": 48,
+        "desktop": 40,
+        "small": 32
+      },
+      "textField": {
+        "phone": 48,
+        "desktop": 44,
+        "multilineMin": 96
+      },
+      "dayRail": {
+        "width": 32,
+        "bar": 12,
+        "parallelBar": 8
+      }
     },
     "z": {
       "sticky": 10,
@@ -2027,16 +2085,25 @@
     },
     "haptics": {
       "checkOff": "Confirm",
+      "destructiveConfirm": "Confirm",
       "startStopSwitch": "Clock_Tick",
       "longPressMenu": "Long_Press",
       "refusal": "Reject",
-      "destructiveConfirm": "Confirm",
       "web": "none"
     },
     "dotGrid": {
-      "spacing": "4px",
-      "color": "grid token",
-      "scope": "behind Day's timeline only"
+      "pitch": "12px (space.4)",
+      "dot": "1px radius, grid token",
+      "scope": "inside Day's 32-wide rail only"
+    },
+    "lint": {
+      "pace/no-raw-design-values": "error",
+      "pace/kit-primitives": "error",
+      "bare Pressable import (no-restricted-imports)": "error"
+    },
+    "web": {
+      "page": "theme-boot.js sets data-theme before the bundle; default dark unless the OS says light; theme-color and page ground from bg-app (#f4f5f9 / #0d0f15); manifest background and theme #0d0f15",
+      "selection": "::selection uses --pace-selection; caret --pace-accent; scrollbars label-quaternary"
     }
   },
   "components": [
@@ -2044,101 +2111,101 @@
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "The one filled ink action per view (New task, Confirm, Save).",
-      "html": "<button class=\"ds-btn-primary\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14\"/><path d=\"M12 5v14\"/></svg><span>Новая задача</span><kbd class=\"ds-kbd\">Alt+N</kbd></button>",
-      "css": ".ds-btn-primary { display: inline-flex; align-items: center; gap: 8px; height: 48px; padding: 0 16px; border: none; border-radius: 12px; background: #2E4AD6; color: #FFFFFF; font-family: Inter, system-ui, sans-serif; font-size: 15px; line-height: 20px; font-weight: 600; cursor: pointer; transition: background-color 100ms cubic-bezier(.4,0,1,1); } .ds-btn-primary .ds-kbd { font: 400 13px/18px Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; color: #FFFFFF; opacity: 1; } .ds-btn-primary:hover { background: linear-gradient(rgba(20,28,70,0.04), rgba(20,28,70,0.04)), #2E4AD6; } .ds-btn-primary:active { background: #2640BC; transition-duration: 0ms; } .ds-btn-primary:focus-visible { outline: 2px solid #2E4AD6; outline-offset: 2px; }"
+      "description": "The one filled ink action per view (on desktop: the sidebar's New task); 48 phone / 40 desktop, key hint only with a keyboard at desktop width.",
+      "html": "<button class=\"ds-btn-primary\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14\"/><path d=\"M12 5v14\"/></svg><span>Сохранить</span><kbd class=\"ds-kbd\">Ctrl+Enter</kbd></button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 8px 20px; border: none; border-radius: 12px; font-family: Inter, system-ui, sans-serif; font-size: 15px; line-height: 20px; font-weight: 600; cursor: pointer; position: relative; background: #2E4AD6; color: #FFFFFF; } .ds-btn-primary .ds-kbd { font: 400 13px/18px Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; color: #FFFFFF; } .ds-btn-primary::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; transition: background-color 100ms cubic-bezier(0.4,0,1,1); } .ds-btn-primary:hover::after { background: rgba(20,28,70,0.04); } .ds-btn-primary:active { background: #2640BC; } .ds-btn-primary:active::after { background: rgba(20,28,70,0.07); transition-duration: 0s; } .ds-btn-primary:focus-visible { outline: 2px solid #2E4AD6; outline-offset: 2px; }"
     },
     {
       "name": "Secondary Button",
       "kind": "button",
       "refersTo": "button-secondary",
-      "description": "Tonal neutral action: Stop, Yes still, Go to device zone.",
-      "html": "<button class=\"ds-btn-secondary\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><rect x=\"6\" y=\"6\" width=\"12\" height=\"12\" rx=\"4\" fill=\"currentColor\"/></svg><span>Стоп</span></button>",
-      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; gap: 8px; height: 48px; padding: 0 16px; border: none; border-radius: 12px; background: rgba(20,28,70,0.07); color: #12141C; font-family: Inter, system-ui, sans-serif; font-size: 15px; line-height: 20px; font-weight: 600; cursor: pointer; transition: background-color 100ms cubic-bezier(.4,0,1,1); } .ds-btn-secondary:hover { background: rgba(20,28,70,0.11); } .ds-btn-secondary:active { background: rgba(20,28,70,0.16); transition-duration: 0ms; } .ds-btn-secondary:focus-visible { outline: 2px solid #2E4AD6; outline-offset: 2px; } .ds-btn-secondary:disabled { background: rgba(20,28,70,0.04); color: #B4B8C7; cursor: default; }"
+      "description": "Tonal neutral action: Stop (filled square), «Да, ещё».",
+      "html": "<button class=\"ds-btn-secondary\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><rect x=\"6\" y=\"6\" width=\"12\" height=\"12\" rx=\"2\" fill=\"currentColor\"/></svg><span>Стоп</span></button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 8px 20px; border: none; border-radius: 12px; font-family: Inter, system-ui, sans-serif; font-size: 15px; line-height: 20px; font-weight: 600; cursor: pointer; position: relative; background: rgba(20,28,70,0.07); color: #12141C; } .ds-btn-secondary::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; transition: background-color 100ms cubic-bezier(0.4,0,1,1); } .ds-btn-secondary:hover::after { background: rgba(20,28,70,0.04); } .ds-btn-secondary:active::after { background: rgba(20,28,70,0.07); transition-duration: 0s; } .ds-btn-secondary:focus-visible { outline: 2px solid #2E4AD6; outline-offset: 2px; } .ds-btn-secondary:disabled { background: rgba(20,28,70,0.04); color: #B4B8C7; cursor: default; }"
     },
     {
       "name": "Plain and Destructive Buttons",
       "kind": "button",
-      "refersTo": "button-plain",
-      "description": "Plain ink text action (Undo) beside the destructive wash (Delete account).",
+      "refersTo": "button-destructive",
+      "description": "Plain ink text action (Undo) beside the destructive button: bg-cell with a 2 px danger border (the danger wash measured under 4.5:1).",
       "html": "<div class=\"ds-btn-row\"><button class=\"ds-btn-plain\">Вернуть</button><button class=\"ds-btn-destructive\">Удалить аккаунт</button></div>",
-      "css": ".ds-btn-row { display: flex; gap: 8px; } .ds-btn-plain, .ds-btn-destructive { height: 44px; padding: 0 12px; border: none; border-radius: 12px; font-family: Inter, system-ui, sans-serif; font-size: 15px; line-height: 20px; font-weight: 600; cursor: pointer; transition: background-color 100ms cubic-bezier(.4,0,1,1); } .ds-btn-plain { background: transparent; color: #2E4AD6; } .ds-btn-plain:hover { background: rgba(20,28,70,0.04); } .ds-btn-plain:active { background: rgba(20,28,70,0.07); } .ds-btn-destructive { padding: 0 16px; background: rgba(195,53,43,0.10); color: #C3352B; } .ds-btn-destructive:hover { background: rgba(195,53,43,0.14); } .ds-btn-plain:focus-visible, .ds-btn-destructive:focus-visible { outline: 2px solid #2E4AD6; outline-offset: 2px; }"
+      "css": ".ds-btn-row { display: flex; gap: 8px; padding: 16px; background: #F4F5F9; } .ds-btn-plain, .ds-btn-destructive { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 8px 20px; border: none; border-radius: 12px; font-family: Inter, system-ui, sans-serif; font-size: 15px; line-height: 20px; font-weight: 600; cursor: pointer; position: relative; } .ds-btn-plain { background: transparent; color: #2E4AD6; } .ds-btn-plain:hover { background: rgba(20,28,70,0.04); } .ds-btn-plain:active { background: rgba(20,28,70,0.07); } .ds-btn-destructive { background: #FFFFFF; color: #C3352B; border: 2px solid #C3352B; } .ds-btn-destructive:hover { background: linear-gradient(rgba(20,28,70,0.04), rgba(20,28,70,0.04)), #FFFFFF; } .ds-btn-plain:focus-visible, .ds-btn-destructive:focus-visible { outline: 2px solid #2E4AD6; outline-offset: 2px; }"
     },
     {
       "name": "Text Field",
       "kind": "input",
       "refersTo": "text-field",
-      "description": "Labelled field with a ruled edge at rest and the ink ring on focus.",
+      "description": "Labelled field on bg-cell with a ruled edge at rest; the field draws its own 2 px ring 2 px out on any focus.",
       "html": "<label class=\"ds-field\"><span class=\"ds-field-label\">Название</span><input class=\"ds-field-input\" placeholder=\"Что нужно сделать?\"><span class=\"ds-field-hint\">Enter, чтобы разобрать</span></label>",
-      "css": ".ds-field { display: flex; flex-direction: column; gap: 4px; font-family: Inter, system-ui, sans-serif; max-width: 360px; } .ds-field-label, .ds-field-hint { font-size: 13px; line-height: 18px; color: #474C60; } .ds-field-input { height: 48px; padding: 0 12px; border: 1px solid #878CA0; border-radius: 12px; background: #FFFFFF; color: #12141C; font: 400 16px/22px Inter, system-ui, sans-serif; caret-color: #2E4AD6; } .ds-field-input::placeholder { color: #646A80; } .ds-field-input:hover { border-color: #646A80; } .ds-field-input:focus { outline: 2px solid #2E4AD6; outline-offset: 2px; }"
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 8px; font-family: Inter, system-ui, sans-serif; max-width: 360px; } .ds-field-label { font-size: 13px; line-height: 18px; color: #12141C; } .ds-field-hint { font-size: 13px; line-height: 18px; color: #474C60; } .ds-field-input { height: 48px; padding: 0 16px; border: 1px solid #878CA0; border-radius: 12px; background: #FFFFFF; color: #12141C; font: 400 16px/22px Inter, system-ui, sans-serif; caret-color: #2E4AD6; } .ds-field-input::placeholder { color: #646A80; } .ds-field-input:focus { outline: 2px solid #2E4AD6; outline-offset: 2px; }"
     },
     {
       "name": "Chips",
       "kind": "chip",
       "refersTo": "chip",
-      "description": "Neutral filter chips; selected = ink wash + check; project identity as a stroke dot.",
-      "html": "<div class=\"ds-chips\"><button class=\"ds-chip\" aria-checked=\"true\" role=\"checkbox\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 6 9 17l-5-5\"/></svg>Все</button><button class=\"ds-chip\" role=\"checkbox\" aria-checked=\"false\"><span class=\"ds-dot\" style=\"background:#9364CE\"></span>Учёба</button><button class=\"ds-chip\" role=\"checkbox\" aria-checked=\"false\"><span class=\"ds-dot\" style=\"background:#1A83DB\"></span>Работа</button></div>",
-      "css": ".ds-chips { display: flex; gap: 8px; flex-wrap: wrap; } .ds-chip { display: inline-flex; align-items: center; gap: 4px; height: 32px; max-width: 180px; padding: 0 12px; border: none; border-radius: 999px; background: rgba(20,28,70,0.07); color: #474C60; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 19px; font-weight: 500; cursor: pointer; transition: background-color 100ms cubic-bezier(.4,0,1,1); } .ds-chip:hover { background: rgba(20,28,70,0.11); } .ds-chip[aria-checked=\"true\"] { background: rgba(46,74,214,0.10); color: #2E4AD6; } .ds-chip:focus-visible { outline: 2px solid #2E4AD6; outline-offset: 2px; } .ds-dot { width: 8px; height: 8px; border-radius: 999px; flex: none; }"
+      "description": "32 pills: neutral fill-2 at rest, a coloured chip at rest is its hue tint under its ink, chosen = solid ink + On-Ink. Never a dot.",
+      "html": "<div class=\"ds-chips\"><button class=\"ds-chip\" role=\"checkbox\" aria-checked=\"true\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 6 9 17l-5-5\"/></svg>Все</button><button class=\"ds-chip ds-chip-hue\" role=\"checkbox\" aria-checked=\"false\">Учёба</button><button class=\"ds-chip\" role=\"checkbox\" aria-checked=\"false\">Без проекта</button></div>",
+      "css": ".ds-chips { display: flex; gap: 8px; flex-wrap: wrap; } .ds-chip { position: relative; display: inline-flex; align-items: center; gap: 8px; height: 32px; max-width: 180px; padding: 0 12px; border: none; border-radius: 999px; background: rgba(20,28,70,0.07); color: #474C60; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 19px; font-weight: 500; cursor: pointer; transition: background-color 100ms cubic-bezier(0.4,0,1,1); } .ds-chip:hover { background: rgba(20,28,70,0.11); } .ds-chip-hue { background: rgba(147,100,206,0.12); color: #694596; } .ds-chip[aria-checked=\"true\"] { background: #2E4AD6; color: #FFFFFF; } .ds-chip:focus-visible { outline: 2px solid #2E4AD6; outline-offset: 2px; }"
     },
     {
       "name": "Task Row in a Group",
       "kind": "card",
       "refersTo": "list-group",
-      "description": "Grouped list on one ground: section header, task rows with check, meta line, tags as tint+ink rectangles, inset separators.",
-      "html": "<section class=\"ds-section\"><h2 class=\"ds-section-h\">С дедлайном</h2><ul class=\"ds-group\"><li class=\"ds-row\"><button class=\"ds-check\" role=\"checkbox\" aria-checked=\"false\" aria-label=\"Отметить выполненной\"></button><div class=\"ds-row-text\"><a class=\"ds-row-title\" href=\"#\">ДЗ по алгебре: №№ 290, 292</a><div class=\"ds-meta\"><span class=\"ds-tag\" style=\"background:rgba(147,100,206,0.12);color:#694596\">Учёба</span><span class=\"ds-urgent\">Срочно</span><span>до 23:59</span></div></div></li><li class=\"ds-row\"><button class=\"ds-check\" role=\"checkbox\" aria-checked=\"false\" aria-label=\"Отметить выполненной\"></button><div class=\"ds-row-text\"><a class=\"ds-row-title ds-low\" href=\"#\">Купить тетради</a><div class=\"ds-meta\"><span class=\"ds-tag\" style=\"background:rgba(147,100,206,0.12);color:#694596\">В работе</span><span class=\"ds-late\">просрочено на 2 ч</span></div></div></li></ul></section>",
-      "css": ".ds-section { font-family: Inter, system-ui, sans-serif; background: #F4F5F9; padding: 0 16px 16px; max-width: 420px; } .ds-section-h { margin: 0; padding: 24px 16px 8px; font-size: 14px; line-height: 19px; font-weight: 500; color: #474C60; } .ds-group { list-style: none; margin: 0; padding: 0; background: #FFFFFF; border-radius: 16px; overflow: hidden; } .ds-row { position: relative; display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px; min-height: 52px; } .ds-row + .ds-row::before { content: ''; position: absolute; top: 0; left: 52px; right: 0; height: 1px; background: rgba(20,28,70,0.10); } .ds-row:hover { background: rgba(20,28,70,0.04); } .ds-check { flex: none; width: 24px; height: 24px; margin-top: -1px; border: 1.75px solid #878CA0; border-radius: 999px; background: transparent; cursor: pointer; transition: background-color 100ms cubic-bezier(.2,.8,.2,1); } .ds-check:active { background: #2E4AD6; border-color: #2E4AD6; } .ds-check:focus-visible { outline: 2px solid #2E4AD6; outline-offset: 2px; } .ds-row-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; } .ds-row-title { font-size: 16px; line-height: 22px; font-weight: 500; color: #12141C; text-decoration: none; } .ds-row-title.ds-low { color: #474C60; font-weight: 400; } .ds-row-title:focus-visible { outline: 2px solid #2E4AD6; outline-offset: 2px; } .ds-meta { display: flex; align-items: center; gap: 6px; font-size: 13px; line-height: 18px; color: #474C60; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; } .ds-tag { display: inline-flex; align-items: center; height: 20px; padding: 0 4px; border-radius: 8px; font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.01em; max-width: 50%; overflow: hidden; text-overflow: ellipsis; } .ds-urgent { color: #C3352B; font-weight: 600; } .ds-late { color: #C3352B; }"
+      "description": "Grouped list on one ground: section header, task rows with the check, meta line with a pill tag, inset separators; the selected row takes fill-1 and a 4 px ink bar.",
+      "html": "<section class=\"ds-section\"><h2 class=\"ds-section-h\">С дедлайном</h2><ul class=\"ds-group\"><li class=\"ds-row ds-selected\"><span class=\"ds-bar\"></span><button class=\"ds-check\" role=\"checkbox\" aria-checked=\"false\" aria-label=\"Отметить выполненной\"></button><div class=\"ds-row-text\"><a class=\"ds-row-title\" href=\"#\">ДЗ по алгебре: №№ 290, 292</a><div class=\"ds-meta\"><span class=\"ds-tag\" style=\"background:rgba(147,100,206,0.12);color:#694596\">Учёба</span><span class=\"ds-urgent\">Срочно</span><span>до 23:59</span></div></div><span class=\"ds-trail\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m17 2 4 4-4 4\"/><path d=\"M3 11v-1a4 4 0 0 1 4-4h14\"/><path d=\"m7 22-4-4 4-4\"/><path d=\"M21 13v1a4 4 0 0 1-4 4H3\"/></svg></span></li><li class=\"ds-row\"><button class=\"ds-check\" role=\"checkbox\" aria-checked=\"false\" aria-label=\"Отметить выполненной\"></button><div class=\"ds-row-text\"><a class=\"ds-row-title ds-low\" href=\"#\">Купить тетради</a><div class=\"ds-meta\"><span class=\"ds-late\">просрочено на 2 ч</span></div></div></li><li class=\"ds-row\"><button class=\"ds-check ds-checked\" role=\"checkbox\" aria-checked=\"true\" aria-label=\"Выполнено\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#F4F5F9\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 6 9 17l-5-5\"/></svg></button><div class=\"ds-row-text\"><a class=\"ds-row-title ds-done\" href=\"#\">Сдать реферат</a></div></li></ul></section>",
+      "css": ".ds-section { font-family: Inter, system-ui, sans-serif; background: #F4F5F9; padding: 0 16px 16px; max-width: 420px; } .ds-section-h { margin: 0; padding: 24px 16px 8px; font-size: 14px; line-height: 19px; font-weight: 500; color: #474C60; } .ds-group { list-style: none; margin: 0; padding: 0; background: #FFFFFF; border-radius: 16px; overflow: hidden; } .ds-row { position: relative; display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px 12px 4px; min-height: 52px; } .ds-row + .ds-row::before { content: ''; position: absolute; top: 0; left: 52px; right: 0; height: 1px; background: rgba(20,28,70,0.10); } .ds-row:hover { background: rgba(20,28,70,0.04); } .ds-selected { background: rgba(20,28,70,0.04); } .ds-bar { position: absolute; left: 2px; top: 8px; bottom: 8px; width: 4px; border-radius: 4px; background: #2E4AD6; } .ds-check { flex: none; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin: -1px 10px 0; border: 1.75px solid #878CA0; border-radius: 999px; background: transparent; cursor: pointer; } .ds-check:active { background: #2E4AD6; border-color: #2E4AD6; } .ds-checked { background: #474C60; border-color: #474C60; } .ds-check:focus-visible { outline: 2px solid #2E4AD6; outline-offset: 2px; } .ds-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; } .ds-row-title { font-size: 16px; line-height: 22px; font-weight: 500; color: #12141C; text-decoration: none; } .ds-row-title.ds-low { color: #474C60; font-weight: 400; } .ds-row-title.ds-done { color: #474C60; font-weight: 400; text-decoration: line-through; } .ds-row-title:focus-visible { outline: 2px solid #2E4AD6; outline-offset: 2px; } .ds-meta { display: flex; align-items: center; gap: 8px; font-size: 13px; line-height: 18px; color: #474C60; font-variant-numeric: tabular-nums; } .ds-tag { display: inline-flex; align-items: center; min-height: 20px; padding: 0 8px; border-radius: 999px; font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.01em; max-width: 50%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; } .ds-urgent { color: #C3352B; font-weight: 600; } .ds-late { color: #C3352B; } .ds-trail { color: #474C60; display: flex; align-items: center; min-height: 24px; }"
     },
     {
       "name": "Running Card",
       "kind": "custom",
       "refersTo": "running-card",
-      "description": "Signature: the running activity as an ink line with a red mark at its expected length; elapsed time is the largest live number.",
-      "html": "<div class=\"ds-run\"><div class=\"ds-run-top\"><span class=\"ds-run-mark\" style=\"background:#009585\"></span><span class=\"ds-run-name\">Отдых</span><button class=\"ds-run-stop\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><rect x=\"6\" y=\"6\" width=\"12\" height=\"12\" rx=\"4\" fill=\"currentColor\"/></svg>Стоп</button></div><div class=\"ds-run-time\"><span class=\"ds-run-live\">2:01</span><span class=\"ds-run-of\">из ~20 мин</span></div><div class=\"ds-run-line\"><span class=\"ds-run-ink\" style=\"width:42%\"></span><span class=\"ds-run-expect\" style=\"left:80%\"></span></div></div>",
-      "css": ".ds-run { font-family: Inter, system-ui, sans-serif; background: #FFFFFF; border-radius: 16px; padding: 12px; max-width: 360px; box-shadow: 0 1px 2px rgba(20,28,70,0.05); } .ds-run-top { display: flex; align-items: center; gap: 8px; } .ds-run-mark { width: 8px; height: 8px; border-radius: 999px; flex: none; } .ds-run-name { flex: 1; min-width: 0; font-size: 16px; line-height: 22px; font-weight: 600; color: #12141C; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .ds-run-stop { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px; border: none; border-radius: 12px; background: rgba(20,28,70,0.07); color: #12141C; font: 600 15px/20px Inter, system-ui, sans-serif; cursor: pointer; } .ds-run-stop:hover { background: rgba(20,28,70,0.11); } .ds-run-stop:focus-visible { outline: 2px solid #2E4AD6; outline-offset: 2px; } .ds-run-time { display: flex; align-items: baseline; gap: 8px; margin: 4px 0 8px; } .ds-run-live { font-size: 22px; line-height: 26px; font-weight: 600; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; color: #12141C; } .ds-run-of { font-size: 13px; line-height: 18px; color: #474C60; font-variant-numeric: tabular-nums; } .ds-run-line { position: relative; height: 4px; border-radius: 999px; background: rgba(20,28,70,0.16); } .ds-run-ink { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: #2E4AD6; transition: width 220ms cubic-bezier(.3,0,0,1); } .ds-run-expect { position: absolute; top: -3px; width: 2px; height: 10px; border-radius: 1px; background: #C3352B; }"
+      "description": "Signature: hue tile, name in headline, time so far in Numeric Value with the Expect, Stop; the 2 px ink line with a 1 px red mark at the expected length.",
+      "html": "<div class=\"ds-run\"><div class=\"ds-run-top\"><span class=\"ds-tile32\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#016A5E\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><line x1=\"10\" x2=\"14\" y1=\"2\" y2=\"2\"/><line x1=\"12\" x2=\"15\" y1=\"14\" y2=\"11\"/><circle cx=\"12\" cy=\"14\" r=\"8\"/></svg></span><div class=\"ds-run-col\"><span class=\"ds-run-name\">Прогулка</span><span class=\"ds-run-time\"><b>12 мин</b><span>из ~20 мин</span></span></div><button class=\"ds-run-stop\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><rect x=\"6\" y=\"6\" width=\"12\" height=\"12\" rx=\"2\" fill=\"currentColor\"/></svg>Стоп</button></div><div class=\"ds-ink\"><span class=\"ds-ink-fill\" style=\"width:30%\"></span><span class=\"ds-ink-mark\" style=\"left:50%\"></span></div></div>",
+      "css": ".ds-run { font-family: Inter, system-ui, sans-serif; background: #FFFFFF; border-radius: 16px; padding: 8px 12px; max-width: 360px; display: flex; flex-direction: column; gap: 4px; } .ds-run-top { display: flex; align-items: center; gap: 12px; } .ds-tile32 { flex: none; width: 32px; height: 32px; border-radius: 12px; background: rgba(0,149,133,0.12); display: flex; align-items: center; justify-content: center; } .ds-run-col { flex: 1; min-width: 0; display: flex; flex-direction: column; } .ds-run-name { font-size: 17px; line-height: 22px; font-weight: 600; letter-spacing: -0.006em; color: #12141C; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .ds-run-time { display: flex; align-items: baseline; gap: 8px; } .ds-run-time b { font-size: 16px; line-height: 22px; font-weight: 500; font-variant-numeric: tabular-nums; color: #12141C; } .ds-run-time span { font-size: 13px; line-height: 18px; color: #474C60; font-variant-numeric: tabular-nums; } .ds-run-stop { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 8px 20px; border: none; border-radius: 12px; background: rgba(20,28,70,0.07); color: #12141C; font: 600 15px/20px Inter, system-ui, sans-serif; cursor: pointer; } .ds-run-stop:hover { background: rgba(20,28,70,0.11); } .ds-run-stop:focus-visible { outline: 2px solid #2E4AD6; outline-offset: 2px; } .ds-ink { position: relative; height: 2px; border-radius: 999px; background: rgba(20,28,70,0.16); margin: 4px 0; } .ds-ink-fill { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: #2E4AD6; } .ds-ink-mark { position: absolute; top: -4px; bottom: -4px; border-left: 1px solid #C3352B; }"
     },
     {
-      "name": "Time Bar Buttons",
+      "name": "Time Bar Tiles",
       "kind": "custom",
       "refersTo": "time-bar-button",
-      "description": "Four fixed tiles; neutral at rest with the icon in the category stroke; the running one takes its hue tint + ink.",
-      "html": "<div class=\"ds-bar\"><button class=\"ds-tile\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#717B89\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"18\" rx=\"2\"/><path d=\"M16 2v4M8 2v4M3 10h18\"/></svg>Календарь</button><button class=\"ds-tile\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#009A4D\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 6 9 17l-5-5\"/></svg>Задача</button><button class=\"ds-tile\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#A87504\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 12h18M12 3v18\"/></svg>Дела</button><button class=\"ds-tile ds-tile-on\" style=\"background:rgba(0,149,133,0.12);color:#016A5E\" aria-label=\"Отдых, идёт\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#009585\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M17 8h1a4 4 0 1 1 0 8h-1\"/><path d=\"M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z\"/></svg>Отдых</button></div>",
-      "css": ".ds-bar { font-family: Inter, system-ui, sans-serif; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 8px 16px; background: #F4F5F9; max-width: 420px; } .ds-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 52px; padding: 6px 4px; border: none; border-radius: 12px; background: rgba(20,28,70,0.07); color: #474C60; font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.01em; cursor: pointer; transition: background-color 100ms cubic-bezier(.4,0,1,1); } .ds-tile:hover { background: rgba(20,28,70,0.11); } .ds-tile:focus-visible { outline: 2px solid #2E4AD6; outline-offset: 2px; } .ds-tile-on { font-weight: 600; }"
+      "description": "Four fixed 56-high tiles; neutral fill-2 at rest; the running one is a bg-cell tile with a 4 px bar in its category stroke and a 600 label.",
+      "html": "<div class=\"ds-bar4\"><button class=\"ds-tile\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"18\" rx=\"2\"/><path d=\"M16 2v4M8 2v4M3 10h18\"/></svg>Календарь</button><button class=\"ds-tile\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><line x1=\"10\" x2=\"14\" y1=\"2\" y2=\"2\"/><line x1=\"12\" x2=\"15\" y1=\"14\" y2=\"11\"/><circle cx=\"12\" cy=\"14\" r=\"8\"/></svg>Задача</button><button class=\"ds-tile\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8\"/><path d=\"M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/></svg>Дела</button><button class=\"ds-tile ds-tile-on\" aria-label=\"Прочее, идёт\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M17 8h1a4 4 0 1 1 0 8h-1\"/><path d=\"M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z\"/></svg>Прочее<span class=\"ds-tile-bar\"></span></button></div>",
+      "css": ".ds-bar4 { font-family: Inter, system-ui, sans-serif; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 8px 16px; background: #F4F5F9; max-width: 420px; } .ds-tile { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; height: 56px; padding: 0; border: none; border-radius: 12px; background: rgba(20,28,70,0.07); color: #474C60; font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.01em; white-space: nowrap; overflow: hidden; cursor: pointer; transition: background-color 100ms cubic-bezier(0.4,0,1,1); } .ds-tile:hover { background: rgba(20,28,70,0.11); } .ds-tile:focus-visible { outline: 2px solid #2E4AD6; outline-offset: 2px; } .ds-tile-on { background: #FFFFFF; color: #12141C; font-weight: 600; } .ds-tile-on:hover { background: #FFFFFF; } .ds-tile-bar { position: absolute; left: 12px; right: 12px; bottom: 4px; height: 4px; border-radius: 999px; background: #009585; }"
     },
     {
       "name": "Phone Navigation Bar",
       "kind": "nav",
       "refersTo": "tab-bar",
-      "description": "Material navigation bar: four destinations, the selected one with a fill-3 pill, filled icon and 600 label.",
-      "html": "<nav class=\"ds-tabs\" aria-label=\"Разделы\"><a class=\"ds-tab\" href=\"#\" aria-current=\"page\"><span class=\"ds-pill\"><svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\" fill=\"currentColor\"/><circle cx=\"12\" cy=\"12\" r=\"3\" fill=\"#FFFFFF\"/></svg></span>Сейчас</a><a class=\"ds-tab\" href=\"#\"><span class=\"ds-pill\"><svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" aria-hidden=\"true\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"18\" rx=\"2\"/><path d=\"M16 2v4M8 2v4M3 10h18\"/></svg></span>День</a><a class=\"ds-tab\" href=\"#\"><span class=\"ds-pill\"><svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><polyline points=\"22 12 16 12 14 15 10 15 8 12 2 12\"/><path d=\"M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z\"/></svg><b class=\"ds-badge\">12</b></span>Входящие</a><a class=\"ds-tab\" href=\"#\"><span class=\"ds-pill\"><svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" aria-hidden=\"true\"><path d=\"M4 6h16M4 12h16M4 18h16\"/></svg></span>Ещё</a></nav>",
-      "css": ".ds-tabs { font-family: Inter, system-ui, sans-serif; display: grid; grid-template-columns: repeat(4, 1fr); height: 64px; background: #FFFFFF; max-width: 420px; } .ds-tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: #474C60; text-decoration: none; font-size: 12px; line-height: 16px; font-weight: 500; } .ds-pill { position: relative; display: flex; align-items: center; justify-content: center; width: 64px; height: 32px; border-radius: 999px; transition: background-color 160ms cubic-bezier(.3,0,0,1); } .ds-tab:hover .ds-pill { background: rgba(20,28,70,0.04); } .ds-tab:active .ds-pill { background: rgba(20,28,70,0.07); } .ds-tab[aria-current=\"page\"] { color: #12141C; font-weight: 600; } .ds-tab[aria-current=\"page\"] .ds-pill { background: rgba(20,28,70,0.11); } .ds-tab:focus-visible { outline: none; } .ds-tab:focus-visible .ds-pill { outline: 2px solid #2E4AD6; outline-offset: 2px; } .ds-badge { position: absolute; top: 0; left: 40px; min-width: 20px; height: 20px; padding: 0 4px; border-radius: 999px; background: #C3352B; color: #FFFFFF; font: 600 11px/20px Inter, system-ui, sans-serif; letter-spacing: 0.02em; text-align: center; font-variant-numeric: tabular-nums; }"
+      "description": "Four destinations on bg-cell; the current one: a fill-3 pill behind the icon in label-primary and a 600 label; the Inbox count hangs off the icon.",
+      "html": "<nav class=\"ds-tabs\" aria-label=\"Разделы\"><a class=\"ds-tab\" href=\"#\" aria-current=\"page\"><span class=\"ds-pill\"><svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z\"/></svg></span>Сейчас</a><a class=\"ds-tab\" href=\"#\"><span class=\"ds-pill\"><svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 6v6l4 2\"/></svg></span>День</a><a class=\"ds-tab\" href=\"#\"><span class=\"ds-pill\"><svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><polyline points=\"22 12 16 12 14 15 10 15 8 12 2 12\"/><path d=\"M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z\"/></svg><b class=\"ds-badge\">12</b></span>Входящие</a><a class=\"ds-tab\" href=\"#\"><span class=\"ds-pill\"><svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"1\"/><circle cx=\"19\" cy=\"12\" r=\"1\"/><circle cx=\"5\" cy=\"12\" r=\"1\"/></svg></span>Ещё</a></nav>",
+      "css": ".ds-tabs { font-family: Inter, system-ui, sans-serif; display: grid; grid-template-columns: repeat(4, 1fr); min-height: 64px; padding: 0 4px; background: #FFFFFF; max-width: 420px; } .ds-tab { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 4px; padding: 12px 0; color: #474C60; text-decoration: none; font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.01em; text-align: center; } .ds-pill { position: relative; display: flex; align-items: center; justify-content: center; width: 64px; height: 32px; border-radius: 999px; } .ds-tab:hover .ds-pill { background: rgba(20,28,70,0.04); } .ds-tab:active .ds-pill { background: rgba(20,28,70,0.07); } .ds-tab[aria-current=\"page\"] { color: #12141C; font-weight: 600; } .ds-tab[aria-current=\"page\"] .ds-pill { background: rgba(20,28,70,0.11); } .ds-tab:focus-visible { outline: none; } .ds-tab:focus-visible .ds-pill { outline: 2px solid #2E4AD6; outline-offset: 2px; } .ds-badge { position: absolute; top: -4px; left: 38px; min-width: 20px; height: 20px; padding: 0 8px; box-sizing: border-box; border-radius: 999px; background: #C3352B; color: #FFFFFF; font: 600 11px/20px Inter, system-ui, sans-serif; letter-spacing: 0.02em; text-align: center; font-variant-numeric: tabular-nums; }"
     },
     {
-      "name": "Sidebar Nav Item",
+      "name": "Sidebar with Nav Items",
       "kind": "nav",
       "refersTo": "nav-item-current",
-      "description": "Desktop sidebar rows; current = fill-3, 600 label and a 3 px leading ink bar.",
-      "html": "<nav class=\"ds-side\" aria-label=\"Разделы\"><a class=\"ds-nav\" href=\"#\" aria-current=\"page\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/></svg>Сейчас</a><a class=\"ds-nav\" href=\"#\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"18\" rx=\"2\"/><path d=\"M16 2v4M8 2v4M3 10h18\"/></svg>День</a><a class=\"ds-nav\" href=\"#\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 6h16M4 12h16M4 18h16\"/></svg>Неделя</a></nav>",
-      "css": ".ds-side { font-family: Inter, system-ui, sans-serif; display: flex; flex-direction: column; gap: 2px; width: 248px; padding: 12px; background: #ECEEF4; box-shadow: inset -1px 0 0 rgba(20,28,70,0.10); } .ds-nav { position: relative; display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 12px; border-radius: 8px; color: #474C60; text-decoration: none; font-size: 15px; line-height: 20px; transition: background-color 100ms cubic-bezier(.4,0,1,1); } .ds-nav:hover { background: rgba(20,28,70,0.04); } .ds-nav:active { background: rgba(20,28,70,0.07); } .ds-nav[aria-current=\"page\"] { background: rgba(20,28,70,0.11); color: #12141C; font-weight: 600; } .ds-nav[aria-current=\"page\"]::before { content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 4px; background: #2E4AD6; } .ds-nav:focus-visible { outline: 2px solid #2E4AD6; outline-offset: 2px; }"
+      "description": "Desktop sidebar: header without a profile name, New task as the shell's one ink button, 44-high nav items; current = fill-3, 600 label and a 4 px leading ink bar.",
+      "html": "<nav class=\"ds-side\" aria-label=\"Разделы\"><div class=\"ds-side-head\"><b>Pace</b></div><button class=\"ds-new\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14\"/><path d=\"M12 5v14\"/></svg><span>Новая задача</span><kbd>Alt+N</kbd></button><a class=\"ds-nav\" href=\"#\" aria-current=\"page\"><span class=\"ds-nav-bar\"></span><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z\"/></svg>Сейчас</a><a class=\"ds-nav\" href=\"#\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 6v6l4 2\"/></svg>День</a><a class=\"ds-nav\" href=\"#\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><polyline points=\"22 12 16 12 14 15 10 15 8 12 2 12\"/><path d=\"M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z\"/></svg>Входящие<b class=\"ds-count\">3</b></a><a class=\"ds-nav\" href=\"#\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z\"/></svg>Проекты</a></nav>",
+      "css": ".ds-side { font-family: Inter, system-ui, sans-serif; display: flex; flex-direction: column; gap: 4px; width: 248px; box-sizing: border-box; padding: 16px 12px; background: #ECEEF4; border-right: 1px solid rgba(20,28,70,0.10); } .ds-side-head { min-height: 44px; display: flex; align-items: center; padding: 0 12px; margin-bottom: 12px; font-size: 17px; line-height: 22px; color: #12141C; } .ds-new { display: flex; align-items: center; gap: 8px; min-height: 44px; margin-bottom: 12px; padding: 0 12px; border: none; border-radius: 12px; background: #2E4AD6; color: #FFFFFF; font: 500 15px/20px Inter, system-ui, sans-serif; cursor: pointer; } .ds-new span { flex: 1; text-align: left; } .ds-new kbd { font: 400 13px/18px Inter, system-ui, sans-serif; } .ds-new:focus-visible { outline: 2px solid #2E4AD6; outline-offset: 2px; } .ds-nav { position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border-radius: 8px; color: #474C60; text-decoration: none; font-size: 15px; line-height: 20px; transition: background-color 100ms cubic-bezier(0.4,0,1,1); } .ds-nav:hover { background: rgba(20,28,70,0.04); } .ds-nav:active { background: rgba(20,28,70,0.07); } .ds-nav[aria-current=\"page\"] { background: rgba(20,28,70,0.11); color: #12141C; font-weight: 600; } .ds-nav-bar { position: absolute; left: 2px; top: 8px; bottom: 8px; width: 4px; border-radius: 4px; background: #2E4AD6; } .ds-nav:focus-visible { outline: 2px solid #2E4AD6; outline-offset: 2px; } .ds-count { margin-left: auto; min-width: 20px; height: 20px; padding: 0 8px; box-sizing: border-box; border-radius: 999px; background: #C3352B; color: #FFFFFF; font: 600 11px/20px Inter, system-ui, sans-serif; text-align: center; font-variant-numeric: tabular-nums; }"
     },
     {
-      "name": "Day Timeline Grid",
+      "name": "Day Rail",
       "kind": "custom",
       "refersTo": "",
-      "description": "Signature: Day's timeline on the faint 4-pt dot grid with the red now-line; blocks carry their pen-colour line.",
-      "html": "<div class=\"ds-day\"><div class=\"ds-hour\">08:00</div><div class=\"ds-block\" style=\"top:8px;height:56px;--pen:#9364CE\"><b>Пары</b><span>08:30–10:05</span></div><div class=\"ds-gap\" style=\"top:72px\">не записано · <a href=\"#\">Записать</a></div><div class=\"ds-now\" style=\"top:104px\"></div><div class=\"ds-hour\" style=\"top:120px\">10:00</div></div>",
-      "css": ".ds-day { font-family: Inter, system-ui, sans-serif; position: relative; height: 160px; max-width: 420px; background-color: #FFFFFF; background-image: radial-gradient(rgba(46,74,214,0.07) 1px, transparent 1px); background-size: 4px 4px; border-radius: 16px; overflow: hidden; } .ds-hour { position: absolute; left: 12px; top: 4px; font-size: 12px; line-height: 16px; color: #646A80; font-variant-numeric: tabular-nums; } .ds-block { position: absolute; left: 64px; right: 12px; display: flex; flex-direction: column; padding: 6px 10px; background: #FFFFFF; border-left: 1px solid var(--pen); font-size: 15px; line-height: 20px; color: #12141C; } .ds-block span { font-size: 13px; line-height: 18px; color: #474C60; font-variant-numeric: tabular-nums; } .ds-gap { position: absolute; left: 64px; font-size: 13px; line-height: 18px; color: #474C60; } .ds-gap a { color: #2E4AD6; text-decoration: none; } .ds-gap a:focus-visible { outline: 2px solid #2E4AD6; outline-offset: 2px; } .ds-now { position: absolute; left: 56px; right: 0; height: 1px; background: #C3352B; } .ds-now::before { content: ''; position: absolute; left: -3px; top: -3px; width: 7px; height: 7px; border-radius: 999px; background: #C3352B; }"
+      "description": "Signature: a 32-wide rail on the 12 px dot grid; one tint bar with a stroke edge beside each row at its measured height, a dashed gap, the red now-line through the row that holds now.",
+      "html": "<div class=\"ds-day\"><div class=\"ds-rail\"><span class=\"ds-rbar\" style=\"top:0;height:64px\"></span><span class=\"ds-rgap\" style=\"top:64px;height:48px\"></span></div><div class=\"ds-drow\" style=\"height:64px\"><b>Пары</b><span>08:30–10:05 · 1 ч 35 мин</span></div><div class=\"ds-drow\" style=\"height:48px\"><span class=\"ds-gaptxt\">не записано · <a href=\"#\">Записать</a></span></div><div class=\"ds-now\" style=\"top:88px\"></div></div>",
+      "css": ".ds-day { font-family: Inter, system-ui, sans-serif; position: relative; max-width: 420px; padding-left: 44px; background: #F4F5F9; } .ds-rail { position: absolute; left: 0; top: 0; bottom: 0; width: 32px; border-radius: 12px; overflow: hidden; background-image: radial-gradient(rgba(46,74,214,0.07) 1px, transparent 1px); background-size: 12px 12px; } .ds-rbar { position: absolute; left: 4px; width: 12px; box-sizing: border-box; border-radius: 4px; background: rgba(147,100,206,0.12); border: 1.75px solid #9364CE; } .ds-rgap { position: absolute; left: 4px; width: 12px; box-sizing: border-box; border-radius: 4px; border: 1px dashed #878CA0; } .ds-drow { display: flex; flex-direction: column; justify-content: center; box-sizing: border-box; padding: 0 16px; font-size: 16px; line-height: 22px; color: #12141C; } .ds-drow span { font-size: 13px; line-height: 18px; color: #474C60; font-variant-numeric: tabular-nums; } .ds-drow .ds-gaptxt a { color: #2E4AD6; text-decoration: none; } .ds-drow a:focus-visible { outline: 2px solid #2E4AD6; outline-offset: 2px; } .ds-now { position: absolute; left: 0; right: 0; height: 1px; background: #C3352B; }"
     }
   ],
   "narrative": {
     "northStar": "The Squared Notebook",
-    "overview": "Pace is a school notebook used as a tool: cool squared paper, ballpoint-blue ink and a red margin rule. The ink does every interactive job (the one primary action, links, the current selection, the focus ring, done); the red margin is status only (the now-line on Day, overdue, Urgent, destructive). Everything at rest is neutral paper and graphite text, so the content (task titles, times, the day's shape) is the brightest thing on the screen.\n\nThe app works in Operate mode on every surface: the person is in the middle of a task, so scanability, consistency and platform expectations outrank expression. The world contributes type rhythm, palette, density and one signature detail; the shell, navigation and controls are the platform's (Material affordances on Android, web semantics on the web, Apple-productivity-grade craft on both). A screen is one ground with grouped list sections on it; elevation is only for things that float. Time is drawn as time: one formatter, tabular figures, proportional spans wherever a screen shows a day.\n\nThe signature lives on Day: the timeline sits on a faint 4-pt dot grid (only behind the timeline), crossed by a red now-line; the running activity reads as an ink line with a red mark at its expected length. Both themes, both scripts (Latin and Cyrillic) and the worst case (long Russian names, 1 284 tasks, font scale 1.6) are part of the design, not tests after it.",
+    "overview": "Pace is a school notebook used as a tool: cool squared paper, ballpoint-blue ink and a red margin rule. The ink does every interactive job (the one primary action, links, the switch that is on, the chosen chip, the selection bar, the focus ring, done); the red margin is status only (the now-line on Day, the expected-length mark on the running line, overdue, Urgent, destructive, the waiting count). Everything at rest is neutral paper and graphite text, so the content (task titles, times, the day's shape) is the brightest thing on the screen.\n\nThe app works in Operate mode on every surface: the person is in the middle of a task, so scanability, consistency and platform expectations outrank expression. The world contributes type rhythm, palette, density and one signature detail; the shell, navigation and controls are the platform's (a Material navigation bar and ripple on Android, web semantics and a CSS state layer on the web). A screen is one ground with grouped list sections on it; elevation is only for things that float. Time is drawn as time: one formatter, tabular figures, and on Day a rail whose bars line up with the rows they belong to.\n\nThe signature lives on Day and in the running card: Day's rail sits on a faint dot grid (only inside the rail), crossed by a red now-line; the running activity reads as a 2 px ink line with a 1 px red mark at its expected length. Colour is never a dot: a project, category or running activity leads with a 32 hue tile (its tint, an icon in its ink). Both themes, both scripts (Latin and Cyrillic) and the worst case (long Russian names, 1 284 tasks, font scale 1.6) are part of the design, not tests after it. With no stored preference and no light OS setting, the page starts dark.",
     "keyCharacteristics": [
       "One cool accent (ink blue) for every interactive job; red is status, never decoration.",
       "One surface with grouped lists; separators only between rows of a group, inset to the text.",
-      "Inter only, thirteen fixed type roles, tabular figures for every number.",
-      "A 4-pt spacing scale and seven radii; nothing off-scale exists.",
-      "Depth by tonal step; shadows only on floating layers in light, a hairline in dark.",
-      "Every press answers within a frame; every overlay leaves the way it came; nothing exceeds 300 ms."
+      "Inter only, thirteen fixed type roles with a phone and a desktop column, tabular figures for every number.",
+      "A 4-pt spacing scale and seven radii; the Tailwind scales are replaced, so nothing off-scale exists.",
+      "Depth by tonal step; the overlay shadow only on floating layers, an inner hairline in dark.",
+      "Every press answers within a frame; every overlay leaves the way it came; nothing exceeds 300 ms, and reduced motion is a 160 ms fade, never nothing."
     ],
     "rules": [
       {
@@ -2148,12 +2215,12 @@
       },
       {
         "name": "The Red Margin Rule",
-        "body": "Red marks status: the now-line, overdue, Urgent, destructive, errors. It is never decoration, never a brand flourish, never a category.",
+        "body": "Red marks status: the now-line, the expected-length mark, overdue, Urgent, destructive, errors, what waits. It is never decoration, never a brand flourish, never a category.",
         "section": "colors"
       },
       {
         "name": "The Pen Colour Rule",
-        "body": "A category is a 1 px line (or a small dot in a value, a chip or a legend) in its hue's `stroke`, with its name in `label-*`. A project is a tag: hue `tint` fill and hue `ink` text, `rounded.sm`. «В работе» / In progress is a violet tag, because blue belongs to the ink. Importance has no colour of its own: Urgent is a red word, Priority a bold word in `label-primary` (600), Low shows no word but draws the title in `label-secondary`, Normal shows nothing.",
+        "body": "A coloured thing is its hue's tint under its ink: a project tag, a coloured chip at rest, a hue tile leading a project, category or running activity row, a bar on Day's rail (with a stroke edge, because the tint alone is under 3:1). Colour is never shown as a dot. Importance has no colour of its own: Urgent is a red word, Low (Необязательно) draws the title in `label-secondary` at 400, Normal shows nothing.",
         "section": "colors"
       },
       {
@@ -2168,12 +2235,12 @@
       },
       {
         "name": "The Tabular Time Rule",
-        "body": "Every duration, clock and count uses a numeric role (tabular figures built in) and one core formatter: Russian gets a non-breaking space before units («2 ч 05 мин», «1 284»), a decimal comma, and hours roll into days past 48 h.",
+        "body": "Every duration, clock and count uses a numeric role or the `numeric` flag (tabular figures) and one core formatter: Russian gets a non-breaking space before units («2 ч 05 мин», «1 284»), a decimal comma, and hours roll into days past 48 h.",
         "section": "typography"
       },
       {
         "name": "The One Section Header Rule",
-        "body": "A section header is `subhead`, sentence case, `label-secondary`, 24 px above and 8 px below, inset to line up with cell text, announced as a heading of its level.",
+        "body": "A section header is `subhead`, sentence case, `label-secondary`, 24 px above and 8 px below, inset to line up with cell text, announced as a heading of its level, with at most one trailing count or action.",
         "section": "typography"
       },
       {
@@ -2183,17 +2250,17 @@
       },
       {
         "name": "The Notebook Grid Rule",
-        "body": "The dot grid exists only behind Day's timeline. It never becomes a page background, a card texture or a decoration elsewhere.",
+        "body": "The dot grid (a 1 px dot every 12 px in `grid`) exists only inside Day's rail. It never becomes a page background, a card texture or a decoration elsewhere.",
         "section": "layout"
       },
       {
         "name": "The Float-Only Rule",
-        "body": "Elevation is for things that float (sheets, dialogs, popovers, toasts, tooltips). Lists, rows, groups and notices sit flat on their ground.",
+        "body": "Elevation is for things that float (sheets, dialogs, popovers, toasts, banners). Lists, rows, groups, the running card and notices sit flat on their ground. Tooltips float on a hairline, without a shadow.",
         "section": "elevation"
       },
       {
         "name": "The One Boundary Rule",
-        "body": "A hairline and a fill never both mark the same boundary. No border around cells, cards, chips at rest, tags or the composer; a 1 px `outline` appears only on a control with no fill to mark it.",
+        "body": "Content containers mark their edge by fill alone: no border around groups, cells, the running card, chips, tags or tiles. A line appears only where a fill cannot carry the boundary at 3:1: a control without a fill (`outline`), the switch track off, the segmented thumb (`label-tertiary` edge), the destructive button (2 px danger), a rail bar (its stroke), and the edge of a toast or tooltip floating over content.",
         "section": "elevation"
       },
       {
@@ -2202,34 +2269,34 @@
         "section": "shapes"
       },
       {
-        "name": "The Rare Pill Rule",
-        "body": "Pills are for chips, switches, badges, the segmented track and indicators. Tags are not pills in this world; they are `sm` rectangles, like a label written on the page.",
+        "name": "The Pill-or-Plate Rule",
+        "body": "Small labels and toggles are pills (chips, tags, badges, switches, segments, indicators); anything that holds a layout (buttons, fields, tiles, groups, cards, overlays) is a rounded rectangle from the scale.",
         "section": "shapes"
       }
     ],
     "dos": [
       "**Do** keep ink blue (#2E4AD6 / #97A9FF) as the only interactive colour, with at most one filled ink element per screen at rest.",
-      "**Do** reserve Red Margin (#C3352B / #FF8274) for the now-line, overdue, Urgent, destructive and errors.",
-      "**Do** show a category as a 1 px line or small dot in its hue `stroke` with the name in `label-*`, and a project as a `sm` tag in hue `tint` + `ink`.",
+      "**Do** reserve Red Margin (#C3352B / #FF8274) for the now-line, the expected-length mark, overdue, Urgent, destructive, errors and what waits.",
+      "**Do** draw a coloured thing as its hue's tint under its ink: a pill tag, a coloured chip at rest, a 32 hue tile leading its row.",
       "**Do** put every number through a numeric role (tabular figures) and the core formatter, with non-breaking spaces in Russian.",
       "**Do** build screens as one `bg-app` ground with `bg-cell` groups (`lg`, 16) and inset separators.",
-      "**Do** give every pressable the one state layer: `fill-1` hover, ripple `fill-3` / `fill-2` overlay, a 2 px + 2 px ink focus ring, `label-quaternary` + `fill-1` when disabled.",
-      "**Do** check every decision in both themes, in Russian, at 320 / 390 / 1440 and at font scale 1.6.",
-      "**Do** pair every overlay's enter with its exit, stay under 300 ms, and give each a reduced-motion fade."
+      "**Do** build every control on the kit's `Pressable` so it gets the one state layer: `fill-1` hover, `fill-3` ripple / `fill-2` overlay, a 2 px + 2 px ink focus ring, `label-quaternary` + `fill-1` when disabled.",
+      "**Do** add every new colour pair to `pairs.ts` and check every decision in both themes, in Russian, at 320 / 390 / 1440 and at font scale 1.6.",
+      "**Do** pair every overlay's enter with its exit, stay at or under 300 ms, chain the next step on completion, and give each a 160 ms reduced-motion fade."
     ],
     "donts": [
       "**Don't** put an eyebrow, kicker or small label above a title.",
       "**Don't** use red as decoration, as a category colour or as a brand accent.",
       "**Don't** use the logo lime (#5E8C00 / #C8F03C) anywhere but the logo, favicon and app icon.",
       "**Don't** show \"Normal\" importance, or give importance its own colour beyond the red Urgent word.",
-      "**Don't** nest cards in cards, outline every container, or mark one boundary with both a hairline and a fill.",
-      "**Don't** put shadows on content; elevation belongs to sheets, dialogs, popovers, toasts and tooltips.",
+      "**Don't** nest cards in cards, outline every container, or add a border where the fill already holds 3:1.",
+      "**Don't** put shadows on content; the overlay shadow belongs to sheets, dialogs, popovers, toasts and banners.",
       "**Don't** use text glyphs (↵, ⋯) as icons, an outlined square for Stop, or a pulsing running dot.",
-      "**Don't** use pill tags or tags with dots; tags are `sm` rectangles.",
-      "**Don't** spread the dot grid beyond Day's timeline.",
-      "**Don't** use off-scale spacing, radii, font sizes or arbitrary values; the token scales are the only scales.",
+      "**Don't** show colour as a dot; a coloured thing is a tint under its ink.",
+      "**Don't** spread the dot grid beyond Day's rail.",
+      "**Don't** use off-scale spacing, radii, font sizes or arbitrary values, a bare pressable, or a direct lucide import; lint rejects them.",
       "**Don't** dim disabled controls with opacity, or show state by colour alone.",
-      "**Don't** animate list mounts, filter changes or day switches, or pair a fixed timer with an animation."
+      "**Don't** animate list mounts, filter changes, tab switches or day switches, or pair a fixed timer with an animation."
     ]
   }
 }

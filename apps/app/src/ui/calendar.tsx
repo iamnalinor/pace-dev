@@ -1,5 +1,5 @@
 import { type Ref, use, useEffect, useRef, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 import {
   type CalendarDay,
@@ -17,6 +17,8 @@ import { moveFocus } from "../platform/move-focus.ts";
 import { cx } from "./cx.ts";
 import { IconButton } from "./icon-button.tsx";
 import { RevealContext } from "./overlay-reveal.ts";
+import { DISABLED } from "./pressable-props.ts";
+import { Pressable } from "./pressable.tsx";
 import { KEYBOARD } from "./use-hotkey.tsx";
 
 /** January 1, 2024 was a Monday: day `n` of that week names weekday `n`. */
@@ -38,7 +40,10 @@ const dayLabel = (date: string, language: Language): string =>
   }).format(new Date(`${date}T00:00:00Z`));
 
 /** The picked day on the solid accent, the month's days in ink, the neighbours' faint. */
-const ink = (cell: CalendarDay, isSelected: boolean): string => {
+const ink = (cell: CalendarDay, isSelected: boolean, isDisabled: boolean): string => {
+  if (isDisabled) {
+    return DISABLED.label;
+  }
   if (isSelected) {
     return "font-semibold text-accent-on";
   }
@@ -75,17 +80,15 @@ const DayCell = ({
   readonly ref?: Ref<View>;
 }) => (
   <Pressable
-    accessibilityLabel={dayLabel(cell.date, language)}
-    accessibilityRole="button"
-    aria-disabled={isDisabled}
+    // A day says it is picked, whatever its role (the kit's `selected` is for a tab or an option).
     aria-selected={isSelected}
     className={cx(
-      "h-10 flex-1 items-center justify-center rounded-lg active:opacity-70",
-      isSelected && "bg-accent",
+      "h-10 flex-1 items-center justify-center",
+      isSelected && !isDisabled && "bg-accent",
       !isSelected && isToday && "border-2 border-label-primary",
-      isDisabled && "opacity-30",
     )}
     disabled={isDisabled}
+    label={dayLabel(cell.date, language)}
     // A sheet's focus trap walks every descendant (react-native-web's), past the tab index: focus
     // from outside the grid on a day other than the stop goes on to the stop, so Shift+Tab into
     // the grid lands on it (round 7).
@@ -94,9 +97,11 @@ const DayCell = ({
       onPick(cell.date);
     }}
     ref={ref}
+    role="button"
+    shape="lg"
     tabIndex={isStop ? 0 : -1}
   >
-    <Text className={cx("font-sans text-footnote tabular-nums", ink(cell, isSelected))}>
+    <Text className={cx("font-sans text-footnote tabular-nums", ink(cell, isSelected, isDisabled))}>
       {String(cell.day)}
     </Text>
     {isMarked ? (

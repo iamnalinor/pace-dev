@@ -25,7 +25,8 @@ import { fitHourPx, gridFromHour, type WeekModel } from "@pace/client";
 import { useCalendarRange, useUsage } from "@pace/client/react";
 import { formatWeekRange } from "@pace/core";
 
-import { PickedPane, PickedSheet } from "./picked-details.tsx";
+import { PickedSheet } from "./picked-details.tsx";
+import { PickedPane } from "./picked-pane.tsx";
 import { BOTTOM_PX, LABELS_PX, WeekGrid } from "./week-grid.tsx";
 import { type Picked, pickedKey } from "./week-picked.ts";
 

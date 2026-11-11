@@ -64,10 +64,28 @@ const wordmarkSvg = (): string =>
 </svg>
 `;
 
+const FAVICON_CHEVRONS = faviconShapes({ accent: DARK_BG, fg: DARK_BG, track: "rgba(0,0,0,.3)" });
+
+/** The tile in one lime: what a PNG holds (a renderer follows no colour scheme). */
 const faviconSvg = (): string =>
+  svg(120, `<rect width="120" height="120" rx="30" fill="${LIME}"/>\n  ${FAVICON_CHEVRONS}`);
+
+/**
+The browser tab's favicon follows the tab strip's scheme (F-WEB-15; owner, round 2): the deeper lime
+of the light `logo` role on a light strip, the bright one on a dark strip. The fill is a style rule,
+so the media query can replace it.
+*/
+const adaptiveFaviconSvg = (): string =>
   svg(
     120,
-    `<rect width="120" height="120" rx="30" fill="${LIME}"/>\n  ${faviconShapes({ accent: DARK_BG, fg: DARK_BG, track: "rgba(0,0,0,.3)" })}`,
+    [
+      `<style>`,
+      `  .tile { fill: ${color("light", "logo")}; }`,
+      `  @media (prefers-color-scheme: dark) { .tile { fill: ${LIME}; } }`,
+      `  </style>`,
+      `<rect class="tile" width="120" height="120" rx="30"/>`,
+      FAVICON_CHEVRONS,
+    ].join("\n  "),
   );
 
 /** A 1024x1024 canvas with `shapes` (drawn in a 120 unit box) centred at `fraction` of the width. */
@@ -99,13 +117,16 @@ export const LOGO_FILES: readonly LogoFile[] = [
   { path: "assets/logo/pace-mark-light.svg", svg: markSvg(LIGHT) },
   { path: "assets/logo/pace-wordmark.svg", svg: wordmarkSvg() },
   { path: "assets/logo/favicon.svg", svg: FAVICON },
-  { path: "apps/app/public/favicon.svg", svg: FAVICON },
+  { path: "apps/app/public/favicon.svg", svg: adaptiveFaviconSvg() },
 ];
 
 export const ICONS: readonly IconSpec[] = [
   // The installed web app looks like the phone's: the same icon, not the browser tab's tile.
   { path: "apps/app/public/icon-192.png", size: 192, svg: APP_ICON },
   { path: "apps/app/public/icon-512.png", size: 512, svg: APP_ICON },
+  // The manifest's maskable entry, a file of its own (F-WEB-13): the tile runs to the edge and the
+  // mark at 56 % stays inside a launcher's mask (the 80 % safe zone).
+  { path: "apps/app/public/icon-maskable-512.png", size: 512, svg: APP_ICON },
   { path: "apps/app/public/apple-touch-icon.png", size: 180, svg: APP_ICON },
   // Expo's web.favicon: the same tile as the SVG, for browsers that ask for a PNG.
   { path: "apps/app/assets/favicon.png", size: 64, svg: FAVICON },

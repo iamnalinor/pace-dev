@@ -13,6 +13,12 @@ export type ShellProps = {
   /** The navigation region (`Navigation`: sidebar, rail or nothing); left out by a nested shell. */
   readonly navigation?: ReactNode;
   readonly content: ReactNode;
+  /**
+  The app's own shell, not a screen's nested one: on the web its content is the page's `main`
+  landmark with the skip link before it, on a phone too, where the shell carries no navigation
+  region (the tab bar is inside the content).
+  */
+  readonly isRoot?: boolean;
   /** The detail of what is selected (Now, Week, Inbox); shown beside the content on `expanded`. */
   readonly inspector?: ReactNode;
   /** Whether something is selected: closed, the content keeps the whole width (F-LAY-03). */

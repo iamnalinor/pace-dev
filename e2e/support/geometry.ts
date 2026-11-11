@@ -141,6 +141,12 @@ export const expectDescendantsStayInside = async (
                   a.height > 0 &&
                   // A focused field's ring is drawn 4 px outside its box on purpose (spec §4.2.28).
                   element.closest('[data-testid="text-field-ring"]') === null &&
+                  // The line's edge buttons (+ at the start, To Inbox and Send at the end) put
+                  // their glyphs on the gutter and let their targets' padding hang past the
+                  // card's edge (QA PR55-1-15): the boxes around a glyph are not held to the
+                  // card, the glyph itself is.
+                  (element.closest('[data-testid^="line-edge-"]') === null ||
+                    element.querySelector("svg") === null) &&
                   isSeen(element),
               );
             const worst = drawn

@@ -3871,3 +3871,173 @@ New bugs go here with their class; a new class gets its own section above.
   field itself, with no legacy shape. `history.test.ts` "offers Undo for a first zone the person
   set through the bot / mcp"; the trade-off for a first zone-question answer is written in
   `history.ts`.
+### 365. A timer paired with an animation instead of its completion
+- **Bug.** F-MOT-01/03 (design overhaul C, Task 5.2): a checked task's row ran a 750 ms dust
+  animation and closed on a fixed `setTimeout` of the same length. Under reduced motion the
+  animation was instant and the timer was not, so the row was a blank hole for about 800 ms; with
+  full motion the close (and the Undo) waited for the dust, about a second after the press. The
+  rows below then jumped on the web, where the layout transition never ran (F-MOT-02).
+- **Missed because.** The jest tests advanced the fake clock by the timer's own constant, so the
+  timer and the animation could never disagree in a test; no test ran with reduced motion or held
+  an animation's completion.
+- **Rule.** The step after an animation runs from the animation's completion callback, never from
+  a timer of "the same" length. An action a press starts is written on the press; motion never
+  gates a write (class 3). One primitive carries a motion on Android and the web alike.
+- **Sweep and guard.** `ui/dissolve.tsx` is a fade plus the row's own height closing up, done on
+  the last animation's completion (`dissolve.test.tsx` holds the completions and asserts no timer
+  is pending); `shared/task-list.tsx` writes the close on the press and keeps a leaving row until
+  its animation ends (`task-list.test.tsx`). Swept every `setTimeout` in a file that animates:
+  `Presence`, `Disclosure`, the overlays and the toast already wait for completion; the rest are
+  delays before something shows (`use-shown-after`, the tooltip) or idle waits (the time bar's
+  fold, the search pause), not a pair of an animation. Left as it is: the accepted proposal's
+  highlight (`accepted-highlight.tsx`) ends its mark on a `motion.highlight` timer; nothing
+  follows it, and under reduced motion the mark simply stays that long.
+
+### 366. A reduced variant the animation library silently switches off
+- **Bug.** Design overhaul C, Task 5.3 (found by `e2e/motion.e2e.ts` under
+  `prefers-reduced-motion`): the kit's reduced variants (spec §3.8: travel and scale replaced by a
+  160 ms fade, "never zero for a change that carries meaning") never played. Every `withTiming`
+  ran with Reanimated's default `reduceMotion: ReduceMotion.System`, which jumps to the end value
+  when the system asks for reduced motion, so a sheet, a dialog, a toast, a disclosure and the
+  check-off simply appeared and vanished (F-MOT-03's second half, thought fixed in the kit batch).
+- **Missed because.** The jest mock of Reanimated completes every animation at once, with or
+  without reduced motion, and `presenceTiming(…, true)` was asserted as data ("160 / 160") but no
+  test looked at frames under reduced motion.
+- **Rule.** When the kit chooses its own reduced variant, the library's own switch is turned off
+  (`ReduceMotion.Never`); a default that "helps" is read before it is relied on. A reduced variant
+  is checked where it runs: frames in a browser with the media feature emulated.
+- **Sweep and guard.** `motion-presets.ts` `timing()` is the one way the kit builds a timed
+  animation and sets `ReduceMotion.Never`; `Presence`, the overlays, `Sheet`, `Disclosure`,
+  `Dissolve`, the composer's unfold and the accepted highlight use it. Left on the system switch
+  on purpose: the skeleton's breath and the Day rows' layout transition (travel only, nothing to
+  show instead). `e2e/motion.e2e.ts` runs the check-off and a route push under reduced motion
+  and asserts intermediate opacities.
+
+### 367. A browser default gesture left on
+- **Bug.** F-WEB-06 (design overhaul C, Task 6.2): on a phone's browser, pulling down at the top of
+  Now reloaded the page (pull-to-refresh), a scroll that reached the end of a sheet went on into
+  the page under it, and the selection, the caret and the scrollbars were the browser's colours.
+- **Missed because.** Every test drives the page with clicks and keys; no test asked what the
+  browser itself does with a gesture the app never handles.
+- **Rule.** The web layer states what each browser default does in an app: overscroll, text
+  selection on controls, the tap highlight, zoom on focus, the keyboard covering a field. A
+  default left on is a decision written down, not an accident.
+- **Sweep and guard.** `global.css`: `overscroll-behavior-y: none` on the page and `contain` in
+  overlays, `::selection`, `caret-color`, `scrollbar-color`; the viewport meta resizes the page
+  for the keyboard and `platform/keyboard.web.ts` keeps the focused field in view. The reload path
+  loses no typing: drafts are kept on the device (`platform/drafts.ts`, feedback 5 item 7), which
+  is why the update card's Refresh needs no draft guard. e2e: `e2e/a11y.e2e.ts` /
+  `e2e/web-baseline.e2e.ts` assert the computed styles.
+
+### 368. An animation's progress used outside 0…1
+- **Bug.** Design overhaul C (found by `e2e/motion.e2e.ts`): a dialog's first drawn frame was at
+  scale 0.944, under the 0.96 it starts from (F-MOT-06 "never from nothing" by a hair). On the web
+  Reanimated's first frame can land a few milliseconds before the animation's start time; the
+  ease-out curve then answers a progress of about −0.4, and `from + (1 − from) × step` dips below
+  `from`.
+- **Missed because.** The unit tests feed the formula 0 and 1; the mock finishes every animation
+  at once, so no test saw a first frame.
+- **Rule.** A value derived from an animation's progress clamps the progress to 0…1 first, unless
+  an overshoot is the design (a spring).
+- **Sweep and guard.** `overlay-motion.ts` `grownScale(from, step)` clamps; `Dialog`, `Popover` and
+  `Presence` use it (`overlay-motion.test.ts`). The sheet's offset and `Presence`'s translate can
+  overshoot the same way but only while fully transparent; left. `e2e/motion.e2e.ts` asserts every
+  sampled frame of a dialog is at 95 % or more.
+
+### 378. A dependency's feature probe that the production policy forbids
+- **Bug.** Design overhaul C (found by `e2e/web-baseline.e2e.ts`, once `serve-web.ts` applied
+  `_headers`): every load of the web build reported a `securitypolicyviolation` (`script-src eval`,
+  logged as an error in the console). Zod 4 probes `new Function("")` once before it compiles a
+  fast object parser; the CSP has no `'unsafe-eval'`, the probe throws, zod catches it and falls
+  back, so nothing visibly broke.
+- **Missed because.** Until C the e2e server served no headers, and no test listened for the
+  policy's own report: a caught probe leaves the screen exactly as it was.
+- **Rule.** Under a strict CSP, a library that feature-detects by trying is told the answer up
+  front (its config), so it never tries; a violation report is a failure even when the page works.
+- **Sweep and guard.** The bundle's other `eval` sites: Metro's split-bundle loader (`eval(body)`,
+  only for async bundles, none today: re-check when bundle splitting lands) and a uuid helper that
+  evals `require` only where `crypto` is missing (never in a browser). Fix:
+  `apps/app/src/platform/content-policy.ts` sets zod's `jitless`, imported first by `entry.ts`
+  (`content-policy.test.ts`). Guard: `e2e/web-baseline.e2e.ts` records every
+  `securitypolicyviolation` on Now, Day and Settings and fails on any.
+
+### 369. A press handler that writes is not idempotent while its motion runs
+- **Bug.** Code review of PR C (before merge): with the close written on the press (class 365),
+  a second tap on a row that was already leaving closed the task again. The second close was
+  refused ("Nothing to change"), its toast replaced the "Done · Undo" toast, and its refusal
+  branch took the row out of the leaving set mid-fade. In the same review: rows checked in a quick
+  run were put back by an index taken against a list that later lost an earlier row (the later
+  row jumped down), and a refused close left a stale "dropped" mark that made the next check's
+  row show again while its close waited.
+- **Missed because.** The tests pressed each check once and finished one animation at a time;
+  the old dust ran the write once, from its end, so a second press could not write.
+- **Rule.** A handler that writes guards itself against a repeat while the motion it started
+  runs, with a mark set at the press (state arrives a commit later). A position kept across
+  changes of a list is anchored to a neighbour's id, never to an index. A refusal undoes every
+  mark its start made.
+- **Sweep and guard.** `shared/task-list.tsx`: `startedRef` guards the press, a leaving row is
+  anchored to the row above it, the refusal clears `leaving`, `gone` and `dropped`, an Undo while
+  leaving stops the leave at once, a leaving row does not open. `task-list.test.tsx` holds each
+  case (double tap, two rows in a run finishing in either order, refused-then-checked-again,
+  Undo while leaving, no open). The task list is the only list that keeps a row through a local
+  motion after its write; other one-tap writes (Inbox, the calendar card, the time bar) were not
+  re-checked for a repeat press in this change: a later sweep owns them.
+
+### 377. A heading role without its level
+- **Bug.** Design overhaul C (found by `e2e/a11y.e2e.ts`, one level-1 heading per route): Settings
+  had two `<h1>`, the screen's title and "Danger zone". A raw `<Text accessibilityRole="header">`
+  carries no level, and react-native-web renders a heading without `aria-level` as `<h1>`. Twelve
+  other headings had the same shape: sheet and dialog titles (`overlay-frame.tsx`), Day's
+  calendar and app-usage headers, Week's picked block, the presets' sections, the AI clients in
+  Connect AI, the dev gallery.
+- **Missed because.** Jest asks for `getByRole("header")` and passes at any level; the e2e suites
+  find a screen's title with `level: 1` and `.first()`, so a second h1 was never counted.
+- **Rule.** A heading always names its level: the kit's `Text level` (which sets the role and
+  `aria-level` together), or `aria-level` written beside the role. A screen has one level-1
+  heading; a sheet or a dialog title is level 2.
+- **Sweep and guard.** All thirteen got their level (1 for a screen's only title: login's wordmark,
+  consent, the incompatible-server and crash screens, the gallery). Lint: `HEADING_LEVEL_SYNTAX`
+  in `eslint.config.ts` fails a header role without `aria-level` in `apps/app/src`. e2e:
+  `e2e/a11y.e2e.ts` counts the level-1 headings on every main route at 390 and 1280.
+
+### 379. A region budget enforced by folding one part, with nothing for when that is not enough
+- **Bug.** `e2e/a11y.e2e.ts` (PR C): on a 320 × 568 phone and a computer at 200 % zoom, with
+  something running, Now's list kept 21 % and 29 % of the window and showed no task row: the time
+  bar and the tab bar took the rest. The bar folded its typed field past the 40 % budget (Q12), but
+  the spec's next step for small screens and zoom (§5.1, §8: "the bar scrolls with content") was
+  never built.
+- **Missed because.** Every app test and screenshot ran at 390 × 844 or larger, where folding the
+  field is enough (51 %); no test measured the list's share at the spec's reflow sizes.
+- **Rule.** A budget is enforced to its last step, and the smallest size the spec names is tested.
+- **Sweep and guard.** `ui/screen.tsx`: on a window shorter than 600 (not wide) the footer is laid
+  out at the end of the content and scrolls with it; decided from the window, not from the footer's
+  height, so a footer that grows under the finger never jumps. `screen.test.tsx` holds 390 × 844,
+  320 × 568 and 640 × 450; `a11y.e2e.ts` measures the list's share at 320 px and 200 %.
+
+### 380. An ARIA state moved from the platform prop onto the DOM attribute, past the role's allowed set
+- **Bug.** CI e2e on PR C (`assistant.e2e.ts`, axe `aria-allowed-attr`, critical): the assistant's
+  answer options are buttons that said `aria-selected`. The lint-zero migration moved them from
+  `accessibilityState={{ selected }}` (which react-native-web drops for a button) to the kit's
+  `Pressable` with `aria-selected` written straight onto the element.
+- **Missed because.** The migration's jest test asserted `toBeSelected()`, which reads the prop and
+  does not know which roles may carry it; axe runs only in e2e, which the migration did not run.
+- **Rule.** A state goes on the element under its role's own attribute (`aria-pressed` for a toggle
+  button, `aria-checked` for a radio, `aria-selected` for a tab, option or gridcell); a state passed
+  by hand past the kit's role check is checked by axe before it lands.
+- **Sweep and guard.** `shared/assistant/questions.tsx` says `aria-pressed`; `composer.test.tsx`
+  asserts it. The calendar's days also pass `aria-selected` by hand on a button (as on the base
+  branch, inside the date grid); axe has not flagged it there (`round6-minors.e2e.ts` passes), left
+  as it is for the calendar's own task.
+
+### 381. Out of sight by an offset from its own place, while its container can move
+- **Bug.** The update strip went back into the layout above the app (the owner's choice over a
+  floating card). On the shots the shell's skip link («Перейти к содержимому») showed over the
+  strip: it was hidden by `translateY(-200%)` of its own height from the shell's top, and the shell
+  now started lower than the page's top.
+- **Missed because.** The hiding rule only held while the shell's top was the page's top; nothing
+  checked the link out of sight with anything laid out above the shell, and the strip only appears
+  with a waiting service worker, which no e2e brings about.
+- **Rule.** Something hidden off the page is moved by the page's measure (the viewport) plus its
+  own, never by a step from its own place that assumes where its container sits.
+- **Sweep and guard.** The only off-page hide in `global.css` is the skip link; it now moves by
+  `calc(-100vh - 100%)`. `focus-ring.test.ts` holds the rule.
