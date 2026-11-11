@@ -24,6 +24,11 @@ type SyncMessage = Extract<
   { type: typeof SYNC_TYPES extends Set<infer T> ? T : never }
 >;
 
+/** The types that answer a request by its id. */
+const ANSWER_TYPES: ReadonlySet<unknown> = new Set(["error", "events", "pushed"]);
+
+const isAnswerType = (type: unknown): boolean => ANSWER_TYPES.has(type);
+
 const isSyncMessage = (message: LiveServerMessage): message is SyncMessage =>
   (SYNC_TYPES as ReadonlySet<string>).has(message.type);
 
@@ -55,19 +60,38 @@ const onSyncMessage = (message: SyncMessage, on: LiveHandlers): void => {
 };
 
 /**
-One message as the channel reads it: the sync protocol's own goes to `onSyncMessage`; a type a
-newer server added is passed over; the rest (the pool's notices, also when off-contract) goes
-to `message` as parsed JSON, which reads it with its own schema.
+A message of a sync type that failed its schema; true when it was handled (class 373). An answer
+fails its request now, not at the request's timeout. A hello still says the server speaks v2 and
+is the socket's catch-up: read as one that names nothing (a pull), never as a notice, which left
+the copy and v2 waiting for the poll.
+*/
+const wasOutOfShapeHandled = (raw: { readonly type?: unknown }, on: LiveHandlers): boolean => {
+  if (isAnswerType(raw.type) && "id" in raw && typeof raw.id === "string") {
+    on.invalid(raw.id);
+    return true;
+  }
+  if (raw.type === "hello") {
+    on.hello(null);
+    return true;
+  }
+  return false;
+};
+
+/**
+One message as the channel reads it: the sync protocol's own goes to `onSyncMessage` (out of
+shape, to `wasOutOfShapeHandled`); a type a newer server added is passed over; the rest (the pool's
+notices, also when off-contract) goes to `message` as parsed JSON, which reads it with its own
+schema.
 */
 export const onLiveMessage = (raw: { readonly type?: unknown }, on: LiveHandlers): void => {
   const parsed = LiveServerMessageSchema.safeParse(raw);
-  if (parsed.success && isSyncMessage(parsed.data)) {
-    onSyncMessage(parsed.data, on);
-  } else if (!parsed.success || parsed.data.type !== "unknown") {
-    if (!parsed.success && raw.type === "events" && "id" in raw && typeof raw.id === "string") {
-      on.invalid(raw.id);
-      return;
+  if (parsed.success) {
+    if (isSyncMessage(parsed.data)) {
+      onSyncMessage(parsed.data, on);
+    } else if (parsed.data.type !== "unknown") {
+      on.message?.(raw);
     }
+  } else if (!wasOutOfShapeHandled(raw, on)) {
     on.message?.(raw);
   }
 };

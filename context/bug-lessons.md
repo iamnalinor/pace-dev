@@ -1927,6 +1927,7 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-11 | Wave review, item 1: a connect's hello judged the copy while a direct `syncNow()` hung; the run then failed with no backoff and the offline line stayed up beside a live socket until the 5-min poll (or an empty second pull went out) | 370 (new) | yes: `firstTickIn` waits through `isFresh`; no other reader decides on the run's state before it settles | `sync-client.test.ts`: a hello during a run that fails leads to a run; one during a run that reaches the head asks no second pull |
 | 2026-11-11 | Wave review, item 2: on the web Day showed screen time only for rows, and a failed read has none, so a 503 was silent (R23-08 again) | 371 (new), 62 | yes: Week's calendar shows its failure whatever its rows; the usage marks on blocks show no total | `day-web.test.tsx`: the failed read says so with Try again; one Retry beside the offline sync line; an empty answer stays silent |
 | 2026-11-11 | Wave review, item 3: the notification feed's page and freshness outlived a sign-out; another account signed in within 5 s saw the previous account's pool | 372 (new), 103 | yes: the instance reader is public; the sync's success record only times the loop's first tick after the start's own pull | `create-client.test.ts` (sign-out empties the feed, the next account fetches its own); `notifications.test.ts` (a page landing after `reset` is dropped) |
+| 2026-11-11 | Wave review, item 4: a v2 hello out of shape went to the notices' reader: no catch-up pull and v2 off until the 5-min poll | 373 (new) | yes: `pushed` and `error` answers out of shape left their request waiting for its timeout; fixed with it | `live.test.ts` raw frames: broken hellos pull and turn v2 on; broken `pushed`/`error` fail their request at once |
 
 ### 125. A live region around a ticking value
 - **Bug.** PR B 4.2 (F-A11Y-10): the running row sat in `accessibilityLiveRegion="polite"` around the
@@ -3804,3 +3805,17 @@ New bugs go here with their class; a new class gets its own section above.
   `createPaceClient` resets the feed on every token change (`feedFollowsSession`).
   `create-client.test.ts` "never shows the last account's notifications…"; `notifications.test.ts`
   "drops a page that lands after a reset".
+
+### 373. A protocol message out of shape handed to the channel that ignores it
+- **Bug.** Wave review, item 4: a v2 socket's hello that failed the schema (a field a server got
+  wrong) went to `on.message`, the notices' reader, which drops it: no catch-up pull, and `isV2`
+  stayed false, so every request went over HTTP until the 5-minute poll. The sweep found the same
+  for a `pushed` or `error` answer out of shape: its request waited for its timeout.
+- **Missed because.** The live tests send through `say`, which checks the message against the
+  schema first, so no test could send one out of shape; only `events` had a path for it.
+- **Rule.** Every message the protocol itself depends on (the hello, each answer by id) has an
+  explicit path for "this type, out of shape": the hello counts as one naming nothing, an answer
+  fails its request at once. Only notices fall through to the lenient reader.
+- **Sweep and guard.** `onLiveMessage` handles hello, events, pushed and error out of shape.
+  `live.test.ts` sends raw frames: three broken hellos (a pull, v2 on), a broken `pushed` and
+  `error` (the request fails at once, no notice).
