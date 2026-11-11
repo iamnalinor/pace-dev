@@ -1,10 +1,12 @@
-import { Text, type View } from "react-native";
+import type { View } from "react-native";
+
 import Svg, { Circle, Ellipse, Path } from "react-native-svg";
 
 import { useT } from "#app/app-state.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { Pressable } from "#app/ui/pressable.tsx";
 import { RadioGroup, useRadio } from "#app/ui/radio-group.tsx";
+import { Text } from "#app/ui/text.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { COMPUTER_OSES, type ComputerOs } from "@pace/client";
 import { composite, type MessageKey } from "@pace/core";
@@ -110,11 +112,10 @@ const Segment = ({
         os={os}
       />
       <Text
-        className={cx(
-          "font-sans text-footnote",
-          isChosen ? "font-medium text-accent-text" : "text-label-secondary",
-        )}
-        numberOfLines={1}
+        className={isChosen ? "font-medium" : ""}
+        policy="truncate"
+        role="footnote"
+        tone={isChosen ? "accent" : "secondary"}
       >
         {t(NAME_KEY[os])}
       </Text>

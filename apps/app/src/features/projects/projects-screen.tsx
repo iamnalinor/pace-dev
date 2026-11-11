@@ -2,7 +2,7 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { View } from "react-native";
 
-import type { Project } from "@pace/core";
+import type { Project, ProjectColorName } from "@pace/core";
 
 import { useAppState, useIsAccountUnknown, useLanguage, usePace, useT } from "#app/app-state.tsx";
 import { useBack } from "#app/shared/use-back.ts";
@@ -21,6 +21,9 @@ import { openTasksLabel } from "@pace/client";
 
 import { ProjectForm } from "./project-form.tsx";
 
+/** The colour a new project starts with: a stored colour name, not a CSS colour. */
+const FIRST_COLOR: ProjectColorName = "blue";
+
 /**
 The inline form of a new project: a name and a color, created on the spot. It sits at the top of
 the list; closing it (cancelled or created) goes back to the header's button through `onClose`.
@@ -32,7 +35,7 @@ const NewProject = ({ onClose }: { readonly onClose: () => void }) => {
     <View className="mx-gutter mb-3 mt-3">
       <ProjectForm
         draftKey="project.new"
-        initial={{ color: "blue", name: "" }}
+        initial={{ color: FIRST_COLOR, name: "" }}
         isNameFocused
         onCancel={onClose}
         onSave={async (values) => {

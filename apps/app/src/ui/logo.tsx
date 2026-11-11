@@ -45,6 +45,7 @@ export const PaceLogo = ({
     <Text
       accessibilityLabel={heading}
       accessibilityRole="header"
+      aria-level={1}
       className="font-sans text-largeTitle font-semibold text-label-primary"
     >
       {wordmark}

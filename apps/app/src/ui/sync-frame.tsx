@@ -14,7 +14,7 @@ import {
 } from "#app/app-state.tsx";
 import { useIsDeviceOffline } from "#app/platform/device-offline.ts";
 import { canStartSenders } from "#app/senders.ts";
-import { type MessageKey, z } from "@pace/core";
+import { type MessageKey, shadow, z } from "@pace/core";
 
 import { cx } from "./cx.ts";
 import { useFloatPlace, usePublishStatus } from "./float-layer.ts";
@@ -22,6 +22,7 @@ import { Icon, type IconName } from "./icon.tsx";
 import { Pressable } from "./pressable.tsx";
 import { Skeleton } from "./skeleton.tsx";
 import { Text } from "./text.tsx";
+import { useTheme } from "./theme-provider.tsx";
 import { useBreakpoint } from "./use-breakpoint.ts";
 
 /**
@@ -36,7 +37,7 @@ the control that asks again. The kit knows nothing of servers.
 */
 export type ServerProblem = { readonly message: MessageKey; readonly action: ReactNode };
 
-const CARD = "max-w-toast-max rounded-lg border border-separator bg-elevated pl-4 pr-1 shadow-lg";
+const CARD = "max-w-toast-max rounded-lg border border-separator bg-elevated pl-4 pr-1";
 
 /**
 The strip's card: an icon, the line and its control, with the toast's rounded corners (a pill's
@@ -59,6 +60,7 @@ export const SyncPill = ({
     readonly nativeEvent: { readonly layout: { readonly height: number } };
   }) => void;
 }) => {
+  const { scheme } = useTheme();
   const line = (
     <>
       <Icon name={icon} size="inline" tone="secondary" />
@@ -73,6 +75,7 @@ export const SyncPill = ({
       className={cx(CARD, isStacked ? "pt-1" : "min-h-hit-web flex-row items-center gap-2")}
       onLayout={onLayout}
       role="status"
+      style={{ boxShadow: shadow(scheme, "overlay") }}
       testID="sync-strip"
     >
       {isStacked ? (

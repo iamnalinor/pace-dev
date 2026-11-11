@@ -1,5 +1,3 @@
-import type { ReactNode } from "react";
-
 import { Text, View } from "react-native";
 
 import type { GalleryData } from "@pace/core/testing";
@@ -25,8 +23,9 @@ import { NavItem } from "#app/ui/nav-item.tsx";
 import { SidebarHeader } from "#app/ui/sidebar.tsx";
 import { Tag } from "#app/ui/tag.tsx";
 import { openTasksLabel } from "@pace/client";
-import { formatCount, formatDuration, type MessageKey } from "@pace/core";
+import { formatCount, formatDuration } from "@pace/core";
 
+import { Section } from "./gallery-kit.tsx";
 import {
   dayRows,
   GALLERY_NOW,
@@ -50,25 +49,6 @@ const NOTHING = (): void => undefined;
 /** A capture row and a task pane as shown, with nothing behind their actions. */
 const STILL_ROW = { isSelected: false, onOpen: NOTHING, onRemoved: NOTHING } as const;
 const STILL_PANE = { onClose: NOTHING, onGone: NOTHING } as const;
-
-/** One section of the gallery: a heading and the components it shows. */
-const Section = ({
-  children,
-  title,
-}: {
-  readonly children: ReactNode;
-  readonly title: MessageKey;
-}) => {
-  const t = useT();
-  return (
-    <View className="gap-2 px-5 pt-6">
-      <Text accessibilityRole="header" className="font-sans text-headline text-label-primary">
-        {t(title)}
-      </Text>
-      {children}
-    </View>
-  );
-};
 
 /** Task rows, tags and chips: the components that carry the user's own words. */
 export const TextSections = ({ data }: { readonly data: GalleryData }) => {

@@ -1,5 +1,6 @@
 import {
   DIALOG_SCALE,
+  grownScale,
   overlayTiming,
   placePopover,
   POPOVER_SCALE,
@@ -19,6 +20,16 @@ describe("overlay motion (spec §6 sheet, dialog, popover)", () => {
   it("never grows a dialog or a popover from nothing (F-MOT-06)", () => {
     expect(DIALOG_SCALE).toEqual({ enter: 0.96, exit: 0.98 });
     expect(POPOVER_SCALE).toBeCloseTo(0.98, 5);
+  });
+
+  it("keeps the scale between its start and 1 even when a frame lands just outside the run (F-MOT-06)", () => {
+    // The web's first frame can come a few ms before the animation's start: an ease-out curve
+    // then answers a step below 0, which drew the dialog at 94 %.
+    expect(grownScale(DIALOG_SCALE.enter, -0.4)).toBeCloseTo(0.96, 5);
+    expect(grownScale(DIALOG_SCALE.enter, 0)).toBeCloseTo(0.96, 5);
+    expect(grownScale(DIALOG_SCALE.enter, 0.5)).toBeCloseTo(0.98, 5);
+    expect(grownScale(DIALOG_SCALE.enter, 1)).toBeCloseTo(1, 5);
+    expect(grownScale(POPOVER_SCALE, 1.2)).toBeCloseTo(1, 5);
   });
 
   it("dismisses a dragged sheet past 30 % of its height or at 800 dp/s, never on a drag up", () => {

@@ -12,7 +12,7 @@ import { refuseFocus } from "../platform/refuse-focus.ts";
 import { ButtonWidthContext } from "./button.tsx";
 import { cx } from "./cx.ts";
 import { IconButton } from "./icon-button.tsx";
-import { EASING } from "./motion-presets.ts";
+import { timing } from "./motion-presets.ts";
 import { type OverlayKind, overlayTiming } from "./overlay-motion.ts";
 import { firstOfTick, RevealContext, revealIn, type Viewport } from "./overlay-reveal.ts";
 import { SheetSubmitScope } from "./sheet-submit.tsx";
@@ -82,6 +82,7 @@ export const OverlayTitle = ({
     <View className="flex-1">
       <Text
         accessibilityRole="header"
+        aria-level={2}
         className="font-sans text-title2 text-label-primary"
         nativeID={titleId}
       >
@@ -182,8 +183,8 @@ export const useOverlayProgress = (kind: OverlayKind, isOpen: boolean, letGo: ()
     const { enter, exit } = overlayTiming(kind, isReduced);
     progress.set(
       isOpen
-        ? withTiming(1, { duration: enter, easing: EASING.enter })
-        : withTiming(0, { duration: exit, easing: EASING.exit }, (isFinished) => {
+        ? withTiming(1, timing(enter, "enter"))
+        : withTiming(0, timing(exit, "exit"), (isFinished) => {
             if (isFinished === true) {
               scheduleOnRN(letGo);
             }

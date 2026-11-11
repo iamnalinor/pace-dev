@@ -50,7 +50,7 @@ export const NowBoard = ({
       ) : null}
       <NowTaskGroups rows={rows} />
       <FoldedSection count={future.length} title={t("now.future")}>
-        <TaskRows animateLayout={false} label={t("now.future")} rows={future} />
+        <TaskRows label={t("now.future")} rows={future} />
       </FoldedSection>
     </Screen>
   );

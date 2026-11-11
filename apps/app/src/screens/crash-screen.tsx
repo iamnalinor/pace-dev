@@ -25,7 +25,11 @@ export const CrashScreen = ({ error }: { readonly error: Error }) => {
   const [savedAt] = useState(() => paceNative.saveCrashTrace(traceOf(error)));
   return (
     <View className="flex-1 items-center justify-center gap-4 bg-app px-6">
-      <Text accessibilityRole="header" className="font-sans text-title2 text-label-primary">
+      <Text
+        accessibilityRole="header"
+        aria-level={1}
+        className="font-sans text-title2 text-label-primary"
+      >
         {t(language, "crash.title")}
       </Text>
       <Text className="max-w-message text-center font-sans text-subhead font-normal text-label-secondary">

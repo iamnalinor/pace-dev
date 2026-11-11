@@ -4,6 +4,7 @@ import type { TaskViewModel } from "@pace/client";
 
 import { useT } from "#app/app-state.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
+import { Collapse } from "#app/ui/disclosure.tsx";
 import { RadioChips } from "#app/ui/radio-chips.tsx";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
@@ -134,7 +135,10 @@ export const CloseSheet = ({
           setReasonAsked((count) => count + 1);
         }}
       />
-      {form.mode === "other" ? <GiveUpFields form={form} reasonAsked={reasonAsked} /> : null}
+      {/* The reason grows in and shrinks away: the fields under it never jump (QA 21 L2). */}
+      <Collapse open={form.mode === "other"}>
+        <GiveUpFields form={form} reasonAsked={reasonAsked} />
+      </Collapse>
       <TimeCheckScope checks={times}>
         <WhenPicker
           deviceTz={deviceTz}

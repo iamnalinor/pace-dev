@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 import type { Task } from "@pace/core";
 
 import { useAppState, useT } from "#app/app-state.tsx";
 import { Icon } from "#app/ui/icon.tsx";
 import { ListRow } from "#app/ui/list-row.tsx";
+import { Pressable } from "#app/ui/pressable.tsx";
 import { RadioGroup } from "#app/ui/radio-group.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 import { Text as KitText } from "#app/ui/text.tsx";
@@ -51,13 +52,14 @@ export const ActivityTaskField = ({
         {t("day.taskLink")}
       </Text>
       <Pressable
-        accessibilityLabel={t("day.taskSelection", { title: label })}
-        accessibilityRole="button"
-        aria-expanded={isOpen}
-        className="min-h-hit-web flex-row items-center justify-between gap-2 rounded-lg border border-outline bg-cell px-3 active:opacity-80"
+        className="min-h-hit-web flex-row items-center justify-between gap-2 border border-outline bg-cell px-3"
+        expanded={isOpen}
+        label={t("day.taskSelection", { title: label })}
         onPress={() => {
           setIsOpen((current) => !current);
         }}
+        role="button"
+        shape="lg"
       >
         <KitText className="flex-1 font-normal" policy="truncate" role="subhead">
           {label}

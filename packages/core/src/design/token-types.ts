@@ -138,6 +138,8 @@ export type TokensV2 = {
     readonly exit: Readonly<Record<MotionStep, number>>;
     /** How long a created row carries its one-time highlight, fading (spec §6 "proposal accepted"). */
     readonly highlight: number;
+    /** One half of a placeholder's breath: the shimmer's period is twice this (spec §6 "skeleton", 1.2 s). */
+    readonly breath: number;
     readonly reduced: { readonly fade: number };
     readonly spring: {
       readonly sheet: {

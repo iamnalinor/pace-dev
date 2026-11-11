@@ -1,5 +1,11 @@
 import { type ReactNode, useState } from "react";
-import { type NativeScrollEvent, type NativeSyntheticEvent, ScrollView, View } from "react-native";
+import {
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  ScrollView,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { layout, space } from "@pace/core";
@@ -44,6 +50,85 @@ export type ScrollerProps = {
 
 /** The room a list keeps under its last row (64), when nothing floats over its foot. */
 const FOOT_ROOM = space["11"];
+
+/**
+A window shorter than this (a 320 × 568 phone, a computer at 200 % zoom) cannot hold a footer (the
+time bar, the nav bar under it) inside the region budget and still give the list half of it: the
+footer then scrolls with the content, at its end (spec §5.1 and §8, Q12; F-LAY-01). Decided from the
+window, not from the footer's measured height, so a footer that grows under the finger (a picker
+opening) never jumps out of place.
+*/
+const SHORT_WINDOW = 600;
+
+/**
+Where a screen's footer goes: fixed under the body, or (on a short window, `SHORT_WINDOW`) at the
+end of the content, scrolling with it. A body that scrolls by itself or fills keeps it fixed: there
+is no end to put it at. A toast floats above a fixed footer (the time bar) instead of covering its
+buttons; an inline one lifts nothing.
+*/
+const useFooterPlace = ({
+  hasFooter,
+  isActive,
+  isScrolledByScreen,
+  isWide,
+}: {
+  readonly hasFooter: boolean;
+  readonly isActive: boolean;
+  readonly isScrolledByScreen: boolean;
+  readonly isWide: boolean;
+}) => {
+  const { height: windowHeight } = useWindowDimensions();
+  const isInline = hasFooter && !isWide && windowHeight < SHORT_WINDOW && isScrolledByScreen;
+  const [height, setHeight] = useState(0);
+  const isFixed = hasFooter && !isInline;
+  useLiftToastAbove(isFixed ? height : 0, isActive);
+  return { isFixed, isInline, onHeight: setHeight };
+};
+
+/**
+The scroll edge (F-LAY-13): once the content scrolls under the header, the header keeps the page's
+ground and a hairline marks its edge; at rest the line is there, unseen, so nothing moves when it
+shows.
+*/
+const HeaderEdge = ({
+  children,
+  column,
+  isScrolled,
+}: {
+  readonly children: ReactNode;
+  readonly column: string;
+  readonly isScrolled: boolean;
+}) => (
+  <View
+    className={cx("border-b bg-app", isScrolled ? "border-separator" : "border-transparent")}
+    testID="screen-header-edge"
+  >
+    <View className={column} testID="screen-column">
+      {children}
+    </View>
+  </View>
+);
+
+/** The footer fixed under the body, telling its height (a toast floats above it). */
+const FixedFooter = ({
+  children,
+  column,
+  onHeight,
+}: {
+  readonly children: ReactNode;
+  readonly column: string;
+  readonly onHeight: (height: number) => void;
+}) => (
+  <View
+    className={column}
+    onLayout={(event) => {
+      onHeight(event.nativeEvent.layout.height);
+    }}
+    testID="screen-footer"
+  >
+    {children}
+  </View>
+);
 
 /** Whether the body has scrolled at all: content is then under the header's edge. */
 const isUnder = (event: NativeSyntheticEvent<NativeScrollEvent>): boolean =>
@@ -122,10 +207,13 @@ export const Screen = ({
   const isWide = useIsWide();
   const column = isWide ? ANCHORED[anchor] : COLUMN;
   const insets = useSafeAreaInsets();
-  // A toast floats above the footer (the time bar) instead of covering its buttons.
-  const [footerHeight, setFooterHeight] = useState(0);
   const isActive = useIsScreenActive();
-  useLiftToastAbove(footer === undefined ? 0 : footerHeight, isActive);
+  const footerPlace = useFooterPlace({
+    hasFooter: footer !== undefined,
+    isActive,
+    isScrolledByScreen: scroller === undefined && !fills,
+    isWide,
+  });
   // The toast and the sync strip float over this column, not over the room beside it (PR55-1-14).
   usePublishColumn(isWide ? COLUMN_WIDTH[anchor] : 0, isActive);
   // While a toast or the offline pill floats over the list's foot, the list scrolls that much further.
@@ -152,14 +240,9 @@ export const Screen = ({
       nothing moves when it shows.
       */}
       {header === undefined ? null : (
-        <View
-          className={cx("border-b bg-app", isScrolled ? "border-separator" : "border-transparent")}
-          testID="screen-header-edge"
-        >
-          <View className={column} testID="screen-column">
-            {header}
-          </View>
-        </View>
+        <HeaderEdge column={column} isScrolled={isScrolled}>
+          {header}
+        </HeaderEdge>
       )}
       <ScreenBody
         column={column}
@@ -169,18 +252,17 @@ export const Screen = ({
         {...(scrollLabel !== undefined && { scrollLabel })}
       >
         {children}
+        {footerPlace.isInline ? (
+          <View className={column} testID="screen-footer">
+            {footer}
+          </View>
+        ) : null}
       </ScreenBody>
-      {footer === undefined ? null : (
-        <View
-          className={column}
-          onLayout={(event) => {
-            setFooterHeight(event.nativeEvent.layout.height);
-          }}
-          testID="screen-footer"
-        >
+      {footerPlace.isFixed ? (
+        <FixedFooter column={column} onHeight={footerPlace.onHeight}>
           {footer}
-        </View>
-      )}
+        </FixedFooter>
+      ) : null}
     </View>
   );
 };

@@ -1,142 +1,35 @@
-import { startTransition, useEffect, useRef, useState } from "react";
-import { View } from "react-native";
-import Animated, {
-  Easing,
-  ReduceMotion,
-  type SharedValue,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
+import { type ReactNode, useEffect, useRef } from "react";
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 
-/** Long enough to watch it go, short enough that the list moves on at once. */
-export const DISSOLVE_MS = 750;
+import { timing } from "./motion-presets.ts";
+import { ROW_MOTION } from "./motion.ts";
+import { useIsMotionReduced } from "./use-reduced-motion.ts";
 
-const COLUMNS = 30;
-const ROWS = 5;
-/** How far into the run the sweep reaches the right edge; the rest is the last dust drifting. */
-const SWEEP = 0.5;
-
-const FILL = { bottom: 0, left: 0, position: "absolute", right: 0, top: 0 } as const;
-
-/** A repeatable 0..1 per index: the dust scatters the same way every time. */
-const noise = (seed: number): number => {
-  const value = Math.sin(seed * 12.9898) * 43_758.5453;
-  return value - Math.floor(value);
-};
-
-type Speck = {
-  readonly x: number;
-  readonly y: number;
-  readonly size: number;
-  /** Where in the run (0..1) the sweep reaches it. */
-  readonly start: number;
-  readonly dx: number;
-  readonly dy: number;
-};
-
-const specksOf = (width: number, height: number): readonly Speck[] =>
-  Array.from({ length: COLUMNS * ROWS }, (_, index) => {
-    const column = index % COLUMNS;
-    const row = Math.floor(index / COLUMNS);
-    return {
-      dx: 14 + noise(index * 4 + 1) * 40,
-      dy: -(8 + noise(index * 4 + 2) * 34),
-      size: 2 + noise(index * 4 + 3) * 2.5,
-      start: (column / COLUMNS) * SWEEP + noise(index * 4 + 4) * 0.08,
-      x: ((column + noise(index * 7)) / COLUMNS) * width,
-      y: ((row + noise(index * 9)) / ROWS) * height,
-    };
-  });
-
-/** One speck: it appears when the sweep reaches it, then drifts up and right as it fades. */
-const SpeckView = ({
-  color,
-  progress,
-  speck,
-}: {
-  readonly color: string;
-  readonly progress: SharedValue<number>;
-  readonly speck: Speck;
-}) => {
-  const style = useAnimatedStyle(() => {
-    const local = Math.min(Math.max((progress.value - speck.start) / (1 - speck.start), 0), 1);
-    return {
-      opacity: local === 0 ? 0 : 1 - local,
-      transform: [
-        { translateX: speck.dx * local },
-        { translateY: speck.dy * local },
-        { scale: 1 - local * 0.5 },
-      ],
-    };
-  });
-  return (
-    <Animated.View
-      style={[
-        {
-          backgroundColor: color,
-          borderRadius: speck.size / 2,
-          height: speck.size,
-          left: speck.x,
-          position: "absolute",
-          top: speck.y,
-          width: speck.size,
-        },
-        style,
-      ]}
-    />
-  );
-};
+/** The box's height while it is not closing up: its own. */
+const OWN_HEIGHT = -1;
 
 /**
-The specks over the row. They are mounted after the frame that answers the check, in a render that
-yields to the next tap (a transition): the check fills at once, whatever 150 views cost
-(bug-lessons 310).
-*/
-const Dust = ({
-  color,
-  progress,
-  size,
-}: {
-  readonly color: string;
-  readonly progress: SharedValue<number>;
-  readonly size: { readonly height: number; readonly width: number };
-}) => {
-  const [isMounted, setIsMounted] = useState(false);
-  useEffect(() => {
-    startTransition(() => {
-      setIsMounted(true);
-    });
-  }, []);
-  return isMounted ? (
-    <View pointerEvents="none" style={FILL} testID="dissolve-dust">
-      {specksOf(size.width, size.height).map((speck, index) => (
-        // eslint-disable-next-line @eslint-react/no-array-index-key -- the specks are a fixed grid
-        <SpeckView color={color} key={index} progress={progress} speck={speck} />
-      ))}
-    </View>
-  ) : null;
-};
-
-/**
-The row's content turning to dust, as a deleted message does in Telegram: a sweep from left
-to right replaces it with specks that drift up and away. `onDone` runs once it is gone. With
-reduced motion it simply goes.
+A checked row leaving (spec §6 "check a task"): its content fades (160 ms, the owner's plain fade,
+Q2) while the box closes up to nothing (220 ms), so the rows below move up continuously, by the
+same primitive on Android and the web (F-MOT-02). `onDone` runs from the last animation's
+completion, never from a timer (F-MOT-03). Reduced motion keeps the fade and closes up at once
+when it ends: the row is never blank while it still takes its place. Made inactive again (a
+refused close), the row is back as it was.
 */
 export const Dissolve = ({
   children,
-  color,
   isActive,
   onDone,
 }: {
-  readonly children: React.ReactNode;
-  /** The specks' color: the row's ink. */
-  readonly color: string;
+  readonly children: ReactNode;
   readonly isActive: boolean;
   readonly onDone: () => void;
 }) => {
-  const [size, setSize] = useState({ height: 0, width: 0 });
-  const progress = useSharedValue(0);
+  const isReduced = useIsMotionReduced();
+  const opacity = useSharedValue(1);
+  const height = useSharedValue(OWN_HEIGHT);
+  const measuredRef = useRef(0);
   // The latest `onDone`: a new closure each render must not restart the run.
   const onDoneRef = useRef(onDone);
   useEffect(() => {
@@ -144,51 +37,51 @@ export const Dissolve = ({
   });
   useEffect(() => {
     if (!isActive) {
-      // A refused close puts the row back: the content shows again.
-      progress.value = 0;
+      opacity.set(1);
+      height.set(OWN_HEIGHT);
       return;
     }
-    // Reduced motion makes the timing instant: the row simply goes.
-    progress.value = withTiming(1, {
-      duration: DISSOLVE_MS,
-      easing: Easing.out(Easing.quad),
-      reduceMotion: ReduceMotion.System,
-    });
-    const run = { isDone: false };
     const finish = (): void => {
-      if (run.isDone) {
-        return;
-      }
-
-      run.isDone = true;
       onDoneRef.current();
     };
-    const timer = setTimeout(finish, DISSOLVE_MS);
-    return () => {
-      clearTimeout(timer);
-      // Gone before the dust settled (the list moved on): the check still counts.
-      finish();
+    const whenFinished = (isFinished?: boolean): void => {
+      "worklet";
+      // Taken over (the row was put back): nothing is done.
+      if (isFinished === true) {
+        scheduleOnRN(finish);
+      }
     };
-  }, [isActive, progress]);
-  const contentStyle = useAnimatedStyle(() => ({
-    opacity: 1 - Math.min(progress.value / (SWEEP + 0.1), 1),
-  }));
+    const { checkFade, closeUp } = ROW_MOTION;
+    opacity.set(
+      withTiming(
+        0,
+        timing(isReduced ? checkFade.reduced : checkFade.duration, checkFade.easing),
+        isReduced ? whenFinished : undefined,
+      ),
+    );
+    if (isReduced) {
+      return;
+    }
+    height.set(measuredRef.current);
+    height.set(withTiming(0, timing(closeUp.duration, closeUp.easing), whenFinished));
+  }, [height, isActive, isReduced, opacity]);
+  const style = useAnimatedStyle(() => {
+    const own = height.get();
+    return own < 0
+      ? { opacity: opacity.get() }
+      : { height: own, opacity: opacity.get(), overflow: "hidden" };
+  });
   return (
-    <View
+    <Animated.View
       onLayout={(event) => {
-        const { height, width } = event.nativeEvent.layout;
-        // A hidden box (its tab left behind on the web) measures 0 × 0: not a size to draw dust
-        // in, and taking it would render every row of the list twice per tab switch.
-        if (height === 0 && width === 0) {
-          return;
+        // The row's own height, kept from before the close-up starts shrinking it.
+        if (!isActive) {
+          measuredRef.current = event.nativeEvent.layout.height;
         }
-        setSize((known) =>
-          known.height === height && known.width === width ? known : { height, width },
-        );
       }}
+      style={style}
     >
-      <Animated.View style={contentStyle}>{children}</Animated.View>
-      {isActive ? <Dust color={color} progress={progress} size={size} /> : null}
-    </View>
+      {children}
+    </Animated.View>
   );
 };

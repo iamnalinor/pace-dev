@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
 import { entryFieldProps } from "#app/platform/enter-key.ts";
 import { cx } from "#app/ui/cx.ts";
 import { Icon } from "#app/ui/icon.tsx";
+import { Pressable } from "#app/ui/pressable.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 import { KEYBOARD } from "#app/ui/use-hotkey.tsx";
 
@@ -67,9 +68,8 @@ const Row = ({
       ) : null}
       {onRemove === undefined ? null : (
         <Pressable
-          accessibilityLabel={t("form.removeSubtask", { label })}
-          accessibilityRole="button"
-          className="h-10 w-10 items-center justify-center rounded-md active:opacity-70"
+          className="items-center justify-center"
+          label={t("form.removeSubtask", { label })}
           onBlur={() => {
             setIsFocused(false);
           }}
@@ -77,6 +77,8 @@ const Row = ({
             setIsFocused(true);
           }}
           onPress={onRemove}
+          role="button"
+          shape="md"
           style={{ opacity: isShowsRemove ? 1 : 0 }}
         >
           <Icon name="x" size="inline" />
@@ -107,12 +109,13 @@ const AddSubtask = ({
   if (!isOpen) {
     return (
       <Pressable
-        accessibilityLabel={t("form.addSubtask")}
-        accessibilityRole="button"
-        className="h-10 flex-row items-center gap-2 self-start rounded-md pr-2 active:opacity-70"
+        className="h-10 flex-row items-center gap-2 self-start pr-2"
+        label={t("form.addSubtask")}
         onPress={() => {
           setIsOpenByPress(true);
         }}
+        role="button"
+        shape="md"
       >
         <Icon name="plus" size="inline" />
         <Text className="font-sans text-subhead font-normal text-label-secondary">

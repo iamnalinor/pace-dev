@@ -6,7 +6,6 @@ import { CheckCircle } from "#app/ui/check-circle.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { Dissolve } from "#app/ui/dissolve.tsx";
 import { ListRow } from "#app/ui/list-row.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
 
 import { MetaLine, RepeatMark } from "./meta-line.tsx";
 import { useSelectedTask } from "./task-opener.tsx";
@@ -39,7 +38,7 @@ export const TaskRow = ({
   readonly checked?: boolean;
   /** Without it the check is read-only. */
   readonly onCheck?: () => void;
-  /** Just checked: the row turns to dust, then `onDissolved` closes it. */
+  /** Just checked: the row fades and closes up, then `onDissolved` lets it go. */
   readonly isDissolving?: boolean;
   readonly onDissolved?: () => void;
   readonly onOpen: () => void;
@@ -48,15 +47,10 @@ export const TaskRow = ({
   readonly withTag?: boolean;
 }) => {
   const t = useT();
-  const { palette } = useTheme();
   const isSelected = useSelectedTask() === row.id;
   return (
     <AcceptedHighlight id={row.id}>
-      <Dissolve
-        color={palette["label.secondary"]}
-        isActive={isDissolving}
-        onDone={onDissolved ?? NOTHING}
-      >
+      <Dissolve isActive={isDissolving} onDone={onDissolved ?? NOTHING}>
         <ListRow
           control={
             <CheckCircle

@@ -261,6 +261,7 @@ export const CalendarSection = ({
     <View accessibilityLabel={t("day.calendar")} className="mx-5 mt-4 gap-1" role="group">
       <Text
         accessibilityRole="header"
+        aria-level={2}
         className="font-sans text-footnote font-medium text-label-primary"
       >
         {t("day.calendar")}

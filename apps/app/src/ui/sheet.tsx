@@ -16,7 +16,7 @@ import { motion, shadow } from "@pace/core";
 import { paletteVars } from "../platform/theme.ts";
 import { Dialog, type DialogProps } from "./dialog.tsx";
 import { useIsWide } from "./layout.ts";
-import { EASING } from "./motion-presets.ts";
+import { timing } from "./motion-presets.ts";
 import { overlayClosers, OverlayContent, OverlayLayer, Scrim } from "./overlay-frame.tsx";
 import { overlayTiming, shouldDismiss } from "./overlay-motion.ts";
 import { HAS_SHEET_CROSS, IS_HANDLE_ACCESSIBLE } from "./overlay-platform.ts";
@@ -52,7 +52,7 @@ completion, never a timer (F-MOT-03, F-MOT-05).
 */
 const startEnter = ({ offset, progress }: SheetMotion, isReduced: boolean): void => {
   const { enter: duration } = overlayTiming("sheet", isReduced);
-  const config = { duration, easing: EASING.enter };
+  const config = timing(duration, "enter");
   progress.set(withTiming(1, config));
   offset.set(isReduced ? 0 : withTiming(0, config));
 };
@@ -64,7 +64,7 @@ const startExit = (
   letGo: () => void,
 ): void => {
   const { exit: duration } = overlayTiming("sheet", isReduced);
-  const config = { duration, easing: EASING.exit };
+  const config = timing(duration, "exit");
   offset.set(offset.get() + drag.get());
   drag.set(0);
   if (!isReduced) {

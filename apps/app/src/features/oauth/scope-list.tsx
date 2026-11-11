@@ -1,11 +1,11 @@
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 import type { OAuthScope } from "@pace/core";
 
 import { useT } from "#app/app-state.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { Icon } from "#app/ui/icon.tsx";
-import { spacePress } from "#app/ui/space-press.ts";
+import { Pressable } from "#app/ui/pressable.tsx";
 import { SCOPE_KEYS } from "@pace/client";
 
 /** The requested scopes as plain-language checkboxes, all ticked until the person unticks one. */
@@ -28,16 +28,14 @@ export const ScopeList = ({
         const isChecked = chosen.includes(scope);
         return (
           <Pressable
-            accessibilityRole="checkbox"
-            aria-checked={isChecked}
-            className="min-h-hit-web flex-row items-center gap-3 rounded-md border border-outline px-3 py-2"
+            checked={isChecked}
+            className="min-h-hit-web flex-row items-center gap-3 border border-outline px-3 py-2"
             key={scope}
             onPress={() => {
               onToggle(scope);
             }}
-            {...spacePress(() => {
-              onToggle(scope);
-            })}
+            role="checkbox"
+            shape="md"
           >
             <View
               className={cx(

@@ -38,8 +38,8 @@ not to whatever an older screen still shows.
    motion (§6). Add or amend the spec entry so the next change can't silently revert it.
 4. **Build only from tokens and the kit.**
    - Colours, spacing, radii, type, durations, easings: generated classes and accessors only
-     (`bun design:generate` after a token change). `pace/no-raw-design-values` and its exact
-     ratchet (`DESIGN_VALUE_WARNINGS`) fail anything else; never raise the number.
+     (`bun design:generate` after a token change). `pace/no-raw-design-values` (an error)
+     fails anything else.
    - Choose a role **by its job, never by the old name** (class 112): a selected state is a cue
      (≥ 3:1 against unselected), meta text is `label.secondary`, quiet priority is a
      `label.secondary` title, red is status only.
@@ -85,7 +85,7 @@ not to whatever an older screen still shows.
 ## Before a UI pull request
 
 - [ ] Comp or demo shown to the owner for anything new on screen; spec §4/§5 entry added or amended
-- [ ] No raw design values; lint ratchet unchanged or lower; roles chosen by job
+- [ ] No raw design values (lint is clean); roles chosen by job
 - [ ] New colour pairs (text, cues, layered tints) in `pairs.ts`, both themes, every ground
 - [ ] Every state the spec names exists and is tested; keyboard, focus ring, Space, targets
 - [ ] RU and EN, phone and desktop, light and dark shot and looked at; worst-case gallery entry

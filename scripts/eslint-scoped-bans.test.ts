@@ -2,8 +2,6 @@ import { describe, expect, it } from "bun:test";
 import { ESLint } from "eslint";
 import path from "node:path";
 
-import { BARE_PRESSABLE_MARKER } from "./eslint-ratchet.ts";
-
 /**
 The bans scoped to some folders, read from the resolved config so a glob that drifts away from a
 folder fails here. The display-text bans (bug-lessons 110 and 111: `toFixed`, cutting the first
@@ -150,7 +148,7 @@ describe("a bare pressable (bug-lessons F-CMP-01)", () => {
   );
 
   it(
-    "is reported with the way to the kit, the message the ratchet counts it by",
+    "is reported with the way to the kit",
     async () => {
       const [result] = await eslint.lintText(
         [
@@ -167,9 +165,11 @@ describe("a bare pressable (bug-lessons F-CMP-01)", () => {
       );
       // The named import, the namespace one (it reaches RN.Pressable) and gesture-handler's.
       expect(flagged.map((message) => message.line)).toEqual([1, 2, 3]);
-      expect(flagged.every((message) => message.message.includes(BARE_PRESSABLE_MARKER))).toBe(
-        true,
-      );
+      expect(
+        flagged.every((message) =>
+          message.message.includes("use Pressable from #app/ui/pressable"),
+        ),
+      ).toBe(true);
     },
     LINT_APP_FILE_MS,
   );
@@ -293,7 +293,7 @@ describe("icons and line limits from the kit (bug-lessons 109)", () => {
     "apps/app/src/ui/sidebar.tsx",
     "apps/app/app/(tabs)/index.tsx",
   ])("are checked in %s", async (file) => {
-    expect(await kitPrimitives(file)).toBe(1);
+    expect(await kitPrimitives(file)).toBe(2);
   });
 
   it("leave tests alone", async () => {

@@ -14,6 +14,7 @@ import {
 } from "@pace/core";
 
 import { deviceLanguage } from "./platform/device-language.ts";
+import { storedLanguage } from "./platform/language-stored.ts";
 import { useServerOrigin } from "./platform/server-origin.ts";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
 import { runSyncLoop } from "./sync-loop.ts";
@@ -217,18 +218,32 @@ export const useAppState = <T,>(selector: (state: ClientState) => T): T =>
 
 export const useSettings = (): Settings => useAppState((state) => state.settings);
 
-export const useLanguage = (): Language => {
+/** The account's language, once this session's copy is read; `null` until then and signed out. */
+export const useAccountLanguage = (): Language | null => {
   const { status } = useAuth();
   const { api } = usePace();
   const readyToken = use(SyncedContext).ready;
-  const override = use(LanguageOverrideContext);
   const accountLanguage = useAppState((state) => state.settings.language);
+  return status === "signed-in" && readyToken !== null && readyToken === api.currentSessionToken()
+    ? accountLanguage
+    : null;
+};
+
+/**
+The language of the UI: the account's; before the account's copy is read, the one this device
+last knew for it (the web keeps it for the first paint, F-DAT-04); signed out, the device's.
+*/
+export const useLanguage = (): Language => {
+  const { status } = useAuth();
+  const override = use(LanguageOverrideContext);
+  const accountLanguage = useAccountLanguage();
   if (override !== null) {
     return override;
   }
-  return status === "signed-in" && readyToken !== null && readyToken === api.currentSessionToken()
-    ? accountLanguage
-    : deviceLanguage();
+  if (accountLanguage !== null) {
+    return accountLanguage;
+  }
+  return (status === "signed-out" ? null : storedLanguage()) ?? deviceLanguage();
 };
 
 /** `t` bound to the account language. */

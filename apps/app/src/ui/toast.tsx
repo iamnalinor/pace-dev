@@ -13,7 +13,7 @@ import { View } from "react-native";
 
 import type { AppState as ClientState } from "@pace/client";
 
-import { clipText, clipWords, isRevokedIn, z } from "@pace/core";
+import { clipText, clipWords, isRevokedIn, shadow, z } from "@pace/core";
 
 import { useAppState, useT } from "../app-state.tsx";
 import { focusUndoIfLost } from "../platform/toast-focus.ts";
@@ -23,6 +23,7 @@ import { IconButton } from "./icon-button.tsx";
 import { Presence } from "./presence.tsx";
 import { Pressable } from "./pressable.tsx";
 import { Text } from "./text.tsx";
+import { useTheme } from "./theme-provider.tsx";
 
 export type ToastInput = {
   readonly message: string;
@@ -97,6 +98,7 @@ export const ToastCard = ({
   readonly toast: ToastInput;
 }) => {
   const t = useT();
+  const { scheme } = useTheme();
   const undoes = toast.action?.undoes;
   const holds = toast.action?.holds;
   const isUndone = useAppState(
@@ -116,9 +118,10 @@ export const ToastCard = ({
   return (
     <View
       className={cx(
-        "flex-row items-center gap-1 rounded-lg border border-separator bg-elevated py-1 pl-4 pr-1 shadow-lg",
+        "flex-row items-center gap-1 rounded-lg border border-separator bg-elevated py-1 pl-4 pr-1",
         className,
       )}
+      style={{ boxShadow: shadow(scheme, "overlay") }}
       testID="toast-card"
     >
       {/* The words wrap to as many lines as they need. */}
@@ -279,7 +282,7 @@ export const ToastProvider = ({ children }: { readonly children: ReactNode }) =>
                 testID="toast"
                 {...holdWhileUsed}
               >
-                <Presence enter="rise" onExited={shown.letGo} show={isToastShown}>
+                <Presence enter="rise" exit="drop" onExited={shown.letGo} show={isToastShown}>
                   {shown.kept === null ? null : (
                     <ToastCard key={shown.kept.id} onDone={shown.hide} toast={shown.kept} />
                   )}

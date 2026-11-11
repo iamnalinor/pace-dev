@@ -76,6 +76,7 @@ export const ActivityApps = ({
     <View className="gap-2 border-t border-separator pt-4">
       <Text
         accessibilityRole="header"
+        aria-level={2}
         className="font-sans text-subhead font-semibold text-label-primary"
       >
         {t("day.appsDuring")}

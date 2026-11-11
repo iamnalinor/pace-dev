@@ -1,13 +1,5 @@
 import { ESLint } from "eslint";
 
-import {
-  BARE_PRESSABLE_MARKER,
-  BARE_PRESSABLE_RULE,
-  DESIGN_VALUE_RULE,
-  KIT_PRIMITIVE_RULE,
-  type Ratchet,
-  summarise,
-} from "./eslint-ratchet.ts";
 import { clearReport, readReport } from "./eslint-report.ts";
 
 /**
@@ -15,60 +7,22 @@ ESLint per workspace, one process each: type-aware linting of every project in a
 process outgrows the CI runner's memory. Each part keeps its own cache; extra arguments
 (e.g. `--fix`) are passed through.
 
-Every part is zero-tolerance for errors and warnings, except for three backlogs in the app part,
-each an exact ratchet (see `eslint-ratchet.ts`): `pace/no-raw-design-values` must report exactly
-`DESIGN_VALUE_WARNINGS`, the bare-pressable `no-restricted-imports` exactly
-`BARE_PRESSABLE_WARNINGS`, `pace/kit-primitives` exactly `KIT_PRIMITIVE_WARNINGS`. Results come back as JSON and are printed with ESLint's stylish formatter.
+Every part is zero-tolerance for errors and warnings. Results come back as JSON and are printed
+with ESLint's stylish formatter.
 */
 
-/**
-The `pace/no-raw-design-values` backlog (redesign-plan, "Lint baseline"). An exact ratchet: more
-warnings fail, fewer fail too until this number is lowered to the new count. At 0 the rule
-becomes an error and this allowance goes away.
-*/
-const DESIGN_VALUE_WARNINGS = 23;
-
-/**
-The bare-pressable backlog (bug-lessons F-CMP-01: a React Native `Pressable`/`Touchable*` in
-`src/features` or `src/shared` instead of `#app/ui/pressable`). Exact, like the one above; the kit
-tasks migrate the callers and lower it; at 0 the rule becomes an error.
-*/
-const BARE_PRESSABLE_WARNINGS = 6;
-
-/**
-The kit-primitive backlog (bug-lessons 109; spec §4.1.2 rule 9): a lucide icon outside the kit's
-`Icon`, or `numberOfLines` on React Native's `Text` outside the kit's `Text`. Exact, like the ones
-above; the screen tasks migrate the callers and lower it; at 0 the rule becomes an error.
-*/
-const KIT_PRIMITIVE_WARNINGS = 2;
-
-const APP_RATCHETS: readonly Ratchet[] = [
-  { allowance: DESIGN_VALUE_WARNINGS, constant: "DESIGN_VALUE_WARNINGS", rule: DESIGN_VALUE_RULE },
-  {
-    allowance: BARE_PRESSABLE_WARNINGS,
-    constant: "BARE_PRESSABLE_WARNINGS",
-    marker: BARE_PRESSABLE_MARKER,
-    rule: BARE_PRESSABLE_RULE,
-  },
-  {
-    allowance: KIT_PRIMITIVE_WARNINGS,
-    constant: "KIT_PRIMITIVE_WARNINGS",
-    rule: KIT_PRIMITIVE_RULE,
-  },
-];
-
-const PARTS: readonly (readonly [string, readonly string[], readonly Ratchet[]])[] = [
-  ["packages", ["packages"], []],
-  ["api", ["apps/api"], []],
-  ["app", ["apps/app"], APP_RATCHETS],
-  ["updates", ["apps/updates"], []],
-  ["root", [".", "--ignore-pattern", "apps/**", "--ignore-pattern", "packages/**"], []],
+const PARTS: readonly (readonly [string, readonly string[]])[] = [
+  ["packages", ["packages"]],
+  ["api", ["apps/api"]],
+  ["app", ["apps/app"]],
+  ["updates", ["apps/updates"]],
+  ["root", [".", "--ignore-pattern", "apps/**", "--ignore-pattern", "packages/**"]],
 ];
 
 const extra = process.argv.slice(2);
 const stylish = await new ESLint().loadFormatter("stylish");
 
-for (const [name, targets, ratchets] of PARTS) {
+for (const [name, targets] of PARTS) {
   // ESLint cuts a long report short when it exits into a pipe, so it writes the report to a file.
   const report = `.cache/eslint/${name}.json`;
   clearReport(report);
@@ -99,11 +53,15 @@ for (const [name, targets, ratchets] of PARTS) {
   if (output !== "") {
     console.log(output);
   }
-  const { problem } = summarise(results, ratchets);
-  if (problem === undefined && run.exitCode === 0) {
+  const warnings = results.reduce((total, result) => total + result.warningCount, 0);
+  if (warnings === 0 && run.exitCode === 0) {
     continue;
   }
 
-  console.error("eslint failed in", name, problem ?? "");
+  console.error(
+    "eslint failed in",
+    name,
+    warnings > 0 ? `${String(warnings)} warning(s): fix them.` : "",
+  );
   process.exit(run.exitCode === 0 ? 1 : run.exitCode);
 }

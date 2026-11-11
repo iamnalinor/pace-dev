@@ -1,6 +1,5 @@
-import { memo, useCallback, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { View } from "react-native";
-import Animated from "react-native-reanimated";
 
 import type { NowRow } from "@pace/client";
 
@@ -9,7 +8,6 @@ import { focusedRowPlace, focusRowPlace, type RowPlace } from "#app/platform/foc
 import { Button } from "#app/ui/button.tsx";
 import { Disclosure } from "#app/ui/disclosure.tsx";
 import { Group } from "#app/ui/group.tsx";
-import { ROW_ENTER, ROW_EXIT, ROW_LAYOUT } from "#app/ui/motion.ts";
 
 import { useOpenTask } from "./task-opener.tsx";
 import { TaskRow } from "./task-row.tsx";
@@ -30,88 +28,210 @@ many again, so a 1 284-task fold mounts a page, not the lot, inside the screen's
 */
 export const PAGE_SIZE = 30;
 
-/** The rows turning to dust after their check, and the ones whose dust has gone. */
-const useSettling = (rows: readonly NowRow[]) => {
-  const { check } = useCheckTask();
-  // Rows turning to dust after their check; each closes once its dust has gone.
-  const [dissolving, setDissolving] = useState<ReadonlySet<string>>(() => new Set());
-  // Rows whose dust has gone: they leave the list at once, so the rows below move up as the
-  // dust ends, not after the close has been written. A refused close brings the row back.
+/**
+A checked row on its way out: the row as it was, the row it stood under when it was checked (`null`:
+the first), and where the keyboard focus stood (it goes to the row that takes its place, PR55-1-10).
+It is anchored to its neighbour, not to an index: rows checked in a quick run each keep their place
+whichever of them is gone first.
+*/
+type Leaving = { readonly after: null | string; readonly place: RowPlace; readonly row: NowRow };
+
+/** Puts `row` right under `after` (first when `null`); false when `after` is not in the list yet. */
+const didPlaceAfter = (list: NowRow[], row: NowRow, after: null | string): boolean => {
+  if (after === null) {
+    list.unshift(row);
+    return true;
+  }
+  const at = list.findIndex((each) => each.id === after);
+  if (at === -1) {
+    return false;
+  }
+  list.splice(at + 1, 0, row);
+  return true;
+};
+
+/** `rows` with the leaving rows the store has already dropped put back where they stood. */
+const withLeaving = (
+  rows: readonly NowRow[],
+  leaving: ReadonlyMap<string, Leaving>,
+): readonly NowRow[] => {
+  const ids = new Set(rows.map((row) => row.id));
+  let pending = leaving
+    .values()
+    .filter(({ row }) => !ids.has(row.id))
+    .toArray();
+  if (pending.length === 0) {
+    return rows;
+  }
+  const merged = [...rows];
+  // A row may stand under another leaving row: place what can be placed until nothing moves.
+  for (let isMoving = true; isMoving && pending.length > 0; ) {
+    const before = pending.length;
+    pending = pending.filter(({ after, row }) => !didPlaceAfter(merged, row, after));
+    isMoving = pending.length < before;
+  }
+  // Its neighbour has gone some other way: it ends the list until it has gone too.
+  merged.push(...pending.map(({ row }) => row));
+  return merged;
+};
+
+const without = <Value,>(map: ReadonlyMap<string, Value>, id: string): ReadonlyMap<string, Value> =>
+  new Map(map.entries().filter(([key]) => key !== id));
+
+/**
+What the store's list says about the rows that were checked: `gone` rows are hidden until the
+store drops them (and are forgotten then: closed again later, such a row leaves anew); `dropped`
+are leaving rows the store has dropped since their check. A dropped row the store lists again (an
+Undo while it was leaving) stops leaving at once and shows as it is. Adjusted while rendering, not
+in an effect, to skip a stale frame.
+*/
+const useStoreDrops = (
+  rows: readonly NowRow[],
+  leaving: ReadonlyMap<string, Leaving>,
+  setLeaving: (
+    update: (current: ReadonlyMap<string, Leaving>) => ReadonlyMap<string, Leaving>,
+  ) => void,
+) => {
   const [gone, setGone] = useState<ReadonlySet<string>>(() => new Set());
-  // Once the store has dropped a row, forget it: closed again later (undone, then checked
-  // again), it dissolves anew. Adjusted while rendering, not in an effect, to skip a stale frame.
+  const [dropped, setDropped] = useState<ReadonlySet<string>>(() => new Set());
   const present = rows.map((row) => row.id).join("\n");
   const [seen, setSeen] = useState(present);
   if (seen !== present) {
     const ids = new Set(rows.map((row) => row.id));
     setSeen(present);
-    setDissolving((current) => keeping(current, (id) => ids.has(id)));
     setGone((current) => keeping(current, (id) => ids.has(id)));
+    const left = leaving
+      .keys()
+      .filter((id) => !ids.has(id) && !dropped.has(id))
+      .toArray();
+    const back = dropped
+      .values()
+      .filter((id) => ids.has(id))
+      .toArray();
+    if (left.length > 0 || back.length > 0) {
+      setDropped(new Set([...dropped, ...left].filter((id) => !back.includes(id))));
+    }
+    if (back.length > 0) {
+      setLeaving((current) => new Map(current.entries().filter(([id]) => !back.includes(id))));
+    }
   }
-  // Where each checked row's focus stood: it goes to the row that takes its place (PR55-1-10).
-  const placesRef = useRef(new Map<string, RowPlace>());
-  const settle = useCallback(
-    async (row: NowRow): Promise<void> => {
-      setGone((current) => new Set([...current, row.id]));
-      focusRowPlace(placesRef.current.get(row.id) ?? null);
-      placesRef.current.delete(row.id);
-      const checking = await check(row);
-      if (checking.ok) {
-        return;
-      }
-
-      setGone((current) => keeping(current, (id) => id !== row.id));
-      setDissolving((current) => keeping(current, (id) => id !== row.id));
-    },
-    [check],
-  );
-  const dissolve = useCallback((row: NowRow): void => {
-    placesRef.current.set(row.id, focusedRowPlace());
-    setDissolving((current) => new Set([...current, row.id]));
-  }, []);
-  return { dissolve, dissolving, gone, settle };
+  return { dropped, gone, setDropped, setGone };
 };
 
 /**
-One row of the list, rendered again only for a change of its own: its task, its dust, the list's
-look. The handlers take the row, so the list hands every row the same ones and a check on one row
-(or a store change about another task) renders that row alone (bug-lessons 310).
+The rows leaving after their check (spec §6): the close is written the moment the check is
+pressed and never gates the motion (bug-lessons 3), so a leaving row is kept here, as it was, until
+its animation reports it has finished, even once the store has dropped it. A row whose animation
+ended before the store dropped it stays `gone` meanwhile; a refused close brings the row back. A
+second press on a leaving row does nothing: the close is written once (bug-lessons 369).
+*/
+const useSettling = (rows: readonly NowRow[]) => {
+  const { check } = useCheckTask();
+  const [leaving, setLeaving] = useState<ReadonlyMap<string, Leaving>>(() => new Map());
+  const { dropped, gone, setDropped, setGone } = useStoreDrops(rows, leaving, setLeaving);
+  const shown = withLeaving(
+    rows.filter((row) => !gone.has(row.id)),
+    leaving,
+  );
+  // What the handlers read, kept current after each commit, so they stay the same functions and a
+  // memoised row is not rendered again for them (bug-lessons 310).
+  const latestRef = useRef({ dropped, leaving, rows, shown });
+  useLayoutEffect(() => {
+    latestRef.current = { dropped, leaving, rows, shown };
+  });
+  // The rows whose close was started, written at the press itself: a second tap comes before the
+  // commit that would tell it the row is leaving.
+  const startedRef = useRef(new Set<string>());
+  useEffect(() => {
+    for (const id of startedRef.current) {
+      if (!leaving.has(id)) {
+        startedRef.current.delete(id);
+      }
+    }
+  }, [leaving]);
+  const start = useCallback(
+    (row: NowRow): void => {
+      if (startedRef.current.has(row.id)) {
+        return;
+      }
+      startedRef.current.add(row.id);
+      const place = focusedRowPlace();
+      // Where it stood, read from the list at the press: a row is not told its place, or every row
+      // under a leaving one would render again as the list closes up (bug-lessons 310).
+      const list = latestRef.current.shown;
+      const at = list.findIndex((each) => each.id === row.id);
+      const after = at > 0 ? (list[at - 1]?.id ?? null) : null;
+      setLeaving((current) => new Map([...current, [row.id, { after, place, row }]]));
+      void (async () => {
+        const checking = await check(row);
+        if (checking.ok) {
+          return;
+        }
+
+        setLeaving((current) => without(current, row.id));
+        setGone((current) => keeping(current, (id) => id !== row.id));
+        setDropped((current) => keeping(current, (id) => id !== row.id));
+      })();
+    },
+    [check, setDropped, setGone],
+  );
+  const finish = useCallback(
+    (row: NowRow): void => {
+      const latest = latestRef.current;
+      const entry = latest.leaving.get(row.id);
+      if (entry === undefined) {
+        return;
+      }
+      setLeaving((current) => without(current, row.id));
+      setDropped((current) => keeping(current, (id) => id !== row.id));
+      // Still in the store (the close is being written) and never dropped: hidden until it is.
+      if (!latest.dropped.has(row.id) && latest.rows.some((each) => each.id === row.id)) {
+        setGone((current) => new Set([...current, row.id]));
+      }
+      focusRowPlace(entry.place);
+    },
+    [setDropped, setGone],
+  );
+  return { finish, leaving, shown, start };
+};
+
+/**
+One row of the list, rendered again only for a change of its own: its task, whether it is leaving,
+the list's look. The handlers take the row, so the list hands every row the same ones
+and a check on one row (or a store change about another task) renders that row alone
+(bug-lessons 310). No entering or exiting motion: a list that mounts, a filter that changes and a
+row made by a hotkey are instant (F-MOT-07); the one motion is the checked row leaving.
 */
 const Row = memo(
   ({
     checked,
-    isAnimated,
-    isDissolving,
+    isLeaving,
     onCheck,
-    onDissolved,
+    onLeft,
     onOpen,
     row,
     withTag,
   }: {
     readonly checked: boolean;
-    readonly isAnimated: boolean;
-    readonly isDissolving: boolean;
+    readonly isLeaving: boolean;
     readonly onCheck: (row: NowRow) => void;
-    readonly onDissolved: (row: NowRow) => void;
+    readonly onLeft: (row: NowRow) => void;
     readonly onOpen: (taskId: string) => void;
     readonly row: NowRow;
     readonly withTag: boolean;
   }) => (
-    <Animated.View
-      entering={ROW_ENTER}
-      // The dust is the exit of a checked row; the fade would only bring it back for a moment.
-      {...(!isDissolving && { exiting: ROW_EXIT })}
-      {...(isAnimated && { layout: ROW_LAYOUT })}
-      role="listitem"
-    >
+    <View role="listitem">
       <TaskRow
         checked={checked}
-        isDissolving={isDissolving}
+        isDissolving={isLeaving}
         onDissolved={() => {
-          onDissolved(row);
+          onLeft(row);
         }}
         onOpen={() => {
-          onOpen(row.id);
+          // A row on its way out is a task just closed: nothing to open (it is gone in a moment).
+          if (!isLeaving) {
+            onOpen(row.id);
+          }
         }}
         row={row}
         withTag={withTag}
@@ -121,7 +241,7 @@ const Row = memo(
           },
         })}
       />
-    </Animated.View>
+    </View>
   ),
 );
 
@@ -139,14 +259,12 @@ const boundaryOf = (
 
 /** A list of task rows: tap to open, the check to close. */
 export const TaskRows = ({
-  animateLayout = true,
   boundary,
   checked = false,
   label,
   rows,
   withTag = true,
 }: {
-  readonly animateLayout?: boolean;
   /** Where the rows change kind: the first open row `isAfter` holds a labelled edge-to-edge rule above it. */
   readonly boundary?: { readonly isAfter: (row: NowRow) => boolean; readonly label: string };
   /** Closed tasks: checked rows that open the task (reopen is there). */
@@ -158,17 +276,8 @@ export const TaskRows = ({
   const t = useT();
   const openTask = useOpenTask();
   const [shownCount, setShownCount] = useState(PAGE_SIZE);
-  const { dissolve, dissolving, gone, settle } = useSettling(rows);
-  const onDissolved = useCallback(
-    (row: NowRow): void => {
-      void settle(row);
-    },
-    [settle],
-  );
-  const open = rows.filter((row) => !gone.has(row.id));
+  const { finish, leaving, shown: open, start } = useSettling(rows);
   const hidden = Math.max(0, open.length - shownCount);
-  // A long list turns the layout animation off: sliding a page of rows is not worth the frames.
-  const isAnimated = animateLayout && open.length <= PAGE_SIZE;
   return (
     <>
       <Group
@@ -180,11 +289,10 @@ export const TaskRows = ({
         {open.slice(0, shownCount).map((row) => (
           <Row
             checked={checked}
-            isAnimated={isAnimated}
-            isDissolving={dissolving.has(row.id)}
+            isLeaving={leaving.has(row.id)}
             key={row.id}
-            onCheck={dissolve}
-            onDissolved={onDissolved}
+            onCheck={start}
+            onLeft={finish}
             onOpen={openTask}
             row={row}
             withTag={withTag}

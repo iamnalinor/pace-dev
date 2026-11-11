@@ -1,27 +1,20 @@
-import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { Pressable, Text, View } from "react-native";
-import Animated, {
-  ReduceMotion,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
-import { SafeAreaInsetsContext, useSafeAreaInsets } from "react-native-safe-area-context";
+import { type ReactNode, useEffect, useState } from "react";
+import { View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Workbox } from "workbox-window";
 
 import { useT } from "#app/app-state.tsx";
+import { Button } from "#app/ui/button.tsx";
+import { Presence } from "#app/ui/presence.tsx";
+import { Text } from "#app/ui/text.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
+import { shadow, space, z } from "@pace/core";
 
 /** How often an open tab asks the server for a newer build. */
 const CHECK_EVERY_MS = 60 * 60 * 1000;
 
-/** The strip's slide: long enough to see where it came from, short enough not to wait for it. */
-const SLIDE_MS = 300;
-
-const CLIP = { overflow: "hidden" } as const;
-
 /**
-Registers the service worker; when a new build has installed and waits, a strip at the
+Registers the service worker; when a new build has installed and waits, a card at the
 top of the page says so. Refresh hands control to the new worker and reloads once it has taken over.
 */
 const useWaitingWorker = (): null | Workbox => {
@@ -61,65 +54,45 @@ const useWaitingWorker = (): null | Workbox => {
 };
 
 /**
-The notice: a quiet blue strip across the top of the page, one centred row with what happened and
-the one thing to do (there is no "later", so it stays until the page is refreshed). It sits in
-the layout above the app, not over it: it grows from nothing, so the whole app slides down
-instead of being covered. It takes the phone's top safe area itself (the web app installed to a
-home screen draws under the status bar); reduced motion makes it appear at once.
+The notice (spec §7 "Update banner", F-WEB-07): a compact card over the top of the page, with what
+happened and the one thing to do (there is no "later", so it stays until the page is refreshed). It
+lies over the app and pushes nothing: the screen under it keeps its layout, so a tap aimed at a row
+never lands on a row that has just moved. It rises 8 px and fades in (`Presence`; a fade alone under
+reduced motion) and keeps clear of the phone's status bar itself. A reload loses no typing: drafts
+are kept on the device (`platform/drafts.ts`), so Refresh needs no "save your draft first".
 */
-export const UpdateStrip = ({ onRefresh }: { readonly onRefresh: () => void }) => {
+export const UpdateCard = ({ onRefresh }: { readonly onRefresh: () => void }) => {
   const t = useT();
-  const { palette } = useTheme();
+  const { scheme } = useTheme();
   const insets = useSafeAreaInsets();
-  const [isHovered, setIsHovered] = useState(false);
-  const height = useSharedValue(0);
-  const style = useAnimatedStyle(() => ({ height: height.get() }));
   return (
-    <Animated.View style={[CLIP, style]}>
-      <View
-        accessibilityLiveRegion="polite"
-        className="flex-row flex-wrap items-center justify-center gap-x-4 gap-y-2 bg-accent-quiet px-4 py-3"
-        onLayout={(event) => {
-          height.set(
-            withTiming(event.nativeEvent.layout.height, {
-              duration: SLIDE_MS,
-              reduceMotion: ReduceMotion.System,
-            }),
-          );
-        }}
-        role="status"
-        style={{ paddingTop: insets.top + 10 }}
-      >
-        <Text className="shrink text-center font-sans text-subhead font-normal text-accent-text">
-          {t("update.message")}
-        </Text>
-        <Pressable
-          accessibilityRole="button"
-          className="rounded-md border px-3 py-1 active:opacity-80"
-          onHoverIn={() => {
-            setIsHovered(true);
-          }}
-          onHoverOut={() => {
-            setIsHovered(false);
-          }}
-          onPress={onRefresh}
-          style={{
-            // Outlined in the strip's own foreground at 40%, washed at 10% under the pointer.
-            backgroundColor: isHovered ? `${palette["accent.text"]}1a` : "transparent",
-            borderColor: `${palette["accent.text"]}66`,
-          }}
+    <View
+      className="absolute inset-x-0 top-0 items-center px-gutter"
+      pointerEvents="box-none"
+      style={{ paddingTop: insets.top + space["2"], zIndex: z.toast }}
+    >
+      <Presence enter="rise" initial show>
+        <View
+          accessibilityLiveRegion="polite"
+          aria-live="polite"
+          className="max-w-toast-max flex-row flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-lg bg-elevated py-2 pl-4 pr-2"
+          role="status"
+          style={{ boxShadow: shadow(scheme, "overlay") }}
+          testID="update-card"
         >
-          <Text className="font-sans text-subhead text-accent-text">{t("update.refresh")}</Text>
-        </Pressable>
-      </View>
-    </Animated.View>
+          <Text className="shrink" role="subhead">
+            {t("update.message")}
+          </Text>
+          <Button onPress={onRefresh} variant="secondary">
+            {t("update.refresh")}
+          </Button>
+        </View>
+      </Presence>
+    </View>
   );
 };
 
-/**
-The strip above the app, and the app under it. While it is open the strip has taken the top
-safe area, so the screens are told there is none left (they pad themselves with it).
-*/
+/** The app, and the card over it while a new build waits. */
 export const UpdateFrame = ({
   children,
   isOpen,
@@ -128,18 +101,14 @@ export const UpdateFrame = ({
   readonly children: ReactNode;
   readonly isOpen: boolean;
   readonly onRefresh: () => void;
-}) => {
-  const insets = useSafeAreaInsets();
-  const below = useMemo(() => (isOpen ? { ...insets, top: 0 } : insets), [insets, isOpen]);
-  return (
-    <View className="flex-1 bg-app">
-      {isOpen ? <UpdateStrip onRefresh={onRefresh} /> : null}
-      <SafeAreaInsetsContext value={below}>{children}</SafeAreaInsetsContext>
-    </View>
-  );
-};
+}) => (
+  <View className="flex-1 bg-app">
+    {children}
+    {isOpen ? <UpdateCard onRefresh={onRefresh} /> : null}
+  </View>
+);
 
-/** Wraps the app: once a new build waits, the strip slides down above it; Refresh hands control to the new worker, which reloads the page. */
+/** Wraps the app: once a new build waits, the card shows over it; Refresh hands control to the new worker, which reloads the page. */
 export const UpdateBanner = ({ children }: { readonly children: ReactNode }) => {
   const waiting = useWaitingWorker();
   return (

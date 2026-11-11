@@ -1141,6 +1141,10 @@ once review, QA and CI are green.
 
 ## Lint baseline
 
+PR C, Task 8.1 (2026-11-10): the three ratchets reached 0 and the rules are errors (`pace/no-raw-design-values`, the bare-pressable `no-restricted-imports`, `pace/kit-primitives`; `scripts/eslint-ratchet.ts` and the allowances in `scripts/eslint-all.ts` are gone, which now fails on any warning). The activity task field, scope list, server line, subtask list, the assistant's question and action cards, the calendar's day cells and the update banner's Refresh moved to the kit's `Pressable` (the `active:opacity-*` classes went with the state layer); disabled and busy states there use the kit's `DISABLED` treatment instead of `opacity-30/50/60`; the preset preview and OS picker titles use the kit `Text` (`policy="truncate"`); the new-project form starts from a typed `ProjectColorName` constant instead of a bare colour word; the update banner's slide reads `motion.duration.lg`; the sync strip and toast card take the `overlay` shadow token instead of `shadow-lg`.
+
+PR C, Tasks 5.1 + 5.2 (2026-11-10): `DESIGN_VALUE_WARNINGS` 17 (from 23): the dust's `DISSOLVE_MS` and its raw durations went with the dust, the rows' `.duration()` builders and the placeholder's breath read motion tokens (`motion.breath`, new: half of the skeleton's 1.2 s period).
+
 Feedback 5 item 10 (2026-11-08): `DESIGN_VALUE_WARNINGS` 23 (from 24): the subtask checklist's `opacity-50` for a sent subtask went with the sent mark.
 
 Tasks 4.8 + 4.9 (2026-11-06): `DESIGN_VALUE_WARNINGS` 26 (from 29), `BARE_PRESSABLE_WARNINGS` 7 (from 8): Projects, Presets list and Insights moved to the kit.

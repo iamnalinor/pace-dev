@@ -39,4 +39,18 @@ over `data-theme` and the metas.
   for (const meta of document.querySelectorAll('meta[name="theme-color"]')) {
     meta.setAttribute("content", GROUNDS[scheme]);
   }
+  // The document's language before the bundle (F-DAT-04): the signed-in account's as the app last
+  // kept it (`pace.language`, src/platform/language-stored.web.ts), else the browser's.
+  let language = null;
+  try {
+    language = localStorage.getItem("pace.language");
+  } catch {
+    // Blocked site data: the browser's language decides.
+  }
+  if (language !== "ru" && language !== "en") {
+    // No navigator (or no language in it): English, the source catalog.
+    const browser = globalThis.navigator?.language ?? "en";
+    language = browser.toLowerCase().startsWith("ru") ? "ru" : "en";
+  }
+  root.lang = language;
 }

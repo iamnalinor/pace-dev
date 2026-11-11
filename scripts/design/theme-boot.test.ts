@@ -13,11 +13,16 @@ type Situation = {
   readonly stored: null | string;
   readonly system: "dark" | "light" | "none";
   readonly isBlocked?: boolean;
+  /** The account's language as the app kept it (`pace.language`). */
+  readonly language?: string;
+  /** The browser's own language (`navigator.language`); none: no navigator at all. */
+  readonly browser?: string;
 };
 
 /** Runs `theme-boot.js` against a stand-in browser; answers what it set. */
-const boot = ({ isBlocked = false, stored, system }: Situation) => {
+const boot = ({ browser, isBlocked = false, language, stored, system }: Situation) => {
   const theme: Record<string, string> = {};
+  const root = { dataset: theme, lang: "" };
   const contents = ["#000000", "#ffffff"];
   const metas = contents.map((_content, index) => ({
     setAttribute: (name: string, value: string) => {
@@ -29,7 +34,7 @@ const boot = ({ isBlocked = false, stored, system }: Situation) => {
   // eslint-disable-next-line sonarjs/code-eval -- runs the repo's own boot script in an empty context with stand-in browser objects
   runInNewContext(read("theme-boot.js"), {
     document: {
-      documentElement: { dataset: theme },
+      documentElement: root,
       querySelectorAll: (selector: string) => (selector.includes("theme-color") ? metas : []),
     },
     localStorage: {
@@ -37,15 +42,29 @@ const boot = ({ isBlocked = false, stored, system }: Situation) => {
         if (isBlocked) {
           throw new Error("blocked");
         }
+        if (key === "pace.language") {
+          return language ?? null;
+        }
         return key === "pace.theme" ? stored : null;
       },
     },
+    ...(browser !== undefined && { navigator: { language: browser } }),
     matchMedia: (query: string) => ({ matches: query.includes(system) }),
   });
-  return { contents, theme: theme["theme"] };
+  return { contents, lang: root.lang, theme: theme["theme"] };
 };
 
 describe("theme-boot.js", () => {
+  it("sets the document's language before the bundle: the kept account's, else the browser's (F-DAT-04)", () => {
+    const base = { stored: null, system: "dark" } as const;
+    expect(boot({ ...base, browser: "en-US", language: "ru" }).lang).toBe("ru");
+    expect(boot({ ...base, browser: "ru-RU", language: "en" }).lang).toBe("en");
+    expect(boot({ ...base, browser: "ru-RU" }).lang).toBe("ru");
+    expect(boot({ ...base, browser: "de-DE", language: "de" }).lang).toBe("en");
+    expect(boot({ ...base, browser: "ru", isBlocked: true }).lang).toBe("ru");
+    expect(boot(base).lang).toBe("en");
+  });
+
   it("applies the stored preference whatever the OS says, in the page and both theme-color metas", () => {
     for (const theme of THEMES) {
       for (const system of ["dark", "light"] as const) {

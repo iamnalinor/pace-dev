@@ -4,7 +4,8 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 
-import { EASING, presenceFrom, type PresencePreset, presenceTiming } from "./motion-presets.ts";
+import { presenceFrom, type PresencePreset, presenceTiming, timing } from "./motion-presets.ts";
+import { grownScale } from "./overlay-motion.ts";
 import { useIsMotionReduced } from "./use-reduced-motion.ts";
 
 export type PresenceProps = Pick<ViewProps, "className" | "pointerEvents" | "testID"> & {
@@ -63,7 +64,7 @@ export const Presence = ({
     }
     if (show) {
       const { enter: duration } = presenceTiming(enter, isReduced);
-      progress.set(withTiming(1, { duration, easing: EASING.enter }));
+      progress.set(withTiming(1, timing(duration, "enter")));
       return;
     }
     const letGo = (): void => {
@@ -72,7 +73,7 @@ export const Presence = ({
     };
     const { exit: duration } = presenceTiming(exit, isReduced);
     progress.set(
-      withTiming(0, { duration, easing: EASING.exit }, (isFinished) => {
+      withTiming(0, timing(duration, "exit"), (isFinished) => {
         // Shown again before the exit finished: the enter took over, nothing lets go.
         if (isFinished === true) {
           scheduleOnRN(letGo);
@@ -92,7 +93,7 @@ export const Presence = ({
     }
     return from.scale === undefined
       ? { opacity: step }
-      : { opacity: step, transform: [{ scale: from.scale + (1 - from.scale) * step }] };
+      : { opacity: step, transform: [{ scale: grownScale(from.scale, step) }] };
   }, [from.scale, from.translateX, from.translateY]);
   return isMounted ? (
     <Animated.View {...rest} {...leavingProps(show)} style={style}>

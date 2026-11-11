@@ -189,7 +189,11 @@ export const ConsentFlow = ({
         <Text className="font-sans text-title1 text-label-primary">{t("app.name")}</Text>
       </View>
       <View className="gap-1">
-        <Text accessibilityRole="header" className="font-sans text-title1 text-label-primary">
+        <Text
+          accessibilityRole="header"
+          aria-level={1}
+          className="font-sans text-title1 text-label-primary"
+        >
           {t("oauth.title")}
         </Text>
         <Text className="font-sans text-subhead font-normal text-label-secondary">

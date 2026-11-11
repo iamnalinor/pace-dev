@@ -2,7 +2,7 @@ import { type ReactNode, useEffect, useSyncExternalStore } from "react";
 import { View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 
-import { EASING } from "#app/ui/motion-presets.ts";
+import { timing } from "#app/ui/motion-presets.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { useIsMotionReduced } from "#app/ui/use-reduced-motion.ts";
 import { motion } from "@pace/core";
@@ -54,7 +54,7 @@ const Wash = () => {
   const opacity = useSharedValue(1);
   useEffect(() => {
     if (!isReduced) {
-      opacity.set(withTiming(0, { duration: motion.highlight, easing: EASING.exit }));
+      opacity.set(withTiming(0, timing(motion.highlight, "exit")));
     }
   }, [isReduced, opacity]);
   const style = useAnimatedStyle(() => ({

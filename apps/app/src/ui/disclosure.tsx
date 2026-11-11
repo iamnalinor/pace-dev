@@ -13,7 +13,7 @@ import { formatCount, motion } from "@pace/core";
 
 import { cx } from "./cx.ts";
 import { Icon } from "./icon.tsx";
-import { EASING } from "./motion-presets.ts";
+import { timing } from "./motion-presets.ts";
 import { Pressable } from "./pressable.tsx";
 import { Text } from "./text.tsx";
 import { useIsMotionReduced } from "./use-reduced-motion.ts";
@@ -40,9 +40,7 @@ const Chevron = ({
   useEffect(() => {
     const to = isOpen ? 1 : 0;
     // Reduced motion: the chevron simply points the new way (a turn is travel, §3.8).
-    turn.set(
-      isReduced ? to : withTiming(to, { duration: motion.duration.md, easing: EASING.move }),
-    );
+    turn.set(isReduced ? to : withTiming(to, timing(motion.duration.md, "move")));
   }, [isOpen, isReduced, turn]);
   const style = useAnimatedStyle(() => ({
     transform: [{ rotate: `${String(turn.get() * 90)}deg` }],
@@ -65,9 +63,9 @@ type Box = {
 /** Grows the box to the measured height while it fades in, then calls `onDone` (on the JS side). */
 const startGrow = ({ height, isReduced, measured, opacity }: Box, onDone: () => void): void => {
   const duration = isReduced ? motion.reduced.fade : motion.duration.md;
-  height.set(isReduced ? measured : withTiming(measured, { duration, easing: EASING.move }));
+  height.set(isReduced ? measured : withTiming(measured, timing(duration, "move")));
   opacity.set(
-    withTiming(1, { duration, easing: EASING.move }, (isFinished) => {
+    withTiming(1, timing(duration, "move"), (isFinished) => {
       if (isFinished === true) {
         scheduleOnRN(onDone);
       }
@@ -100,10 +98,10 @@ const startShrink = (
   // would cost that frame: parked N2).
   height.set(from);
   if (!isReduced) {
-    height.set(withTiming(0, { duration, easing: EASING.exit }));
+    height.set(withTiming(0, timing(duration, "exit")));
   }
   opacity.set(
-    withTiming(0, { duration, easing: EASING.exit }, (isFinished) => {
+    withTiming(0, timing(duration, "exit"), (isFinished) => {
       if (isFinished === true) {
         scheduleOnRN(onDone);
       }
@@ -188,6 +186,50 @@ const useContentMotion = (isOpen: boolean, onShown: (() => void) | undefined) =>
   return { onLayout, phase, style };
 };
 
+/** The animated box around the content: clipped while it moves, gone once closed. */
+const CollapseBox = ({
+  children,
+  content,
+}: {
+  readonly children: ReactNode;
+  readonly content: ReturnType<typeof useContentMotion>;
+}) =>
+  content.phase === "gone" ? null : (
+    <Animated.View
+      aria-hidden={content.phase === "closing"}
+      pointerEvents={content.phase === "closing" ? "none" : "auto"}
+      // The clip in the style: a reanimated view takes no className on the web (bug-lessons 148).
+      style={[content.style, CLIP]}
+      {...(content.phase === "closing" && {
+        importantForAccessibility: "no-hide-descendants" as const,
+      })}
+    >
+      <View
+        onLayout={(event) => {
+          content.onLayout(event.nativeEvent.layout.height);
+        }}
+        testID="disclosure-content"
+      >
+        {children}
+      </View>
+    </Animated.View>
+  );
+
+/**
+The fold without a trigger of its own (spec §6 disclosure): content that another control shows
+and hides (the close sheet's reason, shown for Cancelled and Skipped) grows to its height and
+shrinks away with the disclosure's own motion, so what is around it never jumps (QA 21 L2).
+*/
+export const Collapse = ({
+  children,
+  onShown,
+  open,
+}: {
+  readonly children: ReactNode;
+  readonly onShown?: (() => void) | undefined;
+  readonly open: boolean;
+}) => <CollapseBox content={useContentMotion(open, onShown)}>{children}</CollapseBox>;
+
 export type DisclosureProps = {
   readonly open: boolean;
   readonly onToggle: () => void;
@@ -249,26 +291,7 @@ export const Disclosure = ({
         )}
         <Chevron isOpen={open} isReduced={isReduced} />
       </Pressable>
-      {content.phase === "gone" ? null : (
-        <Animated.View
-          aria-hidden={content.phase === "closing"}
-          pointerEvents={content.phase === "closing" ? "none" : "auto"}
-          // The clip in the style: a reanimated view takes no className on the web (bug-lessons 148).
-          style={[content.style, CLIP]}
-          {...(content.phase === "closing" && {
-            importantForAccessibility: "no-hide-descendants" as const,
-          })}
-        >
-          <View
-            onLayout={(event) => {
-              content.onLayout(event.nativeEvent.layout.height);
-            }}
-            testID="disclosure-content"
-          >
-            {children}
-          </View>
-        </Animated.View>
-      )}
+      <CollapseBox content={content}>{children}</CollapseBox>
     </View>
   );
 };

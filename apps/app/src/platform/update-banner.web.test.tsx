@@ -5,12 +5,12 @@ import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-cont
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 
-import { UpdateFrame, UpdateStrip } from "./update-banner.web.tsx";
+import { UpdateCard, UpdateFrame } from "./update-banner.web.tsx";
 
-describe("UpdateStrip", () => {
+describe("UpdateCard", () => {
   it("says what happened and offers a single Refresh button, nothing to postpone", async () => {
     const onRefresh = jest.fn();
-    await renderScreen(<UpdateStrip onRefresh={onRefresh} />, await createTestRuntime());
+    await renderScreen(<UpdateCard onRefresh={onRefresh} />, await createTestRuntime());
     expect(screen.getByText("A new version of Pace is ready.")).toBeOnTheScreen();
     expect(screen.getAllByRole("button")).toHaveLength(1);
     expect(screen.queryByText("Later")).toBeNull();
@@ -42,15 +42,18 @@ const renderFrame = async (isOpen: boolean) =>
   );
 
 describe("UpdateFrame", () => {
-  it("shows no strip while no new build waits, and the screens keep the status bar's room", async () => {
+  it("shows no card while no new build waits", async () => {
     await renderFrame(false);
     expect(screen.queryByRole("button")).toBeNull();
     expect(screen.getByTestId("top-inset")).toHaveTextContent("47");
   });
 
-  it("takes the status bar's room itself once open, so the screens below do not pad it twice", async () => {
+  it("lays the card over the app and pushes nothing: the screens keep their own room (F-WEB-07)", async () => {
     await renderFrame(true);
     expect(screen.getByRole("button", { name: "Refresh page" })).toBeOnTheScreen();
-    expect(screen.getByTestId("top-inset")).toHaveTextContent("0");
+    expect(screen.getByTestId("top-inset")).toHaveTextContent("47");
+    // The card is the frame's last child, drawn over the app, and takes no touches beside itself.
+    const card = screen.getByTestId("update-card");
+    expect(card).toBeOnTheScreen();
   });
 });

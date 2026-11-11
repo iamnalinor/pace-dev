@@ -27,7 +27,6 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import tseslint from "typescript-eslint";
 
 import { GENERATED_CLASSES } from "./scripts/design/generate-design.ts";
-import { BARE_PRESSABLE_MARKER } from "./scripts/eslint-ratchet.ts";
 import { plugin as pace } from "./scripts/eslint-rules/index.ts";
 
 /** Fails loudly if a plugin stops shipping a config we rely on (instead of silently linting less). */
@@ -137,6 +136,17 @@ const ACTION_ANSWER_SYNTAX = [
 ];
 
 /**
+A heading without a level is an `<h1>` on the web (react-native-web's default), a second level-1
+title on the screen (bug-lessons 377): the kit's `Text level`, or `aria-level` beside the role.
+*/
+const HEADING_LEVEL_SYNTAX = {
+  message:
+    'A heading names its level: use the kit\'s Text with `level`, or add `aria-level` beside accessibilityRole="header" (bug-lessons 377).',
+  selector:
+    "JSXOpeningElement:has(JSXAttribute[name.name=/^(accessibilityRole|role)$/][value.value=/^(header|heading)$/]):not(:has(JSXAttribute[name.name='aria-level']))",
+};
+
+/**
 An action stages through `emit`/`stageEmit` (actions/deps.ts), which loads the source a checkpoint's
 base needs; a bare `state.stage(` skips that and answers `history/not-loaded` (bug-lessons 360).
 */
@@ -145,6 +155,10 @@ const ACTION_STAGE_SYNTAX = {
     "An action never stages past the history loader: use emit / stageEmit from actions/deps.ts (or withCompleteHistory first), bug-lessons 360.",
   selector: "CallExpression[callee.property.name='stage'][callee.object.property.name='state']",
 };
+
+/** What the bare-pressable ban says (also what its test looks for). */
+const BARE_PRESSABLE_MESSAGE =
+  "A bare pressable has no state layer (no ripple, hover or focus ring): use Pressable from #app/ui/pressable.";
 
 /** React Native's (and gesture-handler's) pressables with no state layer (bug-lessons 122). */
 const BARE_PRESSABLES = [
@@ -574,42 +588,40 @@ export default defineConfig([
         ...RESTRICTED_SYNTAX,
         ...DISPLAY_TEXT_SYNTAX,
         ...ACTION_ANSWER_SYNTAX,
+        HEADING_LEVEL_SYNTAX,
       ],
     },
   },
-  // Design values come from the tokens (spec §9.3). A warning, counted in
-  // context/design/redesign-plan.md, until the app is migrated; then it becomes an error. A class
-  // outside GENERATED_CLASSES (the token scales and layout utilities) is off the scale.
+  // Design values come from the tokens (spec §9.3). An error: a class outside GENERATED_CLASSES
+  // (the token scales and layout utilities) is off the scale.
   {
     files: APP,
     ignores: TESTS,
     plugins: { pace },
-    rules: { "pace/no-raw-design-values": ["warn", { allowedClasses: GENERATED_CLASSES }] },
+    rules: { "pace/no-raw-design-values": ["error", { allowedClasses: GENERATED_CLASSES }] },
   },
   // Icons and line limits come from the kit's Icon and Text (spec §4.1.1, §4.1.2 rule 9; bug-lessons
-  // 109). A warning counted by its own exact ratchet (KIT_PRIMITIVE_WARNINGS in
-  // scripts/eslint-all.ts) while the screens migrate in their tasks; then it becomes an error.
+  // 109). An error.
   {
     files: APP,
     ignores: TESTS,
     plugins: { pace },
-    rules: { "pace/kit-primitives": "warn" },
+    rules: { "pace/kit-primitives": "error" },
   },
   // Features and shared rows press through the kit's Pressable, which draws the state layer
-  // (bug-lessons F-CMP-01). A warning counted by its own exact ratchet (BARE_PRESSABLE_WARNINGS in
-  // scripts/eslint-all.ts) while the kit tasks migrate the callers; then it becomes an error.
+  // (bug-lessons F-CMP-01). An error.
   {
     files: ["apps/app/src/features/**/*.{ts,tsx}", "apps/app/src/shared/**/*.{ts,tsx}"],
     ignores: TESTS,
     rules: {
       "no-restricted-imports": [
-        "warn",
+        "error",
         {
           paths: [
-            { importNames: BARE_PRESSABLES, message: BARE_PRESSABLE_MARKER, name: "react-native" },
+            { importNames: BARE_PRESSABLES, message: BARE_PRESSABLE_MESSAGE, name: "react-native" },
             {
               importNames: BARE_PRESSABLES,
-              message: BARE_PRESSABLE_MARKER,
+              message: BARE_PRESSABLE_MESSAGE,
               name: "react-native-gesture-handler",
             },
           ],
