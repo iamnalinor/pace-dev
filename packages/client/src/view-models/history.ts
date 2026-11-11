@@ -160,15 +160,28 @@ const isOfGoneTask = (state: HistorySource, event: Event, taskId: null | string)
 The zone the app gave an account that had none (`ensureTimezone`, at the first sign-in): the
 system's setting, not the person's act, so it offers no Undo (QA PR55-1-11, R27-12: a fresh
 account's History began with an undoable «Settings changed»; undone, the app only writes it again).
-Written as `system` from this build on; before, from the device's own source, as the log's first
-event that sets the zone and nothing else.
+Written as `system` from this build on; before, from the device's own source (`app` or `web`,
+never the bot or MCP: those zones are the person's), as the log's first event that sets the zone
+and nothing else.
+
+The trade-off (class 376): on an account from before this build, a first zone the person picked in
+the app (the zone question, shown only where the device's zone was unusable and the app wrote
+none) has the same shape and also offers no Undo. Nothing in the event tells the two apart (one
+device, the zone alone, stamped at the write), and an Undo there would only bring back "no zone",
+which the app fills (or asks for) again; so the overlap is accepted rather than an Undo that
+undoes nothing.
 */
+const LEGACY_ZONE_SOURCES: ReadonlySet<Event["source"]> = new Set(["app", "web"]);
+
 const isInitialZone = (event: Event, log: readonly Event[]): boolean => {
   if (event.type !== "settings.updated" || event.payload.timezone === undefined) {
     return false;
   }
   if (event.source === "system") {
     return true;
+  }
+  if (!LEGACY_ZONE_SOURCES.has(event.source)) {
+    return false;
   }
   const first = log.find(
     (candidate) =>

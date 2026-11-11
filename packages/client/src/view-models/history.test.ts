@@ -42,6 +42,26 @@ describe("historyViewModel", () => {
     expect(history.events.find((entry) => entry.id === legacy.id)?.revocable).toBe(false);
   });
 
+  it.each(["bot", "mcp"] as const)(
+    "offers Undo for a first zone the person set through the %s: the app never wrote one from there (class 376)",
+    async (source) => {
+      const world = await setupActions([]);
+      const own = unwrap(
+        await world.state.dispatch({
+          occurredAt: NOW,
+          payload: { timezone: MOSCOW },
+          source,
+          type: "settings.updated",
+        }),
+      );
+      const history = historyViewModel(fullSource(world.state.store.getState()), {
+        atIso: NOW,
+        deviceTz: MOSCOW,
+      });
+      expect(history.events.find((entry) => entry.id === own.id)?.revocable).toBe(true);
+    },
+  );
+
   it("names how a task was closed: done, cancelled or skipped (QA round 20 L8)", async () => {
     const world = await setupActions();
     const [skipped] = unwrap(await world.actions.closeTask({ outcome: "skipped", taskId: TRK_ID }));

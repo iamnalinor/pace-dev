@@ -1930,6 +1930,7 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-11 | Wave review, item 4: a v2 hello out of shape went to the notices' reader: no catch-up pull and v2 off until the 5-min poll | 373 (new) | yes: `pushed` and `error` answers out of shape left their request waiting for its timeout; fixed with it | `live.test.ts` raw frames: broken hellos pull and turn v2 on; broken `pushed`/`error` fail their request at once |
 | 2026-11-11 | Wave review, item 5: Skip kept its in-flight keys in state; two presses before the hide rendered sent two requests and two dismiss writes | 374 (new), 36 | yes: History's Undo confirm, Export, the account's Telegram ask and the dev sign-in were guarded by state only; all fixed | two presses in one `act`, one request: `use-phone-answers.test.ts`, `history-screen.test.tsx`, `export-row.web.test.tsx`, `login-screen.test.tsx`, `settings.test.tsx` |
 | 2026-11-11 | Wave review, item 6: checking off the last row left focus on the page (the heading's-neighbour fallback was documented, not built), and the wait was exactly two frames | 375 (new), 5 | yes: the other focus helpers poll or run after the removal | `focus-place.web.test.ts` (jsdom): next row, heading's neighbour, a slow row, focus moved meanwhile |
+| 2026-11-11 | Wave review, item 7: the legacy `isInitialZone` matched a first zone from any source, so one the person set through the bot or MCP lost its Undo; the app-written shape and a first zone-question answer stay indistinguishable (trade-off written in the code) | 376 (new) | yes: `close-reasons.ts` reads `system` itself; no other legacy shape is matched | `history.test.ts`: a first zone from the bot or MCP is undoable |
 
 ### 125. A live region around a ticking value
 - **Bug.** PR B 4.2 (F-A11Y-10): the running row sat in `accessibilityLiveRegion="polite"` around the
@@ -3854,3 +3855,18 @@ New bugs go here with their class; a new class gets its own section above.
   the unmount, after the field is gone, so one frame is enough; the sheet, claim and toast helpers
   poll. `focus-place.web.test.ts`: the next row, the heading's neighbour (list emptied or gone), a
   row that takes six frames, and focus the person moved meanwhile.
+
+### 376. A legacy heuristic wider than the writes it stands in for
+- **Bug.** Wave review, item 7: History took an account's first zone-only `settings.updated` for
+  the app's own zone write (`isInitialZone`, for logs from before it was written as `system`) from
+  any source. A zone the person set first through the bot or MCP lost its Undo, though the app
+  never wrote a zone from there.
+- **Missed because.** The legacy test wrote the old shape from the web only; nothing asked which
+  sources the old write could have come from.
+- **Rule.** A heuristic that recognises an old write matches every field the old writer fixed
+  (here the source: the device's own, `app` or `web`), and what it still cannot tell apart is
+  written down beside it, with why the remaining overlap is acceptable.
+- **Sweep and guard.** The other reader of `source === "system"` (`close-reasons.ts`) reads the
+  field itself, with no legacy shape. `history.test.ts` "offers Undo for a first zone the person
+  set through the bot / mcp"; the trade-off for a first zone-question answer is written in
+  `history.ts`.
