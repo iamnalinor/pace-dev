@@ -22,6 +22,39 @@ export type PhoneAnswers = {
 };
 
 /**
+Skips on their way to the server (owner, bug-lessons 311): a Skip shows at the press, not when the
+server has answered; refused, the event is never gone here and still asked about everywhere else
+(bug class 3). A second press before the hide renders joins the skip on its way: one request, one
+dismiss, one answer (class 374; state would not have rendered yet, so the map is a ref).
+*/
+const useSkips = (dismiss: (key: string) => void) => {
+  const [sending, setSending] = useState<ReadonlySet<string>>(() => new Set());
+  const skipsRef = useRef(new Map<string, Promise<boolean>>());
+  const wasSkipTaken = async (key: string, wasTaken: () => Promise<boolean>): Promise<boolean> => {
+    setSending((current) => new Set([...current, key]));
+    try {
+      const isTaken = await wasTaken();
+      if (isTaken) {
+        // Kept by the overlay before the skip lets go: the event never shows in between.
+        dismiss(key);
+      }
+      return isTaken;
+    } finally {
+      skipsRef.current.delete(key);
+      setSending((current) => new Set([...current].filter((each) => each !== key)));
+    }
+  };
+  return {
+    sending,
+    skip: async (key: string, wasTaken: () => Promise<boolean>): Promise<boolean> => {
+      const sent = skipsRef.current.get(key) ?? wasSkipTaken(key, wasTaken);
+      skipsRef.current.set(key, sent);
+      return await sent;
+    },
+  };
+};
+
+/**
 Answers kept on the phone (a dismissed event, a series rule): shown at once, then written to the
 phone's storage (slow on Android's keystore, bug-lessons 108). The overlay holds an answer only
 while its write is on its way: once it landed and a read has it, the read wins (so a rule removed
@@ -37,10 +70,6 @@ export const usePhoneAnswers = (reload: () => Promise<void>, memory: number): Ph
     readonly rules: readonly Held<SeriesRule>[];
   }>({ dismissed: [], rules: [] });
   const nextRef = useRef(0);
-  // Skips on their way to the server (owner, bug-lessons 311): a Skip shows at the press, not
-  // when the server has answered; refused, the event is never gone here and still asked about
-  // everywhere else (bug class 3).
-  const [sending, setSending] = useState<ReadonlySet<string>>(() => new Set());
   // A change to what the phone remembers made elsewhere (Permissions forgot a rule): answers
   // that could not be saved give way to it. Adjusted while rendering, not in an effect.
   const [seenMemory, setSeenMemory] = useState(memory);
@@ -88,19 +117,11 @@ export const usePhoneAnswers = (reload: () => Promise<void>, memory: number): Ph
       await rememberDismissed(key);
     });
   };
+  const { sending, skip } = useSkips(dismiss);
   return {
     dismiss,
     dismissed: new Set([...held.dismissed.map((each) => each.value), ...sending]),
-    skip: async (key, wasTaken) => {
-      setSending((current) => new Set([...current, key]));
-      const isTaken = await wasTaken();
-      if (isTaken) {
-        // Kept by the overlay before the skip lets go: the event never shows in between.
-        dismiss(key);
-      }
-      setSending((current) => new Set([...current].filter((each) => each !== key)));
-      return isTaken;
-    },
+    skip,
     remember: (rule) => {
       nextRef.current += 1;
       const id = nextRef.current;

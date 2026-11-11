@@ -1928,6 +1928,7 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-11 | Wave review, item 2: on the web Day showed screen time only for rows, and a failed read has none, so a 503 was silent (R23-08 again) | 371 (new), 62 | yes: Week's calendar shows its failure whatever its rows; the usage marks on blocks show no total | `day-web.test.tsx`: the failed read says so with Try again; one Retry beside the offline sync line; an empty answer stays silent |
 | 2026-11-11 | Wave review, item 3: the notification feed's page and freshness outlived a sign-out; another account signed in within 5 s saw the previous account's pool | 372 (new), 103 | yes: the instance reader is public; the sync's success record only times the loop's first tick after the start's own pull | `create-client.test.ts` (sign-out empties the feed, the next account fetches its own); `notifications.test.ts` (a page landing after `reset` is dropped) |
 | 2026-11-11 | Wave review, item 4: a v2 hello out of shape went to the notices' reader: no catch-up pull and v2 off until the 5-min poll | 373 (new) | yes: `pushed` and `error` answers out of shape left their request waiting for its timeout; fixed with it | `live.test.ts` raw frames: broken hellos pull and turn v2 on; broken `pushed`/`error` fail their request at once |
+| 2026-11-11 | Wave review, item 5: Skip kept its in-flight keys in state; two presses before the hide rendered sent two requests and two dismiss writes | 374 (new), 36 | yes: History's Undo confirm, Export, the account's Telegram ask and the dev sign-in were guarded by state only; all fixed | two presses in one `act`, one request: `use-phone-answers.test.ts`, `history-screen.test.tsx`, `export-row.web.test.tsx`, `login-screen.test.tsx`, `settings.test.tsx` |
 
 ### 125. A live region around a ticking value
 - **Bug.** PR B 4.2 (F-A11Y-10): the running row sat in `accessibilityLiveRegion="polite"` around the
@@ -3819,3 +3820,21 @@ New bugs go here with their class; a new class gets its own section above.
 - **Sweep and guard.** `onLiveMessage` handles hello, events, pushed and error out of shape.
   `live.test.ts` sends raw frames: three broken hellos (a pull, v2 on), a broken `pushed` and
   `error` (the request fails at once, no notice).
+
+### 374. A once-only guard kept in React state, read at the press
+- **Bug.** Wave review, item 5: Skip tracked its in-flight keys in a `useState` set. Two presses
+  before the hide rendered both saw the key absent: two requests, two `dismiss` writes, and a
+  flicker or a wrong toast when the two answers differed. The sweep found the same in four more
+  controls guarded only by a busy state: History's Undo confirm (two revocations, the second
+  refused), Export (two downloads), Wipe/Delete's Telegram ask (two confirmations) and the dev
+  sign-in (Enter and the button together).
+- **Missed because.** Every test pressed once and awaited; state is current by the next press
+  only when a render ran in between, and a test that awaits always lets one run.
+- **Rule.** A guard that must hold from the press on lives in a ref read at the press
+  (`useBusyLatch`, or a map of the promise in flight that a second press joins); state only
+  draws the spinner. Test each such control with two presses in one `act`.
+- **Sweep and guard.** `useBusyLatch` moved to `src/shared` and now guards Undo, Export and the
+  dev sign-in; Skip joins the promise in flight per key, the account ask joins its promise. The
+  ref-guarded ones (`add-computer`, the assistant's approve, the server sheets) were already right.
+  Tests: `use-phone-answers.test.ts`, `history-screen.test.tsx`, `export-row.web.test.tsx`,
+  `login-screen.test.tsx`, `settings.test.tsx` (each "… (class 374)": two presses, one request).

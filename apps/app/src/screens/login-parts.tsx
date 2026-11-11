@@ -3,6 +3,7 @@ import { ActivityIndicator, Text, View } from "react-native";
 
 import type { MessageKey } from "@pace/core";
 
+import { useBusyLatch } from "#app/shared/use-busy-latch.ts";
 import { TextField } from "#app/ui/text-field.tsx";
 
 import type { BotLoginPhase, useBotLogin } from "./use-bot-login.ts";
@@ -74,24 +75,25 @@ export const DevLoginForm = () => {
   const t = useT();
   const { auth } = useAuth();
   const [telegramId, setTelegramId] = useState("");
-  const [isBusy, setIsBusy] = useState(false);
+  // Enter and the button in one frame both saw it idle and signed in twice (class 374).
+  const latch = useBusyLatch();
   const [error, setError] = useState<MessageKey | null>(null);
   const id = telegramId.trim();
   const submit = async (): Promise<void> => {
-    if (id === "" || isBusy) {
+    if (id === "") {
       return;
     }
     if (!isTelegramId(id)) {
       setError("login.devIdInvalid");
       return;
     }
-    setError(null);
-    setIsBusy(true);
-    const result = await auth.loginWithDev(id);
-    setIsBusy(false);
-    if (!result.ok) {
-      setError(signInErrorKey(result.error));
-    }
+    await latch.run(async () => {
+      setError(null);
+      const result = await auth.loginWithDev(id);
+      if (!result.ok) {
+        setError(signInErrorKey(result.error));
+      }
+    });
   };
   return (
     <View className="gap-2 rounded-xl border border-separator bg-cell p-4">
@@ -110,7 +112,7 @@ export const DevLoginForm = () => {
         value={telegramId}
       />
       <Button
-        busy={isBusy}
+        busy={latch.isBusy}
         disabled={id === ""}
         onPress={() => void submit()}
         variant="secondary"

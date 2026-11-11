@@ -5,10 +5,9 @@ import { useStore } from "zustand";
 import { useT } from "#app/app-state.tsx";
 import { serverHost } from "#app/platform/server-store.ts";
 import { retryServerRestart, serverSwitchStore } from "#app/platform/server-switch-state.ts";
+import { useBusyLatch } from "#app/shared/use-busy-latch.ts";
 import { Button } from "#app/ui/button.tsx";
 import { Text } from "#app/ui/text.tsx";
-
-import { useBusyLatch } from "./use-busy-latch.ts";
 
 /**
 The saved server waits for a cold start: what happened and the one way on. `onRestart` throws when

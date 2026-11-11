@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 
 import { en, renderScreen } from "#app/test/render.tsx";
 import { paramsSet, searchParams, setSearchParams } from "#app/test/router.ts";
@@ -52,6 +52,22 @@ describe("HistoryScreen", () => {
     expect(screen.getByRole("header", { name: en("history.undoConfirm") })).toBeOnTheScreen();
     expect(revoke).not.toHaveBeenCalled();
     await fireEvent.press(screen.getByRole("button", { name: en("history.undoConfirm") }));
+    await waitFor(() => {
+      expect(revoke).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("undoes once for two presses of the confirm before it turns busy (class 374)", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    await runtime.actions.captureInbox("Water the plants");
+    await renderScreen(<HistoryScreen />, runtime);
+    const revoke = jest.spyOn(runtime.actions, "revoke");
+    await fireEvent.press((await screen.findAllByRole("button", { name: /^Undo: / }))[0] as never);
+    const confirm = screen.getByRole("button", { name: en("history.undoConfirm") });
+    await act(async () => {
+      void fireEvent.press(confirm);
+      void fireEvent.press(confirm);
+    });
     await waitFor(() => {
       expect(revoke).toHaveBeenCalledTimes(1);
     });

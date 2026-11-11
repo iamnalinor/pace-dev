@@ -143,6 +143,17 @@ describe("LoginScreen", () => {
     expect(auth.loginWithDev).toHaveBeenCalledWith("1919");
   });
 
+  it("signs in once for a press and Enter in the same frame (class 374)", async () => {
+    auth.loginWithDev.mockResolvedValue(ok(fakeUser));
+    await renderScreen();
+    await fireEvent.changeText(screen.getByLabelText("Telegram id"), "1919");
+    await act(async () => {
+      void fireEvent.press(screen.getByText("Sign in as dev"));
+      void fireEvent(screen.getByLabelText("Telegram id"), "submitEditing");
+    });
+    expect(auth.loginWithDev).toHaveBeenCalledTimes(1);
+  });
+
   it("signs in with Enter in the Telegram id field (QA PR55-1-06)", async () => {
     auth.loginWithDev.mockResolvedValue(ok(fakeUser));
     await renderScreen();

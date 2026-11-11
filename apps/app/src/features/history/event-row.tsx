@@ -4,6 +4,7 @@ import type { HistoryEntry } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { zonedText } from "#app/format/time.ts";
+import { useBusyLatch } from "#app/shared/use-busy-latch.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
@@ -56,21 +57,21 @@ const useUndo = (entry: HistoryEntry) => {
   const { actions } = usePace();
   const run = useRunAction();
   const [isConfirming, setIsConfirming] = useState(false);
-  const [isBusy, setIsBusy] = useState(false);
+  // Two presses of the confirm in one frame both saw it idle and revoked twice (class 374).
+  const latch = useBusyLatch();
   return {
     ask: (): void => {
       setIsConfirming(true);
     },
     close: (): void => {
-      if (!isBusy) {
+      if (!latch.isBusy) {
         setIsConfirming(false);
       }
     },
-    isBusy,
+    isBusy: latch.isBusy,
     isConfirming,
     undo: async (): Promise<void> => {
-      setIsBusy(true);
-      try {
+      await latch.run(async () => {
         // A row of several revocations written together is undone together (R26-10).
         const revocation = await run(
           entry.ids.length > 1 ? actions.revokeAll(entry.ids) : actions.revoke(entry.id),
@@ -78,9 +79,7 @@ const useUndo = (entry: HistoryEntry) => {
         if (revocation.ok) {
           setIsConfirming(false);
         }
-      } finally {
-        setIsBusy(false);
-      }
+      });
     },
   };
 };

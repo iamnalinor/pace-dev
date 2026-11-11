@@ -188,3 +188,15 @@ describe("a copy that never reached the server (QA PR55-1-01)", () => {
     expect(eventRows?.rows.some((row) => row.includes(baseEvent.id))).toBe(true);
   });
 });
+
+it("exports once for two presses before it turns busy (class 374)", async () => {
+  await renderScreen(<ExportRow />, await createTestRuntime());
+  const button = screen.getByRole("button", { name: en("settings.export.action") });
+  await act(async () => {
+    void fireEvent.press(button);
+    void fireEvent.press(button);
+  });
+  await waitFor(() => {
+    expect(download).toHaveBeenCalledTimes(1);
+  });
+});

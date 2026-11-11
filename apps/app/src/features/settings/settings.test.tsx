@@ -728,6 +728,30 @@ describe("SettingsScreen", () => {
     expect(isControl(wipeBack, wipeBackControl)).toBe(true);
   });
 
+  it("asks Telegram once for two presses of Wipe's confirm before it turns busy (class 374)", async () => {
+    const id = "123e4567-e89b-42d3-a456-426614174009";
+    const created = jest.fn(() => ({
+      id,
+      expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+    }));
+    const runtime = await createTestRuntime({
+      routes: {
+        "POST /api/account/confirmations": created,
+        [`GET /api/account/confirmations/${id}`]: () => ({ status: "pending" }),
+      },
+      world: "empty",
+    });
+    await renderScreen(<SettingsScreen />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.wipe") }));
+    const confirm = screen.getByRole("button", { name: en("settings.wipe.confirm") });
+    await act(async () => {
+      void fireEvent.press(confirm);
+      void fireEvent.press(confirm);
+    });
+    expect(await screen.findByText(en("settings.confirmation.waiting"))).toBeOnTheScreen();
+    expect(created).toHaveBeenCalledTimes(1);
+  });
+
   it("gives focus to the waiting line's Cancel once Telegram is asked, and back to Wipe after it (QA PR55-1-10)", async () => {
     const id = "123e4567-e89b-42d3-a456-426614174009";
     const runtime = await createTestRuntime({

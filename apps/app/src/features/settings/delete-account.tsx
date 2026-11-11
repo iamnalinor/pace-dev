@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Text, View } from "react-native";
 
 import type { AccountAction, AccountConfirmation, AccountConfirmationStatus } from "@pace/client";
@@ -100,6 +100,8 @@ const useDangerFlow = () => {
   const [action, setAction] = useState<AccountAction | null>(restored?.action ?? null);
   const [request, setRequest] = useState<AccountConfirmation | null>(restored?.request ?? null);
   const [isBusy, setIsBusy] = useState(false);
+  // Read at the press: two presses in one frame both saw `isBusy` false (class 374).
+  const askingRef = useRef<null | Promise<boolean>>(null);
   const [notice, setNotice] = useState<Notice>(null);
   // Stable, so a re-render (each sync status change) does not restart the poll's timer.
   const onTerminal = useCallback((next: Notice): void => {
@@ -110,21 +112,32 @@ const useDangerFlow = () => {
   }, []);
   useConfirmationPoll({ action, request, onTerminal });
   /** Asks Telegram to confirm; whether the waiting line took the buttons' place. */
-  const didBegin = async (): Promise<boolean> => {
-    if (action === null) {
-      return false;
-    }
+  const didAsk = async (asked: AccountAction): Promise<boolean> => {
     setIsBusy(true);
-    const result = await auth.requestAccountConfirmation(action);
+    const result = await auth.requestAccountConfirmation(asked);
     setIsBusy(false);
     if (result.ok) {
-      savePendingConfirmation({ action, request: result.value });
+      savePendingConfirmation({ action: asked, request: result.value });
       setRequest(result.value);
       setNotice(null);
       return true;
     }
     setNotice(result.error === "account/no-telegram" ? "noTelegram" : "failed");
     return false;
+  };
+  /** A second press while Telegram is asked joins that ask: one request, one answer. */
+  const didBegin = async (): Promise<boolean> => {
+    if (action === null) {
+      return false;
+    }
+    askingRef.current ??= (async () => {
+      try {
+        return await didAsk(action);
+      } finally {
+        askingRef.current = null;
+      }
+    })();
+    return await askingRef.current;
   };
   const cancel = async (): Promise<void> => {
     if (request === null) {

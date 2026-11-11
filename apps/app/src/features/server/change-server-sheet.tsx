@@ -5,6 +5,7 @@ import { useStore } from "zustand";
 import { usePace, useT } from "#app/app-state.tsx";
 import { isBuildServer, serverStore } from "#app/platform/server-store.ts";
 import { switchServer } from "#app/platform/server.ts";
+import { useBusyLatch } from "#app/shared/use-busy-latch.ts";
 import { Button } from "#app/ui/button.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
@@ -17,7 +18,6 @@ import {
 } from "@pace/core";
 
 import { configurationErrorKey } from "./configuration-error.ts";
-import { useBusyLatch } from "./use-busy-latch.ts";
 
 type Problem = InstanceError | ServerUrlError;
 

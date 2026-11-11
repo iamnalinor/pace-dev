@@ -8,11 +8,11 @@ import type { FirebaseConfigReason } from "@pace/core";
 import { usePace, useT } from "#app/app-state.tsx";
 import { checkServer } from "#app/platform/server-origin.ts";
 import { serverStore } from "#app/platform/server-store.ts";
+import { useBusyLatch } from "#app/shared/use-busy-latch.ts";
 import { Button } from "#app/ui/button.tsx";
 import { Text } from "#app/ui/text.tsx";
 
 import { configurationErrorKey } from "./configuration-error.ts";
-import { useBusyLatch } from "./use-busy-latch.ts";
 
 const useConfigurationRetry = () => {
   const runtime = usePace();

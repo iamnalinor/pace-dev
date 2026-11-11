@@ -1,8 +1,7 @@
-import { useState } from "react";
-
 import { usePace, useT } from "#app/app-state.tsx";
 import { exportData, type ExportError } from "#app/features/settings/export-data.web.ts";
 import { errorText } from "#app/format/action-error.ts";
+import { useBusyLatch } from "#app/shared/use-busy-latch.ts";
 import { Button } from "#app/ui/button.tsx";
 import { useToast } from "#app/ui/toast.tsx";
 
@@ -22,22 +21,20 @@ export const ExportRow = () => {
   const t = useT();
   const toast = useToast();
   const runtime = usePace();
-  const [isBusy, setIsBusy] = useState(false);
+  // Two presses in one frame both saw it idle and downloaded twice (class 374).
+  const latch = useBusyLatch();
   return (
     <Button
-      busy={isBusy}
+      busy={latch.isBusy}
       onPress={async () => {
-        setIsBusy(true);
-        try {
+        await latch.run(async () => {
           const result = await exportData(runtime);
-          if (result.ok) {
-            toast.show({ message: t("settings.export.done", { file: result.value }) });
-            return;
-          }
-          toast.show({ message: exportErrorText(t, result.error) });
-        } finally {
-          setIsBusy(false);
-        }
+          toast.show({
+            message: result.ok
+              ? t("settings.export.done", { file: result.value })
+              : exportErrorText(t, result.error),
+          });
+        });
       }}
       variant="secondary"
     >
