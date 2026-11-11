@@ -4028,3 +4028,16 @@ New bugs go here with their class; a new class gets its own section above.
   asserts it. The calendar's days also pass `aria-selected` by hand on a button (as on the base
   branch, inside the date grid); axe has not flagged it there (`round6-minors.e2e.ts` passes), left
   as it is for the calendar's own task.
+
+### 381. Out of sight by an offset from its own place, while its container can move
+- **Bug.** The update strip went back into the layout above the app (the owner's choice over a
+  floating card). On the shots the shell's skip link («Перейти к содержимому») showed over the
+  strip: it was hidden by `translateY(-200%)` of its own height from the shell's top, and the shell
+  now started lower than the page's top.
+- **Missed because.** The hiding rule only held while the shell's top was the page's top; nothing
+  checked the link out of sight with anything laid out above the shell, and the strip only appears
+  with a waiting service worker, which no e2e brings about.
+- **Rule.** Something hidden off the page is moved by the page's measure (the viewport) plus its
+  own, never by a step from its own place that assumes where its container sits.
+- **Sweep and guard.** The only off-page hide in `global.css` is the skip link; it now moves by
+  `calc(-100vh - 100%)`. `focus-ring.test.ts` holds the rule.

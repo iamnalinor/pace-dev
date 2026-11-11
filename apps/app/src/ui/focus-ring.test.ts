@@ -57,3 +57,10 @@ describe("the focus ring", () => {
     expect(after.match(/@media/g)).toHaveLength(1);
   });
 });
+
+describe("the skip link out of sight", () => {
+  it("is moved off the page by the viewport, not by its own height: a strip above the shell must not bring it into view (bug-lessons 381)", () => {
+    const rule = /\[data-skip-link\]:not\(:focus-within\)\s*\{([^}]*)\}/u.exec(SHEET)?.[1] ?? "";
+    expect(rule).toMatch(/translateY\(calc\(-100vh - 100%\)\)/u);
+  });
+});

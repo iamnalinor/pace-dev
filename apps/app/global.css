@@ -130,10 +130,12 @@ phone's, a 4 high `fill.4` track filled in `label.primary` up to the thumb (`--p
 /*
 The shell's skip link (ui/shell.web.tsx; spec §4.2.18, F-A11Y-12): above the top edge of the page,
 whole (nothing clipped, nothing under the pointer), until the keyboard reaches it; then it comes
-down to where it sits, the first stop of the page.
+down to where it sits, the first stop of the page. Off by the viewport's height plus its own, not
+by a multiple of its own: the shell can start lower than the page's top (the update strip above it),
+and a link moved up by its own height alone would show over that strip (bug-lessons 381).
 */
 [data-skip-link]:not(:focus-within) {
-  transform: translateY(-200%);
+  transform: translateY(calc(-100vh - 100%));
 }
 
 /*

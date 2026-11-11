@@ -96,6 +96,9 @@ export const USED_PAIRS: readonly ContrastPair[] = [
   { fg: "accent.on", bg: "accent", target: "textSmall" },
   { fg: "accent.on", bg: "accent.pressed", target: "textSmall" },
   { fg: "accent.text", bg: "accentQuiet", over: "bg.cell", target: "meta" },
+  // The update strip across the top of the page: its words and its plain Refresh on the quiet accent.
+  { fg: "label.primary", bg: "accentQuiet", over: "bg.app", target: "text" },
+  { fg: "accent.text", bg: "accentQuiet", over: "bg.app", target: "meta" },
   { fg: "status.danger", bg: "dangerQuiet", over: "bg.cell", target: "textSmall" },
   { fg: "status.warn", bg: "warnQuiet", over: "bg.cell", target: "meta" },
   // A count badge: cell-coloured digits on the danger fill.
