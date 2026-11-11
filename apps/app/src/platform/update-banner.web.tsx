@@ -58,20 +58,19 @@ one centred row with what happened and the one thing to do (there is no "later",
 the page is refreshed). It sits in the layout above the app, not over it: it grows from nothing
 (`Collapse`, the disclosure's motion; at once under reduced motion), so the app slides down and
 nothing (Back, a title, a header action) is covered. A tap aimed at a row cannot land on a moved row
-in practice: the strip comes at most once per build and grows over the disclosure's duration. It
-takes the phone's top safe area itself (the installed app draws under the status bar). A reload
+in practice: the strip comes at most once per build and grows over the disclosure's duration. The
+phone's top safe area (the installed app draws under the status bar) is `UpdateFrame`'s. A reload
 loses no typing: drafts are kept on the device (`platform/drafts.ts`).
 */
 export const UpdateStrip = ({ onRefresh }: { readonly onRefresh: () => void }) => {
   const t = useT();
-  const insets = useSafeAreaInsets();
   return (
     <View
       accessibilityLiveRegion="polite"
       aria-live="polite"
       className="flex-row flex-wrap items-center justify-center gap-x-3 bg-accent-quiet px-gutter pb-1"
       role="status"
-      style={{ paddingTop: insets.top + space["1"] }}
+      style={{ paddingTop: space["1"] }}
       testID="update-strip"
     >
       <Text className="shrink text-center" role="subhead">
@@ -85,8 +84,10 @@ export const UpdateStrip = ({ onRefresh }: { readonly onRefresh: () => void }) =
 };
 
 /**
-The strip above the app, and the app under it. While it is open the strip has taken the top safe
-area, so the screens are told there is none left (they pad themselves with it).
+The strip above the app, and the app under it. While it is open the frame holds the top safe area
+in a fixed band in the strip's colour and the screens are told there is none left (they pad
+themselves with it). The band appears at full height in the same render as the inset is taken from
+the app, so the app does not move then; only the strip's own row grows and pushes it down.
 */
 export const UpdateFrame = ({
   children,
@@ -101,6 +102,13 @@ export const UpdateFrame = ({
   const below = useMemo(() => (isOpen ? { ...insets, top: 0 } : insets), [insets, isOpen]);
   return (
     <View className="flex-1 bg-app">
+      {isOpen ? (
+        <View
+          className="bg-accent-quiet"
+          style={{ height: insets.top }}
+          testID="update-status-bar"
+        />
+      ) : null}
       <Collapse open={isOpen}>{isOpen ? <UpdateStrip onRefresh={onRefresh} /> : null}</Collapse>
       <View className="flex-1">
         <SafeAreaInsetsContext value={below}>{children}</SafeAreaInsetsContext>
@@ -109,7 +117,7 @@ export const UpdateFrame = ({
   );
 };
 
-/** Wraps the app: once a new build waits, the card shows over it; Refresh hands control to the new worker, which reloads the page. */
+/** Wraps the app: once a new build waits, the strip opens above it; Refresh hands control to the new worker, which reloads the page. */
 export const UpdateBanner = ({ children }: { readonly children: ReactNode }) => {
   const waiting = useWaitingWorker();
   return (
