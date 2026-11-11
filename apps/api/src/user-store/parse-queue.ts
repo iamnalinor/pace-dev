@@ -16,6 +16,7 @@ import {
 import type { DecisionEntry } from "../shared/contract.ts";
 import type { HealthMemory } from "../shared/llm/health-store.ts";
 import type { Cooldowns, LlmError } from "../shared/llm/llm.ts";
+import type { ActorStorage } from "../shared/ports/actor-storage.ts";
 
 import { loadConfig } from "../shared/config.ts";
 import { inboxBody } from "../shared/inbox.ts";
@@ -55,35 +56,32 @@ export const BLIND_TRIES = 3;
 /** A text not read within a day goes to the Inbox, so nothing waits forever. */
 const GIVE_UP_MINUTES = 24 * 60;
 
-export const queueOf = async (storage: DurableObjectStorage): Promise<readonly QueuedParse[]> =>
+export const queueOf = async (storage: ActorStorage): Promise<readonly QueuedParse[]> =>
   (await storage.get<readonly QueuedParse[]>(QUEUE_KEY)) ?? [];
 
 export const saveQueue = async (
-  storage: DurableObjectStorage,
+  storage: ActorStorage,
   queue: readonly QueuedParse[],
 ): Promise<void> => {
   await (queue.length === 0 ? storage.delete(QUEUE_KEY) : storage.put(QUEUE_KEY, queue));
 };
 
 export const enqueue = async (
-  storage: DurableObjectStorage,
+  storage: ActorStorage,
   item: Omit<QueuedParse, "id">,
 ): Promise<void> => {
   await saveQueue(storage, [...(await queueOf(storage)), { ...item, id: newId() }]);
 };
 
 /** The providers still cooling down at `now`. */
-export const cooldownsOf = async (
-  storage: DurableObjectStorage,
-  now: string,
-): Promise<Cooldowns> => {
+export const cooldownsOf = async (storage: ActorStorage, now: string): Promise<Cooldowns> => {
   const stored = (await storage.get<Cooldowns>(COOLDOWNS_KEY)) ?? {};
   return Object.fromEntries(Object.entries(stored).filter(([, until]) => until > now));
 };
 
 /** Remembers the rate limits a call ran into, so the next calls skip those providers. */
 export const noteLimits = async (
-  storage: DurableObjectStorage,
+  storage: ActorStorage,
   limited: Cooldowns,
   now: string,
 ): Promise<void> => {
@@ -101,7 +99,7 @@ export const queueDueAt = (queue: readonly QueuedParse[], now: string): null | s
     .at(0) ?? null;
 
 /** Moves the alarm earlier when a queued text is due before it. */
-export const armForQueue = async (storage: DurableObjectStorage, now: string): Promise<void> => {
+export const armForQueue = async (storage: ActorStorage, now: string): Promise<void> => {
   const due = queueDueAt(await queueOf(storage), now);
   if (due === null) {
     return;
@@ -261,7 +259,7 @@ type DrainStore = {
 };
 
 export type DrainDeps = {
-  readonly storage: DurableObjectStorage;
+  readonly storage: ActorStorage;
   readonly env: object;
   readonly now: string;
   readonly store: DrainStore;

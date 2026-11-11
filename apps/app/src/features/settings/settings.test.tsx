@@ -15,10 +15,13 @@ import { createTestRuntime } from "#app/test/runtime.ts";
 import { problem } from "@pace/client/testing";
 
 import { paceNative } from "../../../modules/pace-native/index.ts";
+import { PushIneligibilityReason } from "./notification-settings.tsx";
 
 /** Where focus went and what was said, as a confirm asked the platform (bug class 5). */
 const mockMoveFocus = jest.fn<undefined, [unknown, string | undefined]>();
 jest.mock("#app/platform/move-focus.ts", (): unknown => ({
+  // The page has no focus of its own here: a control that goes leaves it nowhere.
+  isFocusLost: () => true,
   moveFocus: (target: unknown, say?: string) => {
     mockMoveFocus(target, say);
   },
@@ -96,6 +99,13 @@ const insetOf = (text: string): string | undefined => {
     node = node.parent;
   }
   return node === null ? undefined : "px-row-x";
+};
+
+/** Push subscriptions belong to a signed-in session, as they do on a real phone. */
+const createPushRuntime = async (options: Parameters<typeof createTestRuntime>[0]) => {
+  const runtime = await createTestRuntime(options);
+  await runtime.auth.adoptToken("session-settings");
+  return runtime;
 };
 
 describe("SettingsScreen", () => {
@@ -257,6 +267,24 @@ describe("SettingsScreen", () => {
     });
   });
 
+  it("names the Week control its hint points to by the words Week shows, not by its glyph (QA PR55-1-17)", async () => {
+    await renderScreen(<SettingsScreen />, await createTestRuntime({ world: "empty" }));
+    const hint = en("settings.nightHours.hintOff", { button: en("week.nightHours") });
+    expect(screen.getByText(hint)).toBeOnTheScreen();
+    expect(hint).toContain(`“${en("week.nightHours")}”`);
+  });
+
+  it("says which notifications quiet hours hold back by the names their switches carry (QA PR55-1-17)", async () => {
+    await renderScreen(<SettingsScreen />, await createTestRuntime({ world: "empty" }));
+    const hint = en("settings.quietHours.hint", {
+      digest: en("notify.kind.deadline_digest"),
+      event: en("notify.kind.event_start"),
+      login: en("notify.kind.login"),
+      overrun: en("notify.kind.activity_overrun"),
+    });
+    expect(screen.getByText(hint)).toBeOnTheScreen();
+  });
+
   it("says so and turns night hours back when the device refuses to save it, then rests", async () => {
     const disk = refusingStore();
     const runtime = await createTestRuntime({ eventStore: disk.eventStore, world: "empty" });
@@ -330,7 +358,7 @@ describe("SettingsScreen", () => {
     fakeNotifications.state.granted = true;
     fakeNotifications.state.pushToken = "fcm-token";
     const server = pushRoutes();
-    const runtime = await createTestRuntime({ routes: server.routes, world: "empty" });
+    const runtime = await createPushRuntime({ routes: server.routes, world: "empty" });
     await renderScreen(<SettingsScreen />, runtime);
     const option = (method: "fcm" | "none" | "poll") =>
       screen.getByRole("radio", { name: en(`settings.push.option.${method}`) });
@@ -353,7 +381,7 @@ describe("SettingsScreen", () => {
   it("names each way plainly, and says the background check's rhythm", async () => {
     fakeNotifications.state.granted = true;
     fakeNotifications.state.pushToken = "fcm-token";
-    const runtime = await createTestRuntime({ routes: pushRoutes().routes, world: "empty" });
+    const runtime = await createPushRuntime({ routes: pushRoutes().routes, world: "empty" });
     await renderScreen(<SettingsScreen />, runtime);
     const option = (name: string) => screen.getByRole("radio", { name });
     await waitFor(() => {
@@ -379,7 +407,7 @@ describe("SettingsScreen", () => {
     fakeNotifications.state.granted = true;
     fakeNotifications.state.pushToken = "fcm-token";
     const server = pushRoutes();
-    const runtime = await createTestRuntime({ routes: server.routes, world: "empty" });
+    const runtime = await createPushRuntime({ routes: server.routes, world: "empty" });
     await renderScreen(<SettingsScreen />, runtime);
     const option = (method: "auto" | "fcm" | "none" | "poll") =>
       screen.getByRole("radio", { name: en(`settings.push.option.${method}`) });
@@ -399,7 +427,7 @@ describe("SettingsScreen", () => {
     fakeNotifications.state.granted = true;
     fakeNotifications.state.pushToken = "fcm-token";
     const offered = { pushMethods: ["poll"] };
-    const runtime = await createTestRuntime({
+    const runtime = await createPushRuntime({
       routes: {
         ...pushRoutes().routes,
         "GET /api/push/methods": () => offered,
@@ -428,7 +456,7 @@ describe("SettingsScreen", () => {
     fakeNotifications.state.granted = true;
     fakeNotifications.state.pushToken = "fcm-token";
     jest.spyOn(firebaseProject, "appFirebaseProject").mockReturnValue("pace-app");
-    const runtime = await createTestRuntime({
+    const runtime = await createPushRuntime({
       routes: {
         ...pushRoutes().routes,
         "GET /api/push/methods": () => ({
@@ -440,7 +468,7 @@ describe("SettingsScreen", () => {
     });
     await setPushChoice(null);
     await renderScreen(<SettingsScreen />, runtime);
-    expect(await screen.findByText(en("settings.push.otherProject"))).toBeOnTheScreen();
+    expect(await screen.findByText(en("settings.push.reason.other-project"))).toBeOnTheScreen();
     expect(screen.queryByRole("radio", { name: en("settings.push.option.fcm") })).toBeNull();
     expect(screen.getByRole("radio", { name: en("settings.push.option.poll") })).toBeOnTheScreen();
     jest.restoreAllMocks();
@@ -449,7 +477,7 @@ describe("SettingsScreen", () => {
   it("says so and keeps the previous pick when the phone refuses to save a method", async () => {
     fakeNotifications.state.granted = true;
     fakeNotifications.state.pushToken = "fcm-token";
-    const runtime = await createTestRuntime({ routes: pushRoutes().routes, world: "empty" });
+    const runtime = await createPushRuntime({ routes: pushRoutes().routes, world: "empty" });
     await setPushChoice(null);
     await renderScreen(<SettingsScreen />, runtime);
     const poll = await screen.findByRole("radio", { name: en("settings.push.option.poll") });
@@ -466,7 +494,7 @@ describe("SettingsScreen", () => {
   it("keeps the picked method shown and selected while offline", async () => {
     fakeNotifications.state.granted = true;
     fakeNotifications.state.pushToken = "fcm-token";
-    const runtime = await createTestRuntime({
+    const runtime = await createPushRuntime({
       routes: { "GET /api/push/methods": () => problem(503, "offline") },
       world: "empty",
     });
@@ -491,7 +519,7 @@ describe("SettingsScreen", () => {
       .mockImplementation(() => {
         exemption.granted = true;
       });
-    const runtime = await createTestRuntime({ routes: pushRoutes().routes, world: "empty" });
+    const runtime = await createPushRuntime({ routes: pushRoutes().routes, world: "empty" });
     await setPushChoice(null);
     await renderScreen(<SettingsScreen />, runtime);
     const option = (method: "fcm" | "poll") =>
@@ -700,6 +728,57 @@ describe("SettingsScreen", () => {
     expect(isControl(wipeBack, wipeBackControl)).toBe(true);
   });
 
+  it("asks Telegram once for two presses of Wipe's confirm before it turns busy (class 374)", async () => {
+    const id = "123e4567-e89b-42d3-a456-426614174009";
+    const created = jest.fn(() => ({
+      id,
+      expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+    }));
+    const runtime = await createTestRuntime({
+      routes: {
+        "POST /api/account/confirmations": created,
+        [`GET /api/account/confirmations/${id}`]: () => ({ status: "pending" }),
+      },
+      world: "empty",
+    });
+    await renderScreen(<SettingsScreen />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.wipe") }));
+    const confirm = screen.getByRole("button", { name: en("settings.wipe.confirm") });
+    await act(async () => {
+      void fireEvent.press(confirm);
+      void fireEvent.press(confirm);
+    });
+    expect(await screen.findByText(en("settings.confirmation.waiting"))).toBeOnTheScreen();
+    expect(created).toHaveBeenCalledTimes(1);
+  });
+
+  it("gives focus to the waiting line's Cancel once Telegram is asked, and back to Wipe after it (QA PR55-1-10)", async () => {
+    const id = "123e4567-e89b-42d3-a456-426614174009";
+    const runtime = await createTestRuntime({
+      routes: {
+        "POST /api/account/confirmations": () => ({
+          id,
+          expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+        }),
+        [`GET /api/account/confirmations/${id}`]: () => ({ status: "pending" }),
+        [`POST /api/account/confirmations/${id}/cancel`]: () => ({ status: "cancelled" }),
+      },
+      world: "empty",
+    });
+    await renderScreen(<SettingsScreen />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.wipe") }));
+    mockMoveFocus.mockClear();
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.wipe.confirm") }));
+    expect(await screen.findByText(en("settings.confirmation.waiting"))).toBeOnTheScreen();
+    const [toWaiting] = mockMoveFocus.mock.calls[0] ?? [];
+    const waitingCancel = screen.getByRole("button", { name: en("common.cancel") });
+    expect(isControl(toWaiting, waitingCancel)).toBe(true);
+    await fireEvent.press(waitingCancel);
+    const wipe = await screen.findByRole("button", { name: en("settings.wipe") });
+    const [back] = mockMoveFocus.mock.calls[1] ?? [];
+    expect(isControl(back, wipe)).toBe(true);
+  });
+
   it("follows the server, not this device's clock, past the request's expiry (bug class 35)", async () => {
     const id = "123e4567-e89b-42d3-a456-426614174003";
     // This device's clock runs ahead: the request already looks over here.
@@ -793,4 +872,15 @@ describe("Settings sections (spec §5.17)", () => {
   it("runs in a zone that is not UTC, so a host-zone assumption fails here (bug-lessons class 135)", () => {
     expect(new Date(2026, 0, 1).getTimezoneOffset()).not.toBe(0);
   });
+});
+
+it("explains a pending notification restart and only restarts on deliberate activation", async () => {
+  const restart = jest.spyOn(paceNative, "restartApp").mockReturnValue(true);
+  const runtime = await createTestRuntime({ world: "empty" });
+  await renderScreen(<PushIneligibilityReason reason="restart-needed" />, runtime);
+  expect(screen.getByText(en("settings.push.reason.restart-needed"))).toBeOnTheScreen();
+  expect(restart).not.toHaveBeenCalled();
+  await fireEvent.press(screen.getByRole("button", { name: en("settings.push.restart") }));
+  expect(restart).toHaveBeenCalledTimes(1);
+  restart.mockRestore();
 });

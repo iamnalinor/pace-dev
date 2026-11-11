@@ -1,8 +1,9 @@
-import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 import { AppState, Text } from "react-native";
 
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { withWindowWidth } from "#app/test/window.ts";
 import { FAKE_STORE_ID, fakeUser, problem } from "@pace/client/testing";
 
 import { EmptyState, EmptyText } from "./empty-state.tsx";
@@ -24,6 +25,40 @@ const App = () => (
     <Text>{en("now.empty")}</Text>
   </SyncFrame>
 );
+
+describe("a server problem the composer hands in", () => {
+  const serverProblem = {
+    action: <Text>Ask again</Text>,
+    message: "server.firebaseProjectMismatch",
+  } as const;
+
+  it("says it with the composer's control instead of the strip's own Retry", async () => {
+    const runtime = await createTestRuntime();
+    await runtime.auth.me();
+    await renderScreen(
+      <SyncFrame isBare={false} serverProblem={serverProblem}>
+        <Text>{en("now.empty")}</Text>
+      </SyncFrame>,
+      runtime,
+    );
+    expect(screen.getByText(en("server.firebaseProjectMismatch"))).toBeOnTheScreen();
+    expect(screen.getByText("Ask again")).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: en("sync.retry") })).toBeNull();
+    expect(screen.getByText(en("now.empty"))).toBeOnTheScreen();
+  });
+
+  it("says nothing on the bare screens (signing in has its own notice)", async () => {
+    const runtime = await createTestRuntime();
+    await runtime.auth.me();
+    await renderScreen(
+      <SyncFrame isBare serverProblem={serverProblem}>
+        <Text>{en("now.empty")}</Text>
+      </SyncFrame>,
+      runtime,
+    );
+    expect(screen.queryByText(en("server.firebaseProjectMismatch"))).toBeNull();
+  });
+});
 
 describe("the first-sync cover (QA round 17 M4)", () => {
   it("shows no empty copy while an empty copy waits for its first sync, then the screen", async () => {
@@ -90,6 +125,32 @@ const Screens = () => (
     <EmptyText className="">{en("day.empty")}</EmptyText>
   </SyncFrame>
 );
+
+describe("the first-sync cover beside a computer's window (QA PR55-1-13)", () => {
+  withWindowWidth(1440);
+
+  it("is drawn in the shell's frame: the navigation's column, then the rows where the screen starts", async () => {
+    const pull = heldPull();
+    const runtime = await createTestRuntime({
+      routes: { ...DEV_LOGIN, "GET /api/sync/pull": pull.route },
+      world: "empty",
+    });
+    await runtime.auth.loginWithDev("1");
+    await renderScreen(<App />, runtime);
+    const frame = screen.getByTestId("first-sync-shell");
+    expect(String(screen.getByTestId("first-sync-navigation").props["className"])).toContain(
+      "w-sidebar",
+    );
+    expect(
+      within(frame).getByRole("progressbar", { name: en("sync.firstSync") }),
+    ).toBeOnTheScreen();
+    await act(async () => {
+      pull.answer(EMPTY_PAGE);
+      await Promise.resolve();
+    });
+    expect(await screen.findByText(en("now.empty"))).toBeOnTheScreen();
+  });
+});
 
 describe("a first sync that failed on an empty copy (QA round 21 M4)", () => {
   it.each([

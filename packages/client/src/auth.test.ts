@@ -15,6 +15,7 @@ import {
 const setup = async (
   routes: Readonly<Record<string, FakeRoute>>,
   initialToken: null | string = null,
+  canSignIn: () => boolean = () => true,
 ): Promise<{
   readonly auth: Auth;
   readonly calls: ReturnType<typeof createFakeFetch>["calls"];
@@ -32,7 +33,7 @@ const setup = async (
     sessionEnded: () => auth.hasEnded(),
     token: () => auth.token(),
   });
-  const auth = createAuth({ api, session });
+  const auth = createAuth({ api, session, canSignIn });
   await auth.ready;
   return { auth, calls: fake.calls, session };
 };
@@ -256,6 +257,27 @@ describe("createAuth bot login", () => {
     expect(polls).toBe(3);
     expect(auth.token()).toBe("bot");
     await expect(session.get()).resolves.toBe("bot");
+  });
+
+  it("does not persist a poll result that arrived after cancellation", async () => {
+    const answer = Promise.withResolvers<{
+      status: string;
+      token: string;
+      user: typeof fakeUser;
+    }>();
+    const { auth, session } = await setup({
+      "GET /api/auth/nonce/n1": async () => await answer.promise,
+    });
+    const controller = new AbortController();
+    const waiting = auth
+      .resumeBotLogin("n1")
+      .waitForToken({ intervalMs: 10, timeoutMs: 1000, signal: controller.signal });
+    controller.abort();
+    answer.resolve({ status: "ready", token: "late", user: fakeUser });
+    await expect(waiting).resolves.toEqual({ ok: false, error: "cancelled" });
+    expect(auth.token()).toBeUndefined();
+    expect(auth.store.getState().status).toBe("signed-out");
+    await expect(session.get()).resolves.toBeNull();
   });
 
   it("resumes polling a nonce after the login page recreates its auth client", async () => {
@@ -825,5 +847,169 @@ describe("createAuth: a stale tab never ends another tab's newer session (round 
     await fresh.logout();
     await expect(session.get()).resolves.toBeNull();
     await expect(fresh.isSessionStored()).resolves.toBe(false);
+  });
+});
+
+describe("host authentication lifetime", () => {
+  it("drops a deferred grant and bot answer after the host stops sign-in", async () => {
+    const lifetime = { active: true };
+    const answer = Promise.withResolvers<{ token: string; user: typeof fakeUser }>();
+    const client = await setup(
+      {
+        "POST /api/auth/dev": async () => await answer.promise,
+        "GET /api/auth/nonce/n1": async () => ({ status: "ready", ...(await answer.promise) }),
+      },
+      null,
+      () => lifetime.active,
+    );
+    const grant = client.auth.loginWithDev("1");
+    const bot = client.auth.resumeBotLogin("n1").waitForToken({ intervalMs: 10, timeoutMs: 1000 });
+    lifetime.active = false;
+    answer.resolve({ token: "late", user: fakeUser });
+    await expect(grant).resolves.toEqual({ ok: false, error: "session/changed" });
+    await expect(bot).resolves.toEqual({ ok: false, error: "cancelled" });
+    expect(client.auth.token()).toBeUndefined();
+    await expect(client.session.get()).resolves.toBeNull();
+  });
+  it("refuses a browser token before any storage write or request when the host retired", async () => {
+    const client = await setup({}, null, () => false);
+    await expect(client.auth.adoptToken("late-browser")).resolves.toEqual({
+      ok: false,
+      error: "session/changed",
+    });
+    await expect(client.auth.startBotLogin("app")).rejects.toThrow("session/changed");
+    expect(client.calls).toEqual([]);
+    await expect(client.session.get()).resolves.toBeNull();
+  });
+});
+
+describe("overlapping authentication persistence", () => {
+  it("preserves a newer deferred browser save when an older token check fails", async () => {
+    const memory = createMemorySessionStore();
+    let writes = 0;
+    const checking = Promise.withResolvers<undefined>();
+    const failed = Promise.withResolvers<Response>();
+    const saving = Promise.withResolvers<undefined>();
+    const release = Promise.withResolvers<undefined>();
+    const fake = createFakeFetch({
+      "GET /api/me": async ({ headers }) => {
+        if (headers["authorization"] === "Bearer A") {
+          checking.resolve(undefined);
+          return await failed.promise;
+        }
+        return fakeMe;
+      },
+    });
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      fetch: fake.fetch,
+      token: () => auth.token(),
+    });
+    const auth = createAuth({
+      api,
+      session: {
+        ...memory,
+        set: async (token) => {
+          writes += 1;
+          if (writes === 2) {
+            saving.resolve(undefined);
+            await release.promise;
+          }
+          await memory.set(token);
+        },
+      },
+    });
+    await auth.ready;
+    const older = auth.adoptToken("A");
+    await checking.promise;
+    const newer = auth.adoptToken("B");
+    await saving.promise;
+    failed.resolve(problem(401, "auth/invalid"));
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    release.resolve(undefined);
+    const oldResult = await older;
+    await expect(newer).resolves.toEqual({ ok: true, value: fakeUser });
+    expect(oldResult).toEqual({ ok: false, error: "session/changed" });
+    expect(auth.token()).toBe("B");
+    await expect(memory.get()).resolves.toBe("B");
+  });
+});
+
+describe("deferred sign-out notes", () => {
+  it.each(["logout", "finishAccountDeletion"] as const)(
+    "keeps a newer login when %s waited for an old note",
+    async (method) => {
+      const memory = createMemorySessionStore();
+      await memory.set("A");
+      const entered = Promise.withResolvers<undefined>();
+      const release = Promise.withResolvers<undefined>();
+      const fake = createFakeFetch({
+        "POST /api/auth/dev": () => ({ token: "B", user: fakeUser }),
+        "POST /api/auth/logout": () => ({ ok: true }),
+      });
+      const api = createApiClient({
+        baseUrl: "https://api.test",
+        fetch: fake.fetch,
+        token: () => auth.token(),
+      });
+      const auth = createAuth({
+        api,
+        session: memory,
+        notes: {
+          ...createMemorySignOutNotes(),
+          leave: async () => {
+            entered.resolve(undefined);
+            await release.promise;
+          },
+        },
+      });
+      await auth.ready;
+      const leaving = auth[method]();
+      await entered.promise;
+      await auth.loginWithDev("1");
+      release.resolve(undefined);
+      await leaving;
+      expect(auth.token()).toBe("B");
+      await expect(memory.get()).resolves.toBe("B");
+      expect(auth.store.getState().status).toBe("signed-in");
+    },
+  );
+});
+
+describe("cancelled polling ownership", () => {
+  it("does not supersede a newer login when polling starts already aborted", async () => {
+    const entered = Promise.withResolvers<undefined>();
+    const release = Promise.withResolvers<undefined>();
+    const memory = createMemorySessionStore();
+    const fake = createFakeFetch({ "POST /api/auth/dev": () => ({ token: "B", user: fakeUser }) });
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      fetch: fake.fetch,
+      token: () => auth.token(),
+    });
+    const auth = createAuth({
+      api,
+      session: {
+        ...memory,
+        set: async (token) => {
+          entered.resolve(undefined);
+          await release.promise;
+          await memory.set(token);
+        },
+      },
+    });
+    await auth.ready;
+    const newer = auth.loginWithDev("1");
+    await entered.promise;
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      auth
+        .resumeBotLogin("old")
+        .waitForToken({ intervalMs: 1, timeoutMs: 100, signal: controller.signal }),
+    ).resolves.toEqual({ ok: false, error: "cancelled" });
+    release.resolve(undefined);
+    await expect(newer).resolves.toEqual({ ok: true, value: fakeUser });
+    await expect(memory.get()).resolves.toBe("B");
   });
 });

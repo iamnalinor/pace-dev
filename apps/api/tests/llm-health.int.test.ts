@@ -8,9 +8,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import { endpoints } from "@pace/core";
 
-import { createApp } from "../src/app.ts";
 import { echoParse, fakeParseModel } from "../src/shared/llm/fake-model.ts";
 import { loginAsDev, readJson } from "./helpers.ts";
+import { createApp } from "./host.ts";
 
 /**
 The providers' health memory through the real route, in workerd with the real `LlmHealth`

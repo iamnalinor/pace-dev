@@ -1,5 +1,7 @@
 import { type CoreState, type Event, taskTrackedMinutes, timeline } from "@pace/core";
 
+import type { CompleteHistorySource } from "../history-types.ts";
+
 /** One cell of an export: text, a number, or empty. Times are ISO 8601 in UTC. */
 export type ExportCell = null | number | string;
 
@@ -107,10 +109,7 @@ const eventSheet = (events: readonly Event[]): ExportSheet => ({
 Everything the account holds, as sheets for a spreadsheet: tasks, subtasks, the time ledger,
 projects, and the full event log (corrections included) for anything the others leave out.
 */
-export const exportSheets = (
-  state: CoreState & { readonly log: readonly Event[] },
-  now: string,
-): readonly ExportSheet[] => [
+export const exportSheets = (state: CompleteHistorySource, now: string): readonly ExportSheet[] => [
   taskSheet(state, now),
   subtaskSheet(state),
   activitySheet(state, now),

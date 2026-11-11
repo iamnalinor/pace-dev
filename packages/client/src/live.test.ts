@@ -4,6 +4,7 @@ import {
   LIVE_MAX_IN_FLIGHT,
   LIVE_REQUEST_TIMEOUT_MS,
   LIVE_SESSION_ENDED,
+  LIVE_V1,
   LIVE_V2,
   type LiveClientMessage,
 } from "@pace/core";
@@ -449,6 +450,71 @@ const openChannel = (isHello = true) => {
 
 const page = { events: [], more: false, seq: 3, since: 2, storeId: "store-a" };
 
+/** A channel whose socket opened as `protocol`; the server has not spoken yet. */
+const opened = (protocol: string | undefined) => {
+  const sockets = fakeSockets();
+  const onChange = vi.fn();
+  const onHello = vi.fn();
+  const live = createLiveChannel({
+    baseUrl: "https://api.test",
+    createSocket: sockets.create,
+    deviceId: "dev-1",
+    onChange,
+    onHello,
+    token: () => "tok",
+  });
+  live.start();
+  const socket = sockets.made[0];
+  if (socket === undefined) {
+    throw new Error("no socket");
+  }
+  socket.protocol = protocol;
+  socket.open();
+  return { live, onChange, onHello, socket };
+};
+
+describe("createLiveChannel catching up on connect (QA PR55-1-12)", () => {
+  it("leaves a v2 socket's catch-up to its hello, which names where the log stands", () => {
+    const { live, onChange, onHello, socket } = opened(LIVE_V2);
+    expect(onChange).not.toHaveBeenCalled();
+    say(socket, { protocol: LIVE_V2, seq: 43, storeId: "store-a", type: "hello" });
+    expect(onHello).toHaveBeenCalledExactlyOnceWith({ seq: 43, storeId: "store-a" });
+    expect(onChange).not.toHaveBeenCalled();
+    live.stop();
+  });
+
+  it("asks for a pull on a hello that names nothing (an older server)", () => {
+    const { live, onChange, onHello, socket } = opened(LIVE_V2);
+    say(socket, { protocol: LIVE_V2, type: "hello" });
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onHello).not.toHaveBeenCalled();
+    live.stop();
+  });
+
+  it("takes a hello that fails the schema for one that names nothing: a pull, and v2 on (class 373)", () => {
+    for (const hello of [
+      { protocol: LIVE_V2, seq: -1, storeId: "store-a", type: "hello" },
+      { protocol: LIVE_V2, seq: 43, storeId: 7, type: "hello" },
+      { seq: 43, storeId: "store-a", type: "hello" },
+    ]) {
+      const { live, onChange, onHello, socket } = opened(LIVE_V2);
+      socket.receive(JSON.stringify(hello));
+      expect(onChange).toHaveBeenCalledTimes(1);
+      expect(onHello).not.toHaveBeenCalled();
+      expect(live.isV2()).toBe(true);
+      live.stop();
+    }
+  });
+
+  it("asks for a pull on open when the socket speaks v1, or does not say", () => {
+    for (const protocol of [LIVE_V1, undefined]) {
+      const { live, onChange } = opened(protocol);
+      expect(onChange).toHaveBeenCalledTimes(1);
+      live.stop();
+    }
+  });
+});
+
 describe("createLiveChannel requests (pace.v2)", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -470,6 +536,21 @@ describe("createLiveChannel requests (pace.v2)", () => {
     v2.live.stop();
     expect(v2.live.isV2()).toBe(false);
   });
+
+  it.each([
+    ["pushed", { accepted: "all", id: "r1", rejected: [], seq: 3, type: "pushed" }],
+    ["error", { code: 7, id: "r1", type: "error" }],
+  ])(
+    "fails a request at once when its %s answer is out of shape (class 373)",
+    async (_name, raw) => {
+      const { live, onMessage, socket } = openChannel();
+      const answer = live.request({ events: [], id: "r1", storeId: "store-a", type: "push" });
+      socket.receive(JSON.stringify(raw));
+      await expect(answer).rejects.toThrow("sync/invalid-response");
+      expect(onMessage).not.toHaveBeenCalled();
+      live.stop();
+    },
+  );
 
   it("answers each request with the server's message of the same id, in any order", async () => {
     const { live, socket } = openChannel();

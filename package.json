@@ -28,7 +28,9 @@
   },
   "scripts": {
     "dev": "bun run --cwd apps/api dev",
+    "dev:web": "bun run --cwd apps/app dev -- --web",
     "build": "bun run --cwd apps/app build:web",
+    "check:config": "bun --no-env-file scripts/check-config.ts",
     "lint": "bun run lint:design && bun run lint:format && bun run lint:eslint && bun run typecheck && bun run lint:knip && bun run lint:dup && bun run lint:arch && bun run lint:workflows && bun run db:check",
     "lint:design": "bun scripts/design/generate-design.ts --check",
     "lint:format": "biome format --write .",
@@ -37,19 +39,23 @@
     "lint:dup": "jscpd",
     "lint:workflows": "bun scripts/check-workflows.ts",
     "lint:arch": "depcruise apps packages e2e --config .dependency-cruiser.mjs",
-    "typecheck": "tsc -p tsconfig.json && tsc -p packages/core && tsc -p packages/client && tsc -p apps/api && tsc -p apps/app && tsc -p e2e",
-    "test": "bun run test:unit && bun run test:api && bun run test:app && bun run test:e2e",
+    "typecheck": "tsc -p tsconfig.json && tsc -p packages/core && tsc -p packages/client && tsc -p apps/api && tsc -p apps/app && tsc -p apps/updates && tsc -p e2e",
+    "test": "bun run test:unit && bun run test:api && bun run test:app && bun run test:updates && bun run test:e2e",
     "test:unit": "bun test scripts && bun run --cwd packages/core test && bun run --cwd packages/client test && python3 -m unittest discover -s tools/pace-agent",
     "test:api": "bun run --cwd apps/api test",
     "test:app": "bun run --cwd apps/app test",
+    "test:updates": "bun run --cwd apps/updates test",
+    "test:native-firebase": "bash scripts/native/test-firebase.sh",
     "test:e2e": "playwright test",
     "test:llm": "bun run --cwd apps/api llm:smoke",
     "test:mutation": "bun run --cwd packages/core test:mutation",
     "design:generate": "bun scripts/design/generate-design.ts",
     "db:generate": "bun run --cwd apps/api db:generate",
     "db:check": "bun run --cwd apps/api db:check",
-    "prepare": "lefthook install",
-    "dev:web": "bun run --cwd apps/app dev -- --web"
+    "prepare": "lefthook install"
+  },
+  "dependencies": {
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
@@ -58,6 +64,7 @@
     "@eslint-react/eslint-plugin": "5.28.8",
     "@eslint/js": "10.0.1",
     "@pace/core": "workspace:*",
+    "@pace/updates": "workspace:*",
     "@playwright/test": "1.63.0",
     "@resvg/resvg-js": "2.6.2",
     "@tsconfig/strictest": "2.0.8",

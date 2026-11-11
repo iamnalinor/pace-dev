@@ -1,4 +1,3 @@
-import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import * as fc from "fast-check";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -6,8 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { addMinutesIso, newId } from "@pace/core";
 
 import * as schema from "../src/user-store/schema.ts";
-import { UserStore } from "../src/user-store/user-store.ts";
 import { meterSql } from "./helpers.ts";
+import { runInUserStore as runInDurableObject, UserStore } from "./host.ts";
 
 /**
 The store's clock, frozen far ahead of the real one (bug-lessons classes 9 and 54): a projection

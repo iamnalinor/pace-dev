@@ -1,59 +1,18 @@
 import type { Context } from "hono";
 
-import {
-  AuthorizationError,
-  type AuthRequest,
-  CimdFetchError,
-  type ConsentDescription,
-} from "@cloudflare/workers-oauth-provider";
-
-import { err, ok, type Result } from "@pace/core";
+import { ok, type Result } from "@pace/core";
 
 import type { AppEnv } from "../shared/app-env.ts";
-import type { Problem } from "../shared/mount.ts";
+import type { AuthProblem, AuthRequest, ConsentDescription } from "../shared/ports/oauth.ts";
 
 import { oauthHelpers } from "../shared/oauth-helpers.ts";
-
-/** An authorization request the provider refused, as the consent page should report it. */
-export type AuthProblem = Problem & {
-  /** The client's redirect URI with the OAuth error, when the provider validated the client. */
-  readonly redirectTo?: string;
-};
-
-/**
-Maps what `parseAuthRequest` throws to a problem. An `AuthorizationError` is the client's
-fault (unknown client, bad redirect URI, missing PKCE); a `CimdFetchError` means the
-client's metadata document could not be fetched. Anything else is a bug or an outage.
-*/
-const describeFailure = (error: unknown): AuthProblem => {
-  if (error instanceof AuthorizationError) {
-    return {
-      code: "oauth/invalid-request",
-      message: error.description,
-      status: 400,
-      ...(error.redirectTo !== undefined && { redirectTo: error.redirectTo }),
-    };
-  }
-  if (error instanceof CimdFetchError) {
-    return {
-      code: "oauth/client-unverified",
-      message: "This app could not be verified",
-      status: 400,
-    };
-  }
-  throw error;
-};
 
 /** Validates an authorization request the way `GET /authorize` sees it. */
 export const parseAuthorization = async (
   c: Context<AppEnv>,
   request: Request,
 ): Promise<Result<AuthRequest, AuthProblem>> => {
-  try {
-    return ok(await oauthHelpers(c).parseAuthRequest(request));
-  } catch (error) {
-    return err(describeFailure(error));
-  }
+  return await oauthHelpers(c).parseAuthRequest(request);
 };
 
 export type Consent = {
@@ -72,10 +31,10 @@ export const loadConsent = async (
 ): Promise<Result<Consent, AuthProblem>> => {
   const helpers = oauthHelpers(c);
   const url = `${new URL(c.req.url).origin}/authorize?${authQuery}`;
-  try {
-    const request = await helpers.parseAuthRequest(new Request(url));
-    return ok({ details: await helpers.describeConsent(request), request });
-  } catch (error) {
-    return err(describeFailure(error));
+  const parsed = await helpers.parseAuthRequest(new Request(url));
+  if (!parsed.ok) {
+    return parsed;
   }
+  const details = await helpers.describeConsent(parsed.value);
+  return details.ok ? ok({ details: details.value, request: parsed.value }) : details;
 };

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import Animated, {
   Easing,
@@ -89,6 +89,36 @@ const SpeckView = ({
 };
 
 /**
+The specks over the row. They are mounted after the frame that answers the check, in a render that
+yields to the next tap (a transition): the check fills at once, whatever 150 views cost
+(bug-lessons 310).
+*/
+const Dust = ({
+  color,
+  progress,
+  size,
+}: {
+  readonly color: string;
+  readonly progress: SharedValue<number>;
+  readonly size: { readonly height: number; readonly width: number };
+}) => {
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    startTransition(() => {
+      setIsMounted(true);
+    });
+  }, []);
+  return isMounted ? (
+    <View pointerEvents="none" style={FILL} testID="dissolve-dust">
+      {specksOf(size.width, size.height).map((speck, index) => (
+        // eslint-disable-next-line @eslint-react/no-array-index-key -- the specks are a fixed grid
+        <SpeckView color={color} key={index} progress={progress} speck={speck} />
+      ))}
+    </View>
+  ) : null;
+};
+
+/**
 The row's content turning to dust, as a deleted message does in Telegram: a sweep from left
 to right replaces it with specks that drift up and away. `onDone` runs once it is gone. With
 reduced motion it simply goes.
@@ -147,18 +177,18 @@ export const Dissolve = ({
     <View
       onLayout={(event) => {
         const { height, width } = event.nativeEvent.layout;
-        setSize({ height, width });
+        // A hidden box (its tab left behind on the web) measures 0 × 0: not a size to draw dust
+        // in, and taking it would render every row of the list twice per tab switch.
+        if (height === 0 && width === 0) {
+          return;
+        }
+        setSize((known) =>
+          known.height === height && known.width === width ? known : { height, width },
+        );
       }}
     >
       <Animated.View style={contentStyle}>{children}</Animated.View>
-      {isActive ? (
-        <View pointerEvents="none" style={FILL}>
-          {specksOf(size.width, size.height).map((speck, index) => (
-            // eslint-disable-next-line @eslint-react/no-array-index-key -- the specks are a fixed grid
-            <SpeckView color={color} key={index} progress={progress} speck={speck} />
-          ))}
-        </View>
-      ) : null}
+      {isActive ? <Dust color={color} progress={progress} size={size} /> : null}
     </View>
   );
 };

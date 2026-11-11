@@ -21,11 +21,11 @@ import { useFeed } from "#app/shared/notifications/use-feed.ts";
 import { useLatestLoad, usePhoneAnswers } from "#app/shared/tracking/use-phone-answers.ts";
 import { activityLabel, type DayModel, eventAnswers } from "@pace/client";
 import {
-  addDaysIn,
   addMinutesIso,
   type AppMinutes,
   appUsage,
   calendarEventKey,
+  nextDayStartIn,
   type PhoneEvent,
   phonePickupAt,
 } from "@pace/core";
@@ -56,7 +56,7 @@ export type DayPhone = {
   readonly pickupAt: null | string;
   readonly askCalendar: () => void;
   /**
-  Skips one occurrence on every channel, then here, as Now's Skip does; `false` (and still shown)
+  Skips one occurrence on every channel, as Now's Skip does: gone at the press; `false` (and back)
   when the server did not take it.
   */
   readonly skip: (event: PhoneCalendarEvent) => Promise<boolean>;
@@ -85,7 +85,7 @@ const EMPTY: Loaded = {
 };
 
 const load = async (day: Pick<DayModel, "date" | "zone">, now: string): Promise<Loaded> => {
-  const dayEnd = addDaysIn(day.date, 1, day.zone);
+  const dayEnd = nextDayStartIn(day.date, day.zone);
   const until = dayEnd > now ? now : dayEnd;
   const phone = await readPhoneEvents(addMinutesIso(day.date, -NIGHT_LOOKBACK_MINUTES), until);
   const apps = [
@@ -174,7 +174,7 @@ export const useDayPhone = (day: DayModel, now: string): DayPhone => {
       ruleOf(known, event) !== "skip" &&
       answers.get(calendarEventKey(event)) !== "skipped",
   );
-  const { dismiss, remember } = answered;
+  const { remember } = answered;
   return {
     askCalendar: () => {
       void (async () => {
@@ -196,14 +196,11 @@ export const useDayPhone = (day: DayModel, now: string): DayPhone => {
     hasUsageAccess: loaded.hasUsageAccess,
     pickupAt: day.isToday ? phonePickupAt(loaded.events, now) : null,
     remember,
-    skip: async (event) => {
-      // Hidden only once the server took it: a skip that did not go through stays to tap again.
-      const isSkipped = await notifications.skipEvent(calendarEventKey(event));
-      if (isSkipped) {
-        dismiss(calendarKey(event));
-      }
-      return isSkipped;
-    },
+    skip: async (event) =>
+      await answered.skip(
+        calendarKey(event),
+        async () => await notifications.skipEvent(calendarEventKey(event)),
+      ),
     usageIn: (startAt, endAt) =>
       named(appUsage(loaded.events, { from: startAt, now, to: endAt }), loaded.labels),
   };

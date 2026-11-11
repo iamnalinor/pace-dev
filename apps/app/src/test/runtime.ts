@@ -10,6 +10,7 @@ import {
   fakeInstance,
   fakeMe,
   type FakeRoute,
+  seedSynced,
 } from "@pace/client/testing";
 import { artboardEvents, MOSCOW, NOW } from "@pace/core/testing";
 
@@ -33,6 +34,25 @@ export const frozenClock = ({ deviceTz = MOSCOW, now = NOW }: TestWorld = {}): C
   now: () => now,
 });
 
+/** The local store behind each test runtime: what `pulledInto` writes the server's events into. */
+const stores = new WeakMap<PaceRuntime, EventStore>();
+
+/**
+Events the server already holds, put into the runtime's copy as synced (through the store's
+guarded writes) and shown: what an earlier sync left on the device.
+*/
+export const pulledInto = async (
+  runtime: PaceRuntime,
+  events: Parameters<typeof seedSynced>[1],
+): Promise<void> => {
+  const store = stores.get(runtime);
+  if (store === undefined) {
+    throw new Error("The runtime was not made by createTestRuntime");
+  }
+  await seedSynced(store, events);
+  await runtime.state.rematerialize();
+};
+
 /** The app runtime on memory adapters, a fake API and a frozen clock, signed out (no sync). */
 export const createTestRuntime = async (options: TestWorld = {}): Promise<PaceRuntime> => {
   const api = createFakeFetch({
@@ -43,17 +63,22 @@ export const createTestRuntime = async (options: TestWorld = {}): Promise<PaceRu
     ...options.routes,
   });
   // The stored server (the build's by default), as the app builds it: the instance check counts.
+  const eventStore = options.eventStore ?? createMemoryEventStore();
   const runtime = await createRuntime({
     clock: frozenClock(options),
     deviceId: async () => "01ARZ3NDEKTSV4RRFFQ69G5FAV",
-    eventStore: options.eventStore ?? createMemoryEventStore(),
+    eventStore,
     fetch: api.fetch,
     session: createMemorySessionStore(),
   });
   await runtime.state.ready;
+  stores.set(runtime, eventStore);
   if (options.world !== "empty") {
     const until = options.now ?? NOW;
-    await runtime.state.ingest(artboardEvents().filter((event) => event.occurredAt <= until));
+    await pulledInto(
+      runtime,
+      artboardEvents().filter((event) => event.occurredAt <= until),
+    );
   }
   return runtime;
 };

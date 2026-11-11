@@ -5,6 +5,7 @@ import { useStore } from "zustand";
 
 import { useAuth, useT } from "#app/app-state.tsx";
 import { serverHost, serverStore } from "#app/platform/server-store.ts";
+import { OtaStatus } from "#app/shared/ota-status.tsx";
 import { Button } from "#app/ui/button.tsx";
 
 import { WAY_OUT } from "./way-out.ts";
@@ -51,6 +52,7 @@ const IncompatibleScreen = () => {
             {t("settings.logout")}
           </Button>
         </View>
+        <OtaStatus />
       </View>
     </View>
   );

@@ -1,6 +1,14 @@
-import { DurableObject } from "cloudflare:workers";
+import {
+  type Event,
+  type KnownLiveServerMessage,
+  LIVE_PAGE,
+  LIVE_V1,
+  LIVE_V2,
+  type LogHead,
+} from "@pace/core";
 
-import { type Event, type KnownLiveServerMessage, LIVE_PAGE, LIVE_V1, LIVE_V2 } from "@pace/core";
+import type { AppBindings } from "../shared/ports/bindings.ts";
+import type { ActorContext, LiveSocket } from "../shared/ports/live-channel.ts";
 
 import { LIVE_EXPIRES_HEADER, LIVE_SESSION_HEADER, liveProtocolOf } from "../shared/socket-auth.ts";
 import { answerLiveMessage, type LiveStoreCalls } from "./live-messages.ts";
@@ -13,6 +21,7 @@ import {
   sessionOf,
   sessionTags,
 } from "./live-sessions.ts";
+import { storedPage } from "./log-queries.ts";
 import { storeIdOf } from "./store-identity.ts";
 
 /** A device id is a tag on its socket; tags are short. */
@@ -22,7 +31,7 @@ const MAX_TAG = 128;
 const DEVICE_TAG = "device:";
 
 /** Sends one message to one socket; one closing meanwhile reconnects and catches up anyway. */
-const sendTo = (socket: WebSocket, message: KnownLiveServerMessage): void => {
+const sendTo = (socket: LiveSocket, message: KnownLiveServerMessage): void => {
   try {
     socket.send(JSON.stringify(message));
   } catch {
@@ -37,10 +46,16 @@ it serves, so that device is not told about its own writes. Tags are all a socke
 survive hibernation, memory does not. A v2 socket hears `hello` first. A request the Worker named
 no session for is refused: no socket outlives a session it cannot be tied to. Neither does one for
 a session that ended after the Worker checked it (`isEndedSession`).
+
+The hello names the log's head, read in the same turn the socket is accepted (nothing appends in
+between: the object runs one event at a time), so a client whose copy already stands there knows
+it missed nothing and pulls nothing on connect (QA PR55-1-12: the start's HTTP pull was followed
+by the same pull over the socket).
 */
 export const acceptLiveSocket = async (
-  ctx: DurableObjectState,
+  ctx: ActorContext,
   request: Request,
+  head: () => Promise<LogHead>,
 ): Promise<Response> => {
   if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
     return new Response("Expected a WebSocket", { status: 426 });
@@ -54,21 +69,19 @@ export const acceptLiveSocket = async (
   }
   const protocol = liveProtocolOf(request.headers.get("Sec-WebSocket-Protocol"));
   const device = new URL(request.url).searchParams.get("device")?.slice(0, MAX_TAG) ?? "";
-  const { 0: client, 1: server } = new WebSocketPair();
-  ctx.acceptWebSocket(server, [
+  const hello =
+    protocol === LIVE_V2
+      ? JSON.stringify({ protocol: LIVE_V2, type: "hello", ...(await head()) })
+      : undefined;
+  return ctx.upgrade(
     protocol,
-    ...sessionTags(session.sessionId, session.expiresAt),
-    ...(device === "" ? [] : [`${DEVICE_TAG}${device}`]),
-  ]);
-  if (protocol === LIVE_V2) {
-    sendTo(server, { protocol: LIVE_V2, type: "hello" });
-  }
-  return new Response(null, {
-    headers: { "Sec-WebSocket-Protocol": protocol },
-    // eslint-disable-next-line unicorn/no-invalid-response-options -- 101 Switching Protocols is how a Worker hands over a WebSocket
-    status: 101,
-    webSocket: client,
-  });
+    [
+      protocol,
+      ...sessionTags(session.sessionId, session.expiresAt),
+      ...(device === "" ? [] : [`${DEVICE_TAG}${device}`]),
+    ],
+    hello,
+  );
 };
 
 /** An append, as the live sockets hear about it. */
@@ -78,19 +91,27 @@ export type LogChange = {
   readonly since: number;
   /** The log's sequence after it. */
   readonly seq: number;
+  /** Checkpoints are active: clients apply the stored `records` (with their seqs), so send them. */
+  readonly withRecords: boolean;
 };
 
 /**
 Tells every live device but the one that wrote them that the log grew: a v1 socket hears
 `changed` (and pulls over HTTP), a v2 socket gets the events themselves, or `more` with none when
 the append is too big for one message (it pulls them over the socket). The events carry the
-store's id, read here so that they and the id can never come from two stores.
+store's id, read here so that they and the id can never come from two stores. The stored records
+go along only while checkpoints are active: no client reads them otherwise.
 */
-export const announceChange = async (ctx: DurableObjectState, change: LogChange): Promise<void> => {
+export const announceChange = async (ctx: ActorContext, change: LogChange): Promise<void> => {
   const { inserted, seq, since } = change;
   const isTooBig = inserted.length > LIVE_PAGE;
   const events: KnownLiveServerMessage = {
     events: isTooBig ? [] : [...inserted],
+    ...(change.withRecords && {
+      records: isTooBig
+        ? []
+        : [...storedPage(ctx.storage, { after: since, through: seq, limit: LIVE_PAGE }).records],
+    }),
     more: isTooBig,
     seq,
     since,
@@ -118,7 +139,7 @@ Sends every live client the message made for the session that opened its socket 
 that session sees it, `seenBy`).
 */
 export const broadcastBySession = (
-  ctx: DurableObjectState,
+  ctx: ActorContext,
   messageFor: (sessionId: string | undefined) => object,
 ): void => {
   for (const socket of servedSockets(ctx)) {
@@ -132,7 +153,7 @@ export const broadcastBySession = (
 };
 
 /** Sends a message to every live client (a feed update: a notification new or resolved). */
-export const broadcast = (ctx: DurableObjectState, message: object): void => {
+export const broadcast = (ctx: ActorContext, message: object): void => {
   broadcastBySession(ctx, () => message);
 };
 
@@ -155,18 +176,24 @@ The live channel's half of a user's store: it accepts live clients (the Worker h
 bearer), answers their keep-alive without waking (no duration billed), takes a v2 socket's pushes
 and pulls through the store's own `push` and `list` (the HTTP routes' calls) and closes cleanly.
 */
-export abstract class LiveStore extends DurableObject implements LiveStoreCalls {
-  constructor(ctx: DurableObjectState, env: Cloudflare.Env) {
-    super(ctx, env);
-    ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
+export abstract class LiveStore implements LiveStoreCalls {
+  readonly ctx: ActorContext;
+  readonly env: AppBindings;
+  constructor(ctx: ActorContext, env: AppBindings) {
+    this.ctx = ctx;
+    this.env = env;
+    ctx.keepAlive("ping", "pong");
   }
 
   abstract push(...args: Parameters<LiveStoreCalls["push"]>): ReturnType<LiveStoreCalls["push"]>;
 
   abstract list(...args: Parameters<LiveStoreCalls["list"]>): ReturnType<LiveStoreCalls["list"]>;
 
-  override async fetch(request: Request): Promise<Response> {
-    return await acceptLiveSocket(this.ctx, request);
+  /** Where the log stands (a v2 socket's hello names it). */
+  abstract logHead(): Promise<LogHead>;
+
+  async fetch(request: Request): Promise<Response> {
+    return await acceptLiveSocket(this.ctx, request, async () => await this.logHead());
   }
 
   /**
@@ -182,14 +209,14 @@ export abstract class LiveStore extends DurableObject implements LiveStoreCalls 
   unanswered as they always did (its `ping` never gets here: the runtime answers it unwoken). One
   whose session expired is closed instead of answered.
   */
-  override async webSocketMessage(socket: WebSocket, data: ArrayBuffer | string): Promise<void> {
+  async webSocketMessage(socket: LiveSocket, data: ArrayBuffer | string): Promise<void> {
     if (!isServed(this.ctx, socket) || !this.ctx.getTags(socket).includes(LIVE_V2)) {
       return;
     }
     sendTo(socket, await answerLiveMessage(this, data, new Date().toISOString()));
   }
 
-  override webSocketClose(socket: WebSocket, code: number): void {
+  webSocketClose(socket: LiveSocket, code: number): void {
     try {
       socket.close(replyCloseCode(code), "closing");
     } catch {

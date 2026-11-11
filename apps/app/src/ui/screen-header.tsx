@@ -81,18 +81,18 @@ const Subtitle = ({ period, subtitle }: Pick<ScreenHeaderProps, "period" | "subt
 /** The title, and on a desktop's top-level header the actions on its line. */
 const TitleRow = ({
   actions,
-  isUnderBar,
+  isPhoneTop,
   title,
   variant,
 }: {
   readonly actions: ReactNode;
-  /** A phone's top-level title: `header.top` (8) under the bar. */
-  readonly isUnderBar: boolean;
+  /** A phone's top-level title without a bar: `header.top` (8) over it. */
+  readonly isPhoneTop: boolean;
   readonly title: string;
   readonly variant: HeaderVariant;
 }) => (
   <View
-    className={cx("flex-row items-start gap-3", isUnderBar && "mt-header-top")}
+    className={cx("flex-row items-start gap-3", isPhoneTop && "mt-header-top")}
     testID="screen-header-title-row"
   >
     <Text className="flex-1" level={1} role={variant === "top" ? "largeTitle" : "title1"}>
@@ -103,10 +103,28 @@ const TitleRow = ({
 );
 
 /**
-The one header of every screen (spec §4.2.16, §5.0.2), two kinds only. `top` on a phone: a 48 bar
-(Back when pushed from More, the actions), the `largeTitle` 8 below it, a subtitle row (the date,
-or the period control), 12 to the content; on a desktop 28 above the title, the actions on its
-line, 16 to the content, so the title sits at the same y on every destination (F-LAY-02). No
+Whether the 48 bar is drawn: always when pushed; on a top-level phone screen only for Back (pushed
+from More) or with no title to carry the actions, which otherwise sit on the title's line.
+*/
+const hasTopBar = ({
+  hasBack,
+  isWide,
+  title,
+  variant,
+}: {
+  readonly hasBack: boolean;
+  readonly isWide: boolean;
+  readonly title: string | undefined;
+  readonly variant: HeaderVariant;
+}): boolean => variant === "pushed" || (!isWide && (hasBack || title === undefined));
+
+/**
+The one header of every screen (spec §4.2.16, §5.0.2), two kinds only. `top` on a phone: the
+`largeTitle` 8 under the status bar with the actions on its line (a 48 bar only when it carries
+Back, pushed from More: the owner found the bar above the title wasted space, 2026-11-10), a
+subtitle row (the date, or the period control), 12 to the content; on a desktop 28 above the
+title, the actions on its line, 16 to the content, so the title sits at the same y on every
+destination (F-LAY-02). No
 eyebrow (F-TYP-02). `pushed`: the 48 bar (Back, a context control, labelled actions), then the
 `title1`, which wraps: an entity name is never cut. Each title is the screen's level-1 heading.
 */
@@ -121,6 +139,7 @@ export const ScreenHeader = ({
 }: ScreenHeaderProps) => {
   const isWide = useIsWide();
   const isTopOnDesktop = variant === "top" && isWide;
+  const hasBar = hasTopBar({ hasBack: back.onBack !== undefined, isWide, title, variant });
   return (
     <View
       className={cx(
@@ -129,11 +148,11 @@ export const ScreenHeader = ({
       )}
       testID="screen-header"
     >
-      {isTopOnDesktop ? null : <Bar actions={actions} context={context} {...back} />}
+      {hasBar ? <Bar actions={actions} context={context} {...back} /> : null}
       {title === undefined ? null : (
         <TitleRow
-          actions={isTopOnDesktop ? actions : undefined}
-          isUnderBar={variant === "top" && !isWide}
+          actions={hasBar ? undefined : actions}
+          isPhoneTop={!(isWide || hasBar)}
           title={title}
           variant={variant}
         />

@@ -1,5 +1,6 @@
 export {
   fallbackPaceNative,
+  type FirebaseStatus,
   type PaceNative,
   PaceNative as paceNative,
   resolvePaceNative,

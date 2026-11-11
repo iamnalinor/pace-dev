@@ -131,9 +131,15 @@ export const Composer = ({ isFocused = false }: { readonly isFocused?: boolean }
   const isCard = unfold.shape === "form" || unfold.phase === "grow";
   return (
     // The line is the field's own cell; the form is a card that takes its shape and height
-    // without ever clipping its content (bug-lessons 5).
+    // without ever clipping its content (bug-lessons 5). The line's frame steps out of the gutter
+    // by its buttons' padding (+'s 16, Send's 4), so their glyphs sit on the gutter and the field
+    // gains the room at 320 (QA PR55-1-15) while the buttons stay inside the frame: a negative
+    // margin on + put it 16 px outside its card (bug-lessons 354).
     <View
-      className={cx("mx-gutter mb-3", isCard && "rounded-xl border border-outline bg-cell p-1")}
+      className={cx(
+        "mb-3",
+        isCard ? "mx-gutter rounded-xl border border-outline bg-cell p-1" : "ml-0 mr-3",
+      )}
       testID="composer-card"
     >
       <ComposerUnfold {...unfold}>

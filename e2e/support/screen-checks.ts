@@ -2,6 +2,7 @@ import type { Page, Request, Response } from "@playwright/test";
 
 import { AxeBuilder } from "@axe-core/playwright";
 
+import { waitForTransitions } from "./animation-wait.ts";
 import { en, ru } from "./catalog.ts";
 import { API_URL } from "./login.ts";
 
@@ -357,17 +358,8 @@ export const axeFaults = async (
   page: Page,
   { isColourOnly }: { readonly isColourOnly: boolean },
 ): Promise<readonly string[]> => {
-  // What the person sees once things settle, not a toast halfway through fading in. A loop (a
-  // skeleton's breathing) never ends: only the animations that do are waited for.
-  await page.waitForFunction(() =>
-    globalThis.document
-      .getAnimations()
-      .every(
-        (animation) =>
-          animation.playState !== "running" ||
-          animation.effect?.getComputedTiming().iterations === Infinity,
-      ),
-  );
+  // What the person sees once things settle, not a toast halfway through fading in.
+  await waitForTransitions(page);
   const builder = new AxeBuilder({ page });
   const results = await (isColourOnly
     ? builder.withRules(["color-contrast", "link-in-text-block"])

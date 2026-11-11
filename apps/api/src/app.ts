@@ -2,10 +2,18 @@ import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 
-import { endpoints, MIN_CLIENT_PROTOCOL, ok, PROTOCOL, PROTOCOL_HEADER } from "@pace/core";
+import {
+  CHECKPOINT_VERSION,
+  endpoints,
+  MIN_CLIENT_PROTOCOL,
+  ok,
+  PROTOCOL,
+  PROTOCOL_HEADER,
+} from "@pace/core";
 
 import type { AppEnv } from "./shared/app-env.ts";
 import type { ParseProvider } from "./shared/llm/llm.ts";
+import type { RequestPlaceReader } from "./shared/ports/request-place.ts";
 
 import { answerAccountConfirmation, mountAccountRoutes } from "./account/account-routes.ts";
 import { mountAuthRoutes } from "./auth/auth-routes.ts";
@@ -17,12 +25,22 @@ import { mountCloudRoutes } from "./cloud/cloud-routes.ts";
 import { mountLinkRoutes } from "./links/link-routes.ts";
 import { mountNotifyRoutes } from "./notify/notify-routes.ts";
 import { mountParseRoutes } from "./parse/parse-routes.ts";
-import { type Config, loadConfig, oauthOrigin, ownOrigin } from "./shared/config.ts";
+import { cleanupProblem, isCleanupError } from "./shared/account-cleanup-types.ts";
+import {
+  type Config,
+  loadConfig,
+  oauthOrigin,
+  ownOrigin,
+  UNNAMED_VERSION,
+} from "./shared/config.ts";
+import { deploymentReadinessOf } from "./shared/deployment-readiness.ts";
+import { publicFirebaseConfigOf, refuseMisconfiguredFirebase } from "./shared/firebase-config.ts";
 import { parseProviders } from "./shared/llm/providers.ts";
 import { createLogger } from "./shared/logger.ts";
 import { mount } from "./shared/mount.ts";
 import { refuseOutdatedClients } from "./shared/protocol.ts";
 import { pushConfigOf, pushMethodsOf } from "./shared/push/registry.ts";
+import { unknownRequestPlaceReader } from "./shared/request-place.ts";
 import { telegramFetch, type TelegramTransport } from "./shared/telegram-api.ts";
 import { mountSyncRoutes } from "./sync/sync-routes.ts";
 
@@ -71,12 +89,17 @@ const mountPublicRoutes = (app: Hono<AppEnv>, deps: AppDeps): void => {
       apiOrigin: ownOrigin(config.apiOrigin, c.req.url),
       botUsername: config.telegramBotUsername,
       features: {
+        historyCheckpoint:
+          config.historyCheckpointMode === "active" && config.version !== UNNAMED_VERSION
+            ? CHECKPOINT_VERSION
+            : null,
         // The skipped slots were already logged by the calls that use the models; not again here.
         assistant: deps.parseProviders({ ...config, llmSkipped: [] }).length > 0,
         // OAuth and MCP answer 503 without an origin the provider accepts (`worker.ts`).
         mcp: oauthOrigin(config.apiOrigin, c.req.url) !== null,
         push: push.pushMethods.includes("fcm"),
       },
+      firebase: publicFirebaseConfigOf(c.env),
       loginMethods: ["telegram-widget" as const, "telegram-deeplink" as const],
       minClientProtocol: MIN_CLIENT_PROTOCOL,
       name: "Pace",
@@ -87,8 +110,7 @@ const mountPublicRoutes = (app: Hono<AppEnv>, deps: AppDeps): void => {
   });
 };
 
-export const createApp = (deps: AppDeps = PLATFORM_DEPS): Hono<AppEnv> => {
-  const app = new Hono<AppEnv>();
+const mountApiGuards = (app: Hono<AppEnv>): void => {
   app.use(
     "/api/*",
     cors({
@@ -97,12 +119,31 @@ export const createApp = (deps: AppDeps = PLATFORM_DEPS): Hono<AppEnv> => {
       origin: (origin, c: Context<AppEnv>) =>
         isAllowedOrigin(origin, c.env.WEB_ORIGIN) ? origin : "",
     }),
-    refuseOutdatedClients(SERVED_TO_ANY_PROTOCOL),
   );
+  // Read-only operator diagnostics must identify an invalid inactive candidate as well.
+  // This narrow exception cannot authenticate, send notifications or mutate application state.
+  mount(app, endpoints.deploymentReadiness, ({ c }) => ok(deploymentReadinessOf(c.env)));
+  app.use("/api/*", refuseMisconfiguredFirebase, refuseOutdatedClients(SERVED_TO_ANY_PROTOCOL));
+};
+
+export const createApp = (
+  deps: AppDeps = PLATFORM_DEPS,
+  requestPlaceReader: RequestPlaceReader = unknownRequestPlaceReader,
+): Hono<AppEnv> => {
+  const app = new Hono<AppEnv>();
+  mountApiGuards(app);
   app.onError((thrown, c) => {
     if (thrown instanceof HTTPException) {
       // Middleware answers with a prepared JSON response (`res`); anything else gets the generic shape.
       return thrown.res ?? c.json({ code: "http", message: thrown.message }, thrown.status);
+    }
+    if (isCleanupError(thrown.message)) {
+      const problem = cleanupProblem(thrown.message);
+      createLogger("info").warn("A store refused during an account cleanup", {
+        code: thrown.message,
+        path: c.req.path,
+      });
+      return c.json({ code: problem.code, message: problem.message }, problem.status);
     }
     createLogger("info").error("Unhandled error", { error: thrown.stack ?? thrown.message });
     // Never leak internals (stack traces, SQL) to the client.
@@ -110,6 +151,7 @@ export const createApp = (deps: AppDeps = PLATFORM_DEPS): Hono<AppEnv> => {
   });
   app.notFound((c) => c.json({ code: "not-found", message: "Not found" }, 404));
   app.use(async (c, next) => {
+    c.set("requestPlaceReader", requestPlaceReader);
     const config = loadConfig(c.env);
     if (!config.ok) {
       createLogger("info").error(config.error);

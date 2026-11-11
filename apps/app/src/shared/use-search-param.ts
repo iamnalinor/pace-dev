@@ -1,9 +1,10 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { useCallback } from "react";
 
 import { usePace, useSettings } from "#app/app-state.tsx";
 import { fromWallClock } from "#app/format/time.ts";
 import { usePushEntry, useStepBack } from "#app/platform/push-entry.ts";
+import { useSceneSearchParams } from "#app/ui/search-params.tsx";
 import { formatInZone } from "@pace/core";
 
 /**
@@ -27,7 +28,9 @@ stored with that value and reads as nothing for another one (bug-lessons 201).
 export const useSearchParam = (
   name: string,
 ): readonly [value: null | string, set: (next: null | string) => void, forget: () => void] => {
-  const params: Readonly<Record<string, string | string[] | undefined>> = useLocalSearchParams();
+  // The scene's params, not the router's own: one object until the address changes, so entering
+  // a screen whose address says the same renders nothing (bug-lessons 310).
+  const params = useSceneSearchParams();
   const router = useRouter();
   const pushEntry = usePushEntry();
   const didStepBack = useStepBack();

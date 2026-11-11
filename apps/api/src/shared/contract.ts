@@ -4,6 +4,7 @@ import type {
   CoreState,
   DecisionResolveBody,
   EventInput,
+  Interval,
   NewNotification,
   NotificationKind,
   PoolNotification,
@@ -277,3 +278,14 @@ export const POOL_ACTIONS = {
   still: "nk",
   stopped: "nx",
 } as const satisfies Record<Answer, string>;
+
+/** One device's upload: its app sessions and, from a phone, its uses and how far it read. */
+export type UsageUpload = {
+  readonly deviceId: string;
+  readonly deviceName: string;
+  readonly sessions: readonly Omit<UsageRow, "deviceId" | "deviceName">[];
+  readonly uses?: readonly Interval[] | undefined;
+  readonly until?: string | undefined;
+  /** Sent by a phone (a full sign-in), not by a computer's agent token. */
+  readonly isPhone: boolean;
+};

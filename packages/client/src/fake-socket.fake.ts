@@ -6,6 +6,8 @@ import type { SocketLike } from "./live.ts";
 export type FakeSocket = SocketLike & {
   readonly url: string;
   readonly protocols: readonly string[];
+  /** The subprotocol the server chose, as a browser's socket says it once open; unset by default. */
+  protocol?: string | undefined;
   readonly sent: string[];
   closed: boolean;
   /**

@@ -1,0 +1,11 @@
+# Notification availability in Settings
+
+The existing phone notification section retains its method picker and current-method line. A secondary footnote explains why Google notifications cannot currently work: server disabled, app package absent, restart pending, initialization/storage/configuration failure, unsupported build, unknown configuration, project mismatch, or unavailable device services. These messages describe the user-visible condition without exposing frameworks. EN/RU catalogs define every string. Unavailable Google is omitted from offered methods; the saved choice remains intact and background polling remains available if offered.
+
+`PushIneligibilityReason` takes an explicit reason for gallery rendering. The layout uses the existing `gap-2`, `font-sans`, `text-footnote`, `text-label-secondary` roles, and secondary Button. It adds no colours or motion. Text wraps naturally on phone and desktop in both themes and languages. Only restart-pending shows an action: Restart Pace, through the kit's button, with existing keyboard/focus/pressed/disabled semantics. The explanatory text confirms tasks and unsent changes remain. There is no automatic restart. Failed restart produces a localized existing toast. Null reason renders nothing. The existing method line communicates fallback and denied permission.
+
+Comp: `comps/runtime-push-reasons.html`. Matrix screenshots and design critique are root-owned and pending. This scoped HTML establishes content/order; final visual validation uses the real kit component, not browser default styles.
+
+Gallery: `apps/app/src/screens/gallery/gallery-push-reasons.tsx`, composed by `ChromeSections` in `gallery-sections.tsx` under the existing localized `settings.push.hint` heading. All ten explanatory reasons and null are supplied as fixed props; rendering never changes push, native, or server stores. Existing card/separator/spacing tokens frame each case. The `gallery-push-reasons` test id identifies the section for matrix screenshots.
+
+The gallery supplies the presentational restart callback as a no-op; Settings keeps the default native action. A targeted gallery test verifies preview activation neither restarts the app nor changes push state.

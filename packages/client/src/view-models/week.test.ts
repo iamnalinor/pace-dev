@@ -4,20 +4,23 @@ import type { CalendarEvent, CoreState } from "@pace/core";
 
 import { artboardState, ctx, MOSCOW } from "@pace/core/testing";
 
+import { insightsModel } from "./insights.ts";
 import { fitHourPx, gridFromHour, lanesOf, placeIn, weekModel } from "./week.ts";
 
 /** The artboard world with Week's night hours on or off, and these tracked stretches. */
 const world = ({
   nightHours = false,
   tracked = [],
+  zone = MOSCOW,
 }: {
   readonly nightHours?: boolean;
   readonly tracked?: readonly { readonly startAt: string; readonly endAt: string }[];
+  readonly zone?: string;
 }): CoreState => {
   const base = artboardState();
   return {
     ...base,
-    settings: { ...base.settings, nightHours },
+    settings: { ...base.settings, nightHours, timezone: zone },
     time: {
       ...base.time,
       activities: Object.fromEntries(
@@ -52,6 +55,46 @@ const event = (startAt: string, endAt: string): CalendarEvent => ({
 });
 
 describe("Week's hour range", () => {
+  it("keeps midnight cells and the week end after Monday's midnight was skipped", () => {
+    const state = world({
+      nightHours: true,
+      zone: "Asia/Tehran",
+      tracked: [{ startAt: "2021-03-22T19:30:00.000Z", endAt: "2021-03-22T20:30:00.000Z" }],
+    });
+    const week = weekModel(state, "2021-03-24T12:00:00.000Z", ctx("2021-03-31T12:00:00.000Z"));
+    expect({
+      monday: week.days[0]?.date,
+      tuesday: week.days[1]?.date,
+      tuesdayMinutes: week.days[1]?.blocks.map((block) => block.minutes),
+      weekEnd: week.weekEnd,
+      next: week.next,
+    }).toEqual({
+      monday: "2021-03-21T20:30:00.000Z",
+      tuesday: "2021-03-22T19:30:00.000Z",
+      tuesdayMinutes: [60],
+      weekEnd: "2021-03-28T19:30:00.000Z",
+      next: "2021-03-28T19:30:00.000Z",
+    });
+  });
+
+  it("keeps the next Monday out of insights after a skipped Monday midnight", () => {
+    const state = world({
+      zone: "Asia/Tehran",
+      tracked: [
+        { startAt: "2021-03-22T19:30:00.000Z", endAt: "2021-03-22T20:30:00.000Z" },
+        { startAt: "2021-03-28T19:30:00.000Z", endAt: "2021-03-28T20:30:00.000Z" },
+      ],
+    });
+    const insights = insightsModel(
+      state,
+      "2021-03-24T12:00:00.000Z",
+      ctx("2021-03-31T12:00:00.000Z"),
+    );
+    expect(insights.totalMinutes).toBe(60);
+    expect(insights.next).toBe("2021-03-28T19:30:00.000Z");
+    expect(insights.previous).toBe("2021-03-14T20:30:00.000Z");
+  });
+
   it("is 07–24 by default, and 00–24 with night hours on", () => {
     expect(weekModel(world({}), null, ctx()).fromHour).toBe(7);
     expect(weekModel(world({ nightHours: true }), null, ctx()).fromHour).toBe(0);

@@ -1,10 +1,9 @@
-import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
-
 import { eq } from "drizzle-orm";
 
 import type { Resolution } from "@pace/core";
 
 import type { AnswerOrigin } from "../shared/contract.ts";
+import type { SqliteDatabase } from "../shared/ports/sqlite.ts";
 import type { PoolDeps } from "./notification-pool.ts";
 
 import { sessionHashFor } from "../shared/push-subscriptions.ts";
@@ -24,7 +23,7 @@ import {
 } from "./pool-rows.ts";
 import * as schema from "./schema.ts";
 
-type Db = DrizzleSqliteDODatabase<typeof schema>;
+type Db = SqliteDatabase<"sync", typeof schema>;
 
 const markDismissalTerminal = async (db: Db, id: number, reason: string): Promise<void> => {
   await db

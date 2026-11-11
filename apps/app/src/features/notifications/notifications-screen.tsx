@@ -92,7 +92,7 @@ const useNotificationFeed = () => {
     loadedAt: sessions.status === "ready" ? sessions.loadedAt : null,
   };
   useEffect(() => {
-    void feed.refresh();
+    void feed.refreshUnlessFresh();
   }, [feed]);
   const unread = model.unreadIds.join(",");
   useEffect(() => {
@@ -152,7 +152,7 @@ export const NotificationsScreen = () => {
           }
           {...(!isWide && back !== undefined && { backLabel: t("common.back"), onBack: back })}
           title={t("notifications.title")}
-          variant={isWide ? "top" : "pushed"}
+          variant="top"
         />
       }
       scroller={(scroll) => (

@@ -72,6 +72,42 @@ jobs:
           path: .cache/jest
           key: jest-${{ runner.os }}-${{ hashFiles('bun.lock') }}-${{ github.sha }}
       - run: bun test:api
+      - run: bun test:updates
+      # The Firebase controller is Android-free: pin its crash/restart decisions without
+      # installing an SDK or starting an emulator. Android build/device gates stay separate.
+      # It downloads a Kotlin compiler and two jars and cold-compiles, so a pull request runs it
+      # only when the controller or the script changed; main (and a manual run) always does.
+      - name: Did the native Firebase controller change?
+        id: native
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          changed="$(git diff --name-only "$BASE_SHA" HEAD)"
+          if grep -qE '^(apps/app/modules/pace-native/|scripts/native/test-firebase\.sh$)' <<<"$changed"; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      # The downloads are pinned by digest in the script, so its hash is the whole cache key.
+      - if: github.event_name != 'pull_request' || steps.native.outputs.changed == 'true'
+        uses: actions/cache/restore@v6
+        id: native-jvm
+        with:
+          path: .cache/native-jvm
+          key: native-jvm-${{ runner.os }}-${{ hashFiles('scripts/native/test-firebase.sh') }}
+      - if: github.event_name != 'pull_request' || steps.native.outputs.changed == 'true'
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Native Firebase controller (JVM only)
+        if: github.event_name != 'pull_request' || steps.native.outputs.changed == 'true'
+        run: bun run test:native-firebase
+      - if: github.ref == 'refs/heads/main' && steps.native-jvm.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: .cache/native-jvm
+          key: native-jvm-${{ runner.os }}-${{ hashFiles('scripts/native/test-firebase.sh') }}
 
   e2e:
     name: End-to-end (Playwright)
@@ -105,6 +141,11 @@ jobs:
       # build, not rebuilt). A latency run right after ~200 tests on the same servers read 296 ms
       # against a 240 ms ceiling (bug-lessons log, A9 fix round 3); the ceilings stay Task 5.6's.
       - run: bunx playwright test --project chromium
+      - name: Checkpoint history and export (opt-in test server)
+        run: bunx playwright test e2e/checkpoint-history.e2e.ts --project chromium --workers 1
+        env:
+          E2E_REUSE_WEB_BUILD: 1
+          PACE_E2E_CHECKPOINTS: 1
       - run: bunx playwright test --project latency --no-deps
         env:
           E2E_REUSE_WEB_BUILD: 1
@@ -147,7 +188,10 @@ jobs:
         run: bun expo prebuild --platform android --no-install
       - name: Assemble release APK (signed with the committed debug keystore)
         working-directory: apps/app/android
-        run: ./gradlew :app:assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
+        run: >-
+          ./gradlew :app:assembleRelease --no-daemon
+          '-Dorg.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=1024m -XX:+ExitOnOutOfMemoryError'
+          -PreactNativeArchitectures=arm64-v8a
       - name: APK size
         run: du -h apps/app/android/app/build/outputs/apk/release/app-release.apk | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7

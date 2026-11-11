@@ -20,6 +20,7 @@ import { say } from "./fake-socket.fake.ts";
 import { createFakeSyncServer, type FakeRequest } from "./fake-sync-server.fake.ts";
 import { createHeldEventStore } from "./held-event-store.fake.ts";
 import { STABLE_MS } from "./live-timers.ts";
+import { seedCopy, storedEvents } from "./local-store.fake.ts";
 import { createMemorySessionStore } from "./session.ts";
 import { type AppStateHandle, createAppState } from "./state.ts";
 import {
@@ -65,7 +66,7 @@ const setup = async (
   readonly sync: SyncClient;
 }> => {
   const store = createMemoryEventStore();
-  await store.append(pending);
+  await store.append(pending, await store.readMeta());
   return { ...(await started(store, routes)), store };
 };
 
@@ -81,6 +82,135 @@ const pushesOf = (calls: ReturnType<typeof createFakeFetch>["calls"]) =>
     .filter((call) => call.path === "/api/sync/push")
     .map((call) => call.body as { events: readonly Event[]; storeId: string })
     .map(({ events, storeId }) => ({ ids: events.map((event) => event.id), storeId }));
+
+describe("createSyncClient catching up to a connect's hello (QA PR55-1-12)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** A loop started on a copy that pulled the server's log up to seq 2; every pull answered. */
+  const caughtUp = async () => {
+    const { calls, state, store, sync } = await setup({
+      "GET /api/sync/pull": ({ url }) =>
+        url.searchParams.get("since") === "0"
+          ? { events: localEvents(2), more: false, seq: 2, storeId: STORE_ID }
+          : { events: [], more: false, seq: 2, storeId: STORE_ID },
+      "POST /api/sync/push": acceptAll,
+    });
+    await sync.syncNow();
+    vi.useFakeTimers();
+    sync.start({ intervalMs: 60_000 });
+    await vi.advanceTimersByTimeAsync(0);
+    const before = calls.length;
+    return { calls: () => calls.slice(before), state, store, sync };
+  };
+
+  it("asks nothing when the copy already stands where the server's log stood", async () => {
+    const { calls, sync } = await caughtUp();
+    await sync.catchUpTo({ seq: 2, storeId: STORE_ID });
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(calls()).toEqual([]);
+    sync.stop();
+  });
+
+  it.each([
+    ["behind the log", { seq: 3, storeId: STORE_ID }],
+    ["on another store", { seq: 2, storeId: "store-b" }],
+  ])("pulls once when the copy is %s", async (_name, head) => {
+    const { calls, sync } = await caughtUp();
+    await sync.catchUpTo(head);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(calls().map((call) => call.path)).toContain("/api/sync/pull");
+    sync.stop();
+  });
+
+  it("runs when the last run could not reach the server: its success clears the offline line", async () => {
+    const { calls, sync } = await caughtUp();
+    sync.status.setState({ lastError: "network", online: false });
+    await sync.catchUpTo({ seq: 2, storeId: STORE_ID });
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(calls().map((call) => call.path)).toContain("/api/sync/pull");
+    expect(sync.status.getState().online).toBe(true);
+    sync.stop();
+  });
+
+  /** Like `caughtUp`, but the next pull hangs until `gate.answer` settles it (class 370). */
+  const caughtUpWithHungPull = async () => {
+    const gate = { answer: (_page: unknown): void => undefined, isClosed: false };
+    const { calls, state, store, sync } = await setup({
+      "GET /api/sync/pull": async ({ url }) => {
+        if (url.searchParams.get("since") === "0") {
+          return { events: localEvents(2), more: false, seq: 2, storeId: STORE_ID };
+        }
+        if (!gate.isClosed) {
+          return { events: [], more: false, seq: 3, storeId: STORE_ID };
+        }
+        gate.isClosed = false;
+        return await new Promise((resolve, reject) => {
+          gate.answer = (page) => {
+            if (page instanceof Error) {
+              reject(page);
+            } else {
+              resolve(page);
+            }
+          };
+        });
+      },
+      "POST /api/sync/push": acceptAll,
+    });
+    await sync.syncNow();
+    vi.useFakeTimers();
+    sync.start({ intervalMs: 60_000 });
+    await vi.advanceTimersByTimeAsync(0);
+    const before = calls.length;
+    gate.isClosed = true;
+    const pulls = () => calls.slice(before).filter((call) => call.path === "/api/sync/pull");
+    return { gate, pulls, state, store, sync };
+  };
+
+  it("runs after a direct run in flight at the hello fails: the offline line does not wait for the poll", async () => {
+    const { gate, pulls, sync } = await caughtUpWithHungPull();
+    const direct = sync.syncNow();
+    await vi.advanceTimersByTimeAsync(0);
+    const catching = sync.catchUpTo({ seq: 2, storeId: STORE_ID });
+    await vi.advanceTimersByTimeAsync(0);
+    gate.answer(new TypeError("Failed to fetch"));
+    await direct;
+    await catching;
+    expect(sync.status.getState().online).toBe(false);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(pulls().length).toBeGreaterThanOrEqual(2);
+    expect(sync.status.getState().online).toBe(true);
+    sync.stop();
+  });
+
+  it("asks no second pull when the run in flight at the hello brings the copy to the head", async () => {
+    const { gate, pulls, sync } = await caughtUpWithHungPull();
+    const direct = sync.syncNow();
+    await vi.advanceTimersByTimeAsync(0);
+    const catching = sync.catchUpTo({ seq: 3, storeId: STORE_ID });
+    await vi.advanceTimersByTimeAsync(0);
+    gate.answer({ events: localEvents(1), more: false, seq: 3, storeId: STORE_ID });
+    await direct;
+    await catching;
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(pulls()).toHaveLength(1);
+    sync.stop();
+  });
+
+  it("runs when the copy holds writes the server has not got", async () => {
+    const { calls, state, sync } = await caughtUp();
+    await state.dispatch({
+      occurredAt: at(10),
+      payload: { language: "en" },
+      type: "settings.updated",
+    });
+    await sync.catchUpTo({ seq: 2, storeId: STORE_ID });
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(calls().map((call) => call.path)).toContain("/api/sync/push");
+    sync.stop();
+  });
+});
 
 describe("createSyncClient push", () => {
   it("pushes pending events in batches of 200, marks accepted and keeps rejected", async () => {
@@ -156,7 +286,7 @@ describe("createSyncClient pull", () => {
     await expect(sync.syncNow()).resolves.toEqual({ ok: true, value: { pulled: 2, pushed: 0 } });
     expect(calls.filter((call) => call.path === "/api/sync/push")).toHaveLength(0);
     expect(state.store.getState().settings).toMatchObject({ language: "ru", timezone: "UTC" });
-    await expect(store.getCursor()).resolves.toBe(2);
+    expect((await store.readMeta()).cursor).toBe(2);
     await expect(store.listPending()).resolves.toEqual([]);
   });
 
@@ -187,7 +317,7 @@ describe("createSyncClient pull", () => {
     });
     await expect(sync.syncNow()).resolves.toEqual({ ok: true, value: { pulled: 0, pushed: 0 } });
     expect(state.store.getState().events).toEqual([]);
-    await expect(store.getCursor()).resolves.toBe(5);
+    expect((await store.readMeta()).cursor).toBe(5);
   });
 });
 
@@ -218,9 +348,9 @@ describe("createSyncClient across a wipe", () => {
     expect(result.ok).toBe(false);
     // The old account's page never lands in the fresh copy: no events, no cursor, no store id.
     expect(state.store.getState().events).toEqual([]);
-    await expect(store.listAll()).resolves.toEqual([]);
-    await expect(store.getCursor()).resolves.toBe(0);
-    await expect(store.getStoreId()).resolves.toBeNull();
+    await expect(storedEvents(store)).resolves.toEqual([]);
+    expect((await store.readMeta()).cursor).toBe(0);
+    expect((await store.readMeta()).storeId).toBeNull();
   });
 });
 
@@ -229,9 +359,9 @@ describe("createSyncClient store id", () => {
 
   it("remembers the store id of the first pull", async () => {
     const { store, sync } = await setup({ "GET /api/sync/pull": noPull });
-    await expect(store.getStoreId()).resolves.toBeNull();
+    expect((await store.readMeta()).storeId).toBeNull();
     await sync.syncNow();
-    await expect(store.getStoreId()).resolves.toBe(STORE_ID);
+    expect((await store.readMeta()).storeId).toBe(STORE_ID);
   });
 
   it("pulls before it pushes, so the store id is confirmed first", async () => {
@@ -273,17 +403,15 @@ describe("createSyncClient store id", () => {
       },
       localEvents(2),
     );
-    await store.setStoreId(STORE_ID);
-    await store.setCursor(9);
-    await store.setSyncVersion(SYNC_SCHEMA_VERSION);
+    await seedCopy(store, { storeId: STORE_ID, cursor: 9, syncVersion: SYNC_SCHEMA_VERSION });
     await expect(sync.syncNow()).resolves.toEqual({ ok: true, value: { pulled: 1, pushed: 0 } });
     // The old outbox never reaches the fresh store.
     expect(calls.filter((call) => call.path === "/api/sync/push")).toHaveLength(0);
     expect(sinces).toEqual(["9", "0"]);
-    await expect(store.listAll()).resolves.toEqual([remote]);
+    await expect(storedEvents(store)).resolves.toEqual([remote]);
     await expect(store.listPending()).resolves.toEqual([]);
-    await expect(store.getCursor()).resolves.toBe(1);
-    await expect(store.getStoreId()).resolves.toBe("store-b");
+    expect((await store.readMeta()).cursor).toBe(1);
+    expect((await store.readMeta()).storeId).toBe("store-b");
     expect(state.store.getState().events).toEqual([remote]);
     expect(state.store.getState().settings.language).toBe("ru");
   });
@@ -293,11 +421,11 @@ describe("createSyncClient store id", () => {
       { "GET /api/sync/pull": noPull, "POST /api/sync/push": acceptAll },
       localEvents(1),
     );
-    await store.setCursor(4);
+    await seedCopy(store, { cursor: 4 });
     await sync.syncNow();
     expect(calls.filter((call) => call.path === "/api/sync/push")).toHaveLength(0);
-    await expect(store.listAll()).resolves.toEqual([]);
-    await expect(store.getStoreId()).resolves.toBe(STORE_ID);
+    await expect(storedEvents(store)).resolves.toEqual([]);
+    expect((await store.readMeta()).storeId).toBe(STORE_ID);
   });
 
   it("keeps what was written before the very first pull and sends it", async () => {
@@ -330,7 +458,7 @@ describe("createSyncClient store id", () => {
       },
       localEvents(1),
     );
-    await store.setStoreId(STORE_ID);
+    await seedCopy(store, { storeId: STORE_ID });
     await expect(sync.syncNow()).resolves.toEqual({ error: "store/changed", ok: false });
     expect(calls.map((call) => call.path)).toEqual(["/api/sync/pull", "/api/sync/pull"]);
     expect(sync.status.getState()).toMatchObject({ lastError: "store/changed", syncing: false });
@@ -348,9 +476,7 @@ describe("createSyncClient store id", () => {
       },
       "POST /api/sync/push": acceptAll,
     });
-    await store.setStoreId(STORE_ID);
-    await store.setCursor(9);
-    await store.setSyncVersion(SYNC_SCHEMA_VERSION);
+    await seedCopy(store, { storeId: STORE_ID, cursor: 9, syncVersion: SYNC_SCHEMA_VERSION });
     const run = sync.syncNow();
     // Written on the old copy while the server's answer (a new store) is on its way.
     await state.dispatch({
@@ -398,7 +524,7 @@ describe("createSyncClient: a write while the first pull is under way (QA round 
       },
       "POST /api/sync/push": acceptAll,
     });
-    await expect(store.getStoreId()).resolves.toBeNull();
+    expect((await store.readMeta()).storeId).toBeNull();
     const run = sync.syncNow();
     const written = await writeDuring(state);
     held.resolve(null);
@@ -458,8 +584,8 @@ describe("createSyncClient: a write while the first pull is under way (QA round 
     await expect(first).resolves.toEqual({ error: "sync request timed out", ok: false });
     expect(pushesOf(fake.calls)).toEqual([]);
     // The first page was kept: its store is confirmed and the cursor stands after it.
-    await expect(store.getStoreId()).resolves.toBe(STORE_ID);
-    await expect(store.getCursor()).resolves.toBe(1);
+    expect((await store.readMeta()).storeId).toBe(STORE_ID);
+    expect((await store.readMeta()).cursor).toBe(1);
     await expect(store.listPending()).resolves.toHaveLength(1);
 
     isCut = false;
@@ -479,9 +605,7 @@ describe("createSyncClient reset with local writes in flight", () => {
 
   it("drops a write queued behind one in flight: nothing of the old copy is pushed afterwards", async () => {
     const held = createHeldEventStore();
-    await held.store.setStoreId(STORE_ID);
-    await held.store.setCursor(9);
-    await held.store.setSyncVersion(SYNC_SCHEMA_VERSION);
+    await seedCopy(held.store, { storeId: STORE_ID, cursor: 9, syncVersion: SYNC_SCHEMA_VERSION });
     const { calls, state, sync } = await started(held.store, {
       "GET /api/sync/pull": ({ url }) =>
         url.searchParams.get("since") === "0"
@@ -517,7 +641,7 @@ describe("createSyncClient reset with local writes in flight", () => {
     held.release();
     await expect(sync.syncNow()).resolves.toMatchObject({ ok: true, value: { pushed: 0 } });
     expect(calls.filter((call) => call.path === "/api/sync/push")).toHaveLength(0);
-    await expect(held.store.listAll()).resolves.toEqual([remote]);
+    await expect(storedEvents(held.store)).resolves.toEqual([remote]);
     await expect(held.store.listPending()).resolves.toEqual([]);
   });
 });
@@ -541,9 +665,11 @@ const recordedPull = (answer: FakeRoute) => {
 /** A held store already paired with the server's store `STORE_ID` up to `cursor`. */
 const paired = async (cursor: number) => {
   const held = createHeldEventStore();
-  await held.store.setStoreId(STORE_ID);
-  await held.store.setCursor(cursor);
-  await held.store.setSyncVersion(SYNC_SCHEMA_VERSION);
+  await seedCopy(held.store, {
+    storeId: STORE_ID,
+    cursor,
+    syncVersion: SYNC_SCHEMA_VERSION,
+  });
   return held;
 };
 
@@ -598,14 +724,14 @@ describe("createSyncClient after the local store refused a write", () => {
     });
     held.writes[0]?.reject();
     await expect(refused).resolves.toMatchObject({ ok: false });
-    await expect(held.store.getCursor()).resolves.toBe(4);
+    expect((await held.store.readMeta()).cursor).toBe(4);
     expect(state.store.getState().events).toEqual([]);
     held.release();
     expect(pull.sinces).toEqual(["4"]);
 
     await expect(sync.syncNow()).resolves.toEqual({ ok: true, value: { pulled: 1, pushed: 0 } });
     expect(pull.sinces).toEqual(["4", "4"]);
-    await expect(held.store.getCursor()).resolves.toBe(5);
+    expect((await held.store.readMeta()).cursor).toBe(5);
     expect(state.store.getState().events).toEqual([remote]);
 
     await expect(sync.syncNow()).resolves.toEqual({ ok: true, value: { pulled: 0, pushed: 0 } });
@@ -662,12 +788,11 @@ describe("createSyncClient after an update that reads more of the log", () => {
   /** A store as an installed client left it: pulled up to 500, one change not yet sent. */
   const upgradedStore = async () => {
     const store = createMemoryEventStore();
-    await store.append([remote]);
-    await store.markSynced([remote.id]);
+    await store.append([remote], await store.readMeta());
+    await store.markSynced([remote.id], await store.readMeta());
     const [outbox] = localEvents(1);
-    await store.append(outbox === undefined ? [] : [outbox]);
-    await store.setStoreId(STORE_ID);
-    await store.setCursor(500);
+    await store.append(outbox === undefined ? [] : [outbox], await store.readMeta());
+    await seedCopy(store, { storeId: STORE_ID, cursor: 500 });
     return { outbox, store };
   };
 
@@ -698,7 +823,7 @@ describe("createSyncClient after an update that reads more of the log", () => {
       language: "ru",
       timezone: "UTC",
     });
-    await expect(store.getCursor()).resolves.toBe(501);
+    expect((await store.readMeta()).cursor).toBe(501);
     // The next start pulls from where it stopped.
     const next = await started(store, routes);
     await next.sync.syncNow();
@@ -708,7 +833,7 @@ describe("createSyncClient after an update that reads more of the log", () => {
 
   it("does not re-pull again after its store was reset and pulled from 0", async () => {
     const { store } = await upgradedStore();
-    await store.setSyncVersion(SYNC_SCHEMA_VERSION);
+    await seedCopy(store, { syncVersion: SYNC_SCHEMA_VERSION });
     const sinces: (null | string)[] = [];
     const routes: Readonly<Record<string, FakeRoute>> = {
       "GET /api/sync/pull": ({ url }) => {
@@ -1097,7 +1222,7 @@ describe("createSyncClient over the live socket", () => {
     expect(server.requests).toEqual(via("socket", "pull", "push", "pull"));
     expect(server.log().map((event) => event.id)).toEqual([remote.id, ...pending.map((e) => e.id)]);
     await expect(store.listPending()).resolves.toEqual([]);
-    await expect(store.getCursor()).resolves.toBe(3);
+    expect((await store.readMeta()).cursor).toBe(3);
     expect(client.state.store.getState().events.map((event) => event.id)).toContain(remote.id);
     client.live.stop();
   });
@@ -1129,7 +1254,7 @@ describe("createSyncClient over the live socket", () => {
       ]);
       expect(server.log()).toHaveLength(3);
       expect(copies(server.log())).toEqual([1, 1, 1]);
-      const local = await store.listAll();
+      const local = await storedEvents(store);
       expect(local).toHaveLength(3);
       expect(copies(local)).toEqual([1, 1, 1]);
       await expect(store.listPending()).resolves.toEqual([]);
@@ -1212,7 +1337,7 @@ describe("createSyncClient over the live socket", () => {
     server.append([remote]);
     await vi.advanceTimersByTimeAsync(SOON_MS * 2);
     expect(client.state.store.getState().events).toEqual([remote]);
-    await expect(store.getCursor()).resolves.toBe(1);
+    expect((await store.readMeta()).cursor).toBe(1);
     expect(server.requests).toHaveLength(before);
     client.sync.stop();
     client.live.stop();
@@ -1258,8 +1383,8 @@ describe("createSyncClient over the live socket", () => {
     await new Promise((resolve) => {
       setTimeout(resolve, 10);
     });
-    await expect(store.getCursor()).resolves.toBe(3);
-    const local = await store.listAll();
+    expect((await store.readMeta()).cursor).toBe(3);
+    const local = await storedEvents(store);
     expect(new Set(local.map((event) => event.id))).toEqual(
       new Set([other.id, derived.id, ...pending.map((event) => event.id)]),
     );
@@ -1292,10 +1417,10 @@ const expectOnlyTheFreshStore = async (
   context: Awaited<ReturnType<typeof setupLive>>,
   fresh: { readonly events: readonly Event[]; readonly storeId: string },
 ): Promise<void> => {
-  await expect(context.store.listAll()).resolves.toEqual(fresh.events);
+  await expect(storedEvents(context.store)).resolves.toEqual(fresh.events);
   await expect(context.store.listPending()).resolves.toEqual([]);
-  await expect(context.store.getStoreId()).resolves.toBe(fresh.storeId);
-  await expect(context.store.getCursor()).resolves.toBe(fresh.events.length);
+  expect((await context.store.readMeta()).storeId).toBe(fresh.storeId);
+  expect((await context.store.readMeta()).cursor).toBe(fresh.events.length);
   expect(context.client.state.store.getState().events).toEqual(fresh.events);
 };
 
@@ -1339,6 +1464,9 @@ describe("createSyncClient's offline flag (QA round 17 review m3, I2)", () => {
     const store = createMemoryEventStore();
     const full: EventStore = {
       ...store,
+      applyLegacyPage: async () => {
+        throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+      },
       append: async () => {
         throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
       },

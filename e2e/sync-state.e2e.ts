@@ -537,10 +537,9 @@ test("Day's first load asks for the day's app usage once, though two of its part
     }
   });
   await page.goto("/day");
-  await expect(page.getByRole("heading", { name: "Экранное время" })).toBeVisible({
-    timeout: 15_000,
-  });
-  await expect.poll(() => asked.length).toBeGreaterThan(0);
+  // The web shows no screen time section for a day nothing was sent for (QA PR55-1-08): the read
+  // itself is what is counted.
+  await expect.poll(() => asked.length, { timeout: 15_000 }).toBeGreaterThan(0);
   await new Promise((resolve) => {
     // A window of time is what is measured here, not a condition to wait for.
     setTimeout(resolve, 2000);

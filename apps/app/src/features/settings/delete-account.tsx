@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Text, View } from "react-native";
 
 import type { AccountAction, AccountConfirmation, AccountConfirmationStatus } from "@pace/client";
@@ -100,6 +100,8 @@ const useDangerFlow = () => {
   const [action, setAction] = useState<AccountAction | null>(restored?.action ?? null);
   const [request, setRequest] = useState<AccountConfirmation | null>(restored?.request ?? null);
   const [isBusy, setIsBusy] = useState(false);
+  // Read at the press: two presses in one frame both saw `isBusy` false (class 374).
+  const askingRef = useRef<null | Promise<boolean>>(null);
   const [notice, setNotice] = useState<Notice>(null);
   // Stable, so a re-render (each sync status change) does not restart the poll's timer.
   const onTerminal = useCallback((next: Notice): void => {
@@ -109,20 +111,33 @@ const useDangerFlow = () => {
     setNotice(next);
   }, []);
   useConfirmationPoll({ action, request, onTerminal });
-  const begin = async (): Promise<void> => {
-    if (action === null) {
-      return;
-    }
+  /** Asks Telegram to confirm; whether the waiting line took the buttons' place. */
+  const didAsk = async (asked: AccountAction): Promise<boolean> => {
     setIsBusy(true);
-    const result = await auth.requestAccountConfirmation(action);
+    const result = await auth.requestAccountConfirmation(asked);
     setIsBusy(false);
     if (result.ok) {
-      savePendingConfirmation({ action, request: result.value });
+      savePendingConfirmation({ action: asked, request: result.value });
       setRequest(result.value);
       setNotice(null);
-    } else {
-      setNotice(result.error === "account/no-telegram" ? "noTelegram" : "failed");
+      return true;
     }
+    setNotice(result.error === "account/no-telegram" ? "noTelegram" : "failed");
+    return false;
+  };
+  /** A second press while Telegram is asked joins that ask: one request, one answer. */
+  const didBegin = async (): Promise<boolean> => {
+    if (action === null) {
+      return false;
+    }
+    askingRef.current ??= (async () => {
+      try {
+        return await didAsk(action);
+      } finally {
+        askingRef.current = null;
+      }
+    })();
+    return await askingRef.current;
   };
   const cancel = async (): Promise<void> => {
     if (request === null) {
@@ -138,7 +153,7 @@ const useDangerFlow = () => {
     }
     onTerminal(terminalNotice(result.value));
   };
-  return { action, begin, cancel, isBusy, notice, request, setAction, setNotice };
+  return { action, cancel, didBegin, isBusy, notice, request, setAction, setNotice };
 };
 
 /** Wipe and Delete, each opening its warning; focus moves on to the warning's Cancel. */
@@ -216,7 +231,13 @@ const DangerPrompt = ({ flow }: { readonly flow: ReturnType<typeof useDangerFlow
             flow.setAction(null);
           }}
           onPrimary={() => {
-            void flow.begin();
+            // The buttons give way to the waiting line: focus goes to its Cancel (PR55-1-10).
+            focus.toStatus();
+            void (async () => {
+              if (!(await flow.didBegin())) {
+                focus.release();
+              }
+            })();
           }}
           primaryLabel={t(
             flow.action === "wipe" ? "settings.wipe.confirm" : "settings.deleteAccount.confirm",
@@ -233,8 +254,10 @@ const DangerPrompt = ({ flow }: { readonly flow: ReturnType<typeof useDangerFlow
           <View className="self-start">
             <Button
               onPress={() => {
+                focus.toOpener(flow.action ?? undefined);
                 void flow.cancel();
               }}
+              ref={focus.statusRef()}
               variant="plain"
             >
               {t("common.cancel")}

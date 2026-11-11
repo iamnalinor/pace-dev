@@ -17,6 +17,7 @@ import {
   type FakeRoute,
   fakeUser,
   problem,
+  storedEvents,
 } from "@pace/client/testing";
 
 import type { createFakeBackgroundTask } from "./testing/background-task.fake.ts";
@@ -440,6 +441,34 @@ describe("PaceProvider", () => {
     expect(api.pathsCalled("/api/sync/pull").length).toBeGreaterThan(before);
   });
 
+  it("syncs on a return even when the recurring instances fail to be written", async () => {
+    const { runtime } = await setup();
+    await runtime.auth.loginWithDev("1");
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    await waitFor(() => {
+      expect(runtime.state.store.getState().settings.timezone).not.toBeNull();
+    });
+    const ensure = jest
+      .spyOn(runtime.actions, "ensureInstances")
+      .mockRejectedValue(new Error("disk full"));
+    const syncNow = jest.spyOn(runtime.sync, "syncNow");
+    const [, listener] = addEventListener.mock.calls[0] ?? [];
+    await act(async () => {
+      listener?.("active");
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(syncNow).toHaveBeenCalled();
+    });
+    expect(ensure).toHaveBeenCalledTimes(1);
+    ensure.mockRestore();
+    syncNow.mockRestore();
+  });
+
   it("sends a Log out the server did not hear again when the app returns, signed out (R22-02)", async () => {
     const { runtime } = await setup();
     await render(
@@ -595,7 +624,7 @@ describe("PaceProvider", () => {
     background.registerTaskAsync.mockClear();
     const { runtime } = await setup();
     const refresh = jest
-      .spyOn(runtime.notifications, "refresh")
+      .spyOn(runtime.notifications, "refreshUnlessFresh")
       .mockRejectedValue(new Error("offline"));
     await render(
       <PaceProvider runtime={runtime}>
@@ -627,7 +656,7 @@ describe("PaceProvider", () => {
     );
     // Synced, and the signed-in start's own write (the time zone) sent: then the loop rests.
     await waitFor(async () => {
-      await expect(eventStore.getStoreId()).resolves.not.toBeNull();
+      expect((await eventStore.readMeta()).storeId).not.toBeNull();
       await expect(eventStore.listPending()).resolves.toEqual([]);
     });
     await act(async () => {
@@ -645,10 +674,10 @@ describe("PaceProvider", () => {
     await waitFor(() => {
       expect(screen.getByTestId("title")).toHaveTextContent("Now");
     });
-    await expect(eventStore.listAll()).resolves.toEqual([]);
+    await expect(storedEvents(eventStore)).resolves.toEqual([]);
     await expect(eventStore.listPending()).resolves.toEqual([]);
-    await expect(eventStore.getCursor()).resolves.toBe(0);
-    await expect(eventStore.getStoreId()).resolves.toBeNull();
+    expect((await eventStore.readMeta()).cursor).toBe(0);
+    expect((await eventStore.readMeta()).storeId).toBeNull();
   });
 });
 
@@ -796,7 +825,7 @@ describe("a stale tab of a browser signed in again elsewhere (round 6 I1)", () =
     );
     // Synced, and the signed-in start's own write (the time zone) sent: then the loop rests.
     await waitFor(async () => {
-      await expect(eventStore.getStoreId()).resolves.not.toBeNull();
+      expect((await eventStore.readMeta()).storeId).not.toBeNull();
       await expect(eventStore.listPending()).resolves.toEqual([]);
     });
     await act(async () => {
@@ -818,7 +847,7 @@ describe("a stale tab of a browser signed in again elsewhere (round 6 I1)", () =
     });
     await expect(shared.get()).resolves.toBe("tok_other_tab");
     await expect(eventStore.listPending()).resolves.toHaveLength(1);
-    await expect(eventStore.getStoreId()).resolves.not.toBeNull();
+    expect((await eventStore.readMeta()).storeId).not.toBeNull();
   });
 });
 
@@ -837,7 +866,7 @@ describe("a stale tab's sign-out racing another tab's sign-in (re-review N3)", (
       </PaceProvider>,
     );
     await waitFor(async () => {
-      await expect(eventStore.getStoreId()).resolves.not.toBeNull();
+      expect((await eventStore.readMeta()).storeId).not.toBeNull();
       await expect(eventStore.listPending()).resolves.toEqual([]);
     });
     runtime.sync.stop();
@@ -849,18 +878,21 @@ describe("a stale tab's sign-out racing another tab's sign-in (re-review N3)", (
       await shared.set("tok_other_tab");
       // What the other tab's client does at its sign-in, on the store both tabs share.
       await runtime.claimLocalCopy("tok_other_tab");
-      await eventStore.append([
-        {
-          deviceId: "01ARZ3NDEKTSV4RRFFQ69G5FAW",
-          id: "01JOTHERTAB0000000000000000",
-          occurredAt: "2026-10-06T10:00:00.000Z",
-          payload: { language: "ru" },
-          precision: "exact",
-          recordedAt: "2026-10-06T10:00:00.000Z",
-          source: "web",
-          type: "settings.updated",
-        },
-      ]);
+      await eventStore.append(
+        [
+          {
+            deviceId: "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            id: "01JOTHERTAB0000000000000000",
+            occurredAt: "2026-10-06T10:00:00.000Z",
+            payload: { language: "ru" },
+            precision: "exact",
+            recordedAt: "2026-10-06T10:00:00.000Z",
+            source: "web",
+            type: "settings.updated",
+          },
+        ],
+        await eventStore.readMeta(),
+      );
       return isStored;
     });
     const before = runtime.state.copy();
@@ -882,7 +914,7 @@ describe("a stale tab's sign-out racing another tab's sign-in (re-review N3)", (
       });
     });
     await expect(eventStore.listPending()).resolves.toHaveLength(1);
-    await expect(eventStore.getStoreId()).resolves.not.toBeNull();
+    expect((await eventStore.readMeta()).storeId).not.toBeNull();
   });
 });
 
@@ -896,7 +928,7 @@ const syncedWithUnsent = async (shared: SessionStore) => {
     </PaceProvider>,
   );
   await waitFor(async () => {
-    await expect(eventStore.getStoreId()).resolves.not.toBeNull();
+    expect((await eventStore.readMeta()).storeId).not.toBeNull();
     await expect(eventStore.listPending()).resolves.toEqual([]);
   });
   await act(async () => {
@@ -924,10 +956,10 @@ describe("this tab's own sign-out (fix round 2 review M1, A9 review I1)", () => 
     });
     // The person left this browser: nothing of the account stays (a shared computer).
     await waitFor(async () => {
-      await expect(eventStore.listAll()).resolves.toEqual([]);
+      await expect(storedEvents(eventStore)).resolves.toEqual([]);
     });
     await expect(eventStore.listPending()).resolves.toEqual([]);
-    await expect(eventStore.getStoreId()).resolves.toBeNull();
+    expect((await eventStore.readMeta()).storeId).toBeNull();
   });
 
   it("keeps the copy while another tab's session is still stored: its unsent change survives", async () => {
@@ -949,7 +981,7 @@ describe("this tab's own sign-out (fix round 2 review M1, A9 review I1)", () => 
     });
     await expect(shared.get()).resolves.toBe("tok_other_tab");
     await expect(eventStore.listPending()).resolves.toHaveLength(1);
-    await expect(eventStore.getStoreId()).resolves.not.toBeNull();
+    expect((await eventStore.readMeta()).storeId).not.toBeNull();
   });
 
   it("empties the copy when the shared store cannot be read (fails toward privacy)", async () => {
@@ -961,7 +993,7 @@ describe("this tab's own sign-out (fix round 2 review M1, A9 review I1)", () => 
       await runtime.auth.logout();
     });
     await waitFor(async () => {
-      await expect(eventStore.listAll()).resolves.toEqual([]);
+      await expect(storedEvents(eventStore)).resolves.toEqual([]);
     });
   });
 });

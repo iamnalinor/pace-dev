@@ -65,6 +65,23 @@ export const ruNotify: { readonly [K in keyof typeof enNotify]: string } = {
   "notifications.method.fcm": "Google",
   "notifications.method.poll": "Pace",
   "settings.notifications": "Уведомления",
+  "settings.push.reason.server-disabled": "На этом сервере отключены уведомления Google.",
+  "settings.push.reason.package-missing":
+    "Это приложение не настроено для уведомлений Google на этом сервере.",
+  "settings.push.reason.restart-needed":
+    "Перезапустите Pace, чтобы применить настройки уведомлений. Задачи и неотправленные изменения останутся на телефоне.",
+  "settings.push.reason.initialization-failed":
+    "Не удалось запустить уведомления Google на этом телефоне.",
+  "settings.push.reason.storage-failed": "Не удалось сохранить настройки уведомлений на телефоне.",
+  "settings.push.reason.unsupported":
+    "Эта версия Pace не поддерживает уведомления Google этого сервера.",
+  "settings.push.reason.invalid-config": "Настройки уведомлений Google на сервере неполные.",
+  "settings.push.reason.configuration-pending": "Проверяем доступность уведомлений Google.",
+  "settings.push.reason.other-project": "Сервер использует другой проект уведомлений Google.",
+  "settings.push.reason.services-unavailable":
+    "Сервисы уведомлений Google недоступны на этом телефоне.",
+  "settings.push.restart": "Перезапустить Pace",
+  "settings.push.restartFailed": "Не удалось перезапустить Pace. Закройте и откройте приложение.",
   "settings.push.hint": "Как этот телефон получает уведомления",
   "settings.push.option.auto": "Автоматически",
   "settings.push.option.fcm": "Google",
@@ -77,7 +94,6 @@ export const ruNotify: { readonly [K in keyof typeof enNotify]: string } = {
     "Этот телефон не показывает уведомления; все они — в колокольчике приложения.",
   "settings.push.denied":
     "Этот телефон их не показывает: уведомления не разрешены (Настройки → Разрешения).",
-  "settings.push.otherProject": "Google недоступен: у этого сервера другой проект Firebase.",
   "settings.push.notSaved": "Телефон не смог сохранить этот выбор. Попробуйте снова.",
   "settings.push.unavailable": "{method} сейчас недоступен.",
   "settings.notifications.hint": "Куда приходит каждый вид уведомлений.",

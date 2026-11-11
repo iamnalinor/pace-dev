@@ -21,8 +21,10 @@ import { SettingsCell } from "#app/features/settings/settings-cell.tsx";
 import { SettingsLinks } from "#app/features/settings/settings-links.tsx";
 import { TimezoneRow } from "#app/features/settings/timezone-row.tsx";
 import { IS_PHONE } from "#app/platform/device.ts";
+import { useOtaCoordinator } from "#app/platform/ota-provider.tsx";
 import { DestinationScreen } from "#app/screens/destination-screen.tsx";
 import { LogoutButton } from "#app/shared/logout-button.tsx";
+import { OtaDetails } from "#app/shared/ota-status.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { cx } from "#app/ui/cx.ts";
 import { KnownAfterSync } from "#app/ui/empty-state.tsx";
@@ -123,7 +125,11 @@ const NightHoursRow = () => {
     <KnownAfterSync>
       <SwitchRow
         // The hint says what the switch does now (QA round 25 R25-08), and that Week's moon is it.
-        hint={t(settings.nightHours ? "settings.nightHours.hint" : "settings.nightHours.hintOff")}
+        hint={
+          settings.nightHours
+            ? t("settings.nightHours.hint")
+            : t("settings.nightHours.hintOff", { button: t("week.nightHours") })
+        }
         isOn={settings.nightHours}
         label={t("settings.nightHours")}
         onChange={(isOn) => {
@@ -147,6 +153,17 @@ const AccountCell = ({
     <KnownAfterSync>{children}</KnownAfterSync>
   </SettingsCell>
 );
+
+/** The running app bundle and a downloaded update; only where the native updater runs. */
+const UpdatesSection = () => {
+  const t = useT();
+  const coordinator = useOtaCoordinator();
+  return coordinator === null ? null : (
+    <Section title={t("ota.title")}>
+      <OtaDetails coordinator={coordinator} hasTitle={false} />
+    </Section>
+  );
+};
 
 export const SettingsScreen = () => {
   const t = useT();
@@ -202,6 +219,7 @@ export const SettingsScreen = () => {
           <ServerRow />
         </Section>
       ) : null}
+      <UpdatesSection />
       {/* The account's own actions last: export (the web's download), log out, the danger zone. */}
       <View className="mx-gutter gap-3 py-6">
         {/* Bare text and loose buttons start at the section headers' text inset, not the

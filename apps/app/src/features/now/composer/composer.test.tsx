@@ -960,3 +960,29 @@ describe("the line on a computer (design review 2 N5)", () => {
     expect(screen.queryByTestId("line-plus-slot", { includeHiddenElements: true })).toBeNull();
   });
 });
+
+describe("the line's buttons at its edges (QA PR55-1-15)", () => {
+  it("line their glyphs up with the gutter, giving the field the room their padding took", async () => {
+    await renderComposer(await createTestRuntime());
+    // At 320 «Задача или текст» needed 134 px and had 122: + stood 12 px in from the gutter.
+    // The card itself steps out by the targets' padding, so its buttons stay inside it: a negative
+    // margin on a button put + 16 px outside the card (bug-lessons 354).
+    const card = screen.getByTestId("composer-card");
+    expect(String(card.props["className"]).split(" ")).toEqual(
+      expect.arrayContaining(["ml-0", "mr-3"]),
+    );
+    expect(String(card.props["className"])).not.toMatch(/mx-gutter/u);
+    const edges = screen
+      .getAllByTestId(/^line-edge-/u)
+      .map((node) => String(node.props["className"]));
+    expect(edges.join(" ")).not.toMatch(/(^|\s)-m[lrx]-/u);
+  });
+
+  it("gives the form's card the gutter back: the card's border lines up with the list", async () => {
+    await renderComposer(await createTestRuntime());
+    await fireEvent.changeText(line(), "Buy milk");
+    await fireEvent.press(screen.getByRole("button", { name: en("nav.newTask") }));
+    const card = screen.getByTestId("composer-card");
+    expect(String(card.props["className"])).toMatch(/mx-gutter/u);
+  });
+});

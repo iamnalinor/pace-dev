@@ -21,11 +21,13 @@ const ICONS: Readonly<Record<TimeButtonView["id"], IconName>> = {
 };
 
 /**
-Every tile's box (spec §5.1): 56 high, the `md` corners, the width of its quarter. Never `flex-1`:
+Every tile's box (spec §5.1): 56 high, the `md` corners, the width of its quarter, no side padding:
+the centred label has the whole width («Календарь» needs 66 of a 68 tile at 320, where the 2 px
+padding cut it to «Календ…», QA PR55-1-15). Never `flex-1`:
 inside the tooltip's column that made the basis 0, which beat the height, and the tile shrank to the
 44 of its target on the web (design review H5, bug-lessons class 160).
 */
-const TILE = "h-bar-tile w-full items-center justify-center gap-0.5 rounded-md px-1";
+const TILE = "h-bar-tile w-full items-center justify-center gap-0.5 rounded-md";
 
 /**
 How a tile looks (spec §5.1, F-COL-05, F-COL-12): neutral `fill.2` at rest, the Calendar tile with

@@ -1,4 +1,8 @@
-import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
+import {
+  createExecutionContext,
+  createScheduledController,
+  waitOnExecutionContext,
+} from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
@@ -8,10 +12,16 @@ import { endpoints, newId } from "@pace/core";
 import type { TelegramTransport } from "../src/shared/telegram-api.ts";
 
 import { expireConfirmation } from "../src/account/account-routes.ts";
-import { createApp } from "../src/app.ts";
-import { accountConfirmations } from "../src/shared/db/d1-schema.ts";
-import { d1 } from "../src/shared/db/d1.ts";
+import { d1 } from "../src/platform/cloudflare/sqlite.ts";
+import {
+  claimAccountCleanup,
+  prepareAccountCleanup,
+} from "../src/shared/account-cleanup-repository.ts";
+import { archiveOwnerPrefix } from "../src/shared/archive-keys.ts";
+import { accountCleanupOperations, accountConfirmations } from "../src/shared/db/d1-schema.ts";
+import worker from "../src/worker.ts";
 import { answerOf, call, json, loginAsDev, pushEvents, storeIdOf } from "./helpers.ts";
+import { createApp } from "./host.ts";
 
 const sent: { method: string; body: Record<string, unknown> }[] = [];
 const telegramFetch: TelegramTransport = async (input, init) => {
@@ -32,7 +42,7 @@ const app = createApp({
 
 const request = async (
   path: string,
-  options: { token?: string; body?: unknown; method?: string } = {},
+  options: { token?: string; body?: unknown; method?: string; bindings?: Cloudflare.Env } = {},
 ) => {
   const ctx = createExecutionContext();
   const response = await app.fetch(
@@ -49,15 +59,16 @@ const request = async (
       },
       method: options.method ?? (options.body === undefined ? "GET" : "POST"),
     }),
-    env,
+    options.bindings ?? env,
     ctx,
   );
   await waitOnExecutionContext(ctx);
   return response;
 };
 
-const telegramUpdate = async (telegramId: number, data: string) =>
+const telegramUpdate = async (telegramId: number, data: string, bindings?: Cloudflare.Env) =>
   await request("/telegram/webhook", {
+    ...(bindings !== undefined && { bindings }),
     body: {
       callback_query: {
         id: newId(),
@@ -117,7 +128,14 @@ describe("Telegram account confirmations", () => {
     if (stalePending === undefined) {
       throw new Error("missing confirmation");
     }
-    expect((await expireConfirmation(env.DB, stalePending)).status).toBe("processing");
+    await prepareAccountCleanup(d1(env.DB), {
+      operationId: created.id,
+      userId: stalePending.userId,
+      action: "wipe",
+      now: new Date(),
+    });
+    await claimAccountCleanup(d1(env.DB), created.id, new Date());
+    expect((await expireConfirmation(d1(env.DB), stalePending)).status).toBe("processing");
     const polling = endpoints.account.confirmationStatus.output.parse(
       await (await request(`/api/account/confirmations/${created.id}`)).json(),
     );
@@ -128,6 +146,221 @@ describe("Telegram account confirmations", () => {
       ).json(),
     );
     expect(cancelled.status).toBe("pending");
+    // Finish this deliberately held request so the shared owner is available to later tests.
+    await d1(env.DB)
+      .update(accountCleanupOperations)
+      .set({ leaseUntil: new Date(0) })
+      .where(eq(accountCleanupOperations.id, created.id));
+    const recovered = endpoints.account.confirmationStatus.output.parse(
+      await (await request(`/api/account/confirmations/${created.id}`)).json(),
+    );
+    expect(recovered.status).toBe("confirmed");
+  });
+
+  it("recovers a processing confirmation whose request crashed before journal creation", async () => {
+    const token = await loginAsDev("1001");
+    const before = await storeIdOf(token);
+    const created = endpoints.account.createConfirmation.output.parse(
+      await (
+        await request("/api/account/confirmations", { token, body: { action: "wipe" } })
+      ).json(),
+    );
+    await d1(env.DB)
+      .update(accountConfirmations)
+      .set({ status: "processing", expiresAt: new Date(0) })
+      .where(eq(accountConfirmations.id, created.id));
+    const status = endpoints.account.confirmationStatus.output.parse(
+      await (await request(`/api/account/confirmations/${created.id}`)).json(),
+    );
+    expect(status.status).toBe("confirmed");
+    const after = await storeIdOf(token);
+    expect(after).not.toBe(before);
+    await request(`/api/account/confirmations/${created.id}`);
+    expect(await storeIdOf(token)).toBe(after);
+  });
+
+  it("answers another signed-in person's status poll as unknown and resumes nothing for them", async () => {
+    const token = await loginAsDev("1001");
+    const before = await storeIdOf(token);
+    const created = endpoints.account.createConfirmation.output.parse(
+      await (
+        await request("/api/account/confirmations", { token, body: { action: "wipe" } })
+      ).json(),
+    );
+    await d1(env.DB)
+      .update(accountConfirmations)
+      .set({ status: "processing" })
+      .where(eq(accountConfirmations.id, created.id));
+    const stranger = await loginAsDev("1002");
+    const polled = await request(`/api/account/confirmations/${created.id}`, { token: stranger });
+    expect(polled.status).toBe(404);
+    expect(await storeIdOf(token)).toBe(before);
+    const operation = await d1(env.DB).query.accountCleanupOperations.findFirst({
+      where: eq(accountCleanupOperations.id, created.id),
+    });
+    expect(operation).toBeUndefined();
+    // The owner's own poll (signed in, or anonymous after a deletion) still drives it.
+    const owned = endpoints.account.confirmationStatus.output.parse(
+      await (await request(`/api/account/confirmations/${created.id}`, { token })).json(),
+    );
+    expect(owned.status).toBe("confirmed");
+  });
+
+  it("reconciles a crashed processing deletion through scheduled maintenance without an old session", async () => {
+    const token = await loginAsDev("1002");
+    const created = endpoints.account.createConfirmation.output.parse(
+      await (
+        await request("/api/account/confirmations", { token, body: { action: "delete" } })
+      ).json(),
+    );
+    await d1(env.DB)
+      .update(accountConfirmations)
+      .set({ status: "processing" })
+      .where(eq(accountConfirmations.id, created.id));
+    const context = createExecutionContext();
+    await worker.scheduled(createScheduledController(), env, context);
+    await waitOnExecutionContext(context);
+    expect((await call("/api/me", { token })).status).toBe(401);
+    const status = endpoints.account.confirmationStatus.output.parse(
+      await (await request(`/api/account/confirmations/${created.id}`)).json(),
+    );
+    expect(status.status).toBe("confirmed");
+  });
+
+  it("does not alias a second confirmed request to an active cleanup or later wipe newer data", async () => {
+    const token = await loginAsDev("1001");
+    const first = endpoints.account.createConfirmation.output.parse(
+      await (
+        await request("/api/account/confirmations", { token, body: { action: "wipe" } })
+      ).json(),
+    );
+    const firstRow = await d1(env.DB).query.accountConfirmations.findFirst({
+      where: eq(accountConfirmations.id, first.id),
+    });
+    if (firstRow === undefined) {
+      throw new Error("missing confirmation");
+    }
+    await d1(env.DB)
+      .update(accountConfirmations)
+      .set({ status: "processing" })
+      .where(eq(accountConfirmations.id, first.id));
+    await prepareAccountCleanup(d1(env.DB), {
+      operationId: first.id,
+      userId: firstRow.userId,
+      action: "wipe",
+      now: new Date(),
+    });
+    await claimAccountCleanup(d1(env.DB), first.id, new Date());
+    const second = endpoints.account.createConfirmation.output.parse(
+      await (
+        await request("/api/account/confirmations", { token, body: { action: "wipe" } })
+      ).json(),
+    );
+    await telegramUpdate(1001, `account:confirm:${second.id}`);
+    expect(
+      (
+        await d1(env.DB).query.accountConfirmations.findFirst({
+          where: eq(accountConfirmations.id, second.id),
+        })
+      )?.status,
+    ).toBe("pending");
+    await d1(env.DB)
+      .update(accountCleanupOperations)
+      .set({ leaseUntil: new Date(0) })
+      .where(eq(accountCleanupOperations.id, first.id));
+    await request(`/api/account/confirmations/${first.id}`);
+    const generation = await storeIdOf(token);
+    const now = new Date().toISOString();
+    const event = {
+      id: newId(),
+      deviceId: "test",
+      type: "task.created",
+      occurredAt: now,
+      recordedAt: now,
+      source: "app",
+      precision: "exact",
+      payload: {
+        taskId: newId(),
+        title: "New generation",
+        presetId: "work",
+        fields: {},
+        subtasks: [],
+      },
+    };
+    await pushEvents(token, [event]);
+    await request(`/api/account/confirmations/${second.id}`);
+    await request(`/api/account/confirmations/${second.id}`);
+    expect(await storeIdOf(token)).toBe(generation);
+    expect(
+      (await json<{ events: { id: string }[] }>("/api/sync/pull", { token })).events.map(
+        (row) => row.id,
+      ),
+    ).toContain(event.id);
+    const cancelled = endpoints.account.cancelConfirmation.output.parse(
+      await (
+        await request(`/api/account/confirmations/${second.id}/cancel`, { token, method: "POST" })
+      ).json(),
+    );
+    expect(cancelled.status).toBe("cancelled");
+  });
+
+  it("answers a Russian speaker in Russian after the wipe that reset their settings", async () => {
+    const token = await loginAsDev("1001");
+    const now = new Date().toISOString();
+    await pushEvents(token, [
+      {
+        deviceId: "test",
+        id: newId(),
+        occurredAt: now,
+        recordedAt: now,
+        precision: "exact",
+        source: "app",
+        type: "settings.updated",
+        payload: { language: "ru" },
+      },
+    ]);
+    const created = endpoints.account.createConfirmation.output.parse(
+      await (
+        await request("/api/account/confirmations", { token, body: { action: "wipe" } })
+      ).json(),
+    );
+    sent.length = 0;
+    expect((await telegramUpdate(1001, `account:confirm:${created.id}`)).status).toBe(200);
+    expect(JSON.stringify(sent)).toContain("Все данные очищены.");
+    sent.length = 0;
+    // The store is empty now (English by default): the answer keeps the request's language.
+    expect((await telegramUpdate(1001, `account:confirm:${created.id}`)).status).toBe(200);
+    expect(JSON.stringify(sent)).toContain("Этот запрос уже обработан.");
+  });
+
+  it("tells the owner a wipe with more archive objects than one pass deletes is under way, not failed", async () => {
+    const archived = { ...env, HISTORY_ARCHIVE: env.TEST_HISTORY_ARCHIVE };
+    const token = await loginAsDev("1001");
+    const { id: userId } = await json<{ id: string }>("/api/me", { token });
+    for (let index = 0; index <= 100; index += 1) {
+      await env.TEST_HISTORY_ARCHIVE.put(`${archiveOwnerPrefix(userId)}old/${index}`, "x");
+    }
+    const created = endpoints.account.createConfirmation.output.parse(
+      await (
+        await request("/api/account/confirmations", {
+          token,
+          body: { action: "wipe" },
+          bindings: archived,
+        })
+      ).json(),
+    );
+    sent.length = 0;
+    expect((await telegramUpdate(1001, `account:confirm:${created.id}`, archived)).status).toBe(
+      200,
+    );
+    expect(JSON.stringify(sent)).toContain("This can take a few minutes");
+    expect(JSON.stringify(sent)).not.toContain("Could not complete");
+    sent.length = 0;
+    // Pressing Confirm again carries on where the first pass stopped.
+    expect((await telegramUpdate(1001, `account:confirm:${created.id}`, archived)).status).toBe(
+      200,
+    );
+    expect(JSON.stringify(sent)).toContain("All data wiped.");
   });
 
   it("wipes only after the owner confirms, keeps sessions, and changes store id", async () => {

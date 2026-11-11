@@ -1,5 +1,6 @@
 import type { JSHandle, Locator, Page } from "@playwright/test";
 
+import { waitForTransitions } from "./support/animation-wait.ts";
 import { expect, test } from "./support/fixtures.ts";
 import { loginViaApi } from "./support/login.ts";
 import { pushAsClient, ulid } from "./support/seed.ts";
@@ -128,14 +129,12 @@ const throttle = async (page: Page): Promise<void> => {
 };
 
 /**
-Waits until the page is quiet: no CSS animation running, then no change to the page (a
+Waits until the page is quiet: no finite CSS animation running, then no change to the page (a
 JavaScript-driven animation writes styles every frame) for two frames in a row, then an idle
 moment. One tap's tail never spills into the next one's frame.
 */
 const rest = async (page: Page): Promise<void> => {
-  await page.waitForFunction(() =>
-    document.getAnimations().every((animation) => animation.playState !== "running"),
-  );
+  await waitForTransitions(page);
   await page.evaluate(
     async ({ quietFrames, capMs }) => {
       await new Promise<void>((resolve) => {

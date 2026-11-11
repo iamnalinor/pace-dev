@@ -1,5 +1,3 @@
-import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
-
 import { and, desc, eq, gte, isNull, like, lte, or, type SQL } from "drizzle-orm";
 
 import { newId } from "@pace/core";
@@ -11,10 +9,11 @@ import type {
   DecisionRecord,
   JsonValue,
 } from "../shared/contract.ts";
+import type { SqliteDatabase } from "../shared/ports/sqlite.ts";
 
 import * as schema from "./schema.ts";
 
-type Db = DrizzleSqliteDODatabase<typeof schema>;
+type Db = SqliteDatabase<"sync", typeof schema>;
 
 const toDecision = (row: typeof schema.decisions.$inferSelect): DecisionRecord => ({
   ...row,

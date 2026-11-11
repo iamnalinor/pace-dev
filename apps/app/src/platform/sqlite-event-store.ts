@@ -2,7 +2,26 @@ import { openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite";
 
 import type { Event } from "@pace/core";
 
-import { canClearCopy, type EventStore } from "@pace/client";
+import {
+  canInsertGuarded,
+  isStoredCopy,
+  newCopyToken,
+} from "#app/platform/checkpoint-persistence.ts";
+import { sha256Text } from "#app/platform/sha256-text.ts";
+import {
+  appendSqliteEvents,
+  readStoredMeta,
+  sqliteCheckpointStore,
+  sqliteTransaction,
+} from "#app/platform/sqlite-checkpoint-store.ts";
+import {
+  canClearCopy,
+  COPY_CHANGED,
+  type CopyGuard,
+  type EventStore,
+  type Sha256Text,
+  SyncError,
+} from "@pace/client";
 
 const DATABASE_NAME = "pace.db";
 
@@ -16,13 +35,11 @@ const MIGRATIONS: readonly string[] = [
    CREATE INDEX IF NOT EXISTS events_occurred_at ON events (occurred_at, id);
    CREATE TABLE IF NOT EXISTS pending (id TEXT PRIMARY KEY NOT NULL);
    CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);`,
+  "ALTER TABLE events ADD COLUMN seq INTEGER; CREATE INDEX events_seq ON events (seq);",
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;
 
-const CURSOR_KEY = "cursor";
-const STORE_ID_KEY = "storeId";
-const SYNC_VERSION_KEY = "syncVersion";
 const OWNER_KEY = "owner";
 
 const migrate = async (db: SQLiteDatabase): Promise<void> => {
@@ -33,7 +50,14 @@ const migrate = async (db: SQLiteDatabase): Promise<void> => {
     return;
   }
   await db.withExclusiveTransactionAsync(async (txn) => {
-    for (const step of MIGRATIONS.slice(current)) {
+    const locked = await txn.getFirstAsync<{ readonly user_version: number }>(
+      "PRAGMA user_version",
+    );
+    const version = locked?.user_version ?? 0;
+    if (version >= SCHEMA_VERSION) {
+      return;
+    }
+    for (const step of MIGRATIONS.slice(version)) {
       await txn.execAsync(step);
     }
     await txn.execAsync(`PRAGMA user_version = ${String(SCHEMA_VERSION)}`);
@@ -43,6 +67,11 @@ const migrate = async (db: SQLiteDatabase): Promise<void> => {
 const open = async (): Promise<SQLiteDatabase> => {
   const db = await openDatabaseAsync(DATABASE_NAME);
   await migrate(db);
+  await sqliteTransaction(db, async (tx) => {
+    if ((await readMeta(tx, "copyToken")) === null) {
+      await writeMeta(tx, "copyToken", newCopyToken());
+    }
+  });
   return db;
 };
 
@@ -51,8 +80,20 @@ type JsonRow = { readonly json: string };
 const parseRows = (rows: readonly JsonRow[]): readonly Event[] =>
   rows.map((row) => JSON.parse(row.json) as Event);
 
-const insertAll = async (db: SQLiteDatabase, events: readonly Event[]): Promise<void> => {
-  await db.withExclusiveTransactionAsync(async (txn) => {
+/**
+Inserts the unknown events into the log and the outbox. The copy is checked against the guard in
+the same transaction from its `meta` rows alone (class 259); `covered` (nothing written) when a
+checkpoint covers the copy, whose append needs the whole of it.
+*/
+const insertAll = async (
+  db: SQLiteDatabase,
+  events: readonly Event[],
+  guard: CopyGuard,
+): Promise<"covered" | "written"> =>
+  await sqliteTransaction(db, async (txn) => {
+    if (!canInsertGuarded(await readStoredMeta(txn), guard)) {
+      return "covered";
+    }
     const insertEvent = await txn.prepareAsync(
       "INSERT OR IGNORE INTO events (id, occurred_at, json) VALUES ($id, $occurredAt, $json)",
     );
@@ -72,11 +113,18 @@ const insertAll = async (db: SQLiteDatabase, events: readonly Event[]): Promise<
       await insertEvent.finalizeAsync();
       await insertPending.finalizeAsync();
     }
+    return "written";
   });
-};
 
-const deletePending = async (db: SQLiteDatabase, ids: readonly string[]): Promise<void> => {
+const deletePending = async (
+  db: SQLiteDatabase,
+  ids: readonly string[],
+  guard: CopyGuard,
+): Promise<void> => {
   await db.withExclusiveTransactionAsync(async (txn) => {
+    if (!isStoredCopy(await readStoredMeta(txn), guard)) {
+      throw new SyncError(COPY_CHANGED);
+    }
     const remove = await txn.prepareAsync("DELETE FROM pending WHERE id = $id");
     try {
       for (const id of ids) {
@@ -108,7 +156,7 @@ const writeMeta = async (db: SQLiteDatabase, key: string, value: string): Promis
 `occurredAt` for ordered reads; the outbox is a separate id table; `meta` holds the cursor,
 the store id, the sync version and the owner.
 */
-export const createSqliteEventStore = (): EventStore => {
+export const createSqliteEventStore = (hash: Sha256Text = sha256Text): EventStore => {
   let connection: Promise<SQLiteDatabase> | undefined;
   const db = async (): Promise<SQLiteDatabase> => {
     connection ??= open();
@@ -116,9 +164,10 @@ export const createSqliteEventStore = (): EventStore => {
   };
 
   return {
-    append: async (events) => {
-      if (events.length > 0) {
-        await insertAll(await db(), events);
+    ...sqliteCheckpointStore(db, hash),
+    append: async (events, guard) => {
+      if ((await insertAll(await db(), events, guard)) === "covered") {
+        await appendSqliteEvents(await db(), hash, { events, guard });
       }
     },
     clear: async (ifOwner) => {
@@ -129,16 +178,8 @@ export const createSqliteEventStore = (): EventStore => {
           return;
         }
         await txn.execAsync("DELETE FROM events; DELETE FROM pending; DELETE FROM meta;");
+        await writeMeta(txn, "copyToken", newCopyToken());
       });
-    },
-    getCursor: async () => Number((await readMeta(await db(), CURSOR_KEY)) ?? 0),
-    getStoreId: async () => await readMeta(await db(), STORE_ID_KEY),
-    getSyncVersion: async () => Number((await readMeta(await db(), SYNC_VERSION_KEY)) ?? 0),
-    listAll: async () => {
-      const connection = await db();
-      return parseRows(
-        await connection.getAllAsync<JsonRow>("SELECT json FROM events ORDER BY occurred_at, id"),
-      );
     },
     listPending: async () => {
       const connection = await db();
@@ -148,22 +189,16 @@ export const createSqliteEventStore = (): EventStore => {
         ),
       );
     },
-    markSynced: async (ids) => {
-      if (ids.length > 0) {
-        await deletePending(await db(), ids);
-      }
+    markSynced: async (ids, guard) => {
+      await deletePending(await db(), ids, guard);
     },
     setOwner: async (mark) => {
-      await writeMeta(await db(), OWNER_KEY, mark);
-    },
-    setCursor: async (seq) => {
-      await writeMeta(await db(), CURSOR_KEY, String(seq));
-    },
-    setStoreId: async (storeId) => {
-      await writeMeta(await db(), STORE_ID_KEY, storeId);
-    },
-    setSyncVersion: async (version) => {
-      await writeMeta(await db(), SYNC_VERSION_KEY, String(version));
+      await sqliteTransaction(await db(), async (tx) => {
+        if ((await readMeta(tx, OWNER_KEY)) !== mark) {
+          await writeMeta(tx, "copyToken", newCopyToken());
+        }
+        await writeMeta(tx, OWNER_KEY, mark);
+      });
     },
   };
 };

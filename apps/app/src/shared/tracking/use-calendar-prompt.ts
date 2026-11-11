@@ -37,7 +37,7 @@ Skip, which waves that occurrence away here and on every channel.
 */
 export const useCalendarPrompt = (): {
   readonly event: null | PhoneCalendarEvent;
-  /** `false` (and still offered) when the server did not take the skip. */
+  /** Gone at the press; `false` (and offered again) when the server did not take the skip. */
   readonly skip: (event: PhoneCalendarEvent) => Promise<boolean>;
 } => {
   const { api, clock, notifications } = usePace();
@@ -90,14 +90,11 @@ export const useCalendarPrompt = (): {
   );
   return {
     event: offered,
-    skip: async (event) => {
-      // Hidden only once the server took it: a skip that did not go through stays to tap again.
-      if (!(await notifications.skipEvent(calendarEventKey(event)))) {
-        return false;
-      }
-      // Gone at once; the phone's storage (slow on Android) follows.
-      answeredHere.dismiss(calendarKey(event));
-      return true;
-    },
+    // Gone at the press; the server, then the phone's storage (slow on Android) follow.
+    skip: async (event) =>
+      await answeredHere.skip(
+        calendarKey(event),
+        async () => await notifications.skipEvent(calendarEventKey(event)),
+      ),
   };
 };

@@ -159,9 +159,12 @@ const stateOf = (
 const shapeClass = (shape: Shape | undefined): string | undefined =>
   shape === undefined ? undefined : SHAPE_CLASS[shape];
 
-/** The drawn box of a small visual, with the corners; `undefined` without one. */
+/**
+The drawn box of a small visual, with the corners; `undefined` without one. It centres what it
+draws: a 32 disc left its 20 glyph at the top-left (an alongside Stop, QA PR55-1-03, bug-lessons 340).
+*/
 const visualClass = (visual: string | undefined, shape: Shape | undefined): string | undefined =>
-  visual === undefined ? undefined : cx(visual, shapeClass(shape));
+  visual === undefined ? undefined : cx("items-center justify-center", visual, shapeClass(shape));
 
 /**
 The target's classes. Controls never shrink in a row: the text beside them yields (spec §4.1.2).

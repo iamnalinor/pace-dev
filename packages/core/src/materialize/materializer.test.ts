@@ -239,6 +239,10 @@ describe("shouldRematerialize", () => {
     expect(shouldRematerialize(at(3), createdAt2)).toBe(true);
   });
 
+  it("rebuilds at the same instant because the last id is unknown", () => {
+    expect(shouldRematerialize(at(2), createdAt2)).toBe(true);
+  });
+
   it("is true for any correction", () => {
     expect(shouldRematerialize(at(1), revokedA)).toBe(true);
     expect(shouldRematerialize(null, amendedA)).toBe(true);

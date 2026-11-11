@@ -1,4 +1,4 @@
-import { Children, Fragment, isValidElement, type ReactNode } from "react";
+import { Children, Fragment, isValidElement, memo, type ReactNode } from "react";
 import { View, type ViewProps } from "react-native";
 
 import { cx } from "./cx.ts";
@@ -19,16 +19,17 @@ const INSET_CLASS: Readonly<Record<SeparatorInset, string>> = {
 };
 
 /**
-The hairline between two rows. A labelled one (a boundary) is a `separator` in a list, which a list
+The hairline between two rows; drawn again only when it changes, not with every render of its
+list (a list of thirty rows has twenty-nine). A labelled one (a boundary) is a `separator` in a list, which a list
 may only hold inside a list item (axe `aria-required-children`).
 */
-const Separator = ({
+const Separator = memo(function Separator({
   boundary,
   inset,
 }: {
   readonly boundary: string | undefined;
   readonly inset: SeparatorInset;
-}) => {
+}) {
   const line = (
     <View
       className={cx("border-t border-separator", INSET_CLASS[inset])}
@@ -37,7 +38,7 @@ const Separator = ({
     />
   );
   return boundary === undefined ? line : <View role="listitem">{line}</View>;
-};
+});
 
 /**
 An inset grouped list (spec §4.1.1, §5.0.3): rows on the cell ground with the large radius and no

@@ -10,12 +10,15 @@ export type FakeSqlite = {
   readonly executed: string[];
   /** Every statement passed to `prepareAsync`. */
   readonly prepared: string[];
+  /** Every statement passed to `getAllAsync`. */
+  readonly queried: string[];
   readonly opens: number;
   readonly transactions: number;
   /** A fresh empty database and zeroed counters. */
   readonly reset: () => void;
   readonly tables: () => readonly string[];
   readonly userVersion: () => number;
+  readonly failAfterWrites: (writes: number) => void;
 };
 
 const toParams = (params: SQLiteBindParams): Readonly<Record<string, SQLInputValue>> =>
@@ -27,16 +30,31 @@ export const createFakeSqlite = (): FakeSqlite => {
   type Row = Record<string, unknown>;
   const executed: string[] = [];
   const prepared: string[] = [];
+  const queried: string[] = [];
   const count = { opens: 0, transactions: 0 };
   let engine = new DatabaseSync(":memory:");
+  let writesUntilFailure: number | undefined;
+  let tail = Promise.resolve(null);
+  const afterWrite = () => {
+    if (writesUntilFailure === undefined) {
+      return;
+    }
+    if (writesUntilFailure === 0) {
+      writesUntilFailure = undefined;
+      throw new Error("injected SQL write failure");
+    }
+    writesUntilFailure--;
+  };
 
   const database = {
     execAsync: async (source: string) => {
       executed.push(source);
       engine.exec(source);
     },
-    getAllAsync: async <T>(source: string, params: SQLiteBindParams = []) =>
-      engine.prepare(source).all(toParams(params)) as T[],
+    getAllAsync: async <T>(source: string, params: SQLiteBindParams = []) => {
+      queried.push(source);
+      return engine.prepare(source).all(toParams(params)) as T[];
+    },
     getFirstAsync: async <T>(source: string, params: SQLiteBindParams = []) =>
       (engine.prepare(source).get(toParams(params)) as T | undefined) ?? null,
     prepareAsync: async (source: string) => {
@@ -45,6 +63,7 @@ export const createFakeSqlite = (): FakeSqlite => {
       return {
         executeAsync: async (params: SQLiteBindParams = []) => {
           const result = statement.run(toParams(params));
+          afterWrite();
           return { changes: result.changes, lastInsertRowId: result.lastInsertRowid };
         },
         finalizeAsync: async () => undefined,
@@ -52,9 +71,14 @@ export const createFakeSqlite = (): FakeSqlite => {
     },
     runAsync: async (source: string, params: SQLiteBindParams = []) => {
       const result = engine.prepare(source).run(toParams(params));
+      afterWrite();
       return { changes: result.changes, lastInsertRowId: result.lastInsertRowid };
     },
     withExclusiveTransactionAsync: async (task: (txn: SQLiteDatabase) => Promise<void>) => {
+      const previous = tail;
+      const release = Promise.withResolvers<null>();
+      tail = release.promise;
+      await previous;
       count.transactions += 1;
       engine.exec("BEGIN");
       try {
@@ -63,12 +87,17 @@ export const createFakeSqlite = (): FakeSqlite => {
       } catch (error) {
         engine.exec("ROLLBACK");
         throw error;
+      } finally {
+        release.resolve(null);
       }
     },
   };
 
   return {
     executed,
+    failAfterWrites: (writes) => {
+      writesUntilFailure = writes;
+    },
     open: () => {
       count.opens += 1;
       return database as unknown as SQLiteDatabase;
@@ -77,13 +106,17 @@ export const createFakeSqlite = (): FakeSqlite => {
       return count.opens;
     },
     prepared,
+    queried,
     reset: () => {
       engine.close();
       engine = new DatabaseSync(":memory:");
       executed.length = 0;
       prepared.length = 0;
+      queried.length = 0;
       count.opens = 0;
       count.transactions = 0;
+      writesUntilFailure = undefined;
+      tail = Promise.resolve(null);
     },
     tables: () =>
       engine

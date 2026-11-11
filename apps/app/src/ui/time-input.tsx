@@ -7,6 +7,7 @@ import { useT } from "../app-state.tsx";
 import { submitFieldProps } from "../platform/enter-key.ts";
 import { cx } from "./cx.ts";
 import { ErrorMessage } from "./field-error.tsx";
+import { FieldLabel } from "./field-label.tsx";
 import { useIsScreenActive } from "./screen-active.ts";
 import { useSheetSubmit } from "./sheet-submit.tsx";
 import { boxClass, FocusRing } from "./text-field.tsx";
@@ -205,7 +206,8 @@ stored one: a stored time never holds "1" or "14:", and an edit in the middle of
 with a text that is not a time, the field keeps it and says so under itself, as Day's sheet does
 (R26-05). It wears the field's states (the focus ring on focus, the danger border, the disabled
 look) on the same box as `TextField`, and is as wide as its content (F-LAY-09), unless the
-caller sizes it.
+caller sizes it. `isLabelShown` draws its label above it as `TextField` does, so a time beside a
+labelled date lines up with it (the Close sheet's «Время» sat 25 px above «Дата», unnamed: R28-08).
 
 A field can go away without being left: on Android a tap on Done or Save under
 `keyboardShouldPersistTaps="handled"` blurs nothing, so a typed time that is complete is saved
@@ -219,6 +221,7 @@ export const TimeInput = ({
   className,
   editable = true,
   isDraft = false,
+  isLabelShown = false,
   label,
   onTime,
   ref,
@@ -228,6 +231,8 @@ export const TimeInput = ({
   readonly editable?: boolean;
   /** The caller keeps a draft that its own Save or Done writes: hand every complete time over. */
   readonly isDraft?: boolean;
+  /** Its label in words above it (`FieldLabel`), not only to a screen reader. */
+  readonly isLabelShown?: boolean;
   readonly label: string;
   readonly onTime: (time: string) => void;
   readonly ref?: Ref<TextInput> | undefined;
@@ -236,11 +241,13 @@ export const TimeInput = ({
   const { palette } = useTheme();
   const t = useT();
   const messageId = useId();
+  const fieldId = useId();
   const [isFocused, setIsFocused] = useState(false);
   const { commit, isWrong, text, type } = useTypedTime({ isDraft, onTime, value });
   const sheetSubmit = useSheetSubmit();
   return (
     <View className={cx("gap-2 self-start", className)}>
+      {isLabelShown ? <FieldLabel fieldId={fieldId} isDisabled={!editable} text={label} /> : null}
       <View className={boxClass({ isDisabled: !editable, isErrored: isWrong, multiline: false })}>
         {isFocused ? <FocusRing /> : null}
         <TextInput
@@ -253,8 +260,10 @@ export const TimeInput = ({
             editable ? "text-label-primary" : "text-label-quaternary",
           )}
           editable={editable}
+          id={fieldId}
           inputMode="numeric"
           maxLength={TIME_MAX_LENGTH}
+          nativeID={fieldId}
           onBlur={() => {
             setIsFocused(false);
             commit();

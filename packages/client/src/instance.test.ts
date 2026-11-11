@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { InstanceSchema } from "@pace/core";
+import { endpoints, InstanceSchema } from "@pace/core";
 
+import { createApiClient } from "./api-client.ts";
 import { createFakeFetch, fakeInstance, problem } from "./fake-fetch.fake.ts";
-import { checkInstance } from "./instance.ts";
+import { checkInstance, checkInstanceWith, createInstanceReader } from "./instance.ts";
 
 const offline = async (): Promise<Response> => {
   throw new TypeError("Network request failed");
@@ -78,5 +79,99 @@ describe("checkInstance", () => {
       error: "client-outdated",
       ok: false,
     });
+  });
+});
+
+describe("checkInstance configuration failures", () => {
+  it.each([
+    ["project-mismatch", "project-mismatch"],
+    ["future-reason", null],
+    [undefined, null],
+  ])(
+    "preserves configuration failure with reason %s after one discovery call",
+    async (reason, expected) => {
+      const fake = createFakeFetch({
+        "GET /api/instance": () =>
+          Response.json(
+            {
+              code: "server/misconfigured",
+              message: "Server configuration is invalid",
+              reason,
+            },
+            { status: 500 },
+          ),
+      });
+      expect(await checkInstance("https://pace.example.dev", fake.fetch)).toEqual({
+        ok: false,
+        error: { kind: "server-misconfigured", reason: expected },
+      });
+      expect(fake.calls).toHaveLength(1);
+    },
+  );
+
+  it.each([
+    [500, "unknown", "unreachable"],
+    [503, "server/misconfigured", "unreachable"],
+    [426, "server/misconfigured", "unreachable"],
+    [404, "server/misconfigured", "not-pace"],
+  ])("keeps existing handling for status %s and code %s", async (status, code, expected) => {
+    const answer = serverAnswering(() =>
+      Response.json(
+        {
+          code,
+          message: "Error",
+          reason: "project-mismatch",
+        },
+        { status },
+      ),
+    );
+    expect(await checkInstance("https://pace.example.dev", answer)).toEqual({
+      ok: false,
+      error: expected,
+    });
+  });
+});
+
+/** A client's instance reader over a fake server. */
+const readerOn = (fetch: ReturnType<typeof serverAnswering>) => {
+  const api = createApiClient({
+    baseUrl: "https://pace.example.dev",
+    fetch,
+    token: () => undefined,
+  });
+  return createInstanceReader(async () => await api.call(endpoints.instance, {}));
+};
+
+describe("createInstanceReader (QA PR55-1-12)", () => {
+  it("makes one request for checks at once, and the negotiation after them reuses its answer", async () => {
+    const fake = createFakeFetch({ "GET /api/instance": () => fakeInstance });
+    const reader = readerOn(fake.fetch);
+    const [first, second] = await Promise.all([
+      checkInstanceWith(reader.read),
+      checkInstanceWith(reader.read),
+    ]);
+    expect([first.ok, second.ok]).toEqual([true, true]);
+    await reader.latest();
+    expect(fake.calls).toHaveLength(1);
+    // A check that must be current (a return to the app) asks again.
+    await reader.read();
+    expect(fake.calls).toHaveLength(2);
+  });
+
+  it("never keeps a failure: the next read and the negotiation ask again", async () => {
+    const network = { isDown: true };
+    const fake = createFakeFetch({
+      "GET /api/instance": () => {
+        if (network.isDown) {
+          throw new TypeError("Network request failed");
+        }
+        return fakeInstance;
+      },
+    });
+    const reader = readerOn(fake.fetch);
+    expect(await checkInstanceWith(reader.read)).toEqual({ error: "unreachable", ok: false });
+    network.isDown = false;
+    await reader.latest();
+    expect(fake.calls).toHaveLength(2);
   });
 });

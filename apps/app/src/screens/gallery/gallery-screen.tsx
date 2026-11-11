@@ -13,6 +13,7 @@ import { GALLERY_SETS, galleryData, type GallerySet } from "@pace/core/testing";
 import { ControlSections } from "./gallery-controls.tsx";
 import { KitSections } from "./gallery-kit.tsx";
 import { HeaderSections, ListSections, MotionSections } from "./gallery-lists.tsx";
+import { ServerSections } from "./gallery-push-reasons.tsx";
 import { ChromeSections, TaskSections, TextSections, TimeSections } from "./gallery-sections.tsx";
 
 const SET_LABEL: Readonly<Record<GallerySet, MessageKey>> = {
@@ -117,6 +118,7 @@ const GalleryBody = ({
         <TextSections data={data} />
         <TimeSections data={data} />
         <ChromeSections data={data} />
+        <ServerSections />
         <TaskSections data={data} />
         <ControlSections data={data} />
       </View>

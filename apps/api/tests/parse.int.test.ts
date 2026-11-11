@@ -22,9 +22,9 @@ import {
 
 import type { ParseProvider } from "../src/shared/llm/llm.ts";
 
-import { createApp } from "../src/app.ts";
 import { fakeParseModel } from "../src/shared/llm/fake-model.ts";
 import { answerOf, call, json, loginAsDev, readJson } from "./helpers.ts";
+import { createApp } from "./host.ts";
 
 /**
 Every answer is read through the endpoint's own output schema, as the client reads it: the

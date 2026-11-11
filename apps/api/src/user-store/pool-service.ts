@@ -1,5 +1,3 @@
-import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
-
 import {
   addMinutesIso,
   type CoreState,
@@ -15,6 +13,9 @@ import {
 } from "@pace/core";
 
 import type { NotifyError, ResolveError, ResolveMeta } from "../shared/contract.ts";
+import type { AppBindings } from "../shared/ports/bindings.ts";
+import type { ActorContext } from "../shared/ports/live-channel.ts";
+import type { SqliteDatabase } from "../shared/ports/sqlite.ts";
 import type { PollEntry } from "../shared/push/poll-transport.ts";
 import type * as schema from "./schema.ts";
 
@@ -41,7 +42,7 @@ import * as rows from "./pool-rows.ts";
 import { hasPendingAfterWithdraw } from "./pool-withdraw.ts";
 import { type Materialized, prepareBatch } from "./state.ts";
 
-type Db = DrizzleSqliteDODatabase<typeof schema>;
+type Db = SqliteDatabase<"sync", typeof schema>;
 
 /**
 The calendar a pass looks at around now: what started lately and what starts soon. The pool passes
@@ -53,11 +54,11 @@ const CALENDAR_AHEAD_MINUTES = 3 * 24 * 60;
 /** What the pool needs from the user's store: its storage, its state and its one write path. */
 export type PoolHost = {
   readonly db: Db;
-  readonly ctx: DurableObjectState;
-  readonly env: Cloudflare.Env;
+  readonly ctx: ActorContext;
+  readonly env: AppBindings;
   readonly deviceId: string;
   readonly current: () => Promise<Materialized>;
-  readonly insert: (events: readonly Event[]) => Promise<readonly Event[]>;
+  readonly insert: (events: readonly Event[], now: string) => Promise<readonly Event[]>;
   readonly derive: (now: string) => Promise<unknown>;
   readonly chatId: () => Promise<string | undefined>;
 };
@@ -190,7 +191,7 @@ export class NotificationPool {
       return err({ code: prepared.error.code });
     }
     // Written first: an answer whose events did not go in leaves the notification open.
-    await this.#host.insert(prepared.value.events);
+    await this.#host.insert(prepared.value.events, meta.now);
     await applyAnswer(notification, resolution, this.#host);
     await this.#settle(notification.id, resolution, meta);
     await this.#host.derive(meta.now);

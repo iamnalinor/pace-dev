@@ -3,6 +3,8 @@ import {
   type EndpointInput,
   type EndpointOutput,
   type EndpointShape,
+  type FirebaseConfigReason,
+  FirebaseConfigReasonSchema,
   PROTOCOL,
   PROTOCOL_HEADER,
 } from "@pace/core";
@@ -13,12 +15,20 @@ import { heldUntilChecked } from "./held-call.ts";
 export class ApiError extends Error {
   readonly code: string;
   readonly status: number;
+  readonly configurationReason: FirebaseConfigReason | null;
 
-  constructor(status: number, code: string, message: string) {
-    super(message);
+  constructor(
+    status: number,
+    code: string,
+    detail:
+      | string
+      | { readonly message: string; readonly configurationReason: FirebaseConfigReason | null },
+  ) {
+    super(typeof detail === "string" ? detail : detail.message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
+    this.configurationReason = typeof detail === "string" ? null : detail.configurationReason;
   }
 }
 
@@ -74,12 +84,28 @@ const readBody = async (response: Response): Promise<unknown> => {
   }
 };
 
+/** Only this status/code pair may carry a public configuration reason. */
+const configurationReasonOf = (
+  status: number,
+  code: string,
+  body: object,
+): FirebaseConfigReason | null => {
+  if (status !== 500 || code !== "server/misconfigured" || !("reason" in body)) {
+    return null;
+  }
+  const parsed = FirebaseConfigReasonSchema.safeParse(body.reason);
+  return parsed.success ? parsed.data : null;
+};
+
 const describeError = async (response: Response): Promise<ApiError> => {
   const body = await readBody(response);
   if (typeof body === "object" && body !== null && "message" in body && "code" in body) {
     const code = typeof body.code === "string" ? body.code : "unknown";
     const message = typeof body.message === "string" ? body.message : response.statusText;
-    return new ApiError(response.status, code, message);
+    return new ApiError(response.status, code, {
+      message,
+      configurationReason: configurationReasonOf(response.status, code, body),
+    });
   }
   return new ApiError(response.status, "unknown", response.statusText);
 };

@@ -3,9 +3,11 @@ import { Text, View } from "react-native";
 import type { QuickTime } from "@pace/client";
 
 import { useT } from "#app/app-state.tsx";
+import { useViewer } from "#app/shared/use-viewer.ts";
 import { RadioChips } from "#app/ui/radio-chips.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 import { TimeInput } from "#app/ui/time-input.tsx";
+import { zoneName } from "@pace/core";
 
 import type { CloseForm } from "./use-close-form.ts";
 
@@ -17,6 +19,7 @@ is missing means the date.
 */
 const TypedTime = ({ deviceTz, form }: { readonly deviceTz: string; readonly form: CloseForm }) => {
   const t = useT();
+  const { language, now } = useViewer();
   return (
     <View className="gap-2">
       <View className="flex-row gap-2">
@@ -36,6 +39,7 @@ const TypedTime = ({ deviceTz, form }: { readonly deviceTz: string; readonly for
           <TimeInput
             className="w-full"
             isDraft
+            isLabelShown
             label={t("close.time")}
             onTime={(time) => {
               form.setTyped({ ...form.typed, time });
@@ -45,7 +49,7 @@ const TypedTime = ({ deviceTz, form }: { readonly deviceTz: string; readonly for
         </View>
       </View>
       <Text className="font-sans text-caption font-normal text-label-tertiary">
-        {t("edit.inZone", { zone: deviceTz })}
+        {t("edit.inZone", { zone: zoneName(deviceTz, language, now) })}
       </Text>
       {form.problem === null ? null : (
         <Text

@@ -2,7 +2,7 @@ import { useStore } from "zustand";
 import { createStore } from "zustand/vanilla";
 
 import type { InstanceError } from "@pace/client";
-import type { Instance, Result } from "@pace/core";
+import type { FirebaseConfigReason, Instance, Result } from "@pace/core";
 
 import { API_BASE_URL, TELEGRAM_BOT, WEB_ORIGIN } from "./api-base.ts";
 
@@ -12,6 +12,8 @@ export type MismatchReason = "client-outdated" | "server-outdated";
 export type ServerState = {
   /** The server this app talks to (`readServer`), set before the runtime is built for it. */
   readonly origin: string;
+  /** Configuration failure belongs to this origin and never forces a sign-out. */
+  readonly configurationError: null | { readonly reason: FirebaseConfigReason | null };
   /** What the server said about itself this session; null until it answered. */
   readonly instance: Instance | null;
   readonly status: "incompatible" | "ok" | "unknown";
@@ -26,6 +28,7 @@ export const serverHost = (origin: string): string => new URL(origin).host;
 
 /** The current server and whether it fits this app (`unknown` until it answered, never blocking). */
 export const serverStore = createStore<ServerState>(() => ({
+  configurationError: null,
   instance: null,
   origin: API_BASE_URL,
   reason: null,
@@ -34,7 +37,7 @@ export const serverStore = createStore<ServerState>(() => ({
 
 const mismatch = (origin: string, reason: MismatchReason): void => {
   if (serverStore.getState().origin === origin) {
-    serverStore.setState({ reason, status: "incompatible" });
+    serverStore.setState({ configurationError: null, reason, status: "incompatible" });
   }
 };
 
@@ -52,7 +55,20 @@ export const applyInstanceCheck = (
     return;
   }
   if (result.ok) {
-    serverStore.setState({ instance: result.value, reason: null, status: "ok" });
+    serverStore.setState({
+      configurationError: null,
+      instance: result.value,
+      reason: null,
+      status: "ok",
+    });
+    return;
+  }
+  if (typeof result.error === "object") {
+    serverStore.setState({
+      configurationError: { reason: result.error.reason },
+      reason: null,
+      status: "unknown",
+    });
     return;
   }
   switch (result.error) {

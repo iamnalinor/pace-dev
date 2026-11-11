@@ -1,0 +1,1 @@
+ALTER TABLE `account_confirmations` ADD `language` text;

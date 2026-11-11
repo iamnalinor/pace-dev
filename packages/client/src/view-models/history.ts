@@ -1,6 +1,5 @@
 import {
   coreReducer,
-  type CoreState,
   type Event,
   EVENT_LABEL_KEYS,
   INITIAL_CORE_STATE,
@@ -13,15 +12,11 @@ import {
   taskById,
 } from "@pace/core";
 
+import type { CompleteHistorySource } from "../history-types.ts";
+
 import { type NowViewModel, nowViewModel } from "./now.ts";
 
-/** The client state as history reads it: the materialized slices plus both logs. */
-export type HistorySource = CoreState & {
-  /** Effective events: corrections applied. */
-  readonly events: readonly Event[];
-  /** Every event, corrections included. */
-  readonly log: readonly Event[];
-};
+export type HistorySource = CompleteHistorySource;
 
 export type HistoryEntry = {
   readonly id: string;
@@ -161,6 +156,40 @@ on it still stands on its own.
 const isOfGoneTask = (state: HistorySource, event: Event, taskId: null | string): boolean =>
   event.type.startsWith("task.") && taskId !== null && taskById(state.tasks, taskId) === undefined;
 
+/**
+The zone the app gave an account that had none (`ensureTimezone`, at the first sign-in): the
+system's setting, not the person's act, so it offers no Undo (QA PR55-1-11, R27-12: a fresh
+account's History began with an undoable «Settings changed»; undone, the app only writes it again).
+Written as `system` from this build on; before, from the device's own source (`app` or `web`,
+never the bot or MCP: those zones are the person's), as the log's first event that sets the zone
+and nothing else.
+
+The trade-off (class 376): on an account from before this build, a first zone the person picked in
+the app (the zone question, shown only where the device's zone was unusable and the app wrote
+none) has the same shape and also offers no Undo. Nothing in the event tells the two apart (one
+device, the zone alone, stamped at the write), and an Undo there would only bring back "no zone",
+which the app fills (or asks for) again; so the overlap is accepted rather than an Undo that
+undoes nothing.
+*/
+const LEGACY_ZONE_SOURCES: ReadonlySet<Event["source"]> = new Set(["app", "web"]);
+
+const isInitialZone = (event: Event, log: readonly Event[]): boolean => {
+  if (event.type !== "settings.updated" || event.payload.timezone === undefined) {
+    return false;
+  }
+  if (event.source === "system") {
+    return true;
+  }
+  if (!LEGACY_ZONE_SOURCES.has(event.source)) {
+    return false;
+  }
+  const first = log.find(
+    (candidate) =>
+      candidate.type === "settings.updated" && candidate.payload.timezone !== undefined,
+  );
+  return first?.id === event.id && Object.keys(event.payload).length === 1;
+};
+
 const newestFirst = (a: Event, b: Event): number => {
   const keyA = `${a.occurredAt}${a.recordedAt}${a.id}`;
   const keyB = `${b.occurredAt}${b.recordedAt}${b.id}`;
@@ -268,7 +297,11 @@ const entries = (state: HistorySource): readonly HistoryEntry[] => {
       taskId,
       taskTitle: titleOf(state, event, taskId),
       // Undoing an edit of a task that is gone changes nothing: no Undo on it (R27-07).
-      revocable: !isCorrection(event) && isEffective && !isOfGoneTask(state, event, taskId),
+      revocable:
+        !isCorrection(event) &&
+        isEffective &&
+        !isOfGoneTask(state, event, taskId) &&
+        !isInitialZone(event, state.log),
       revokedBy,
       labelKey: labelKeyOf(event),
     };

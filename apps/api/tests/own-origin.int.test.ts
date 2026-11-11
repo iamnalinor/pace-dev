@@ -5,8 +5,8 @@ import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
 
 import { findUserIdByTelegramId } from "../src/auth/users.ts";
+import { d1 } from "../src/platform/cloudflare/sqlite.ts";
 import { oauthOrigin, ownOrigin } from "../src/shared/config.ts";
-import { d1 } from "../src/shared/db/d1.ts";
 import worker, { providerOptions } from "../src/worker.ts";
 import { loginAsDev, readJson } from "./helpers.ts";
 

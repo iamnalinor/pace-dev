@@ -1,0 +1,1175 @@
+{
+  "type": "object",
+  "properties": {
+    "tasks": {
+      "type": "object",
+      "properties": {
+        "byId": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "createdEventId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "presetId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "seriesId": {
+                "type": ["string", "null"]
+              },
+              "seriesRevision": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "userModified": {
+                "type": "boolean"
+              },
+              "projectId": {
+                "type": ["string", "null"]
+              },
+              "importance": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": ["asap", "prioritized", "normal", "nice_to_have"]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "importanceSetAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "dueAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "dueTz": {
+                "type": ["string", "null"]
+              },
+              "startAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "startTz": {
+                "type": ["string", "null"]
+              },
+              "estimateMinutes": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "subtasks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "label": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "number": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "doneAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["id", "label", "number", "doneAt"],
+                  "additionalProperties": false
+                }
+              },
+              "slider": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "description": {
+                "type": ["string", "null"]
+              },
+              "sourceText": {
+                "type": ["string", "null"]
+              },
+              "sources": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": ["string", "null"]
+                    },
+                    "at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": ["text", "url", "at"],
+                  "additionalProperties": false
+                }
+              },
+              "fields": {
+                "type": "object",
+                "properties": {
+                  "link": {
+                    "type": ["string", "null"]
+                  },
+                  "submitVia": {
+                    "type": ["string", "null"]
+                  }
+                },
+                "required": ["link", "submitVia"],
+                "additionalProperties": false
+              },
+              "overrides": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": ["not_started", "in_progress", "paused"]
+              },
+              "statusSince": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "touched": {
+                "type": "boolean"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "submittedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "closed": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "outcome": {
+                        "type": "string",
+                        "enum": ["done", "cancelled", "cancelled_missed", "skipped"]
+                      },
+                      "at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "reason": {
+                        "type": ["string", "null"]
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": ["app", "web", "bot", "mcp", "system"]
+                      },
+                      "eventId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "confirmed": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": ["outcome", "at", "reason", "source", "eventId", "confirmed"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reopenedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lastEventAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "id",
+              "createdEventId",
+              "title",
+              "presetId",
+              "seriesId",
+              "seriesRevision",
+              "userModified",
+              "projectId",
+              "importance",
+              "importanceSetAt",
+              "dueAt",
+              "dueTz",
+              "startAt",
+              "startTz",
+              "estimateMinutes",
+              "subtasks",
+              "slider",
+              "description",
+              "sourceText",
+              "sources",
+              "fields",
+              "overrides",
+              "status",
+              "statusSince",
+              "touched",
+              "createdAt",
+              "submittedAt",
+              "closed",
+              "reopenedAt",
+              "lastEventAt"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["byId"],
+      "additionalProperties": false
+    },
+    "projects": {
+      "type": "object",
+      "properties": {
+        "byId": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "color": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "blue",
+                      "violet",
+                      "green",
+                      "amber",
+                      "coral",
+                      "pink",
+                      "teal",
+                      "slate",
+                      "orange",
+                      "yellow"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "description": {
+                "type": ["string", "null"]
+              },
+              "archived": {
+                "type": "boolean"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": ["id", "name", "color", "description", "archived", "createdAt"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["byId"],
+      "additionalProperties": false
+    },
+    "presets": {
+      "type": "object",
+      "properties": {
+        "byId": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "name": {
+                "type": "string"
+              },
+              "extends": {
+                "type": ["string", "null"]
+              },
+              "builtIn": {
+                "type": "boolean"
+              },
+              "archived": {
+                "type": "boolean"
+              },
+              "definition": {
+                "type": "object",
+                "properties": {
+                  "urgencyPolicy": {
+                    "type": "string",
+                    "enum": ["age", "lag", "pace", "resubmission"]
+                  },
+                  "defaultImportance": {
+                    "type": "string",
+                    "enum": ["asap", "prioritized", "normal", "nice_to_have"]
+                  },
+                  "deadlinePolicy": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "hard"
+                          }
+                        },
+                        "required": ["kind"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "resubmission"
+                          },
+                          "softDays": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "finalMode": {
+                            "type": "string",
+                            "enum": ["fixed", "offset"]
+                          },
+                          "finalAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "finalTz": {
+                            "type": ["string", "null"]
+                          }
+                        },
+                        "required": ["kind", "softDays", "finalAt", "finalTz"],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "submission": {
+                    "type": "string",
+                    "enum": ["per_subtask", "whole"]
+                  },
+                  "progressMode": {
+                    "type": "string",
+                    "enum": ["none", "slider", "subtasks"]
+                  },
+                  "recurrence": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "issued": {
+                            "type": "object",
+                            "properties": {
+                              "weekday": {
+                                "type": "number",
+                                "enum": [1, 2, 3, 4, 5, 6, 7]
+                              },
+                              "time": {
+                                "type": "string",
+                                "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                              }
+                            },
+                            "required": ["weekday", "time"],
+                            "additionalProperties": false
+                          },
+                          "due": {
+                            "type": "object",
+                            "properties": {
+                              "weekday": {
+                                "type": "number",
+                                "enum": [1, 2, 3, 4, 5, 6, 7]
+                              },
+                              "time": {
+                                "type": "string",
+                                "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                              }
+                            },
+                            "required": ["weekday", "time"],
+                            "additionalProperties": false
+                          },
+                          "tz": {
+                            "type": "string"
+                          },
+                          "firstNumber": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": ["issued", "due", "tz"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "fields": {
+                    "type": "object",
+                    "properties": {
+                      "link": {
+                        "type": "boolean"
+                      },
+                      "description": {
+                        "type": "boolean"
+                      },
+                      "startAt": {
+                        "type": "boolean"
+                      },
+                      "submitVia": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "notify": {
+                    "type": "object",
+                    "properties": {
+                      "criticalHours": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "criticalProgress": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "criticalScore": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "waitingDays": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "inProgressIdleDays": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "defaultEstimateMinutes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "color": {
+                    "type": "string",
+                    "enum": [
+                      "blue",
+                      "violet",
+                      "green",
+                      "amber",
+                      "coral",
+                      "pink",
+                      "teal",
+                      "slate",
+                      "orange",
+                      "yellow"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "order": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "extends",
+              "builtIn",
+              "archived",
+              "definition",
+              "createdAt",
+              "order"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["byId"],
+      "additionalProperties": false
+    },
+    "settings": {
+      "type": "object",
+      "properties": {
+        "language": {
+          "type": "string",
+          "enum": ["en", "ru"]
+        },
+        "timezone": {
+          "type": ["string", "null"]
+        },
+        "digestWindows": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+          }
+        },
+        "quietHours": {
+          "type": "object",
+          "properties": {
+            "from": {
+              "type": "string",
+              "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+            },
+            "to": {
+              "type": "string",
+              "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+            }
+          },
+          "required": ["from", "to"]
+        },
+        "nightHours": {
+          "type": "boolean"
+        },
+        "categoryEstimates": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "enum": [
+              "work",
+              "study",
+              "task",
+              "food",
+              "commute",
+              "hygiene",
+              "rest",
+              "chores",
+              "social",
+              "sport",
+              "sleep",
+              "other"
+            ]
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 1440
+          }
+        },
+        "notificationChannels": {
+          "type": "object",
+          "properties": {
+            "login": {
+              "type": "object",
+              "properties": {
+                "telegram": {
+                  "type": "boolean"
+                },
+                "app": {
+                  "type": "boolean"
+                },
+                "web": {
+                  "type": "boolean"
+                }
+              },
+              "required": ["telegram", "app", "web"],
+              "additionalProperties": false
+            },
+            "deadline_digest": {
+              "type": "object",
+              "properties": {
+                "telegram": {
+                  "type": "boolean"
+                },
+                "app": {
+                  "type": "boolean"
+                },
+                "web": {
+                  "type": "boolean"
+                }
+              },
+              "required": ["telegram", "app", "web"],
+              "additionalProperties": false
+            },
+            "event_start": {
+              "type": "object",
+              "properties": {
+                "telegram": {
+                  "type": "boolean"
+                },
+                "app": {
+                  "type": "boolean"
+                },
+                "web": {
+                  "type": "boolean"
+                }
+              },
+              "required": ["telegram", "app", "web"],
+              "additionalProperties": false
+            },
+            "activity_overrun": {
+              "type": "object",
+              "properties": {
+                "telegram": {
+                  "type": "boolean"
+                },
+                "app": {
+                  "type": "boolean"
+                },
+                "web": {
+                  "type": "boolean"
+                }
+              },
+              "required": ["telegram", "app", "web"],
+              "additionalProperties": false
+            }
+          },
+          "required": ["login", "deadline_digest", "event_start", "activity_overrun"],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "language",
+        "timezone",
+        "digestWindows",
+        "quietHours",
+        "nightHours",
+        "categoryEstimates",
+        "notificationChannels"
+      ],
+      "additionalProperties": false
+    },
+    "time": {
+      "type": "object",
+      "properties": {
+        "activities": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "originEventId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1
+              },
+              "category": {
+                "type": "string",
+                "enum": [
+                  "work",
+                  "study",
+                  "task",
+                  "food",
+                  "commute",
+                  "hygiene",
+                  "rest",
+                  "chores",
+                  "social",
+                  "sport",
+                  "sleep",
+                  "other"
+                ]
+              },
+              "taskId": {
+                "type": ["string", "null"]
+              },
+              "buttonId": {
+                "type": ["string", "null"]
+              },
+              "startAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "endAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "expectMinutes": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "isLogged": {
+                "type": "boolean"
+              },
+              "isAlongside": {
+                "type": "boolean"
+              },
+              "stillAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "originEventId",
+              "label",
+              "category",
+              "taskId",
+              "buttonId",
+              "startAt",
+              "endAt",
+              "expectMinutes",
+              "isLogged",
+              "isAlongside",
+              "stillAt"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["activities"],
+      "additionalProperties": false
+    },
+    "series": {
+      "type": "object",
+      "properties": {
+        "byId": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "template": {
+                "type": "object",
+                "properties": {
+                  "taskId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "presetId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "projectId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "importance": {
+                    "type": "string",
+                    "enum": ["asap", "prioritized", "normal", "nice_to_have"]
+                  },
+                  "dueAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "dueTz": {
+                    "type": "string"
+                  },
+                  "startAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "startTz": {
+                    "type": "string"
+                  },
+                  "estimateMinutes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "subtasks": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "label": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "number": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": ["id", "label"]
+                    }
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "sourceText": {
+                    "type": "string"
+                  },
+                  "fields": {
+                    "default": {},
+                    "type": "object",
+                    "properties": {
+                      "link": {
+                        "type": "string"
+                      },
+                      "ticket": {
+                        "type": "string"
+                      },
+                      "submitVia": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "overrides": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  },
+                  "seriesId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "seriesRevision": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "taskId",
+                  "title",
+                  "presetId",
+                  "startAt",
+                  "startTz",
+                  "seriesId",
+                  "seriesRevision"
+                ]
+              },
+              "schedule": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "daily"
+                      },
+                      "until": {
+                        "type": "string",
+                        "format": "date"
+                      }
+                    },
+                    "required": ["kind"]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "weekdays"
+                      },
+                      "until": {
+                        "type": "string",
+                        "format": "date"
+                      }
+                    },
+                    "required": ["kind"]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "every_n_days"
+                      },
+                      "days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 3650
+                      },
+                      "until": {
+                        "type": "string",
+                        "format": "date"
+                      }
+                    },
+                    "required": ["kind", "days"]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "weekly"
+                      },
+                      "until": {
+                        "type": "string",
+                        "format": "date"
+                      }
+                    },
+                    "required": ["kind"]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "monthly"
+                      },
+                      "until": {
+                        "type": "string",
+                        "format": "date"
+                      }
+                    },
+                    "required": ["kind"]
+                  }
+                ]
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "revisionKey": {
+                "type": "string",
+                "minLength": 1
+              },
+              "archived": {
+                "type": "boolean"
+              },
+              "keepTaskId": {
+                "type": ["string", "null"]
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "id",
+              "template",
+              "schedule",
+              "revision",
+              "revisionKey",
+              "archived",
+              "keepTaskId",
+              "createdAt"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["byId"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["tasks", "projects", "presets", "settings", "time", "series"],
+  "additionalProperties": false,
+  "$defs": {
+    "__schema0": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema0"
+          }
+        },
+        {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema0"
+          }
+        }
+      ]
+    }
+  }
+}

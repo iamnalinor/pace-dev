@@ -274,7 +274,9 @@ export const QuickLine = ({
         // wider, a shift too small to read).
         <View aria-hidden className="w-hit-web" testID="line-plus-slot" />
       ) : (
-        <View>
+        // The glyph on the gutter, as the list's checks below are: the composer's frame steps out
+        // by the target's padding (composer.tsx), so the field gains it at 320 (QA PR55-1-15).
+        <View testID="line-edge-start">
           <LineButton
             disabled={isLocked}
             hotkey={HOTKEYS.newTask}
@@ -285,7 +287,8 @@ export const QuickLine = ({
         </View>
       )}
       <LineInput flow={flow} isFocused={isFocused} isLocked={isLocked} isReading={isReading} />
-      <View className="flex-row">
+      {/* Send's 40 circle ends on the gutter (the frame steps out by its 4 px, composer.tsx). */}
+      <View className="flex-row" testID="line-edge-end">
         <LineButton
           disabled={isIdle}
           hotkey={HOTKEYS.toInbox}

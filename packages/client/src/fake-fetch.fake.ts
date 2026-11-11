@@ -1,5 +1,14 @@
 import type { Event, Me, User } from "@pace/core";
 
+/* The guarded writes tests seed a local copy with, for the app's tests as well. */
+export {
+  pullPage,
+  seedCopy,
+  seedPending,
+  seedSynced,
+  storedEvents,
+} from "./local-store.fake.ts";
+
 /** One fake route: returns a JSON body (or a full `Response`) for `METHOD /path`. */
 export type FakeRoute = (request: {
   readonly body: unknown;
@@ -50,6 +59,7 @@ export const FAKE_STORE_ID = "store-test";
 
 /** The sync routes of an empty server: nothing to pull, everything accepted. */
 export const emptySyncRoutes: Readonly<Record<string, FakeRoute>> = {
+  "GET /api/instance": () => fakeInstance,
   "GET /api/sync/pull": () => ({ events: [], more: false, seq: 0, storeId: FAKE_STORE_ID }),
   "POST /api/sync/push": ({ body }) => ({
     accepted: (body as { readonly events: readonly { readonly id: string }[] }).events.map(

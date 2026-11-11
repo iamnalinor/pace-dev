@@ -20,6 +20,7 @@ import type {
   SqlRows,
   TableSchema,
 } from "../shared/contract.ts";
+import type { ActorStorage } from "../shared/ports/actor-storage.ts";
 
 import { SERVER_TZ } from "./notifier.ts";
 
@@ -35,7 +36,12 @@ Tables no query reads and the schema does not list: when the phone was unlocked,
 is for automatic sleep only, never for a connected AI app. Matched anywhere in the text, string
 literals included (SQLite takes `FROM 'phone_uses'` for the table) and in any case.
 */
-const PRIVATE_TABLES = ["phone_uses"] as const;
+const PRIVATE_TABLES = [
+  "phone_uses",
+  "history_checkpoint",
+  "history_checkpoint_chunks",
+  "_history_",
+] as const;
 
 const privateTableIn = (sql: string): string | undefined =>
   PRIVATE_TABLES.find((table) => sql.toLowerCase().includes(table));
@@ -74,10 +80,7 @@ export const guardSql = (sql: string): Result<string, SqlError> => {
 const ROLLBACK = new Error("read-only: rolled back");
 
 /** Runs a guarded query in a transaction that is always rolled back. */
-export const runReadOnly = (
-  storage: DurableObjectStorage,
-  sql: string,
-): Result<SqlRows, SqlError> => {
+export const runReadOnly = (storage: ActorStorage, sql: string): Result<SqlRows, SqlError> => {
   const guarded = guardSql(sql);
   if (!guarded.ok) {
     return guarded;
@@ -107,7 +110,7 @@ export const runReadOnly = (
 };
 
 /** The tables a query may read and how they were created (internal and private ones left out). */
-export const describeTables = (storage: DurableObjectStorage): readonly TableSchema[] =>
+export const describeTables = (storage: ActorStorage): readonly TableSchema[] =>
   [
     ...storage.sql.exec<{ name: string; sql: string }>(
       String.raw`SELECT name, sql FROM sqlite_master WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '\_%' ESCAPE '\' ORDER BY name`,

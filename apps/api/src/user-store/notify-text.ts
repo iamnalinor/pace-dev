@@ -1,12 +1,12 @@
 import {
   type Answer,
   ANSWERS,
-  countryName,
   formatDuration,
   formatLeft,
   type Language,
   type LoginPayload,
   minutesBetween,
+  placeName,
   type PoolNotification,
   type Settings,
   shownLabel,
@@ -95,15 +95,13 @@ const answerButtons = (
 Where a sign-in came from, what Cloudflare reported first (the address and the place, which the
 client cannot choose), then the name the client gave or its browser reads as, which it can: a
 deep-link nonce is minted by whoever asks for it. A part not reported is left out (a server not
-behind Cloudflare's edge knows no address). The city is Cloudflare's own spelling.
+behind Cloudflare's edge knows no address); the place is city, country (`placeName`).
 */
 const signInPlace = (
   { city = "", country, ip, name }: LoginPayload,
   language: Language,
 ): string => {
-  const place = [country === "" ? "" : countryName(country, language), city]
-    .filter((part) => part !== "")
-    .join(", ");
+  const place = placeName({ city, country }, language);
   return [ip === "" ? "" : t(language, "notify.loginIp", { ip }), place, name]
     .filter((part) => part !== "")
     .join(" · ");

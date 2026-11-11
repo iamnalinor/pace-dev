@@ -1,5 +1,7 @@
 import Constants from "expo-constants";
 
+import { ANDROID_SMOKE_API_URL } from "../../android-smoke.ts";
+
 const extra: Readonly<Record<string, unknown>> = Constants.expoConfig?.extra ?? {};
 
 const extraString = (name: string, fallback: string): string => {
@@ -24,3 +26,7 @@ export const TELEGRAM_BOT = extraString("botUsername", "PaceTaskTrackerBot");
 
 /** Dev builds and e2e builds (`extra.isDevLogin`) show the dev login form. */
 export const IS_DEV_LOGIN_ENABLED: boolean = __DEV__ || extra["isDevLogin"] === true;
+
+/** A release-like Android build shows the form only when built for the emulator's test API. */
+export const isNativeDevLoginEnabled = (): boolean =>
+  __DEV__ || (IS_DEV_LOGIN_ENABLED && API_BASE_URL === ANDROID_SMOKE_API_URL);

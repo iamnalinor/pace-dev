@@ -1,5 +1,5 @@
 /** React bindings for @pace/client (works in React DOM and React Native). */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useStore } from "zustand";
 
 import {
@@ -15,14 +15,16 @@ import {
 
 import type { ApiClient } from "./api-client.ts";
 import type { AiOutcome, Assistant } from "./assistant.ts";
+import type { HistoryCoordinator } from "./history-types.ts";
 import type { AppState, AppStateHandle } from "./state.ts";
 import type { AiReading } from "./view-models/ai-reading.ts";
 
 import { type Clock, queryContext, systemClock } from "./clock.ts";
 import { withinDeadline } from "./deadline.ts";
+import { createHistoryHook, type HistoryResource } from "./react/history.ts";
+import { ALWAYS_LIVE, createViewHook, type Liveness, TICK_MS } from "./react/view.ts";
 import { type ComposerDraft, composerModel, type ComposerModel } from "./view-models/composer.ts";
 import { type DayModel, dayModel } from "./view-models/day.ts";
-import { type HistoryViewModel, historyViewModel } from "./view-models/history.ts";
 import { type InboxViewModel, inboxViewModel } from "./view-models/inbox.ts";
 import { type InsightsModel, insightsModel } from "./view-models/insights.ts";
 import { type NowViewModel, nowViewModel } from "./view-models/now.ts";
@@ -33,6 +35,7 @@ import { type TaskViewModel, taskViewModel } from "./view-models/task.ts";
 import { type TimeBarModel, timeBarModel } from "./view-models/time-bar.ts";
 import { type WeekModel, weekModel } from "./view-models/week.ts";
 
+export type { HistoryResource } from "./react/history.ts";
 export {
   type Consent,
   type ConsentPhase,
@@ -40,8 +43,10 @@ export {
   type Identity,
   useConsent,
 } from "./react/oauth.ts";
+
 export { type NewAgent, type Sessions, useSessions } from "./react/sessions.ts";
 export { type RangeRead, useCalendarRange, useUsage, useUsageRead } from "./react/usage.ts";
+export type { Liveness } from "./react/view.ts";
 export { useStore } from "zustand";
 
 export type AppHooks = {
@@ -57,7 +62,7 @@ export type AppHooks = {
   readonly useProjectView: (projectId: string) => Result<ProjectViewModel, "project/unknown">;
   readonly useInbox: () => InboxViewModel;
   readonly useReview: () => ReviewViewModel;
-  readonly useHistory: (atIso: string) => HistoryViewModel;
+  readonly useHistory: (atIso: string) => HistoryResource;
   /** The composer's live chips for the typed line and the user's taps. */
   readonly useComposer: (draft: ComposerDraft) => ComposerModel;
   /** The time bar: buttons and the running activity (refreshed with the clock). */
@@ -69,12 +74,22 @@ export type AppHooks = {
   readonly useWeek: (weekOf: null | string) => WeekModel;
 };
 
-/** Relative times ("5 h ago", "due today") drift slowly: half a minute is fine. */
-const TICK_MS = 30_000;
+/** What the hooks stand on besides the state: each has a default. */
+export type AppHookOptions = {
+  readonly clock?: Clock;
+  readonly history?: HistoryCoordinator;
+  /**
+  The handle of the component's screen (the app's `useScene`): a view on a screen left behind is
+  not computed again until it is in front (`createViewHook`). Always in front by default.
+  */
+  readonly useLiveness?: () => Liveness;
+};
 
 /** Hooks bound to one app state, so screens never pass the store around. */
-export const createAppHooks = (state: AppStateHandle, clock: Clock = systemClock()): AppHooks => {
-  const useVersion = (): number => useStore(state.store, (current) => current.version);
+export const createAppHooks = (
+  state: AppStateHandle,
+  { clock = systemClock(), history, useLiveness = () => ALWAYS_LIVE }: AppHookOptions = {},
+): AppHooks => {
   const useClock = (): QueryContext => {
     const [ctx, setCtx] = useState(() => queryContext(clock));
     useEffect(() => {
@@ -87,20 +102,7 @@ export const createAppHooks = (state: AppStateHandle, clock: Clock = systemClock
     }, []);
     return ctx;
   };
-  /**
-  Recomputes a view-model when the store or the clock moves. A recompute reads the clock
-  afresh: an activity started a second ago must already count as running, not wait for
-  the next tick.
-  */
-  const useView = <T>(compute: (current: AppState, ctx: QueryContext) => T, key = ""): T => {
-    const version = useVersion();
-    const tick = useClock();
-    // `version`, the tick and `key` are the inputs that matter; the store and clock are read on demand.
-    return useMemo(
-      () => compute(state.store.getState(), queryContext(clock)),
-      [version, tick, key],
-    );
-  };
+  const useView = createViewHook({ clock, state, useLiveness });
   return {
     useAppState: (selector) => useStore(state.store, selector),
     useClock,
@@ -111,11 +113,7 @@ export const createAppHooks = (state: AppStateHandle, clock: Clock = systemClock
     useTimeBar: () => useView(timeBarModel),
     useComposer: (draft) =>
       useView((current, ctx) => composerModel(current, draft, ctx), JSON.stringify(draft)),
-    useHistory: (atIso) =>
-      useView(
-        (current, ctx) => historyViewModel(current, { atIso, deviceTz: ctx.deviceTz }),
-        atIso,
-      ),
+    useHistory: createHistoryHook({ state, history, useView }),
     useInbox: () => useView(inboxViewModel),
     useLanguage: () => useStore(state.store, (current) => current.settings.language),
     useNow: (options) =>

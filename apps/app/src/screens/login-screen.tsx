@@ -4,16 +4,25 @@ import { useCallback, useState } from "react";
 import { Text, View } from "react-native";
 import { useStore } from "zustand";
 
+import { ConfigurationNotice } from "#app/features/server/configuration-notice.tsx";
 import { SESSION_CHANGED } from "@pace/client";
 
 import { useAuth, useT } from "../app-state.tsx";
 import { ServerLine } from "../features/server/server-line.tsx";
+import { isNativeDevLoginEnabled } from "../platform/api-base.ts";
 import { serverStore, useServerInfo } from "../platform/server-store.ts";
 import { isPresent } from "../platform/strings.ts";
 import { Button } from "../ui/button.tsx";
 import { PaceLogo } from "../ui/logo.tsx";
-import { DevLoginForm, errorKey, SignedOutLine, Waiting } from "./login-parts.tsx";
-import { useBotLogin } from "./use-bot-login.ts";
+import { Text as KitText } from "../ui/text.tsx";
+import {
+  DevLoginForm,
+  errorKey,
+  LoginChoices,
+  SignedOutLine,
+  signInErrorKey,
+} from "./login-parts.tsx";
+import { type useBotLogin, useServerBotLogin } from "./use-bot-login.ts";
 
 const AUTH_RETURN_URL = "pace://auth";
 
@@ -86,23 +95,48 @@ const SignInButtons = ({
   );
 };
 
+const LoginFeedback = ({
+  isConfigured,
+  isRefused,
+  isWaiting,
+  error,
+}: {
+  readonly isConfigured: boolean;
+  readonly isRefused: boolean;
+  readonly isWaiting: boolean;
+  readonly error: ReturnType<typeof errorKey>;
+}) => {
+  const t = useT();
+  return (
+    <>
+      {isConfigured && isRefused ? <Mismatch /> : null}
+      {!isConfigured || error === undefined ? null : (
+        <KitText className="text-center" role="footnote" tone="danger">
+          {t(error)}
+        </KitText>
+      )}
+      {isConfigured && !isWaiting && isNativeDevLoginEnabled() ? <DevLoginForm /> : null}
+    </>
+  );
+};
+
 export const LoginScreen = () => {
   const t = useT();
   const { auth, status } = useAuth();
-  const bot = useBotLogin();
+  const { bot, configurationError } = useServerBotLogin();
   const { guard, isRefused } = useSignInGuard();
-  const [isWebFailed, setIsWebFailed] = useState(false);
+  const [webError, setWebError] = useState<null | string>(null);
 
   const loginOnWeb = useCallback(
     async (webOrigin: string) => {
-      setIsWebFailed(false);
+      setWebError(null);
       const token = await loginInBrowser(webOrigin);
       if (!isPresent(token)) {
         return;
       }
       const result = await auth.adoptToken(token);
       // A newer session or a Log out meanwhile is no failed sign-in (fix round 2 of QA 22).
-      setIsWebFailed(!result.ok && result.error !== SESSION_CHANGED);
+      setWebError(result.ok || result.error === SESSION_CHANGED ? null : result.error);
     },
     [auth],
   );
@@ -110,7 +144,7 @@ export const LoginScreen = () => {
   if (status === "signed-in") {
     return <Redirect href="/" />;
   }
-  const error = errorKey(bot.phase) ?? (isWebFailed ? "login.failed" : undefined);
+  const error = errorKey(bot.phase) ?? (webError === null ? undefined : signInErrorKey(webError));
   const isWaiting = bot.phase.kind === "waiting";
 
   return (
@@ -122,22 +156,19 @@ export const LoginScreen = () => {
         </Text>
         <SignedOutLine />
       </View>
-      {isWaiting ? (
-        <Waiting onCancel={bot.reset} onReopen={bot.reopen} />
+      {configurationError === null ? (
+        <LoginChoices bot={bot}>
+          <SignInButtons bot={bot} guard={guard} onWeb={loginOnWeb} />
+        </LoginChoices>
       ) : (
-        <SignInButtons bot={bot} guard={guard} onWeb={loginOnWeb} />
+        <ConfigurationNotice />
       )}
-      {isRefused ? <Mismatch /> : null}
-      {error === undefined ? null : (
-        <Text className="text-center font-sans text-footnote text-danger">{t(error)}</Text>
-      )}
-      {__DEV__ && !isWaiting ? (
-        <DevLoginForm
-          onFailure={() => {
-            setIsWebFailed(true);
-          }}
-        />
-      ) : null}
+      <LoginFeedback
+        error={error}
+        isConfigured={configurationError === null}
+        isRefused={isRefused}
+        isWaiting={isWaiting}
+      />
       {isWaiting ? null : <ServerLine />}
     </View>
   );

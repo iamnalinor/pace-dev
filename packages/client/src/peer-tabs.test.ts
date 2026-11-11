@@ -193,3 +193,48 @@ describe("a dropped client (QA round 17 review m1)", () => {
     second.live.stop();
   });
 });
+
+describe("copy-bound peer hints", () => {
+  it("ignores an event payload from the replaced persistent copy", async () => {
+    const { first, second, store } = await twoTabs();
+    const before = await store.readSnapshot();
+    await store.clear();
+    await second.state.rematerialize();
+    const event = settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAY", at(10), { language: "ru" });
+    await second.state.adoptPeerChange({
+      kind: "events",
+      events: [event],
+      copyToken: before.copyToken,
+      storeId: before.storeId,
+      owner: before.owner,
+    });
+    expect(languageOf(second)).toBe("en");
+    first.close();
+    second.close();
+    first.live.stop();
+    second.live.stop();
+  });
+  it("does not reload another owner's source from a shared store hint", async () => {
+    const { first, second, store } = await twoTabs();
+    await first.state.claim("owner-a");
+    await second.state.claim("owner-a");
+    await store.clear();
+    await store.setOwner("owner-b");
+    await store.append(
+      [settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAY", at(10), { language: "ru" })],
+      await store.readMeta(),
+    );
+    const foreign = await store.readSnapshot();
+    await second.state.adoptPeerChange({
+      kind: "reload",
+      copyToken: foreign.copyToken,
+      storeId: foreign.storeId,
+      owner: foreign.owner,
+    });
+    expect(languageOf(second)).toBe("en");
+    first.close();
+    second.close();
+    first.live.stop();
+    second.live.stop();
+  });
+});

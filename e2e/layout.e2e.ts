@@ -4,7 +4,11 @@ import { expect, test } from "./support/fixtures.ts";
 import { loginViaApi } from "./support/login.ts";
 import { seedLivedIn } from "./support/seed.ts";
 
-/** The destinations whose large title must sit at one y (spec §5.0.2, F-LAY-02). */
+/**
+The destinations whose large title must sit at one y (spec §5.0.2, F-LAY-02). On a phone the
+tabs' titles (Now, Day, Inbox) start right under the status bar, and the ones reached through More
+sit under their Back bar (owner, 2026-11-10): each group at one y of its own.
+*/
 const DESTINATIONS = [
   "/",
   "/day",
@@ -15,6 +19,13 @@ const DESTINATIONS = [
   "/history",
   "/settings",
 ] as const;
+
+/** On a phone, the destinations that are tabs (no Back bar above the title). */
+const PHONE_TABS: ReadonlySet<string> = new Set(["/", "/day", "/inbox"]);
+
+/** The y every destination's title is compared with: its group's first, on a phone. */
+const groupOf = (path: string, isPhone: boolean): string =>
+  isPhone && !PHONE_TABS.has(path) ? "/week" : "/";
 
 const VIEWPORTS = [
   { height: 900, width: 1440 },
@@ -43,10 +54,10 @@ for (const viewport of VIEWPORTS) {
     for (const path of DESTINATIONS) {
       tops[path] = (await titleAt(page, path)).y;
     }
-    const first = tops["/"] ?? NaN;
+    const isPhone = viewport.width < 768;
     for (const path of DESTINATIONS) {
       expect(
-        Math.abs((tops[path] ?? NaN) - first),
+        Math.abs((tops[path] ?? NaN) - (tops[groupOf(path, isPhone)] ?? NaN)),
         `${path} ${JSON.stringify(tops)}`,
       ).toBeLessThanOrEqual(1);
     }

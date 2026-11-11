@@ -1,38 +1,26 @@
-import type { EndpointShape, LiveNotice } from "@pace/core";
+import { endpoints, type EndpointShape, type LiveNotice, type LogHead } from "@pace/core";
 
-import type { EventStore } from "./event-store.ts";
+import type { PaceClientOptions } from "./create-client-types.ts";
+import type { HistoryCoordinator } from "./history-types.ts";
+import type { AppStateHandle } from "./state.ts";
+import type { SyncClient } from "./sync-client.ts";
 
 import { type Actions, createActions } from "./actions/actions.ts";
 import { type ApiClient, createApiClient } from "./api-client.ts";
 import { type Assistant, createAssistant } from "./assistant.ts";
 import { type Auth, createAuth } from "./auth.ts";
+import { stateAndSync } from "./client-state.ts";
 import { type Clock, systemClock } from "./clock.ts";
-import {
-  createLiveChannel,
-  type LiveChannel,
-  type LiveEventsPage,
-  type SocketLike,
-} from "./live.ts";
+import { createInstanceReader, type InstanceReader } from "./instance.ts";
+import { createLiveChannel, type LiveChannel, type LiveEventsPage } from "./live.ts";
 import { createNotificationFeed, type NotificationFeed, parseLiveNotice } from "./notifications.ts";
-import { parseStoreChange, type PeerTabs } from "./peer-tabs.ts";
 import { type SessionChecks, sessionChecks } from "./session-checks.ts";
-import {
-  type EndedSessionStore,
-  noteMark,
-  type SessionStore,
-  type SignOutNotes,
-} from "./session.ts";
-import { type AppStateHandle, createAppState } from "./state.ts";
-import { createSyncClient, type SyncClient } from "./sync-client.ts";
-import {
-  httpTransport,
-  preferSocket,
-  socketTransport,
-  type SyncTransport,
-} from "./sync-transport.ts";
+import { noteMark } from "./session.ts";
+import { httpTransport, preferSocket, socketTransport } from "./sync-transport.ts";
 
 export type PaceClient = {
   readonly actions: Actions;
+  readonly history: HistoryCoordinator;
   readonly api: ApiClient;
   /** The LLM reading of free text (needs the network; nothing is written). */
   readonly assistant: Assistant;
@@ -44,6 +32,11 @@ export type PaceClient = {
   readonly live: LiveChannel;
   /** The notification pool, kept current by the live line. */
   readonly notifications: NotificationFeed;
+  /**
+  What the server says about itself (`GET /api/instance`, sent with no session): one reading shared
+  by the app's server check and the checkpoint negotiation (`createInstanceReader`).
+  */
+  readonly instance: InstanceReader;
   /** Other live messages about the pool (a new notification to show, one to take back). */
   readonly onNotice: (listener: (notice: LiveNotice) => void) => () => void;
   /**
@@ -70,72 +63,7 @@ export type PaceClient = {
   readonly close: () => void;
 };
 
-export type PaceClientOptions = {
-  readonly baseUrl: string;
-  /** Defaults to the system clock; tests pass a frozen one. */
-  readonly clock?: Clock;
-  readonly deviceId: string;
-  /** Defaults to the global `fetch`; tests pass a fake. */
-  readonly fetch?: (input: string, init: RequestInit) => Promise<Response>;
-  /** Defaults to the clock's `now`. */
-  readonly now?: () => string;
-  /** The other tabs sharing this store (a browser profile's), told of every change to it. */
-  readonly peers?: PeerTabs | undefined;
-  readonly session: SessionStore;
-  /** The log-outs the server has not heard yet, kept between starts (R22-02); in memory when absent. */
-  readonly endedSessions?: EndedSessionStore | undefined;
-  /** The note a tab that logs out leaves the other tabs of its browser profile (the web only). */
-  readonly signOutNotes?: SignOutNotes | undefined;
-  readonly source: "app" | "web";
-  readonly store: EventStore;
-  /** Defaults to the global `WebSocket`; tests pass a fake. */
-  readonly createSocket?: (url: string, protocols: readonly string[]) => SocketLike;
-};
-
-/**
-The local state and its sync: a local change is sent within a second, over the live socket while
-it can carry it and over HTTP otherwise (decided per call, see `sync-transport.ts`).
-*/
-const stateAndSync = (
-  options: PaceClientOptions,
-  transport: SyncTransport,
-  now: () => string,
-): {
-  readonly state: AppStateHandle;
-  readonly sync: SyncClient;
-  readonly closePeers: () => void;
-} => {
-  // The sync is wired after the state it reads, so the state reaches it through this.
-  const wiring = { sendSoon: (): void => undefined };
-  const state = createAppState({
-    deviceId: options.deviceId,
-    now,
-    onLocal: () => {
-      wiring.sendSoon();
-    },
-    ...(options.peers !== undefined && { onStored: options.peers.post }),
-    source: options.source,
-    store: options.store,
-  });
-  const stopListening = options.peers?.listen((message) => {
-    const change = parseStoreChange(message);
-    if (change !== null) {
-      void state.adoptPeerChange(change);
-    }
-  });
-  const sync = createSyncClient({
-    now,
-    state,
-    store: options.store,
-    transport,
-  });
-  wiring.sendSoon = sync.soon;
-  const closePeers = (): void => {
-    stopListening?.();
-    options.peers?.close();
-  };
-  return { closePeers, state, sync };
-};
+export type { PaceClientOptions } from "./create-client-types.ts";
 
 /**
 The live channel next to the API: a server's "changed" asks the sync for a run, new events go
@@ -145,6 +73,7 @@ const liveChannelOf = (
   options: PaceClientOptions,
   wiring: {
     readonly onChange: () => void;
+    readonly onHello: (head: LogHead) => void;
     readonly onDropped: () => void;
     readonly onFailedToOpen: () => void;
     readonly onEvents: (page: LiveEventsPage) => void;
@@ -159,6 +88,7 @@ const liveChannelOf = (
     ...(options.createSocket !== undefined && { createSocket: options.createSocket }),
     deviceId: options.deviceId,
     onChange: wiring.onChange,
+    onHello: wiring.onHello,
     onDropped: wiring.onDropped,
     onEvents: wiring.onEvents,
     onFailedToOpen: wiring.onFailedToOpen,
@@ -199,6 +129,30 @@ const noticeRouter = (
 };
 
 /**
+A sync run that found the local copy no longer this session's sent nothing (`COPY_CHANGED`).
+Another tab dropped or claimed the shared copy, as a tab does when the session ends, and a run
+that sends nothing hears no 401; a hidden tab has no socket to hear the end either, so it stayed
+signed in on a dead session (PR 55 CI, bug-lessons class 123). It asks the same check a call's 401
+starts, while a session is in use and the client is not closed.
+*/
+const sessionCheckOnCopyChange = (
+  auth: Auth,
+  checks: SessionChecks,
+): { readonly ask: () => void; readonly close: () => void } => {
+  let isClosed = false;
+  return {
+    ask: () => {
+      if (!isClosed && auth.token() !== undefined) {
+        void checks.check();
+      }
+    },
+    close: () => {
+      isClosed = true;
+    },
+  };
+};
+
+/**
 The live channel and the sync it carries: the channel is made first (the sync's calls go over
 it) and reaches the sync once that exists; nothing arrives before `start`.
 */
@@ -210,18 +164,52 @@ const liveAndSync = (
     readonly checks: SessionChecks;
     readonly now: () => string;
     readonly onMessage: (message: unknown) => void;
+    readonly instance: InstanceReader;
   },
 ): {
   readonly closePeers: () => void;
+  readonly history: HistoryCoordinator;
   readonly live: LiveChannel;
   readonly state: AppStateHandle;
   readonly sync: SyncClient;
 } => {
   const { api, auth } = deps;
-  const wired: { sync?: SyncClient } = {};
-  const live: LiveChannel = liveChannelOf(options, {
+  const wired: { sync?: SyncClient; live?: LiveChannel } = {};
+  const live: LiveChannel = liveChannelOf(options, liveWiring(wired, deps));
+  wired.live = live;
+  const transport = preferSocket(socketTransport(live), httpTransport(api));
+  const copyCheck = sessionCheckOnCopyChange(auth, deps.checks);
+  const { closePeers, state, sync, history } = stateAndSync(options, transport, {
+    now: deps.now,
+    api,
+    instance: deps.instance,
+    onCopyChanged: copyCheck.ask,
+  });
+  wired.sync = sync;
+  const close = (): void => {
+    copyCheck.close();
+    closePeers();
+  };
+  return { closePeers: close, live, state, sync, history };
+};
+
+/** What the live channel tells the sync (and the session check), once both exist (`wired`). */
+const liveWiring = (
+  wired: { readonly sync?: SyncClient; readonly live?: LiveChannel },
+  deps: {
+    readonly auth: Auth;
+    readonly checks: SessionChecks;
+    readonly onMessage: (message: unknown) => void;
+  },
+): Parameters<typeof liveChannelOf>[1] => {
+  const { auth } = deps;
+  return {
     onChange: () => {
       wired.sync?.soon();
+    },
+    // A connect: a pull only if the copy is behind where the server's log stood as it opened.
+    onHello: (head) => {
+      void wired.sync?.catchUpTo(head);
     },
     // The socket went: a run finds out at once whether the server is still there (the offline
     // line), instead of at the next safety poll; its failures keep the sync's own backoff.
@@ -249,17 +237,13 @@ const liveAndSync = (
         // The same check a call's 401 starts: what else would send the session waits for it.
         const checked = await deps.checks.check();
         if (checked.ok) {
-          live.start();
+          wired.live?.start();
         }
       })();
     },
     sessionCheck: (): Promise<unknown> | undefined => deps.checks.pending(),
     token: auth.token,
-  });
-  const transport = preferSocket(socketTransport(live), httpTransport(api));
-  const { closePeers, state, sync } = stateAndSync(options, transport, deps.now);
-  wired.sync = sync;
-  return { closePeers, live, state, sync };
+  };
 };
 
 /**
@@ -288,6 +272,7 @@ const apiAndAuth = (
   });
   const auth = createAuth({
     api,
+    canSignIn: options.canSignIn,
     ended: options.endedSessions,
     notes: options.signOutNotes,
     session: options.session,
@@ -298,6 +283,35 @@ const apiAndAuth = (
   wiring.heard = checks.heard;
   wiring.pending = checks.pending;
   return { api, auth, checks };
+};
+
+/**
+The notification feed belongs to the session that fetched it: once this device's token changes
+(a sign-out, another account signed in) the page and its freshness go, so the next account never
+sees the last one's pool, even within `FEED_FRESH_MS` (class 372).
+*/
+const feedFollowsSession = (auth: Auth, feed: NotificationFeed): void => {
+  // Which session the feed was read for: a change of session, not a credential check.
+  let readFor = auth.token();
+  auth.store.subscribe(() => {
+    const current = auth.token();
+    if (current === readFor) {
+      return;
+    }
+
+    readFor = current;
+    feed.reset();
+  });
+};
+
+/** The server's instance, read with no session (the route is public and names no one). */
+const instanceReaderOf = (options: PaceClientOptions): InstanceReader => {
+  const publicApi = createApiClient({
+    baseUrl: options.baseUrl,
+    ...(options.fetch !== undefined && { fetch: options.fetch }),
+    token: () => undefined,
+  });
+  return createInstanceReader(async () => await publicApi.call(endpoints.instance, {}));
 };
 
 /**
@@ -312,10 +326,13 @@ export const createPaceClient = (options: PaceClientOptions): PaceClient => {
   const { now } = clock;
   const { api, auth, checks } = apiAndAuth(options);
   const notices = noticeRouter(createNotificationFeed({ api, source: options.source }));
-  const { closePeers, live, state, sync } = liveAndSync(options, {
+  feedFollowsSession(auth, notices.feed);
+  const instance = instanceReaderOf(options);
+  const { closePeers, live, state, sync, history } = liveAndSync(options, {
     api,
     auth,
     checks,
+    instance,
     now,
     onMessage: notices.onMessage,
   });
@@ -339,6 +356,8 @@ export const createPaceClient = (options: PaceClientOptions): PaceClient => {
     auth,
     clock,
     close: closePeers,
+    history,
+    instance,
     live,
     notifications,
     onNotice,

@@ -3,7 +3,7 @@ import * as SecureStore from "expo-secure-store";
 import type { FakeSecureStore } from "#app/testing/secure-store.fake.ts";
 
 import { createMemoryEventStore } from "@pace/client";
-import { createFakeFetch, fakeInstance } from "@pace/client/testing";
+import { createFakeFetch, fakeInstance, seedSynced, storedEvents } from "@pace/client/testing";
 import { InstanceSchema } from "@pace/core";
 import { artboardEvents } from "@pace/core/testing";
 
@@ -32,7 +32,8 @@ const runtimeWithData = async () => {
     fetch: createFakeFetch({}).fetch,
   });
   await runtime.state.ready;
-  await runtime.state.ingest(artboardEvents().slice(0, 5));
+  await seedSynced(eventStore, artboardEvents().slice(0, 5));
+  await runtime.state.rematerialize();
   return { eventStore, runtime };
 };
 
@@ -64,10 +65,11 @@ describe("switchServer", () => {
     await switchServer(runtime, { instance: instanceB, origin: B });
 
     expect(reset).toHaveBeenCalledTimes(1);
-    await expect(eventStore.listAll()).resolves.toEqual([]);
+    await expect(storedEvents(eventStore)).resolves.toEqual([]);
     expect(secureStore.values.has("pace.session")).toBe(false);
     await expect(readServer()).resolves.toBe(B);
     expect(serverStore.getState()).toEqual({
+      configurationError: null,
       instance: instanceB,
       origin: B,
       reason: null,
@@ -86,6 +88,7 @@ describe("switchServer", () => {
     await switchServer(runtime, null);
     await expect(readServer()).resolves.toBe(API_BASE_URL);
     expect(serverStore.getState()).toEqual({
+      configurationError: null,
       instance: null,
       origin: API_BASE_URL,
       reason: null,

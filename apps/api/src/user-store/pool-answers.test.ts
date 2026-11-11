@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import type { PoolNotification } from "@pace/core";
 
+import type { ActorContext } from "../shared/ports/live-channel.ts";
+
+import { d1 } from "../../tests/host.ts";
 import { applyAnswer } from "./pool-answers.ts";
 
 const signIn: PoolNotification = {
@@ -17,8 +20,8 @@ const signIn: PoolNotification = {
 
 /** A store whose id was not made from a name: it cannot tell whose session to end. */
 const nameless = {
-  ctx: { id: { name: undefined } } as unknown as DurableObjectState,
-  env: { DB: env.DB },
+  ctx: { id: {} } as ActorContext,
+  env: { DB: d1(env.DB) },
 };
 
 describe("applyAnswer", () => {

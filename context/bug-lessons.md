@@ -34,6 +34,14 @@ The classes so far are below. Each has its standing rule, and new code is writte
   own-session notice on read, the feed kept re-marking it (~70 requests a second, the bell never
   cleared); the server-side fix and its re-review looked at the server diff only.
 
+- **Instance (Firebase recovery).** The screen disabled a bot login, but its asynchronous device
+  lookup and nonce creation only checked current availability. After disable → recover, an old
+  completion became eligible again, saved a nonce, opened Telegram and restarted polling; a stale
+  failure could also replace the recovered idle state. Tests had only disabled an already polling
+  nonce. One attempt generation now guards every awaited boundary and is invalidated on disable,
+  reset and unmount; deferred-success/failure tests pin both lookup and creation boundaries and
+  assert that persistence, external navigation and polling stay quiet.
+
 ### 2. One entry path tested, the others assumed
 - **Bug.** Same as 1. Also: the Inbox button counted something Now's counter did not.
 - **Missed because.** The tests followed the happy path the author had in mind.
@@ -1236,6 +1244,11 @@ Extended (F-CPY-02/03/05, 2026-11-06): the same class held for «Отменит�
 - **Sweep and guard.** Every test file that calls `vi.resetModules()` and imports afresh
   (`ids-no-prng`, `numbers`, `initials`); `scripts/fresh-import-timeout.test.ts` fails a new one
   without a `timeout:`.
+- **Instance (measurement isolation, 2026-11-05).** Running the full unit, workerd and Jest suites plus
+  typed lint concurrently distorted the materializer cost ratio and timed out an alarm test,
+  followed by an alarm-value failure consistent with unfinished work. Unchanged suites passed when
+  run sequentially (905 core and 664 API tests). Follow CI's serial order for timing-sensitive
+  verification; diagnose load before changing algorithms, timeouts or expected alarm values.
 
 ### 116. A test green alone, red in its suite
 - **Bug.** A8's RuleTester (`promise-function-async.test.ts`) passed when run by itself and failed
@@ -1421,6 +1434,7 @@ Extended (F-CPY-02/03/05, 2026-11-06): the same class held for «Отменит�
 - **Sweep and guard.** `currentOf(destination, path)` in `ui/sidebar.tsx` serves the sidebar's `NavItem`
   and the rail; the tab bar's current tab is its own route. `nav-item.test.tsx` pins the three looks and
   a table of paths (Settings on `/presets` and `/presets/new`, Now on a task and `/add`).
+
 ## Log
 
 New bugs go here with their class; a new class gets its own section above.
@@ -1834,7 +1848,6 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-03 | QA round 21 L1 / R23-15 (Task 3.9): radio groups outside the close sheet were a tab stop per chip (Settings' theme and language, Now's project filter, the New task form's Start and Repeat, Day's category, the preset editor: 25 stops), several `role=radio` with no `radiogroup`; and the chip rows gave about 40 px of real press area, their 44 px boxes overlapping the next row through a negative margin | 84 | yes: every `radio` in the app now comes from `useRadio` inside a `RadioGroup` (chips, the segmented control, the project picker and Day's task link as `ListRow select`, the colour swatches, the OS picker); the AI-question chips and the date and estimate chips were never radios (actions and pickers: now buttons, the pickers with `aria-expanded`); the kit's Pressable gained the small-visual pattern (`visual`: the target is the layout box, the drawn pill inside, no negative margin), which chips, the switch, the check circle and small buttons use | `useRadio` throws outside a `RadioGroup` (`chip.test.tsx`: a lone radio refuses to render; one `tabIndex` 0 per group, the first when none is chosen); `chip.test.tsx`, `switch.test.tsx`, `check-circle.test.tsx`: the target has no negative margin |
 | 2026-11-03 | QA round 23 R23-10 (Task 3.9): a click on «Показать удалённые» (Presets) or the night-hours label (Settings) did nothing; only the 52 px switch toggled | 84 | yes: every `SwitchRow` (Presets, the preset form's rows, recurrence, calendar sync, the pickers' "Alongside", Settings) is now a `ListRow` toggle; the two bare switches left (the preset override beside its value, the notification matrix's cells) are named by their cell and keep the 48 target | `ListRow` `toggle`: the whole row is one `switch` named by its title, a press on the label flips it, one stop (`list-row.test.tsx`) |
 | 2026-11-03 | F-DAT-02, tags (Task 3.9): `ColorTag` set `numberOfLines` on a box that did not yield, so a 78-96-character project pushed its row | 109 | yes: `ColorTag` is gone; every tag is the kit's `Tag` (the task row's meta line, the running row, Day's rows and totals, the presets list) | `tag.test.tsx` (a 120-character name in a 200 px parent: the tag shrinks, its text is one line ending in "…"); the gallery's Tags section in a 200 px column, measured by `e2e/worst-case.e2e.ts` |
-
 | 2026-11-03 | Task 3.7 (F-CMP-12, R22-21): the toast floated at `BASE_BOTTOM = 96` / `TAB_BAR_HEIGHT = 72`, a guess at the tab bar (really `min-h-12` + padding + inset), and on a computer docked in the sidebar ~1000 px from its cause. Tests read the constants back, so they agreed with the guess | 6 | yes: the offline pill used the same constant (`useFloatBottom`); every floating line now reads one layer | `ui/float-layer.ts`: the tab bar, each screen footer and the pill publish their measured heights, the shell its content region; toast/pill tests drive measured layouts (`toast.test`, `tab-bar.test` "never at a constant") |
 | 2026-11-03 | PR #48 review #6 and QA 23 R23-13a: the offline pill and the toast shared one spot (the toast covered Retry), and at 1440 the pill was centred on the window, straddling the sidebar's edge. The pill e2e checked only the header's controls | 6 | yes: the toast was centred on the window too (and docked in the sidebar); both now float in the content region, the toast stacked above the pill | `usePublishStatus` + `useContentRegionLayout`; e2e `offline-pill.e2e.ts` "offline with a toast" (no overlap, Retry pressable, 390 and 1440) and "inside the content column at 1440" (`controlsUnder` the pill) |
 | 2026-11-03 | QA 23 R23-14 / PR #48 follow-up: on Presets and New preset the sidebar said Settings was the current page (`aria-current="page"`, the full selected look) while the screen showed Back. A destination's `owns(path)` was the only notion of current, so the owner of a pushed screen claimed to be it | 124 (new: "a parent claiming to be the page": a navigation item that owns a pushed screen marks itself as that page) | yes: the rail and the task → Now case had the same rule | `currentOf` (`page` · `section` · null) shared by the sidebar and the rail; `NavItem` gives a section the bar without the fill and `aria-current="true"`; `nav-item.test` table of paths |
@@ -1844,11 +1857,81 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-03 | PR B parked N4: the inspector took presses during its 160 ms exit (a second row press acted on the pane on its way out) | 5 | yes: the fix is in `Presence`, so every exit it keeps (inspector, composer, gallery) takes no touches; `Disclosure` already set `pointerEvents="none"` while closing | `presence.test.tsx` "takes no touches while it leaves" |
 | 2026-11-03 | PR B 3.1 re-review: the kit Pressable's Space for checkbox/radio/switch/tab skipped its own press only when the caller's key handler had called `preventDefault`; a caller that pressed on Space without it would press twice | 113 (a guard that relies on what a caller happens to do) | yes: the kit now owns Space for those roles outright (the caller never sees a Space aimed at the control); the 9 callers still spreading `spacePress` cannot double-fire | `pressable.web.test.tsx` "presses once when a caller presses on Space without preventing the default" |
 | 2026-11-03 | PR B 3.2 re-review: a kit `Link` (and any kit Pressable) handed `aria-disabled` looked disabled to assistive tech and still pressed, and on the web kept its live `href`; a hyphenated JSX attribute passes every prop type, so the type could not refuse it | 10 (a control whose state and behaviour disagree) | yes: `usePressableProps` reads `aria-disabled` as `disabled` for every kit control; the web Link drops `href` on either | `link.web.test.tsx` "is disabled by aria-disabled as by disabled" |
+| 2026-11-03 | Android harness review: the ordinary unit suite inherited `jq` from the host and failed before starting the fixture without it | 250 (new) | yes: the other `jq` calls are in hosted deploy, release, and LLM workflows, outside the unit suite | `smoke.test.ts` runs the real predicates with only Bun, basic shell utilities, and the fixture commands on `PATH` (four failures before the fix) |
+| 2026-11-03 | Firebase preflight: Bun's outer `--no-env-file` did not stop the Bun subprocess from reading dotenv | 120 (runner behavior hidden by the test environment) | yes: `check:config` is the only Firebase preflight package script; the future CI caller also uses the outer flag | the subprocess test runs the actual package command with both bindings unset in the environment and malformed in a fixture `.env`; dropping the child's `--no-env-file` makes the intended disabled check fail |
+| 2026-11-05 | Raw usage retries executed conflict updates even when max(endAt) kept the stored end unchanged, consuming 8 SQLite writes for two repeated/shorter uploads of two rows | 55 (output-only assertions missed physical writes) | yes: both max(endAt) upserts in cloud-data.ts now condition updates on end extension; sessions also preserve device-name updates. Other upserts record profile or push-status changes; calendar and projections already compare changes | cloud-data-writes.test.ts meters real workerd SQL: 8 writes RED, 0 GREEN; accepted counts, historical rows, extension and rename retained; full API 616 tests pass |
+| 2026-11-05 | Configuration recovery initially retained an earlier version mismatch, leaving the versions gate active; the reverse transition retained stale configuration copy | 62 (stale evidence treated as current state) | yes: the two authoritative failure transitions in server-store clear the superseded failure, success and origin change clear configuration status; unreachable keeps last evidence intentionally | server-configuration.test.ts pins both mismatch/configuration transitions RED then GREEN, same-origin recovery and old-origin refusal |
+| 2026-11-05 | Full app suite failed the first-sync timezone guard on a Europe/Moscow host because the test hardcoded Moscow as a zone different from the device | 120 (host environment hidden by CI) | yes: searched all tests for deviceTz inequality assumptions; only this test assumed a particular host zone. It now selects a distinct account zone and avoids constructing an unused extra runtime | original full run 938 pass/1 fail at explicit inequality; focused app-state regression rerun after fixture correction, with both Moscow and UTC host checks required |
+| 2026-11-05 | Configuration-error presentation hid pending bot-login cancellation while nonce polling continued, and signed-in senders retried after the configuration failure; active requests did not publish the typed failure into server state | 1 (one side of a contract changed without tracing every reader and sender) | yes: both login variants now abort pending nonce state; ordinary typed responses publish an origin-scoped error; sync/live and background checks pause; recovery owns one guarded bootstrap that resumes uploads/push and senders without losing the outbox | configuration-network.test.tsx real-runtime regressions: hidden nonce made 6 requests RED, then quiet; active sync marked no configuration failure RED; unsent-event outbox preserved, recovery sync once, stale-origin isolation and interrupted phone startup covered; 89 affected tests passed |
+| 2026-11-05 | Integration review found preflight accepted an unknown rollout policy while runtime rejected every API request for the same value | 1 (configuration contract implemented on one side only) | yes: CLI and runtime now share FirebaseConfigPolicySchema; unset remains additive, unknown and empty supplied values fail closed without echoing values | check-config.test.ts valid/disabled pair with invalid policy failed RED (CLI exited0), then GREEN; existing runtime unknown-policy coverage retained |
+| 2026-11-05 | Native Firebase review: stage(B) persisted a pending server choice while A retained ensure authority; an in-flight ensure(A) could replace the whole record, erase B and make commit(B) fail after the origin write | 1 (handoff generation changed on one path while an older completion retained write authority) | yes: swept all native record writers and trustedOrigin transitions; stage now revokes ensure authority only after successful persistence, commit already revokes it, reconcile alone grants it from the authoritative origin, and ensure requires it. Reconcile must consume the actual persisted origin, never a captured old response | original17 JVM cases tested stale origins after reconciliation and crash cut points but omitted a delayed completion between stage and commit; FirebaseControllerTest.pendingSwitchRevokesOldEnsureAuthorityOnlyAfterDurableStage was RED on the real JVM (18 run/1 fail), then GREEN18/18, also pinning failed-stage usability and successful commit of B |
+| 2026-11-05 | Runtime server switching could leave native Firebase authority attached to the proposed origin after a failed handoff; a failure after persisting the new origin differs from a failure before it | 1 (handoff authority), 62 (stale evidence) | yes: swept stage, reset, origin write, commit and restart failure paths; failed stage preserves old authority, later failures reread durable origin and reconcile against it instead of a captured UI origin | earlier tests covered successful switches and native persistence cut points but not JS failure recovery; server-runtime and firebase-runtime regressions pin durable-origin recovery and keep old-runtime FCM blocked after a failed restart |
+| 2026-11-05 | Reopening notification settings rediscovered server capabilities and erased a known device-services failure, presenting FCM as available again | 62 (new capability evidence overwrote a separate device verdict) | yes: registration and Settings discovery share origin/native-authority-scoped failure retention; authority changes invalidate the old failure rather than carrying it to another server | previous tests covered initial token failure but not a subsequent availability refresh; notifications refresh regression now retains services-unavailable for the same authority |
+| 2026-11-05 | Independent runtime review found that a saved server selection followed by failed restart left old-server sign-in usable behind a dismissible error; reopening then silently selected the new server | 1 (durable handoff and UI authority differ) | yes: reviewed post-write commit/restart failure paths and whole Navigator composition; a root pending-switch gate now replaces routes and sidebar after the durable commit point, with restart-only recovery | prior persistence tests checked native authority and storage but not the still-mounted login; component coverage pins persisted B, absent old login/dismissal, retry and exactly one reset; failed origin writes do not activate the gate |
+| 2026-11-05 | A deferred old push-method storage write could finish after a newer registration, leaving SecureStore on FCM while the visible store correctly showed polling | 48 (stale async completion), 1 (durable versus visible authority) | yes: reviewed token, subscription POST, method persistence and final store publication; native writes are ordered and authority is rechecked before writing and publishing | prior race tests stopped at token retrieval or asserted only the visible store; a deferred overlapping SecureStore write regression failed before ordering and now asserts the final durable method as well as the visible one |
+| 2026-11-05 | Two push registrations for the same origin/session/native snapshot could race when the person changed the preferred method: a delayed older FCM token could overwrite a newer polling registration | 48 (stale async completion within one authority) | yes: registration invocation now has its own generation in addition to origin/session/native checks; subscription writes are ordered as well as local persistence, so an already in-flight old POST finishes before the newer selection is registered | previous races changed origin or native configuration, which masked same-authority overlap; deferred token regression was RED, followed by in-flight POST ordering and persistence failure-recovery coverage; combined push/Settings suite passed 81 tests |
+| 2026-11-05 | Server handoff review traced a late bot-login answer and then a later boundary inside an already-started session save: either could restore old authentication after the new origin was selected | 48 (stale async completion), 1 (handoff authority) | yes: trace grants, resumed bot polling, browser adoption, session persistence/clear, bootstrap and foreground observers; session retirement must revoke authority synchronously and drain/clear old writes before persisting the new origin, while the pending handoff quiesces senders | earlier tests delayed network answers but not the following storage await; new client and real-runtime regressions delay both grant responses and SessionStore.set, pin no adopted old session or me request, and require origin persistence to wait for draining; clear failure blocks the handoff |
+| 2026-11-05 | OTA export extension lookup accepted inherited object property names such as `constructor` as MIME entries | 280 (new) | Swept the new OTA metadata/MIME lookup; require an own property with a string value before accepting an extension | Earlier unknown-extension cases used names absent from the prototype; a `constructor` regression failed before the own-string guard and now passes |
+| 2026-11-05 | OTA Accept negotiation initially let a wildcard override an explicit MIME `q=0` exclusion | 281 (new) | Swept JSON, multipart and no-update negotiation; resolve the most specific matching range before deciding acceptance | Earlier cases tested wildcard acceptance and exclusions separately; overlapping explicit exclusions plus wildcard regressions were RED then GREEN |
 | 2026-11-06 | PR B 4.2 (F-A11Y-10): the running row sat in `accessibilityLiveRegion="polite"` around a value that changes every minute, so a screen reader spoke the whole row at each tick; no test asserted what is *not* announced | 125 (live region around a ticking value) | yes: the time bar's reading-line status stays one announcement; no other live region wraps a clock (swept `accessibilityLiveRegion` in `apps/app/src`) | `running-card.test.tsx` "is not a live region" and "ticks on Stop, and says a start, a stop and the past-expected once each" (`useRunningAnnouncements`); QA checklist: a value that changes while the screen is idle gets no live region, only a one-off announcement of its transitions |
 | 2026-11-06 | PR B 4.1: a check (a control) inside a pressable row is a nested interactive (axe `nested-interactive`); the first `ListRow`-based task row would have put `CheckCircle` inside the row's Pressable | 10 (a control whose structure disagrees with its role) | yes: `ListRow` takes `control`, rendered beside the press area, never inside it | `task-row.test.tsx` "keeps the check beside the press area, never inside it" |
 | 2026-11-06 | R23-12 / QA21 M2: bare `/add` left the cursor on `BODY` (title focus asked for under the first-sync cover) | 126 (new) | yes: every focus-on-arrival caller | `add-focus.test.tsx` (held first pull), e2e at 390 and 1440 |
 | 2026-11-06 | QA21 L3: Day's activity sheet offered tomorrow as an end day, which the "still ahead" check always refused | 127 (new) | yes: the day chips derive from the same `now` the validation uses; Week's detail has no day chips | `activity-draft.test.ts` (no end day ahead of now; midnight edge) and `activity-sheet.test.tsx` |
+| 2026-11-06 | Android CI failed while Expo read app.config.ts: the runtime Firebase plugin imported extensionless expo/config-plugins, which Node 24 ESM does not resolve | 282 (new) | Swept app config and plugin imports: the runtime plugin was the only ESM value import of this Expo subpath and now names config-plugins.js; expo/config imports are type-only, while the existing signing plugin uses CommonJS require and is unaffected | Jest transpilation resolved the extensionless path, so plugin unit tests passed without exercising Expo’s Node loader. New Bun script tests invoke the actual Node Expo config CLI in baked and runtime modes; both failed before the fix and pass afterward, without prebuild or an emulator. GitHub Actions still must rerun the actual Android build |
+| 2026-11-06 | Real Expo Android export contained XML drawable assets and the OTA MIME whitelist rejected the complete export | 283 (new) | Swept all extensions in the real 28-file export; added application/xml to the shared MIME mapping used by both packaging and serving | Synthetic fixtures only covered fonts and images; a captured Expo 57 metadata regression failed before the XML mapping, and the actual export now passes read/sign/stage/promote/select in isolated memory storage |
+| 2026-11-06 | OTA effect cleanup retired a controller retained by React's effect replay; stale restart failure could also replace a newer lifetime's state | 63 (work outliving its owner) | yes: traced OTA check, network decision, fetch and restart completions; existing PaceProvider creates a fresh runtime inside each effect and closes late creations | lifecycle replay and disposed-generation tests; explicit reactivation preserves the hourly budget while generation checks reject retired results |
+| 2026-11-06 | OTA fetch failure was retried on each later foreground/network event even though manifest checks were hourly; Expo fetchUpdateAsync itself performs network work | 1 (indirect request loop) | yes: traced both Expo check and fetch entry points, including the first Wi-Fi resume and retained ready update; no other OTA network entry points exist | separate fetch-attempt budget and sequential-event regression pin request silence until the next allowed attempt; concurrent-only tests had missed sequential retries |
+| 2026-11-06 | Default-disabled OTA fingerprinting failed because the optional certificate was unconditionally listed as an extra file | 120 (build environment hidden by fixture setup) | yes: the only custom extraSource is the public certificate; enabled build validation still requires it, disabled builds add it only when present | real fingerprint test without the certificate RED ENOENT→GREEN; previous fixture always created the certificate |
+| 2026-11-06 | Expo fingerprinting returned a successful hash after subprocess restrictions silently removed native autolinking sources | 62 (partial evidence treated as authoritative) | yes: traced Expo and RN autolinking groups plus the local Android directory; actual 17-source result is rejected and the complete 62-source result accepted | publication collector checks required hashed Expo configuration, native/autolinking sources and enabled certificate presence without reducing Expo defaults; primitive hash-equality tests alone cannot establish complete native evidence |
+| 2026-11-06 | Eight web matrix cases waited forever for the gallery's intentional infinite loading spinner | 284 (new) | Swept all seven document animation waits into a shared finite-transition helper; accessibility and gallery coverage remain enabled | Previous tests exercised settled screens only; real-browser regression combines an infinite spinner and finite transition, proves the finite transition finishes, and covers paused animation |
+| 2026-11-06 | Android Actions exhausted 512 MiB Gradle metaspace and hung until the 55-minute job timeout | 285 (new) | Swept smoke, CI and release assemble commands; retain 2 GiB heap, raise metaspace to 1 GiB and exit on OOM | Stubbed build tests did not assert effective JVM limits; runner and workflow guards now pin all three entry points and failure propagation; native evidence must come from Actions |
+| 2026-11-06 | Type checking caught an invalid-arguments CLI table passing each array as positional test arguments instead of one argv value | 286 (new) | Swept new runtime/Android test tables; wrap argv cases in named objects so the complete array reaches the parser | Runtime tests alone accepted the wrong input as invalid; unified type checking exposed it and the corrected table now exercises duplicate, missing and forbidden flags explicitly |
+| 2026-11-06 | Equal-time events arriving across batches were appended to the warm materialization in arrival order: a lower id's settings patch could win on both client and server, while a full rebuild correctly kept the higher id's patch | 287 (new) | Swept both `shouldRematerialize` callers: client `local-log` and server `canApplyInOrder`; both sort fresh batches but retain only the previous timestamp. The shared guard now conservatively rebuilds on equality because the id tie-break cannot be proven without the previous id; strictly later events remain incremental and corrections retain their rebuild path | Existing materializer order properties generated unique timestamps; the client's equal-time fixture changed independent settings fields, so it did not expose conflicting winners. New core boundary, local dispatch/remote ingest and real UserStore append/read regressions were RED with lower-id `en` incorrectly replacing higher-id `ru`, then GREEN and consistent with a full rebuild |
+| 2026-11-06 | Daily usage splitting and daily readers extended a skipped-midnight day into the next date: São Paulo 2018-11-04 starts at 01:00, and adding one calendar day retained 01:00 instead of ending at the next midnight | 9 (calendar boundaries confused with same-wall-clock date arithmetic) | Swept daily range ends in usage aggregation, Day/Week/screen-time view models, focus/sleep patterns, MCP get_day and app phone/calendar reads. All use shared nextDayStartIn (end of local day plus one millisecond); Day navigation normalizes its previous day start; Week-generated day starts, week navigation/end, Insights ranges and project-week aggregates normalize every shifted boundary. General same-wall-clock addDaysIn behavior stays unchanged | Existing DST fixtures covered 02:00 transitions in New York/Berlin, and time properties generated 2020 onward without midnight-transition zones. New daily split and screen-time regressions were RED (24 hours assigned to the 23-hour date); shared literal/property guards also cover midnight DST, 23/25-hour days and Apia's skipped date. Follow-up Tehran 2021 Monday-midnight regressions were RED for a missing Tuesday hour, next-week leakage and a project hour counted twice across weeks |
+| 2026-11-06 | A revocation/amendment received before its missing target was ignored when the later ordinary target arrived on the warm ordered path: the client showed the uncorrected state until reload, and the server had the same gap | 287, 251 (correction dependency closure missing from warm incremental authority) | Swept client LocalLog, server StateCache and CheckpointCache. Maintain all correction target IDs, including unknown targets and correction IDs; a later target forces source rebuild. Client rebuild refreshes the index after reload, canonical adoption and rollback, while ordinary append checks remain O(1) per ID rather than rescanning history | The checkpoint pure replay already retained unresolved targets, but existing warm client/server tests only corrected already-present events. Eight client loaded/same-session × dispatch/ingest × revoke/amend regressions were RED (`ru` instead of corrected `en`), then GREEN; shuffled correction-chain prefixes compare warm results with complete replay and the incremental performance guard remains green. Server workerd checkpoint cache regression `base correction fulfilled by a later target` was RED with an incorrectly present task, then GREEN |
+| 2026-11-06 | The first immutable daily splitter recursively consumed one day and spread the entire remaining tail, overflowing on a valid 1900–2026 source interval | 288 (new) | Replaced the splitter with balanced splits on actual local-day boundaries: logarithmic stack depth and O(days log days) copying, without a new input cap or local mutation exceptions. Preserves skipped-midnight and skipped-date behavior | The initial property only generated intervals up to seven days. A 46,021-day regression was RED with stack overflow, then GREEN; Apia's entirely skipped date is covered separately |
 | 2026-11-08 | Feedback 5 item 5: MCP `get_task` answered a hand-picked subset of the task (no `startAt` in the text, no `estimate`, no series or sources), so an assistant could not see fields the store had | 138 (new) | yes: `fetch`'s document and the list rows answer the row on purpose; `get_task` is the one "everything about a task" answer | `TASK_FIELDS` in `get-task.ts` is typed `satisfies Record<keyof Task …>`, so a new projection field fails tsc until answered; `mcp-tools.int.test.ts` pins every field in the structured and the text answer |
+| 2026-11-10 | Review of PR 55: the default (legacy) sync path read the whole local log several times per action and per pulled page (two full images per guarded write, a read-back and a second re-materialization per page, `readSnapshot()` for a cursor or an owner): a quadratic first sync, an action that slows with history | 259 (new), 55 | yes: every `readSnapshot()` in the client, the adapters' `change`, the `includes` scans over ids | `store-reads.test.ts` (whole and narrow reads per action, per pulled page, per push, per peer hint; slices keep their identity on an in-order page); `store-cost-contract.fake.ts` on SQLite and IndexedDB (scans of the log per guarded append and per legacy page) |
+| 2026-11-10 | `unmarkDone` checked that the task was open, then waited for the history (seconds), then wrote: a task closed during the wait had its mark taken back, and an old closing send revoked | 118 | yes: every action that awaits `ensureHistory` (delete task, discard inbox, delete activity, `withCompleteHistory` users) validates after it | `actions.test.ts` "refuses to take a mark back on a task closed while the history was loading" (the loader closes the task) |
+| 2026-11-10 | `endingLogout` sent the server log-out whenever sign-in was still allowed, even when its own sign-out did nothing (a sign-in began during its waits, so the sign-out was an older owner's): the device kept a token the server had ended, read later as "ended elsewhere" | 254 | yes: the one place that acts for a session after `signOut(…, owner)`; the gate is now what the call did (the token is gone), not who owns the session now | `auth-revoke.test.ts` "does not have the server end a session the device still holds" and its counterpart |
+| 2026-11-10 | PR #55 review: every usage upload wrote archive revisions and daily totals with no archive bound (nothing reads them), backfilled per day × rows inside the request; live announcements re-read and sent `records` with checkpoints off | 260 (new) | yes: refresh on a zone change gated too; the other optional features (checkpoint cache, archive alarm) were already gated | `usage-revisions.int.test.ts` (no archive: no bookkeeping rows; a year backfills under a rows-read bound), `live.int.test.ts` (no `records` while off, `records` while active) |
+| 2026-11-10 | PR #55 review: a fenced store answered every call with a thrown 500; cleanup steps and journal writes swallowed their errors without a log; a wipe left pending (over 100 archive objects) was told to the owner as failed | 261 (new) | yes: every cleanup code thrown across RPC is mapped by `cleanupProblem`; both catch-alls log | `cleanup-fence.int.test.ts` (503 `cleanup/busy`), `account-cleanup.test.ts` (log with operation and stage), `account-confirmations.int.test.ts` (pending answered as under way, then completes) |
+| 2026-11-10 | PR #55 review: the confirmation status poll resumed a cleanup for any caller, while cancel checked the owner | 262 (new) | yes: the other account routes check `requireUser` or Telegram's signed id | `account-confirmations.int.test.ts` (another person's session gets 404 and nothing runs) |
+| 2026-11-10 | PR #55 review: bot answers about a wipe or deletion fell back to English once the store was fenced or wiped | 263 (new) | yes: every answer about a confirmation reads `replyLanguage` | `account-confirmations.int.test.ts` (RU before and after the wipe) |
+| 2026-11-10 | PR #55 review: OTA staging and promotion checked shape, hashes and read-back but never the RSA signature the app verifies | 264 (new) | yes: both entry points of a publication (stage, promote) | `apps/updates/tests/signature.test.ts` (wrong key and garbage signature refused before any write; promotion re-checks the stored manifest) |
+| 2026-11-10 | PR 55 review: a 500 `server/misconfigured` parked sync, the socket and the background check, and only a sign-in, a return to the app or a Retry tap asked the server again: a server fixed while the app stayed open never resumed | 270 (new) | yes: the client-outdated and incompatible holds are answered by an app update and the return check; offline has the device-online listener and the sync backoff | `watchServer` re-checks with backoff (5 s doubling to 5 min) while the configuration error stands; `server-origin.test.ts`, `configuration-network.test.tsx` "resumes sync on its own" |
+| 2026-11-10 | PR 55 review: the foreground return awaited `ensureInstances()` before the sync, in an IIFE with no catch: a failed local write skipped the sync, the pool and push and was an unhandled rejection; the signed-in start had the same chain | 271 (new) | yes: `sync-loop.ts` return, `bootstrap.ts` start; the remaining chains (`backOnline`, the live-status pool refresh) run one call each | `app-state.test.tsx` "syncs on a return even when the recurring instances fail", `bootstrap.test.ts` "syncs and starts the senders though the recurring instances could not be written" |
+| 2026-11-10 | PR 55 review: `ui/sync-frame.tsx` imported the server feature (its message keys and Retry) | 272 (new) | yes: no other kit module imports a feature or a screen (tests aside) | dependency-cruiser `app-kit-does-not-import-features` |
+| 2026-11-10 | PR 55 review: the OTA coordinator stamped its hourly check before the check ran, so a launch offline was not asked again for an hour though the network listener fired | 273 (new) | yes: the fetch failure stamp is meant to hold for the hour; the notification pool stamps on a page that came | `ota-coordinator.test.ts` "asks again at the next trigger after a failed check" |
+| 2026-11-10 | PR 55 review: an OTA trigger after dispose and activate awaited the retired lifetime's run, whose answer is dropped, and asked nothing itself (a StrictMode replay at launch lost the launch check) | 274 (new) | yes: `checkServer` dedups per runtime, a new runtime is a new key | `ota-coordinator.test.ts` "runs its own check after a reactivation"; `ota-lifecycle.test.ts` now pins the replayed lifetime downloading once |
+| 2026-11-10 | PR 55 landing shots: at 320 px in Russian the sync strip's alert icon was squeezed to a dot beside a wrapping sentence | 275 (new) | yes: fixed in the kit's `Icon`, so every icon beside a wrapping text keeps its size | `icon.test.tsx` "keeps its size beside a text that wraps"; the gallery's strip card at its longest |
+| 2026-11-10 | PR #56 CI: the opt-in checkpoint e2e looked for a year-old "Task created" row on History, which the redesigned, virtualised History list no longer draws under a year of settings rows | 137 (instance: a spec written against the old screen) | yes: the other History specs (journeys, design-shots, route-sweep) look at recent rows or the page | the spec opens History at the moment right after the creation (`?at=`), so the row is first |
+| 2026-11-10 | A checkpoint copy could not go back to the legacy sync: once the server stopped offering checkpoints every run threw `history/rebuild-required` before the push, so the outbox never went out (PR 55 review I1) | 300 (new) | yes: every state a flag or a version can put a copy in (checkpoint, full, unreadable base) has a run that takes it under both server answers | `checkpoint-sync-modes.test.ts` (capability withdrawn, unreadable base, both modes); the adapters' contract `turns a checkpoint's copy into a full one` |
+| 2026-11-10 | A hydrated full copy was bootstrapped again at every start and cut down to a checkpoint when the server had newer events (PR 55 review I2) | 300 | yes: the run is chosen per run from the copy's meta (`CheckpointSync.enabled`) | `checkpoint-sync-modes.test.ts`: restart of a full copy with newer server events, no bootstrap request |
+| 2026-11-10 | The checkpoint tail refused a whole page (wire schema and `parseEvent`) for one event of a newer client: the older client's sync stopped for good (PR 55 review I3) | 13, 150 | yes: `records` on pull, bootstrap and the socket's `events` are opaque on the wire; only the pinned history read stays strict | `checkpoint-sync-tail.test.ts` (HTTP, socket, unasked page, bootstrap tail, strict hydration), `bootstrap.test.ts` |
+| 2026-11-10 | Nothing tied the shape of a checkpoint's `CoreState` to `CHECKPOINT_VERSION`: a field added to the type and the schema together type-checked and made every stored base unreadable (PR 55 review I4) | 301 (new) | yes: the one persisted strict shape with a version (the checkpoint) is frozen; presets already had their previous-release test | `state-shape.test.ts` against `frozen/core-state.v1.frozen.json` |
+| 2026-11-10 | Two sync runs with their own outbox push disagreed: a rejected event failed the checkpoint run and never the legacy one, and the checkpoint run never marked accepted ids sent (PR 55 review I7) | 302 (new) | yes: one `pushOutbox`, one `requiresSource`, one envelope per staged event (`prepare` / `stageEvents`) | `checkpoint-sync-modes.test.ts` (rejected push, accepted ids marked), `stage-emit.test.ts` |
+| 2026-11-10 | The state's fold threw inside `setState` after the in-memory log had already taken the events: one correction hinted by another tab left every later rebuild throwing (PR 55 review I9) | 303 (new) | yes: every `Memory` change derives the state first; errors cross module boundaries as `SyncError` with a code, never matched by message | `checkpoint-state.test.ts`: another tab's hint on a partial copy |
+| 2026-11-10 | On a checkpoint copy the system's own instances dated before the base's last event were refused with `history/not-loaded` and dropped, on every foreground again | 304 (new) | yes: `appendSystem` was the one caller of `stage` that discarded its refusal; `stageEmit` and the store actions already load the source | `instances-checkpoint.test.ts` |
+| 2026-11-10 | Dropping the phone's empty header bar (owner) moved the tabs' titles but not those under More's Back bar, and centring the title row moved a desktop title with actions by 5 px: `layout.e2e.ts` F-LAY-02 failed in CI | 37 | yes: every `ScreenHeader` caller is a destination in the spec, which now groups a phone's titles (tabs; under Back) | the spec checks each group at one y; the title row stays `items-start` |
+| 2026-11-10 | PR 55 follow-up review, item 1: on a checkpoint copy the archive toast's Undo (`undoArchive`) never loaded the history: it staged with `state.stage` below `stageEmit` and answered a refusal, the copy stayed a checkpoint | 360 (new) | yes: every action that writes `event.revoked` / `event.amended` (revoke, revokeAll, undoLast, deleteTask, discardInbox, unmarkDone, deleteActivity, confirm/undo an automatic outcome, startSeriesForTask, restorePreset, undoArchive); only `undoArchive` called below the shared path | `corrections-checkpoint.test.ts` (each action: one load, success, the same event types as a full copy); ESLint `state.stage(` ban in `actions/` (`eslint-scoped-bans.test.ts`) |
+| 2026-11-10 | PR 55 follow-up review, item 2: `restorePreset` read `state.events` before the history was loaded, so on a checkpoint copy (the archive in the base) it answered `action/nothing-to-do` | 118, 360 | yes: the actions that read the log for a target (deleteTask, discardInbox, deleteActivity, unmarkDone, startSeriesForTask) read it after the wait; `confirmAutoOutcome` checked "confirmed already" only before it and now asks again in the queue | `corrections-checkpoint.test.ts` (restorePreset case; two confirms at once write one amendment) |
+| 2026-11-10 | PR 55 follow-up review, item 3: one event this build cannot read in a checkpoint copy's tail, then any correction, stopped the copy's sync for good: the strict source read failed the run before its push, the outbox never left and every run repeated the same requests | 361 (new), 300 | yes: every place the checkpoint run asks for the complete source (`retryPage`, `sourceBootstrap`, `acceptSource`); the History screen and export keep the strict read | `checkpoint-sync-tail.test.ts` (HTTP and socket: the copy turns full, the outbox is sent, the next run is one pull) |
+| 2026-11-10 | PR 55 follow-up review, item 5: a long-lived tab kept the checkpoint run after a deploy rollback or a version bump and failed every run until a reload; the server's pull compared with a literal `1` | 362 (new), 270 | yes: the one cached negotiation on the client (`isOffered`); the other version comparisons on the server already use `CHECKPOINT_VERSION` | `checkpoint-sync-modes.test.ts` (rollback under a running tab: one failed run, then the legacy run settles) |
+| 2026-11-10 | PR 55 follow-up review, item 6: a full copy whose `upgradeCursor` rewind was cut off before its pull was read as never pulled and cut down to a checkpoint | 363 (new), 300 | yes: `isCheckpointRun` and `requiresBootstrap` were the two readers of "has pulled" | `checkpoint-sync-modes.test.ts` (rewound full copy: no bootstrap, whole log kept) |
+| 2026-11-10 | Commit ae5644cd: main's review-I3 refusal (a revocation of an event revoked already) reads the server's `Materialized.revoked`, and the second path that builds a `Materialized`, the checkpoint candidate, did not fill the new field: a state served from a checkpoint took every event as unrevoked. Missed because the candidate's tests compared the fields that existed when it was written | 302 | yes: the full rebuild and the checkpoint candidate are the two builders of `Materialized`; the client's `CoreState` has one (`materialize`) | the shadow comparison of the candidate against the full rebuild checks the revoked set; `checkpoint-cache.int.test.ts` "knows on a cold restart from a checkpoint which events are revoked" (the cold state's `revoked` equals the full rebuild's) |
+| 2026-11-10 | PR 55 follow-up review, item 9: `state-shape.test.ts` wrote a missing frozen shape into the source tree on any run, and did not say it compares zod's printed JSON Schema | 364 (new) | yes: every test that writes a file (the OTA config test writes into a temp folder) | the test fails on a missing file unless `PACE_FREEZE_CHECKPOINT_SHAPE=1` (checked by hand: file moved away, test failed, nothing written) |
+| 2026-11-10 | Two fixes met: the shared instance reader (one `/api/instance` read at load) handed the checkpoint renegotiation the cached answer that had just failed the contract, so a long-lived tab never learned of the rollback | 362 | yes: `latest()` has one caller, the negotiation; every check that must be current uses `read()` | `checkpoint-sync-modes.test.ts` "asks the server what it offers again…" over a client with the shared reader |
+| 2026-11-10 | The city-first place order (`placeName`) was swept through the app and `notify-text`, but the login notice's integration tests still pinned "Germany, Berlin": four `bun test:api` failures, found when the waves were merged | 348 | yes: `grep` for the old order across `apps/api/tests` and `e2e` | the full `bun test:api` runs before a wave that changes shared copy is handed over |
+| 2026-11-11 | The opt-in checkpoint e2e seeded "a copy that never pulled" with the server's store id at cursor 0, which since class 363 is a copy that has pulled (a full one), so no bootstrap ran; once seeded right, its year of settings rows shared the creation's device and instant and History folded the creation into one write (owner R27-05) | 363, 137 | yes: the other e2e seeds that write a local copy (`preparePendingCopy` is the only one) | the seed writes no store id, and the settings rows sit an hour after the creation; the opt-in step runs in CI on every push |
+| 2026-11-11 | Wave review, item 1: a connect's hello judged the copy while a direct `syncNow()` hung; the run then failed with no backoff and the offline line stayed up beside a live socket until the 5-min poll (or an empty second pull went out) | 370 (new) | yes: `firstTickIn` waits through `isFresh`; no other reader decides on the run's state before it settles | `sync-client.test.ts`: a hello during a run that fails leads to a run; one during a run that reaches the head asks no second pull |
+| 2026-11-11 | Wave review, item 2: on the web Day showed screen time only for rows, and a failed read has none, so a 503 was silent (R23-08 again) | 371 (new), 62 | yes: Week's calendar shows its failure whatever its rows; the usage marks on blocks show no total | `day-web.test.tsx`: the failed read says so with Try again; one Retry beside the offline sync line; an empty answer stays silent |
+| 2026-11-11 | Wave review, item 3: the notification feed's page and freshness outlived a sign-out; another account signed in within 5 s saw the previous account's pool | 372 (new), 103 | yes: the instance reader is public; the sync's success record only times the loop's first tick after the start's own pull | `create-client.test.ts` (sign-out empties the feed, the next account fetches its own); `notifications.test.ts` (a page landing after `reset` is dropped) |
+| 2026-11-11 | Wave review, item 4: a v2 hello out of shape went to the notices' reader: no catch-up pull and v2 off until the 5-min poll | 373 (new) | yes: `pushed` and `error` answers out of shape left their request waiting for its timeout; fixed with it | `live.test.ts` raw frames: broken hellos pull and turn v2 on; broken `pushed`/`error` fail their request at once |
+| 2026-11-11 | Wave review, item 5: Skip kept its in-flight keys in state; two presses before the hide rendered sent two requests and two dismiss writes | 374 (new), 36 | yes: History's Undo confirm, Export, the account's Telegram ask and the dev sign-in were guarded by state only; all fixed | two presses in one `act`, one request: `use-phone-answers.test.ts`, `history-screen.test.tsx`, `export-row.web.test.tsx`, `login-screen.test.tsx`, `settings.test.tsx` |
+| 2026-11-11 | Wave review, item 6: checking off the last row left focus on the page (the heading's-neighbour fallback was documented, not built), and the wait was exactly two frames | 375 (new), 5 | yes: the other focus helpers poll or run after the removal | `focus-place.web.test.ts` (jsdom): next row, heading's neighbour, a slow row, focus moved meanwhile |
+| 2026-11-11 | Wave review, item 7: the legacy `isInitialZone` matched a first zone from any source, so one the person set through the bot or MCP lost its Undo; the app-written shape and a first zone-question answer stay indistinguishable (trade-off written in the code) | 376 (new) | yes: `close-reasons.ts` reads `system` itself; no other legacy shape is matched | `history.test.ts`: a first zone from the bot or MCP is undoable |
+| 2026-11-11 | `generate-icons.test.ts` "renders every icon" took 6.4 s on a loaded CI runner and hit Bun's 5 s default | 115 | yes: the other `scripts/` tests that do heavy work in one case (the Android smoke runner) already carry a named timeout | `RENDER_ALL_MS` on that case |
 
 ### 125. A live region around a ticking value
 - **Bug.** PR B 4.2 (F-A11Y-10): the running row sat in `accessibilityLiveRegion="polite"` around the
@@ -2652,3 +2735,1139 @@ New bugs go here with their class; a new class gets its own section above.
 - **Missed because.** Their refusal tests awaited the first call before the second.
 - **Class.** Class 222 again.
 - **Sweep and guard.** `stageEmit`/`emit` take the action's own check and run it in the store's write queue, before the core's retro rules; Delete, Reopen and a bare archive/restore of a project use it (a fast refusal before the queue stays, for the common case). Already in the queue: revocations (222), Stop and close (`serially`), the digest rows (235), Log past (241), the archive's Undo (244). Left, because a duplicate is harmless or refused by the core: renames and field edits (the second writes the same value), subtask marks (the reducer's toggle is by value), Inbox capture (two captures are two notes, as two presses mean). Guard: `actions.test.ts` (two presses at once of Delete, Reopen and archive: one event each).
+
+### 250. A unit test that relies on optional tools from the host
+
+- **Bug.** The Android runner's shell tests stubbed the SDK and Maestro but inherited `jq` from
+  the host. The normal unit suite failed its Android fixtures on a machine without that tool.
+- **Missed because.** CI and the local development image both provided `jq`. The fixture inherited
+  their full `PATH`, hiding the extra prerequisite.
+- **Rule.** Shell fixtures in the unit suite get a `PATH` with the repository runtime, basic shell
+  utilities, and the external commands supplied by the test. Use the repository runtime for JSON
+  validation in code exercised by that suite.
+- **Sweep and guard.** The other `jq` calls run in GitHub workflows outside the unit suite. The
+  Android runner validates both the APK config and the health payload with Bun. The runner tests
+  use an explicit tool list without `jq`.
+
+### 251. A reduced copy (projection, checkpoint, cursor) used where the source record is needed
+- **Bug.** A current projection is not the source envelope needed for undo, correction or historical
+  export. The first checkpoint client performed origin lookups before hydration (2026-11-06).
+- **Missed because.** The previous complete-log-only tests did not expose origin lookups performed
+  before hydration.
+- **Rule.** A projection, checkpoint or cursor is a summary of the source, not the source. Anything
+  that needs source envelopes (undo, correction, historical export, origin lookups), the transport's
+  sequence records or exact counts reads or hydrates the source first, or refuses explicitly; a
+  summary keeps every dependency a later source event can activate (correction targets that have
+  not arrived yet). Malformed evidence fails as invalid; it is never hidden by another transport.
+- **Sweep and guard.** The checkpoint client now hydrates before source-origin lookups and gates
+  unsafe direct staging; full-history guards protect History/export. The sweep covers task, series, inbox, work and activity origin actions,
+  recurrence IDs and empty-account detection. Focused checkpoint/action cases pin ordinary offline
+  actions versus explicit source-dependent refusal.
+- **Instance (enhanced socket).** The first enhanced socket integration dropped actual sequence
+  records from proactive events and treated malformed known replies as unanswered requests. This
+  could lose cursor evidence or time out and repeat the request over HTTP. Legacy-only transport
+  tests had no enhanced envelope. The client now preserves sequence records and rejects malformed
+  known replies immediately as sync/invalid-response; it does not use a second transport to hide
+  corrupt responses. Both requested and proactive paths are covered by the new RED→GREEN transport
+  tests.
+- **Instance (captured cursor is not a count).** A captured high-water cursor is not a count: SQLite
+  AUTOINCREMENT conflict attempts can leave unallocated sequence numbers. Archive restore must
+  compare the captured source inventory digest and counts, preserving original sequences and all
+  allocated lower-cursor records. A gaplessness assumption in the implementation plan was corrected
+  before restore implementation.
+- **Instance (correction closure).** Checkpoint correction closure includes future targets. A
+  correction currently ignored because its target is missing can become active when that ordinary
+  target arrives later in the cursor tail. Retaining only projection state, all source ids and the
+  final canonical key loses this dependency. Initial tests generated corrections targeting earlier
+  events, so no property exercised a correction before its target. Sweep: both new tail corrections
+  and new ordinary ids named by any base correction must require intact-source replay;
+  correctionTargets retains all unique target ids, including targets already present, unknown
+  targets and correction ids. Guard: regression supplies a base revocation whose unknown target
+  later arrives as task.created, and malformed correctionTargets metadata is rejected. Keep this
+  class in checkpoint/bootstrap/archive reconstruction reviews.
+
+### 252. A test that acts once the screen looks ready while its startup writes are still unsent
+- **Bug.** PR55 CI run 42199912608 passed 197 browser tests but the stale-tab logout case stopped on
+  the legitimate unsynced-change confirmation. Its captured page showed one pending change: startup
+  settings can still be syncing after Settings renders.
+- **Missed because.** Previous fast runs happened to acknowledge that write before the logout click.
+- **Rule.** Before a step whose outcome depends on what is still unsent (logout, a session ending,
+  a switch of server), a test waits until the startup writes have begun and the outbox is delivered,
+  not for the screen, not for an outbox count of zero (it can read zero before the first write
+  exists), and not for zero HTTP requests (a socket can still carry the outbox). Never a fixed sleep,
+  never an automatic yes to a data-loss confirmation.
+- **Sweep and guard.** The shared two-tab setup now waits for live sender startup (which follows
+  timezone persistence), then the existing outboxSent condition before session-only assertions;
+  the logout traffic test waits for the same condition. The sweep leaves intentional unsynced-logout and incompatible-server tests
+  intact. Validation is the existing live/login browser regression suite; no fixed sleep or
+  automatic acceptance of the data-loss confirmation is added.
+
+### 253. A digest over records whose key order depends on how they were built
+- **Bug.** The first real remote restore rehearsal rejected identical raw records because SQL
+  capture and schema-parsed archive records inserted object keys in different orders. JSON.stringify
+  is deterministic only after representation normalization.
+- **Missed because.** Earlier codec tests round-tripped one representation and did not combine
+  freshly captured rows with independently decoded monthly objects.
+- **Rule.** Before records are hashed or compared as serialized text, both sides go through the
+  same schema (one canonical key order), whatever produced them; opaque source strings are never
+  normalized. A test of the comparison mixes representations (fresh capture with decoded copies).
+- **Sweep and guard.** Both sides now go through the archive record schema before inventory
+  hashing, and every opaque SQL string is left unchanged. The restore regression now mixes a selected remote month, its superseded raw
+  revision and retained source, then compares inventory, state and export. Equal-revision conflict
+  checks run on schema-normalized records.
+
+### 254. Asynchronous work that checks its owner after the await instead of carrying the owner it started for
+- **Bug.** Checkpoint review found that reading identity after a network response does not protect
+  the original request. A pending batch could also be captured before an account replacement and
+  sent with the next copy's storeId. Checking identity then acknowledging in a separate transaction
+  leaves another replacement window.
+- **Missed because.** Earlier single-owner sync tests did not pause these boundaries.
+- **Rule.** Asynchronous work captures its owner (copy token, owner, generation) before its first
+  await, carries it with every batch it produces, and checks it inside each persistent mutation, in
+  the same transaction as the write. A check in a separate step leaves a window.
+- **Sweep and guard.** Capture of copyToken/owner/generation before the await, a guard retained for
+  every batch and checked inside each persistent mutation; legacy pages now apply source,
+  acknowledgements and cursor together without inventing source sequences. The sweep covers enhanced and legacy pages, pending batches,
+  acknowledgements, version upgrades, history and export. Held-operation regressions replace the
+  owner mid-flight and require no foreign write, acknowledgement, download or stale resource-status
+  update.
+
+### 255. A load keyed on a retry counter instead of the state that makes it necessary
+- **Bug.** History could mount while the initial local copy was still full/empty, finish its first
+  demand immediately, then remain loading after bootstrap installed partial coverage. An effect
+  keyed only by manual retry missed this transition.
+- **Missed because.** Existing tests mounted History after bootstrap.
+- **Rule.** An effect that loads a resource is keyed on what decides whether the resource is needed
+  (here coverage and copy identity), so a transition after mount demands it again; a failure or a
+  clock tick never re-demands it. Acquisition errors come back through the declared Result
+  boundary as a retryable failure, never as a rejected promise.
+- **Sweep and guard.** History's demand now follows coverage and copy identity, and storage
+  acquisition errors are inside the Result boundary. The app regression mounts History first, installs a checkpoint later and
+  asserts exactly one hydration.
+
+### 256. A once-per-period attempt spent by a check that had nothing to work on
+- **Bug.** The first real checkpoint browser run received source mode because a warm actor checked
+  an empty log and recorded its once-per-day advancement marker. Old source arriving afterward could
+  not create its eligible checkpoint until the next day.
+- **Missed because.** Earlier bootstrap fixtures inserted source before constructing their cache, so
+  they missed the warm-empty lifecycle.
+- **Rule.** A once-per-period marker (daily advancement, a budgeted retry) is recorded only by an
+  attempt that could have done the work; an empty input returns before spending it. Test the
+  warm-empty lifecycle: the cache built before the data arrives.
+- **Sweep and guard.** A zero-sequence state now returns before consuming the day marker. Nonempty
+  negative prefix checks remain cached: a later backdate cannot move ahead of an already recent
+  first delivery row. The real-actor regression was RED then GREEN; the same browser assertion
+  subsequently passed without relaxing its requirement for actual checkpoint coverage.
+
+### 257. Checks run in the wrong order on a cold instance: a fence before readiness, costly work before the cheap refusal
+- **Bug.** The full API suite caught two alarm integration mistakes that the focused archive packet
+  omitted. A cold domain service checked its cleanup fence before awaiting readiness, so it treated
+  initialization as a busy cleanup and returned early. Also, archiveHistory evaluated the current
+  timezone (loading the log) before the archive service could reject an absent optional binding.
+- **Missed because.** The focused archive packet omitted these alarm integration paths; only the
+  full API suite exercised them.
+- **Rule.** On an entry point that can run cold (an alarm, a first request), readiness is awaited
+  before any fence or busy flag is read (initialization is not a busy cleanup), and the cheapest
+  refusal (an absent optional binding, a feature that is off) comes before any argument that loads
+  state. Run the night-cost suite whenever a lifecycle wrapper or an optional alarm branch changes.
+- **Sweep and guard.** The cold domain service now awaits readiness before checking its fence, and
+  archiveHistory rejects an absent optional binding before evaluating the timezone. The existing night-cost suite supplies the guard: cold direct alarms must
+  process due work, and unrelated/off-feature alarms must not load the log. Include that suite
+  whenever lifecycle wrappers or optional alarm branches change.
+
+### 258. A guard that refuses before the request, on the only path that hears the server
+
+- **Bug.** PR 55 CI (e2e/live.e2e.ts round 6 M6 and I1): a hidden tab stayed signed in on a session
+  ended from another device. The copy-ownership guards added to the sync run (`legacy-sync-run.ts`
+  `nextPage`, `sync-version.ts` `upgradeCursor`, the checkpoint run's `assertOwner`) throw
+  `sync/copy-changed` before any request once the shared copy is no longer this session's. The
+  other tab heard the end first and dropped (M6) or re-claimed (I1) the copy, so every poll of the
+  hidden tab stopped at the guard: no request, no 401, no session check. A hidden tab has no socket,
+  so its poll was the only thing that could hear the end.
+- **Missed because.** The guards were tested one client at a time (a held operation, the owner
+  replaced mid-flight, "no foreign write" asserted); the 401 path was tested with a copy the tab
+  still owned. No unit test had two clients on one store where one loses the copy *and* the
+  session. Only the e2e crossed the two, and it was read as a timing flake of a 30 s poll.
+- **Rule.** A guard that makes a periodic sender send nothing must not silence what that sender was
+  also there to hear. When a new early return or throw sits before a request, list what the answer
+  to that request used to trigger (a 401's session check, the offline line, a store reset, a
+  protocol refusal) and give each another way to happen. Test it with the state that trips the
+  guard and the server-side fact together, and count the requests after: the tab settles (signed
+  out) and the network goes quiet.
+- **Sweep and guard.** Every `sync/copy-changed` raised inside a run (legacy pull, push, version
+  upgrade, checkpoint run, bootstrap and pages, a closed checkpoint runtime) passes through
+  `runSync`'s one catch, which now reports it (`SyncDeps.onCopyChanged`); the client asks the
+  session check there, as a call's 401 does. The live pages' guard asks for a run, so it ends in
+  the same catch. History and export return the code to a screen the person is looking at, where
+  the socket is up; the sync's hold and the API client's ended-session gate act only after this
+  device ended its own session. `create-client.test.ts` "a tab with no socket signs out when its
+  session ended and the shared copy was … in another tab" runs two clients on one store for both
+  shapes (dropped, claimed by a newer session), red before the fix, and counts `/api/me` after.
+  The three checkpoint tests that pinned "no request at all" after a changed copy now pin what they
+  meant: nothing of the sync goes out (`otherThanSessionCheck`), and a closed client asks nothing.
+
+### 259. A guard that reads everything to compare a few fields
+
+- **Bug.** Review of PR 55: the guarded local copy (`LocalSnapshot`) made the default path, the
+  legacy sync every user runs while checkpoints are off, read the whole event log from the disk
+  several times per action and per pulled page. A guarded append read the full image twice (before
+  and inside its transaction), hashed and parsed the checkpoint again and diffed every record
+  (`pendingIds.includes` per id, quadratic); it used to be one insert. Each pulled page did the same,
+  then `commitSnapshot` read the copy back and folded it, then `rematerialize` read and folded it
+  again, and told the other tabs to do the same. The sync run called `readSnapshot()` to learn the
+  cursor, the owner or the outbox (`nextPage`, `pushOutbox`, `pushBatch`, `shouldPullLegacy`,
+  `upgradeCursor`), and every hint to the other tabs read it for three identity fields. A first
+  sync was quadratic in the log, and an action's cost grew with a year of history, worst on
+  Android's SQLite, where every row is parsed from JSON.
+- **Missed because.** The only cost test (`state-cost.test.ts`) ran on the memory store, where
+  `readSnapshot` returns the object it already holds, and measured time, not reads. The adapters'
+  contract tests held three events. The port had one read, the whole copy, so the cheapest way to
+  write any guard was the expensive one, and every caller looked reasonable alone. Class 55 names
+  the cost; this is how it got in.
+- **Rule.** A store port has a narrow read for what guards compare (`readMeta`: identity, cursor,
+  version, coverage) next to the whole one, and the whole one says in its doc what it is for (a
+  load). A guarded write checks the meta inside its own transaction and writes its rows; it
+  reads the log only when the decision depends on the log (a checkpoint's install, its pages,
+  the history). An operation that answers with what it committed is shown from that answer, never
+  read back. A change decided from the meta is a pure function of the meta (`legacyPageChange`), so
+  an adapter cannot need more. In memory, an answer about the copy comes from the copy held, and
+  a tab takes in another tab's events of the copy it holds without the disk. A membership test
+  inside a loop over events is a `Set` (`idSet`), never `includes`.
+- **Sweep and guard.** Swept every `readSnapshot()` in `packages/client`: the legacy run, the
+  version upgrade, the hints and the checkpoint push's two guard reads now read the meta; the
+  ones left load a copy or decide from the log (reload, claim, a peer's reload, the checkpoint
+  run, bootstrap and history). The adapters' `change` reads the meta, not the image, before it
+  hashes. `eventIds.includes`, `correctionTargets.includes` and `pendingIds.includes` are sets in
+  the client, the adapters and `replayCheckpoint`. Guards: `store-reads.test.ts` counts whole and
+  narrow reads against a store that counts them (an action: none; three in-order pulled pages on
+  2,000 events: no whole read, six narrow ones, where there were fourteen whole ones, and the
+  slices no event touched keep their identity, so nothing was folded again; a push; a peer's
+  events); `store-cost-contract.fake.ts` runs on SQLite and IndexedDB and counts the adapter's
+  own scans of the log (`FROM events ORDER BY`, `getAll` on `events`): a guarded append, the
+  outbox and a legacy page make none, where each append and each page made two. Left as they are,
+  checkpoint mode only: `canReplaySnapshot` parses the checkpoint and its records on every write,
+  and a checkpoint page still installs through the whole image.
+
+### 260. Bookkeeping for an optional consumer written on the hot path whether or not the consumer exists
+- **Bug.** PR #55 review: with no archive bound, every usage upload still wrote raw revisions,
+  archive months and daily totals that nothing reads, and the first upload after deploy (or a
+  timezone change) rebuilt every day with a scan of the table per day (days × rows, in one
+  request's transaction). Live announcements re-read the appended rows as `records` on every
+  broadcast though only a checkpoint client reads them.
+- **Missed because.** The tests ran the feature's paths with the feature's data; none counted
+  what an upload writes with the feature off, and the backfill was tested on a day or two.
+- **Rule.** Work done for an optional consumer (archive, checkpoints) is gated on the same switch
+  the consumer is: off means exactly the writes and payloads from before the feature. A backfill
+  in a request is one pass over the rows it reads, never a query per unit of time.
+- **Sweep and guard.** `writeUsageWithRevisions` takes the archive context only with
+  `HISTORY_ARCHIVE` bound; the zone refresh is gated too; `announceChange` takes `withRecords`
+  from the same rule as `features.historyCheckpoint`. Guards: `usage-revisions.int.test.ts` (no
+  bookkeeping rows without an archive; a year backfills under a rows-read bound),
+  `live.int.test.ts` (no `records` while off).
+
+### 261. A maintenance state answered by a thrown generic error, and catch-alls that log nothing
+- **Bug.** PR #55 review: while an account cleanup fenced a store every call threw `cleanup/busy`
+  and the client got a 500 `internal`; the cleanup's catch-alls returned `cleanup/unavailable`
+  without a log; a wipe left `pending` by design (over 100 archive objects in one pass) was told
+  to the owner as "Could not complete the request".
+- **Missed because.** The fence was tested at the store, not through HTTP; outcomes were tested as
+  `complete` or an error, never `pending` through the bot.
+- **Rule.** A state the system enters on purpose (fenced, pending) has its own typed answer at every
+  boundary (HTTP status via an exhaustive switch, a bot reply), and every catch that turns an error
+  into a code logs it with what it was doing.
+- **Sweep and guard.** `cleanupProblem` maps every cleanup code thrown across RPC in `app.onError`;
+  `execute` and `journalAttempt` log with operation id and stage/step; the bot answers `pending` as
+  under way (an alert, so Confirm stays). Guards: `cleanup-fence.int.test.ts`,
+  `account-cleanup.test.ts`, `account-confirmations.int.test.ts`.
+
+### 262. One route of a pair checks the owner, the other runs the side effect for anyone
+- **Bug.** PR #55 review: `GET /api/account/confirmations/:id` resumed a confirmed cleanup for any
+  caller who knew the id, while the cancel route checked the owner.
+- **Missed because.** The status route is open on purpose (the app polls it after a deletion ended
+  its session), and its tests only polled as the owner or anonymously.
+- **Rule.** A route open without a session still refuses a live session of someone else before any
+  side effect, as its sibling routes do.
+- **Sweep and guard.** `signedInCaller` in `account-routes.ts`. Guard:
+  `account-confirmations.int.test.ts` (another person's poll is 404 and creates no operation).
+
+### 263. A reply localized from state the action itself erases
+- **Bug.** PR #55 review: bot answers about a wipe or deletion fell back to English once the store
+  was fenced (unreadable) or wiped (settings back to defaults).
+- **Missed because.** The language was read only while the confirmation was pending; tests used
+  the default language.
+- **Rule.** What a reply needs after an action (language, names) is captured before the action, on
+  the record the reply is about.
+- **Sweep and guard.** `account_confirmations.language` (migration 0011) and `replyLanguage`. Guard:
+  `account-confirmations.int.test.ts` (RU before and after the wipe).
+
+### 264. A publication pipeline that checks everything but what the consumer checks
+- **Bug.** PR #55 review: OTA `stageRelease` and `promoteRelease` validated the manifest's shape,
+  asset hashes and read-back, but never the RSA signature the app verifies with its pinned
+  certificate, so a release every phone would refuse could become a channel's current one.
+- **Missed because.** Tests signed every fixture with a matching key; nothing staged a wrong-key or
+  garbage signature.
+- **Rule.** A pipeline that publishes to a verifying consumer runs the consumer's check itself,
+  with the same pinned key, before the write and again before the switch that makes it live.
+- **Sweep and guard.** `verifyReleaseSignature` in stage (before any write) and promotion (on the
+  stored manifest, before the CAS). Guard: `apps/updates/tests/signature.test.ts`.
+
+### 270. A parked sender whose only way back is an outside event
+
+- **Bug.** PR 55 review: a 500 `server/misconfigured` set `configurationError`, which stopped the
+  sync loop, the socket and the background check. Only `checkServer` cleared it, and that ran on a
+  sign-in or sign-out, a return to the app, or a Retry tap. A server whose owner fixed it while the
+  app stayed open in front of the person never resumed.
+- **Missed because.** The tests drove the recovery by calling `checkServer` themselves; none waited
+  with the app open and asked whether anything would ask again on its own.
+- **Rule.** Whatever parks a sender must also own its way back: a re-check with backoff while the
+  park lasts (or a listener for the event that ends it), not only the person's next gesture. Test
+  the park with the condition cleared and nothing but time passing.
+- **Sweep and guard.** The other holds: offline has the device-online listener and the sync's own
+  backoff; client-outdated and incompatible need an app or server update and are asked on return.
+  `watchServer` now re-checks a misconfigured server after 5 s, doubling to 5 min, and starts over
+  once it answers (`server-origin.test.ts`, `configuration-network.test.tsx`).
+
+### 271. Independent work chained in one await sequence
+
+- **Bug.** PR 55 review: the foreground return ran `await ensureInstances(); await syncNow(); …`
+  in an IIFE with no catch. A failed local write of the recurring instances skipped the sync, the
+  pool and push, and surfaced as an unhandled rejection. The signed-in start (`bootstrap.ts`) had the
+  same step first, so one failure there left the device without sync or socket until a return.
+- **Missed because.** Every test let `ensureInstances` succeed; the chain's order read as a
+  dependency (instances before the sync that pushes them) though a failure of the first never
+  needs to stop the second.
+- **Rule.** A step whose failure the next ones do not depend on is caught on its own (or run beside
+  them), and every fire-and-forget chain ends in a catch. Test with that step rejecting and assert
+  the later steps still ran.
+- **Sweep and guard.** `sync-loop.ts` (the return runs the instances on their own, the sync chain
+  is caught) and `bootstrap.ts` (the instance step is caught). `backOnline` and the live-status pool
+  refresh are one call each. Tests: `app-state.test.tsx` and `bootstrap.test.ts` with a rejecting
+  `ensureInstances`.
+
+### 272. A kit module that reaches into a feature
+
+- **Bug.** PR 55 review: `ui/sync-frame.tsx` imported `features/server` (its message keys and its
+  Retry), so the kit depended on one feature and could not be shown without it.
+- **Missed because.** dependency-cruiser kept features apart from each other but had no rule for
+  the kit's direction.
+- **Rule.** The kit knows nothing of features or screens: a composer (the root layout, a screen)
+  hands it what a feature has to say, as data or a slot.
+- **Sweep and guard.** `SyncFrame` takes a `ServerProblem` from the root layout
+  (`useServerProblem`); no other kit module imports a feature or a screen. dependency-cruiser
+  `app-kit-does-not-import-features` fails the next one (tests aside).
+
+### 273. A throttle stamped before the attempt it throttles succeeded
+
+- **Bug.** PR 55 review: the OTA coordinator set `lastCheck = now` before `check()`, so a check that
+  failed (offline at launch) still counted, and the network listener's triggers were dropped for an
+  hour.
+- **Missed because.** The hourly test only had checks that succeeded.
+- **Rule.** A "last done" stamp that suppresses retries is written once the attempt answered; a
+  failure has its own stamp only when holding off is the point (a download that failed).
+- **Sweep and guard.** The coordinator stamps after the answer; the fetch failure keeps its hour on
+  purpose; the notification pool stamps on a page that came. `ota-coordinator.test.ts` "asks again
+  at the next trigger after a failed check".
+
+### 274. Coalescing onto a run whose answer will be dropped
+
+- **Bug.** PR 55 review: an OTA `check()` after `dispose()` and `activate()` found the retired
+  lifetime's run in flight, awaited it and returned. That run's answer is dropped as stale, so the
+  new lifetime asked nothing (a StrictMode replay at launch lost the launch check).
+- **Missed because.** The lifecycle test pinned the old behaviour ("nothing downloaded after the
+  replay") as the intent, reading "the stale answer is not accepted" as "nothing happens".
+- **Rule.** A dedup of in-flight work is keyed by the lifetime (or owner) whose answer will be used;
+  a caller of a newer lifetime runs its own.
+- **Sweep and guard.** The coordinator keys the in-flight run by generation; `checkServer` already
+  keys by runtime. `ota-coordinator.test.ts` "runs its own check after a reactivation".
+
+### 275. An icon that shrinks beside a wrapping text on the web
+
+- **Bug.** PR 55 landing shots: at 320 px in Russian the sync strip's alert icon was squeezed to a
+  dot beside its wrapping sentence. A web SVG in a flex row shrinks by default (`flex-shrink: 1`),
+  unlike a React Native view.
+- **Missed because.** Jest does not lay out, and the shots and gallery entries had short lines
+  beside their icons.
+- **Rule.** Icons, like controls, keep their size; only text yields (spec §4.1.2 rule 1).
+- **Sweep and guard.** Fixed once in the kit's `Icon` (`flexShrink: 0` on every glyph), so every
+  icon beside a wrapping text keeps its size; `icon.test.tsx` pins it, and the gallery shows the
+  strip's card at its longest Russian reason.
+
+### 280. A lookup keyed by untrusted text that reads inherited object properties
+- **Bug.** The OTA export extension lookup accepted inherited object property names such as
+  `constructor` as MIME entries (2026-11-05).
+- **Missed because.** Earlier unknown-extension cases used names absent from the prototype.
+- **Rule.** A table looked up by a key that comes from outside (a file extension, a header, a
+  user-typed name) is a `Map` or a null-prototype object, or the lookup requires an own property
+  with a value of the expected type; never `table[key]` on a plain object.
+- **Sweep and guard.** Swept the new OTA metadata/MIME lookup; it requires an own property with a
+  string value before accepting an extension. A `constructor` regression failed before the
+  own-string guard and now passes.
+
+### 281. A broad fallback that overrides a specific exclusion
+- **Bug.** OTA Accept negotiation initially let a wildcard override an explicit MIME `q=0`
+  exclusion (2026-11-05).
+- **Missed because.** Earlier cases tested wildcard acceptance and exclusions separately.
+- **Rule.** Where several rules can match (media ranges, globs, permission scopes), the most specific
+  matching rule decides, and an explicit exclusion is never overridden by a broader allowance.
+  Tests combine the specific and the broad rule on the same input.
+- **Sweep and guard.** Swept JSON, multipart and no-update negotiation; the most specific matching
+  range is resolved before acceptance is decided. Overlapping explicit exclusion plus wildcard
+  regressions were RED then GREEN.
+
+### 282. A test that loads code through a different module loader than the tool that runs it
+- **Bug.** Android CI failed while Expo read app.config.ts: the runtime Firebase plugin imported
+  extensionless `expo/config-plugins`, which Node 24 ESM does not resolve (2026-11-06).
+- **Missed because.** Jest transpilation resolved the extensionless path, so plugin unit tests passed
+  without exercising Expo's Node loader.
+- **Rule.** Code that a native tool loads itself (Expo's config loader, a Gradle or Metro plugin, a
+  CLI under Node) has at least one test that loads it through that tool's own loader; transpiler-
+  based unit tests cannot prove module resolution.
+- **Sweep and guard.** Swept app config and plugin imports: the runtime plugin was the only ESM value
+  import of this Expo subpath and now names `config-plugins.js`; `expo/config` imports are
+  type-only, and the signing plugin uses CommonJS `require` and is unaffected.
+  `scripts/expo-config.test.ts` invokes the actual Node Expo config CLI in baked and runtime modes;
+  both failed before the fix and pass afterward, without prebuild or an emulator. The actual Android
+  build is still proven only in GitHub Actions.
+
+### 283. Fixtures made by hand where the real tool's output is available
+- **Bug.** The real Expo Android export contained XML drawable assets, and the OTA MIME whitelist
+  rejected the complete export (2026-11-06).
+- **Missed because.** Synthetic fixtures only covered fonts and images.
+- **Rule.** A consumer of another tool's output (an export, a manifest, a build's metadata) is tested
+  on a captured real output of the pinned tool version, besides any hand-made cases; the capture is
+  refreshed when the tool is upgraded.
+- **Sweep and guard.** Swept all extensions in the real 28-file export; `application/xml` was added to
+  the shared MIME mapping used by both packaging and serving. A captured Expo 57 metadata regression
+  failed before the XML mapping, and the actual export now passes read/sign/stage/promote/select in
+  isolated memory storage.
+
+### 284. A wait for everything to settle over a set that includes something designed never to settle
+- **Bug.** Eight web matrix cases waited forever for the gallery's intentional infinite loading
+  spinner (2026-11-06).
+- **Missed because.** Previous tests exercised settled screens only.
+- **Rule.** A readiness wait names what it waits for (finite transitions), and excludes perpetual
+  activity (an infinite spinner, a ticking clock) by construction; one shared helper is used by every
+  such wait.
+- **Sweep and guard.** All seven document animation waits now use a shared finite-transition helper;
+  accessibility and gallery coverage remain enabled. A real-browser regression combines an infinite
+  spinner and a finite transition, proves the finite transition finishes, and covers paused
+  animation.
+
+### 285. A build that can exhaust a resource and hang instead of failing fast
+- **Bug.** Android Actions exhausted 512 MiB Gradle metaspace and hung until the 55-minute job timeout
+  (2026-11-06).
+- **Missed because.** Stubbed build tests did not assert the effective JVM limits.
+- **Rule.** Every entry point of a heavy build sets its resource limits explicitly and turns
+  exhaustion into an immediate failure (`-XX:+ExitOnOutOfMemoryError`), the same on every entry point;
+  a hang until the job timeout is a missing failure mode.
+- **Sweep and guard.** Swept the smoke, CI and release assemble commands: 2 GiB heap retained,
+  metaspace raised to 1 GiB, exit on OOM. Runner and workflow guards pin all three entry points and
+  failure propagation; native evidence comes from Actions.
+
+### 286. A parameterized test table whose runner reshapes the input
+- **Bug.** Type checking caught an invalid-arguments CLI table passing each array as positional test
+  arguments instead of one argv value (2026-11-06).
+- **Missed because.** Runtime tests alone accepted the wrong input as invalid, so the negative tests
+  passed for the wrong reason.
+- **Rule.** A table case whose input is itself an array is wrapped in a named object, so the runner's
+  spreading cannot reshape it; a negative test asserts the specific refusal, not just "refused".
+- **Sweep and guard.** Swept the new runtime/Android test tables; argv cases are wrapped in named
+  objects so the complete array reaches the parser. The corrected table exercises duplicate, missing
+  and forbidden flags explicitly; unified type checking exposed the original.
+
+### 287. A warm incremental path that orders or resolves less than the full rebuild does
+- **Bug.** Equal-time events arriving across batches were appended to the warm materialization in
+  arrival order: a lower id's settings patch could win on both client and server, while a full
+  rebuild correctly kept the higher id's patch (2026-11-06). Also, a revocation/amendment received
+  before its missing target was ignored when the later ordinary target arrived on the warm ordered
+  path: the client showed the uncorrected state until reload, and the server had the same gap.
+- **Missed because.** Existing materializer order properties generated unique timestamps; the
+  client's equal-time fixture changed independent settings fields, so it did not expose conflicting
+  winners. Existing warm client/server tests only corrected already-present events (the checkpoint
+  pure replay already retained unresolved targets).
+- **Rule.** An incremental path is correct only where it can prove it gives the full rebuild's
+  answer: when its retained state cannot decide (an equal timestamp without the previous id, a
+  correction whose target may arrive later), it rebuilds. A property compares warm results with a
+  complete replay over shuffled batches, ties and corrections before their targets included.
+- **Sweep and guard.** Both `shouldRematerialize` callers (client `local-log`, server
+  `canApplyInOrder`) sort fresh batches but retain only the previous timestamp, so the shared guard
+  rebuilds on equality; strictly later events stay incremental and corrections keep their rebuild
+  path. Client LocalLog, server StateCache and CheckpointCache maintain all correction target ids,
+  including unknown targets and correction ids; a later target forces a source rebuild, the client
+  refreshes the index after reload, canonical adoption and rollback, and ordinary append checks stay
+  O(1) per id. Guards: core boundary, local dispatch/remote ingest and real UserStore append/read
+  regressions (RED with lower-id `en` replacing higher-id `ru`); eight client loaded/same-session ×
+  dispatch/ingest × revoke/amend regressions; shuffled correction-chain prefixes compared with
+  complete replay; the workerd checkpoint cache regression "base correction fulfilled by a later
+  target". The incremental performance guard remains green.
+
+### 288. Input size turned into recursion depth or repeated copying
+- **Bug.** The first immutable daily splitter recursively consumed one day and spread the entire
+  remaining tail, overflowing on a valid 1900–2026 source interval (2026-11-06).
+- **Missed because.** The initial property only generated intervals up to seven days.
+- **Rule.** A recursion or a copy per element over input whose size the person controls (days in an
+  interval, events in a log) is bounded: balanced splits or iteration, logarithmic stack depth and no
+  copy of the remaining tail per step. Properties include the largest valid input, not only small
+  ones.
+- **Sweep and guard.** The splitter now uses balanced splits on actual local-day boundaries:
+  logarithmic stack depth and O(days log days) copying, without a new input cap or local mutation
+  exceptions; skipped-midnight and skipped-date behavior is preserved. A 46,021-day regression was
+  RED with stack overflow, then GREEN; Apia's entirely skipped date is covered separately.
+
+### 289. A local calendar label read as a UTC instant
+- **Bug.** The first real remote restore rehearsal (class 253) exposed local day labels passed as UTC
+  instants during daily aggregate rebuilding. In negative-offset zones that selects the previous
+  local date.
+- **Missed because.** The aggregate fixtures were UTC-only.
+- **Rule.** A day label (`yyyy-MM-dd`) is resolved in its zone at local noon before
+  `startOfDayIn`, and the day ends at the shared `nextDayStartIn` boundary; it is never parsed as an
+  instant. Tests include positive and negative offsets and a time-zone change.
+- **Sweep and guard.** Daily aggregate rebuilding resolves the label at local noon, then uses
+  `nextDayStartIn`.
+
+### 290. A backup validated against today's input policy instead of its own representation
+- **Bug.** Archive codec implementation finding (2026-11-06): the initial row schemas validated
+  nonempty text/ISO fields and positive intervals. Existing SQL only requires TEXT NOT NULL, and
+  cloud-data.ts:235 explicitly persists zero-length phone uses; these valid historical source rows
+  could therefore block an entire archive.
+- **Missed because.** Existing tests used only ordinary positive intervals and nonempty event
+  fields.
+- **Rule.** A backup validates its representation and capture identity (shape, prefix, cursor,
+  revision, uniqueness, byte/hash/count), not the business rules today's inputs must meet: anything
+  the store holds, however old, must archive and restore unchanged. Input policy belongs to the
+  readers and aggregates that interpret the rows.
+- **Sweep and guard.** Scoped to the new codec: every raw row field is a strict string type without
+  current input constraints; end/start ordering was removed entirely; monthly source-text prefix,
+  cursor, revision, uniqueness, strict object shape and byte/hash/count checks remain. Six RED→GREEN
+  table cases preserve zero/reversed app/phone rows and historical empty/opaque SQL text exactly.
+  Raw usage aggregates separately enforce their input policy. An open review item about interval
+  filters of differing ISO precision is tracked in `context/technical-execution/HANDOFF.md`.
+
+### 291. A key encoding that is not total over the strings the schema admits
+- **Bug.** Ownership keys used `encodeURIComponent`, which throws on lone UTF-16 surrogates; an
+  identity string the schema admitted could therefore crash key generation instead of being refused.
+- **Missed because.** No test fed an identity with malformed UTF-16 (the RED→GREEN test below is the first).
+- **Rule.** An encoding step that can throw (URI encoding, `TextEncoder` round-trips, base64 of
+  text) is total over what the schema before it admits: the schema rejects what the encoding cannot
+  take (malformed UTF-16) and the caller gets a typed error code, never an exception.
+- **Sweep and guard.** Identity schemas now reject malformed UTF-16 before key generation and return
+  archive/invalid; a RED→GREEN test pins that behavior. Raw source strings remain JSON-escaped
+  losslessly, including opaque historical payloads.
+
+### 300. A mode a flag switches on with no path back when the flag is switched off
+- **Bug.** A copy bootstrapped from a checkpoint could only be synced by the checkpoint run. With
+  the server's flag rolled back (or a checkpoint version an older build reads as none) the legacy
+  run answered `history/rebuild-required` on every run, before its push: the outbox stayed on the
+  device for good. The other direction was broken too: a full copy was bootstrapped again at every
+  start and replaced by a checkpoint whenever the server was ahead.
+- **Missed because.** Every test started from a fresh copy under one fixed server answer; none
+  restarted a copy that an earlier run had left in the other mode's state.
+- **Rule.** A flag that changes what is persisted has four cases, not two: each persisted state
+  (made with the flag on, made with it off) under each current answer (on, off). Each has a test
+  that restarts on the stored state and ends settled, with the outbox sent.
+- **Sweep and guard.** The run is chosen per run from the copy's meta; the legacy run turns a
+  checkpoint copy into a full one. `checkpoint-sync-modes.test.ts` holds the four cases and the
+  unreadable base.
+
+### 301. A persisted strict shape with a version number nothing ties to the shape
+- **Bug.** `CoreStateSchema satisfies z.ZodType<CoreState>` passes when a field is added to both.
+  Every stored checkpoint then fails its strict parse under the same `CHECKPOINT_VERSION`, and the
+  state is not ready until an online bootstrap.
+- **Missed because.** The type check compares the schema with today's type, never with what an
+  earlier build stored.
+- **Rule.** A strict schema that reads persisted or peer-written data has its shape frozen per
+  version as data (not as a copy that imports today's leaf schemas), and a test that fails until
+  the version is raised with the shape.
+- **Sweep and guard.** `state-shape.test.ts` and `frozen/core-state.v1.frozen.json`. The redesign's
+  `Subtask.doneAt` needed no bump: no build before this one could store a checkpoint.
+
+### 302. The same step written twice, in two runners that then disagree
+- **Bug.** The checkpoint run and the legacy run each had their own outbox push, chunking and
+  source rule. A rejected event threw in one and was reported in the other; one marked accepted
+  ids sent and the other did not; an action's check ran on an envelope with another id than the
+  one staged.
+- **Missed because.** Each runner had its own tests, written against its own behaviour.
+- **Rule.** A step two paths must agree on is one function both call, and a test runs the same
+  scenario through both paths with one expectation.
+- **Sweep and guard.** `sync-push.ts`, core's `requiresSource`, `state.prepare` / `stageEvents`.
+
+### 303. Mutating before the step that can refuse, and reading errors by their message
+- **Bug.** `Memory.integrate` took the events into the log and then folded; the fold threw inside
+  `store.setState`, so the log held events the state never showed and every later rebuild threw.
+  Around it, some thirty sites threw `new Error("<code>")` and their callers compared `message`.
+- **Missed because.** The refusal needs a correction to reach a checkpoint copy from outside its
+  own guarded writes (another tab's hint), which no test sent.
+- **Rule.** Derive first, commit after: the step that can refuse runs on a copy, and the shared
+  structure changes only once it passed. An error that carries a code is a class with that code.
+- **Sweep and guard.** Every `Memory` change goes through `rebuildFrom`; `SyncError` and its
+  constants replace message matching in the client and the store adapters.
+
+### 304. A refusal dropped by the one caller that loops
+- **Bug.** `appendSystem` staged system events one by one and counted the ones that landed; a
+  `history/not-loaded` refusal counted as "skipped", so on a checkpoint copy an instance issued
+  before the base's last event was never written.
+- **Missed because.** `ensureInstances` was tested on full copies only.
+- **Rule.** A loop that tolerates per-item failure names the failures it tolerates (invalid, known)
+  and handles the rest; a refusal that asks for something (the source) is answered, once per call.
+- **Sweep and guard.** `instances-checkpoint.test.ts`, with and without the source to be had.
+
+### 310. A tap pays for everything mounted: nothing stops a render from walking whole screens
+- **Bug.** Owner, v0.12.0 on Android: every tap lags (check-off, tabs, opening a task), worse after
+  the redesign. Counted on the web build (React's commit hook, 24 open tasks): a tab switch
+  rendered 3 100–5 100 components, a check-off 5 000, an opened task 1 400. The store's speed was
+  not it (6 500 events cost the same as 27; `state-cost.test.ts` already pins that). The causes:
+  (1) every view hook rendered its component on every store version, on every mounted screen, in
+  front or not, and handed it all-new row objects; (2) no list row was memoized and its handlers
+  were new closures, so one check rendered all rows, twice; (3) the screen-in-front flag was a
+  React context, so leaving or entering a screen rendered every consumer, and Now's and Day's top
+  components were consumers; (4) the router makes a new, equal params object for the route it
+  enters, and `useLocalSearchParams` hands it on, so every entered screen rendered in full;
+  (5) the dust's 150 views mounted in the check's own commit; (6) on the web a hidden tab measures
+  0 × 0 and each row took that as a new size, twice per switch. The redesign's kit put more
+  components under each row, which multiplied all of it.
+- **Missed because.** `e2e/latency.e2e.ts` measures the frame after a tap on a 23-event account
+  and has ceilings of 240–380 ms that were "owned by later tasks"; nothing counted work. A render
+  that should not happen is invisible on a fast machine.
+- **Rule.** A change renders what it changed. A view-model shares its unchanged parts with the one
+  before and is computed where the store is read, so an equal view renders nothing; a row is
+  memoized on its own data with handlers that take the row; a screen behind does not follow the
+  store; a flag that only gates effects is a handle that is asked, not a context that renders; a
+  value handed down by a library (route params) is compared by content before it becomes a
+  context. Cost is asserted as a count, never as milliseconds.
+- **Sweep and guard.** `createViewHook` (`packages/client/src/react/view.ts`, `shareEqual`) under
+  every view hook; `Row` in `task-list.tsx` (Now, projects, done lists); `useScene` /
+  `useWhileScreenActive` for the composer's request and the hotkeys; `SearchParamsScene` under
+  every navigator's `sceneLayout`; `Dust`; the zero-size guards in `dissolve.tsx` and Day's rows.
+  Guards: `now-renders.test.tsx` (a check renders its row alone; a store change renders the row it
+  is about; a screen behind renders nothing and catches up in front), `nav-renders.test.tsx`
+  (leaving, entering and covering a tab render no screen; an own param change renders once),
+  `share-equal.test.ts`. Not swept: Day's and Inbox's rows are not memoized yet (their props are
+  rebuilt per render), and the navigators' own chrome still renders on every navigation.
+
+### 311. An action made to wait for the server because an earlier fix needed the refusal
+- **Bug.** Owner: Skip on Now's calendar card (and Day's row) hid the event only after
+  `POST /api/calendar/skip` answered, seconds later on a phone. The wait was put there on purpose
+  (2026-10-14, class 3): before it, the event was hidden at once and a failed skip was ignored.
+- **Missed because.** The tests of that fix pinned "shown while it is sent"; the delay was the
+  asserted behaviour, and class 108's sweep listed it as waiting "on purpose".
+- **Rule.** Handling a refusal is no reason to wait for the answer: show the result at the press,
+  keep what is needed to take it back, and take it back with the sentence when refused.
+- **Sweep and guard.** `usePhoneAnswers.skip` (both callers: `use-calendar-prompt.ts`,
+  `use-day-phone.ts`): hidden while sent, kept by the phone once taken, back when refused. Task
+  closes (Skipped in the close sheet, Inbox discard) already stage before the write. Still waiting
+  on the server by design: a notification's own Attend/Skip buttons in the feed, account sessions.
+  Guards: Now and Day tests with `heldRoute()`: gone while the route is held, one request, back
+  with "That did not go through" when refused.
+
+### 320. A failure's cause folded into one message, and a form that only its button submits
+- **Bug.** The dev sign-in said «Не удалось войти» for an id not on the list (403), for «abc» (sent
+  to the server unchecked) and for a server it could not reach; Enter in its field did nothing
+  (QA PR55-1-06, -07). The form's `onFailure` took no argument, so the code was gone before any
+  screen could word it; the native browser login kept only a boolean.
+- **Missed because.** The tests pressed the button with a good id and a fake that answered; no test
+  sent Enter, a malformed id or a request that never got an answer.
+- **Rule.** A failure travels with its code to the one place that words it (`signInErrorKey`):
+  not allowed, no connection (`network`: the request got no answer) and the rest are three
+  sentences. Input the client can judge is judged there, before a round trip. A one-field form
+  submits on Enter as its button does.
+- **Sweep and guard.** The web Telegram widget's error, the native browser login and the dev form
+  all go through `signInErrorKey`; `login-screen.test.tsx` pins Enter, the local refusal and each
+  code's sentence. The bot flow's `network` stays «Не удалось войти»: it stands for any throw there,
+  not only an unreachable server.
+
+### 321. A copy that never reached the server read as the account
+- **Bug.** A fresh tab whose first pull failed exported an all-empty workbook, with no request, and
+  said «Скачан файл …» (QA PR55-1-01); its History stayed grey rows for good with no word on the
+  page (PR55-1-02). On the legacy path an empty copy has full coverage, so `completeHistoryOf`
+  accepted it as a complete history of nothing.
+- **Missed because.** Every export and History test ran on a copy seeded as synced (the artboard
+  world) or on a checkpoint copy, whose history load does go to the server; none on an empty copy
+  whose first sync failed.
+- **Rule.** "Complete" is a claim about the account, not about the device: a copy with no server
+  store (`storeId` null) holds none of it, whatever its coverage says. A consumer of the whole
+  account syncs first or refuses with the reason (offline, not loaded yet); a screen says the load
+  failed instead of keeping placeholders for good.
+- **Sweep and guard.** Export (`reachedServer`: a sync, then `export/not-synced` or
+  `history/offline`, never a file); History (`usePageHistory`: the error in the page, the sync
+  line's Retry loads it). The other whole-account readers are server-side (MCP `export_all`) or
+  wait for a successful sync already (the zone, class 62). `export-row.web.test.tsx` and
+  `history-first-sync.test.tsx` run the empty-copy-failed-pull world.
+
+### 322. Two controls for one job when a screen's own failure and the app's line say the same
+- **Bug.** Day and Week offline showed the section's «Попробовать снова» under «Календарь не
+  загрузился» / «Не удалось загрузить экранное время» and the sync line's own (QA PR55-1-09); the
+  section's read was never made again when the line's Retry worked.
+- **Missed because.** The section tests rendered the screen alone, without the sync frame, so the
+  second Retry was never on the screen with the first.
+- **Rule.** While the sync line offers Retry, a section's failed read says what did not load with
+  no button of its own, and reads again as soon as the line goes (`useBlockRetry` over
+  `useSyncRetryReason`).
+- **Sweep and guard.** Day's screen time, Week's calendar, History's load failure. Notifications'
+  own Retry stays: its list is the screen, not a section beside the sync line's job.
+  `block-retry.test.tsx` renders the screens inside `SyncFrame` and counts the Retry buttons.
+
+### 323. A section for data the platform can never produce
+- **Bug.** The web's Day showed «Экранное время · 0 мин · Нет данных» on every day, and offline a
+  failure with Retry for something never asked for (QA PR55-1-08).
+- **Missed because.** Day's tests run as the phone (jest-expo's platform), where the section is real.
+- **Rule.** A section shows on a platform only for data that platform can have: the web records
+  no screen time, so it shows the section only for what a phone or a computer sent. Hiding it
+  outright would hide a computer's or a phone's real data, so it is not done.
+- **Sweep and guard.** The phone-only sections already ask `IS_PHONE` (usage access, calendar);
+  `day-web.test.tsx` runs Day as the web build.
+
+### 324. Focus that falls to the page when its control is replaced by something that takes no focus
+- **Bug.** A row checked off from the keyboard left the list and focus went to the page start (QA
+  PR55-1-10); «Очистить через Telegram» gave way to the waiting line and focus went to `body`;
+  Week's «Изменить в Дне» opened Day's editor from the address, so Escape had no opener to give
+  focus back to (R27-09 remainder).
+- **Missed because.** Class 5's guards cover a control that opens something (an opener comes back);
+  these three end with a different control, or none, in place of the one that had focus.
+- **Rule.** Whatever removes the focused control names where focus goes: the row that takes its
+  place in the list (`focusedRowPlace` / `focusRowPlace`), the control that replaces it
+  (`useConfirmFocus().toStatus`), or the item the editor edited (`focusPlaceById`, after the
+  editor's exit animation, only where focus was lost).
+- **Sweep and guard.** Now/Inbox/project rows (`TaskRows`), the danger zone's waiting line, Day's
+  editor opened from the address. `focus-after-swap.e2e.ts` checks a row off and closes Week's
+  «Edit in Day» from the keyboard and fails on `body`.
+
+### 325. A system write that the History offers to undo
+- **Bug.** A fresh account's History began with «Settings changed · Web» and an Undo (QA
+  PR55-1-11, R27-12): the zone the app gives an account without one was written with the device's
+  source, as if the person had chosen it; undone, the app would only write it again.
+- **Missed because.** The zone tests checked that it is written once, never how History lists it.
+- **Rule.** A write the system makes on its own is `source: "system"`, and History offers no Undo
+  for it; the first zone of an account set up before is recognised by shape (the log's first event
+  that sets the zone, alone).
+- **Sweep and guard.** The other writes the client makes on its own already carry `system`
+  (instances of a series, the homework instances, auto outcomes). `history.test.ts` pins both
+  forms; `actions.test.ts` the source.
+
+### 326. The same read made twice because each caller fetches for itself
+- **Bug.** Every load sent `/api/instance` twice (the app's server check and the checkpoint
+  negotiation), `/api/notifications` twice on the Notifications route (the screen's mount and the
+  start), and the log twice: the start's HTTP pull and the same pull over the socket the moment it
+  opened; back online the same again (QA PR55-1-12).
+- **Missed because.** The steady-state guards (class 1) count requests after a screen settled; the
+  duplicates were all inside the load, and jest's fake socket opens no real connection.
+- **Rule.** A read several parts need is owned once: shared and joined while it is out
+  (`createInstanceReader`; the feed's `refreshUnlessFresh`, which also skips a page a few seconds
+  old). A connect's catch-up pull is asked only when the copy is behind where the server's log
+  stood as the socket opened: the server names its head in the v2 `hello`, read in the same turn
+  it accepts the socket, so nothing it appended can slip between.
+- **Sweep and guard.** Instance, notifications, the socket's catch-up (load and reconnect). A
+  check that must be current (a return to the app, Retry) still asks. `load-requests.e2e.ts` loads
+  `/` and `/notifications` and goes offline and back, and fails on any read made twice.
+- **Other side traced.** The connect's pull was also what cleared the offline line after a failed
+  run; skipping it left the line up until the next poll (`sync-state.e2e.ts`, server gone while
+  idle). `catchUpTo` runs whenever the last run failed (`sync-client.test.ts`).
+
+### 327. A placeholder drawn outside the frame the content lands in
+- **Bug.** The first-sync cover at 1440 was a centred column with no sidebar, 80 px right of where
+  the screen's column then appeared: everything jumped as the app showed (QA PR55-1-13).
+- **Missed because.** The cover's tests ran at phone width, where the two frames are the same.
+- **Rule.** A stand-in takes the geometry of what replaces it: the cover draws the navigation's
+  column (empty: its words would be in the device's language) and its rows where the screen's
+  column starts.
+- **Sweep and guard.** The configuration strip's placement is PR55-1-14 (layout, not in this change).
+  `sync-frame.test.tsx` renders the cover at 1440.
+
+### 340. A drawn box larger than what it holds, with nothing centring the content
+- **Bug.** The tonal `IconButton` (an alongside activity's Stop, the main Stop while the card
+  asks) drew a 32 `fill.2` disc as the Pressable's `visual` and put the 20 square in it; the
+  visual was a plain flex column, so the square sat at the disc's top-left (QA PR55-1-03, Now at
+  390 and 1440). The off-centre disc also read as clipped at the card's edge.
+- **Missed because.** The kit's tests checked the visual's classes (size, fill, corners) and the
+  target's centring, never where the content lands inside the visual; every other caller's visual
+  happened to say `items-center justify-center` itself (Button, Chip, Segmented, the swatches) or
+  was exactly its child's size (the check, the switch).
+- **Rule.** A container whose size is set independently of its content centres the content by
+  construction, in the primitive, not by each caller remembering to.
+- **Sweep and guard.** `visualClass` (`pressable-props.ts`) puts `items-center justify-center`
+  on every visual; the callers' own centring stays harmless. `pressable.test.tsx` pins it.
+
+### 341. Information order chosen per width, so the cut lands on the value that matters
+- **Bug.** The task meta line put the due date last on a phone so that the truncation would take
+  it rather than the countdown (design review 2 N10); the owner's own phone then showed
+  "1d left · 0/13 done · D…" and «осталось 23 ч 59 мин · Срок за…»: the deadline, the one fact a
+  person checks, was the piece that was always cut, and the two widths disagreed on the order
+  (QA PR55-1-04 = R28-11).
+- **Missed because.** The tests pinned the reorder itself ("the countdown comes first on a
+  phone"), i.e. the fix of the previous review, not the reader's need; no test looked at what a
+  one-line truncation leaves at 390 with a RU deadline.
+- **Rule.** A line of several facts keeps one reading order at every width. When it does not fit,
+  it wraps between facts (no-break spaces inside each fact, at most N lines), it does not choose a
+  victim by moving it to the end.
+- **Sweep and guard.** `MetaLine` (Now, project lists, History's snapshot rows, the preset preview,
+  the choices sheet) wraps at « · » to two lines; no other width-dependent ordering of joined
+  pieces exists (`join(" · ")` sweep: History's event rows, presets list, Inbox review rows and
+  the decisions footer already wrap as `ListRow` subtitles). `task-row.test.tsx` asserts the same
+  order at 390 and 1440 and the no-break pieces.
+
+### 342. A floating layer centred on the region, not on the column the screen reads in
+- **Bug.** The sync strip and the toast float centred in the shell's content region (248–1440 at
+  1440), while every screen's column hugs the region's leading edge (248–968 or 248–1208); the
+  configuration card sat at 604–1083, half off the column it spoke about (QA PR55-1-14).
+- **Missed because.** R23-13a's test asked only that the layer stay out of the sidebar; no test
+  put a screen's column and the layer in one picture.
+- **Rule.** What floats over a screen is placed against the box the person reads (the screen's
+  column), and that box is published by the screen, not guessed by the layer.
+- **Sweep and guard.** The only floating stack is `float-layer.ts` (toast, sync strip); `Screen`
+  publishes its anchored column width (`usePublishColumn`). `toast.test.tsx` and `screen.test.tsx`
+  pin the stack inside 248–968 and 248–1208.
+
+### 343. A control's label ending in "…" reads as cut text
+- **Bug.** The pane's «Другое время или итог…» link ended in the menu-item ellipsis of desktop HIG;
+  in a pane with room to spare, QA read it as truncated (PR55-1-16).
+- **Missed because.** The truncation sweep looks for clipped boxes; a literal "…" in a catalog
+  string is not clipped, so nothing flagged it.
+- **Rule.** "…" in a visible control's label is reserved for menus (where the convention is read
+  as "asks more"); a link or button says what it opens without it. Progress lines keep theirs.
+- **Sweep and guard.** Catalog sweep of labels ending in "…": only menu items (`Close as…`), the
+  assistant's correction placeholder and progress lines are left; `task.doneOther` lost it.
+
+### 344. A screen's header kind chosen by hand per screen
+- **Bug.** Notifications and the assistant's log on a phone used the pushed header (`title1`
+  under the bar) while Settings, reached the same way from More, used the top-level one; their
+  titles sat ~12 px higher and smaller (QA PR55-1-18, R27-10 Presets, R25-16).
+- **Missed because.** Each screen's test checked its own header, never one screen against its
+  siblings.
+- **Rule.** A collection (a list a phone pushes: Settings, Presets, Notifications, the log) gets
+  the top-level header with Back on a phone; an entity (a task, a project, a preset) gets the
+  pushed one. The choice is one helper, not a per-screen literal.
+- **Sweep and guard.** `ListScreen` / `useListVariant` (`pushed-screen.tsx`) for Presets and the
+  log, Notifications `top` at every width; `list-titles.test.tsx` renders the four lists at 390 and
+  asks each for a `largeTitle` and Back. The bar logic itself (`ScreenHeader`) is unchanged.
+
+### 345. A flush offset written by hand next to a padding it does not follow
+- **Bug.** A text button meant to start where the text above starts was pulled back with an ad
+  hoc `-ml-4` (12 px) while its padding is `px-5 lg:px-4` (16/12): 4 px off on a phone; and two
+  more (the project form's «В архив», Week's «Изменить в Дне») had no offset at all, indented by
+  16 px (R28-13, R27-11).
+- **Missed because.** The offsets were written at each caller (class 11 again) and checked by eye
+  at one width.
+- **Rule.** An offset that cancels a control's own padding lives in the control, beside the
+  padding it mirrors, at every breakpoint.
+- **Sweep and guard.** `Button isFlush` (`FLUSH` beside `SIDE_PAD` in `button.tsx`); the sessions
+  list's Retry moved to it. Day's screen-time Retry (`activity-usage.tsx`) still carries its own
+  `-ml-4`: left for the agent working on that block (PR55-1-08), to move to `isFlush`.
+  `button.test.tsx` pins the pull to the padding at each size.
+
+### 346. One control, two names
+- **Bug.** The same day stepper said «Предыдущий день» on Day and «На день раньше» on History
+  (QA PR55-1-18).
+- **Missed because.** Each screen had its own catalog keys; nothing compares labels of the same
+  control across screens.
+- **Rule.** A shared control takes its words from one key, whichever screen draws it.
+- **Sweep and guard.** History uses `day.previous` / `day.next`; `history.dayBack` /
+  `history.dayForward` are gone, so a new screen cannot pick them up.
+
+### 347. An identifier shown as words, and a field without the label its neighbour has
+- **Bug.** The Close sheet said «Время читается в поясе Europe/Moscow» (an IANA id), and its time
+  field had no visible label beside the labelled date, so it sat 25 px higher (R28-08). The same id
+  showed in a deadline's «в зоне America/New_York».
+- **Missed because.** The tests read the copy by its key with the id as the parameter, so the id
+  was the expected text.
+- **Rule.** A value meant for machines (an IANA zone, a code) reaches copy through a formatter
+  that names it as people do; a field beside labelled fields carries its own visible label.
+- **Sweep and guard.** Core `zoneName` (`longGeneric` in English, the city in Russian, the id's
+  city where `Intl` cannot say); the Close sheet, a task's deadline zone and a preset's final
+  deadline use it. Settings' timezone row keeps the id on purpose (it is the setting itself).
+  `TimeInput isLabelShown`. `close-sheet.test.tsx` checks no `Europe/Moscow` and both labels.
+
+### 348. A phrase composed in two places from the same parts
+- **Bug.** The app's feed and the server's Telegram notice each joined country and city, country
+  first: «Соединённые Штаты, Columbus» (QA PR55-1-17); Settings' session rows left the city out.
+- **Missed because.** Class 1 again, across the app and the Worker: each copy had its own test.
+- **Rule.** A phrase built from data parts (a place, a duration range) is one core function that
+  every surface calls.
+- **Sweep and guard.** Core `placeName` (city, then the country in the reader's language): the
+  feed, the Telegram/phone text and Settings' session rows. Tests in core, the client and the API.
+  The city stays in Cloudflare's English: no gazetteer ships to translate it (noted, not hidden).
+
+### 349. "No keys on a phone" decided per control
+- **Bug.** Buttons hid their key hints at a phone's width, but Settings' «Клавиши — Alt+N …» row
+  checked only for a fine pointer and showed at 390 in a desktop browser (QA PR55-1-17).
+- **Missed because.** The jest window is a phone and the row's test mocked a keyboard: the test
+  pinned the leak.
+- **Rule.** "Does this layout show keys" is one predicate that every hint and list asks.
+- **Sweep and guard.** `useKeysShown` (`button.tsx`) for `KeyHint` and `KeyboardRow`;
+  `keyboard-row.test.tsx` asks for nothing at 390 and the list at 1440.
+
+### 350. Focus moved with the browser's scroll while an overlay reveals the same view
+- **Bug.** Opening the deadline panel in the 1440 edit dialog, the body began a smooth scroll to
+  show the panel whole; a frame later the calendar claimed focus for its chosen day, and the
+  browser's focus scroll stopped the reveal with only the panel's top in view (R28-03). At 390 there
+  is no keyboard, so no focus claim, and the reveal finished.
+- **Missed because.** The reveal's tests ran without the calendar's focus claim (jest has no
+  scrolling), and the e2e looked at 390.
+- **Rule.** Inside a container that scrolls a view into place itself, moving focus uses
+  `preventScroll`; one owner per scroll.
+- **Sweep and guard.** `claimFocus(…, { preventScroll })`, the calendar passes it inside a
+  `RevealContext`; `claim-focus.web.test.ts`. `claimFocus` has no other caller.
+
+### 351. Copy that names a control by its glyph or by an inside word
+- **Bug.** «Луна на Неделе включает то же самое» (the Week button is labelled «Ночные часы»; the
+  moon is its icon), and quiet hours «Придерживает «начало события» и «всё ещё…?»» named the
+  notifications by paraphrase, not by the names their switches carry (QA PR55-1-17).
+- **Missed because.** Copy is reviewed per string; nothing ties a reference in one string to the
+  label it refers to.
+- **Rule.** A sentence that points at a control or a kind names it with that thing's own label,
+  passed as a parameter from its key, so the two cannot drift.
+- **Sweep and guard.** `settings.nightHours.hintOff` takes `{button}` = `week.nightHours`;
+  `settings.quietHours.hint` takes the four `notify.kind.*` names; `settings.test.tsx` renders both.
+
+### 352. An empty state that repeats the control right above it
+- **Bug.** Empty Now showed the composer's line and, an inch below, «Add a task» opening the same
+  form (QA PR55-1-19): one job, two controls (PRODUCT.md principle 2).
+- **Missed because.** The empty-state test asked for "a way to add", and found the duplicate.
+- **Rule.** An empty state offers an action only when the screen has no other way to that job in
+  view.
+- **Sweep and guard.** Every `EmptyState` with an action: Inbox's «Open the line» leads to a line
+  that is not on its screen, the others retry or clear a filter; only Now's went.
+  `now-screen.test.tsx` asks for the line and no «Add a task».
+
+### 353. Fixed side padding inside chrome whose width is fixed by the window
+- **Bug.** At 320 the composer's + kept 12 px of target padding at the gutter and the time-bar
+  tile kept 2 px a side: «Задача или…» (134 px needed, 122 left) and «Календ…» (66 of 64)
+  (QA PR55-1-15).
+- **Missed because.** The worst-case sweep runs at 390; 320 is below the target width.
+- **Rule.** In a row of fixed-width chrome, a control's visual edge (not its target's) sits on the
+  gutter, and a centred label gets the whole tile.
+- **Sweep and guard.** The composer's + and Send pulled to the gutter (`-ml-4`, `-mr-1`, mirrors
+  of the 44 target around a 20 glyph and a 40 circle), the tiles lost `px-1`;
+  `composer.test.tsx` pins the offsets.
+
+### 354. A control pulled out of the frame that owns it by a negative margin
+- **Bug.** Class 353's fix lined the composer's + and Send up with the gutter by pulling the buttons
+  out of the line (`-ml-4`, `-mr-1`). The composer's frame (`composer-card`) had no padding to give,
+  so the + target sat 16 px outside its card in every frame; during the unfold's grow the card
+  clips (`overflow: hidden`), so the frame cut its own control. CI's overlays e2e caught it
+  («New task · Alt+N» 16 px outside, `overlays.e2e.ts` :159 and :175).
+- **Missed because.** The wave's guard was a jest test that pinned the class names (`-ml-4`), the
+  implementation rather than the outcome, and the e2e containment sweep was not run before the
+  commit.
+- **Rule.** To move a control's visual edge onto the gutter, move the frame that owns the control
+  (its margin or padding), never the control out of its frame. A negative margin on a child is
+  right only where its parent's padding takes it back (a flush text button inside a padded row).
+- **Sweep and guard.** The composer's line frame now steps out of the gutter itself (`ml-0 mr-3`
+  in line shape, `mx-gutter` as the form's card); its buttons carry no offset and their
+  positions are unchanged (+ at 0–44, Send ending at 308 / 378). The other negative margins
+  (`Button` `FLUSH`, the header's Back `-ml-3`, the overlays' close `-mr-2`, the sheet's grabber
+  `-mt-3`, the screen-time Retry `-ml-4`, the count badge) each pull into a padding their surface
+  has (gutter, `sheet-pad`, `row-x`). `composer.test.tsx` asserts that the frame, not the buttons,
+  carries the offset; `overlays.e2e.ts` measures every box in the card in every frame.
+
+### 355. A shrinking text beside fixed siblings with no line of its own to go to
+- **Bug.** Class 341's fix let the meta line wrap between pieces inside its text, but the text still
+  shared one flex row with the tag (up to half the row) and the importance word (`shrink-0`). In
+  the gallery's narrow rows at 320 the text got 12 px: «осталось 6 ч 30 мин» stood one letter a
+  line and the two-line clamp showed «о с.»; at 390 «осталось 6 ч / 30 мин» broke inside a piece
+  (worst-case sweep 18>12, 19>7 in CI).
+- **Missed because.** The jest tests render the row without a width; the worst-case sweep at 320
+  that would have flagged it was not run before the commit.
+- **Rule.** A text that wraps inside itself still needs a line wide enough for its widest piece.
+  In a row with fixed siblings, the row wraps (`flex-wrap`) and the text keeps its own width as
+  its basis, so it starts a line of its own instead of shrinking to a sliver; only alone on its
+  line does it shrink and wrap.
+- **Sweep and guard.** `MetaLine` wraps (`flex-row flex-wrap gap-y-1`): the pieces stay beside the
+  tag when they fit and go under it when they do not. The other `min-w-0 shrink` texts in rows
+  (period stepper, task header, the gallery's tag rows) pass the worst-case sweep at 320 in all
+  four sets. `task-row.test.tsx` pins the wrap and the natural basis; the sweep at 320 is the
+  outcome guard, and `docs/design.md`'s pre-PR checklist now has every layout commit run
+  `worst-case.e2e.ts` and `overlays.e2e.ts` before it is committed.
+
+### 360. A caller that reaches below the shared path and skips the step it adds
+- **Bug.** PR 55 follow-up review, item 1: the archive toast's Undo (`undoArchive`) staged its
+  revocation with `state.stage(…)` to get an in-queue check, below `stageEmit`, which is where the
+  history loader runs. A revocation always needs the source, so on a checkpoint copy it never loaded
+  the history: it answered `action/nothing-to-do` (its check read a log that held no archive) or
+  `history/not-loaded`, and the copy stayed a checkpoint. Item 2 is the same shape seen from the
+  read side: `restorePreset` read `state.events` before any wait (class 118).
+- **Missed because.** Every action test ran on a full copy, where the loader is a no-op; the
+  checkpoint tests covered `stageEmit`, `revoke` and the system's instances, the paths that load, not
+  the actions that call below them.
+- **Rule.** A step every write must take (load the source, check in the queue) lives in the one
+  path the writes share; a caller that needs something extra passes it in (`emit`'s `check`)
+  instead of calling the layer below. An action that reads the log for a correction's target reads
+  it after the history is loaded.
+- **Sweep and guard.** Every action that writes a correction runs on a checkpoint copy in
+  `corrections-checkpoint.test.ts` (one history load, success, the same events as a full copy).
+  The sweep also found `confirmAutoOutcome` checking "confirmed already" only before the wait: it is
+  asked again in the queue now. ESLint bans `state.stage(` in `packages/client/src/actions/`
+  outside `deps.ts` and `instances.ts` (`scripts/eslint-scoped-bans.test.ts` pins the scope).
+
+### 361. A strict read on the one path a sync run must always get through
+- **Bug.** PR 55 follow-up review, item 3: a checkpoint copy's tail skips an event this build
+  cannot read (class 13, 150). Once any correction arrived after it, the page needed the source
+  (`history/rebuild-required` → `ensureComplete`), and the pinned read of the complete source, strict
+  on purpose, refused the skipped event with `history/incomplete`. The run threw before its push:
+  the cursor never moved, the outbox never left, and every later run sent the same requests again.
+  The bootstrap's recovery (`recoverBootstrap → sourceBootstrap`) and a `source` answer on a
+  checkpoint copy (`acceptSource`) had the same shape.
+- **Missed because.** The tail tests put the unreadable event and the strict read side by side but
+  never in the same run: no test sent a correction after an event the tail had skipped, so the run
+  never had to read a source it could not read.
+- **Rule.** A read that is strict for a person's view (History, export) is not the sync's way past
+  an obstacle: when a run needs it and it refuses for good, the run takes the tolerant way that
+  already exists (here the legacy pull from 0 that a flag rollback uses), and still pushes. Test a
+  refusal that does not go away by running twice: the second run must be quiet.
+- **Sweep and guard.** The three places the checkpoint run asks for the complete source go through
+  `sourceOrConvert` (`checkpoint-sync-types.ts`), which turns `history/incomplete` into
+  `checkpoint/source-unreadable`; `sync-run.ts` answers it with the legacy run (and a live page
+  with a pull). The History screen and export still read strictly. `checkpoint-sync-tail.test.ts`
+  "becomes a full copy the tolerant way…" (HTTP and socket): after the run the copy is full and the
+  outbox sent, and the next run makes exactly one request, a pull.
+
+### 362. A negotiated capability cached for as long as the runtime lives
+- **Bug.** PR 55 follow-up review, item 5: whether the server offers checkpoints was asked once per
+  runtime (`isOffered`). A deploy rollback or a `CHECKPOINT_VERSION` bump left a long-lived tab on
+  the checkpoint run, failing every run on a contract the server no longer spoke, until a reload.
+  On the server, `pull` compared the asked version with a literal `1`, not with `CHECKPOINT_VERSION`.
+- **Missed because.** The mode tests restart the client between server answers (class 300), so
+  each start negotiated afresh; none changed the server under a running tab.
+- **Rule.** A capability learned from the server is a guess that a failure on its contract
+  invalidates: the cache is dropped when a run fails that way, and the next run asks again. A
+  version compared on both sides is the shared constant on both sides.
+- **Sweep and guard.** `checkpoint-sync.ts` clears `runtime.negotiated` on a contract error (a page
+  or checkpoint out of shape, an unknown route or parameter); `history-sync.ts` compares with
+  `CHECKPOINT_VERSION`. `checkpoint-sync-modes.test.ts` "a long-lived tab on a server that rolls
+  back under it": one failed run, then the legacy run sends the outbox and the copy settles.
+
+### 363. Progress judged by a field an interrupted step rewinds
+- **Bug.** PR 55 follow-up review, item 6: "has this copy pulled?" was read as `cursor !== 0`. The
+  legacy run's schema upgrade (`upgradeCursor`) rewinds a full copy's cursor to 0 in its own
+  transaction before pulling again; cut off between the two (the app closed), the next run read the
+  full copy as one that never pulled, bootstrapped it and cut it down to a checkpoint.
+- **Missed because.** Upgrade tests ran the rewind and the pull in one run; no test restarted in
+  between.
+- **Rule.** A decision about a copy's history reads a field only its first pull sets and nothing
+  rewinds (`storeId`), not one a resumable step moves back and forth.
+- **Sweep and guard.** `isCheckpointRun` and `requiresBootstrap` read `storeId`.
+  `checkpoint-sync-modes.test.ts` "a full copy whose schema upgrade was cut off".
+
+### 364. A test that writes into the source tree when what it compares against is missing
+- **Bug.** PR 55 follow-up review, item 9: `state-shape.test.ts` wrote the frozen shape of a new
+  `CHECKPOINT_VERSION` itself when the file was missing. Any run (CI, a fresh checkout, a version
+  raised by mistake) could freeze whatever shape the code had into the source tree, and a frozen
+  file is never to be written twice.
+- **Missed because.** The write was meant as a convenience for the one person raising the version;
+  nothing separated that deliberate step from every other run of the suite.
+- **Rule.** A test fails when its reference is missing; writing a reference (a frozen shape, a
+  snapshot that guards a contract) is a separate, explicit step behind a variable. A test that
+  compares a library's printed output says so, and what to do when only the library changed.
+- **Sweep and guard.** `state-shape.test.ts` writes only with `PACE_FREEZE_CHECKPOINT_SHAPE=1`
+  and says in its header that it reads zod's JSON Schema output. Swept every test that writes a
+  file: the only other one (`apps/app/ota-build-config.test.ts`) writes into a `mkdtemp` folder;
+  the presets' previous-release test (`old-reader-compat.test.ts`) only reads.
+
+### 370. A decision taken while the run that settles it is still in flight
+- **Bug.** Wave review, item 1: `catchUpTo` (a connect's hello) judged the copy at once. On a
+  return to the app a direct `syncNow()` was still hanging over HTTP: `lastError` was still null and
+  the cursor at the head, so it asked nothing; the run then failed, and a direct run schedules no
+  backoff, so the app showed offline next to a connected socket until the 5-minute poll. The same
+  early judgement asked an empty second pull when the hello came before the run moved the cursor.
+- **Missed because.** The hello tests called `catchUpTo` on a loop at rest; none held a run open
+  across the hello and settled it after.
+- **Rule.** A decision that reads what a run in flight is about to write (its error, the cursor,
+  the outbox) waits for that run and reads after it. Test it with the run held by a deferred
+  answer, settled both ways after the decision was asked.
+- **Sweep and guard.** The other readers of the run's state either wait already (`firstTickIn`
+  reads `isFresh`, false while a run is in flight) or follow the status store (`followSyncedLanguage`
+  acts on the transition). `sync-client.test.ts` "runs after a direct run in flight at the hello
+  fails…" and "asks no second pull when the run in flight at the hello brings the copy to the head".
+
+### 371. A section shown for its rows only, so its failure has nowhere to appear
+- **Bug.** Wave review, item 2: the web's Day showed screen time only when the day had rows (class
+  323). `useRangeRead` reports a failure only with no rows, so on the web the failure sentence could
+  never show: a read that failed looked the same as a day nothing was sent for, class 62 / R23-08
+  again (a computer's screen time is real on the web).
+- **Missed because.** The fix for 323 was tested with an empty answer and with a 503, and the 503
+  test asserted the silence as the wanted behaviour; no test said what a failed read owes the
+  person on the web.
+- **Rule.** A condition that hides a section for "no data" lets its failure through: the guard
+  is "rows, or the read failed", never "rows" alone. One Retry per offline state still holds
+  (`useBlockRetry`).
+- **Sweep and guard.** The other reads behind a section: Week's calendar shows `CalendarFailed`
+  whatever its rows; Week's and the activity sheet's usage draw marks on blocks with no total or
+  "none". `day-web.test.tsx`: a 503 shows the sentence and its Try again reads again; offline
+  beside the sync line there is one Retry; an empty answer shows nothing.
+
+### 372. A cache of an account's data that outlives the session it was read for
+- **Bug.** Wave review, item 3: the notification feed's page and its `fetchedAt` were not cleared
+  on a sign-out, and the signed-in start now asks `refreshUnlessFresh`; another account signed in
+  within `FEED_FRESH_MS` (5 s) was shown the last account's pool. A fetch still out at the
+  sign-out could also land on the next session's screen.
+- **Missed because.** The freshness tests ran one session; the sign-out tests looked at the local
+  copy and the drafts (class 103), not at the client's in-memory caches.
+- **Rule.** Anything the client keeps of an account (a page, its freshness, a fetch still out)
+  is keyed to the session: a token change empties it and drops what is in flight. A freshness
+  window never spans two sessions.
+- **Sweep and guard.** The other memory the client keeps: the instance reader is public and names
+  no one; the sync's last-success record decides only the loop's first tick, and the signed-in start
+  runs its own pull before the loop; `markRead`'s asked ids are unique across accounts.
+  `createPaceClient` resets the feed on every token change (`feedFollowsSession`).
+  `create-client.test.ts` "never shows the last account's notifications…"; `notifications.test.ts`
+  "drops a page that lands after a reset".
+
+### 373. A protocol message out of shape handed to the channel that ignores it
+- **Bug.** Wave review, item 4: a v2 socket's hello that failed the schema (a field a server got
+  wrong) went to `on.message`, the notices' reader, which drops it: no catch-up pull, and `isV2`
+  stayed false, so every request went over HTTP until the 5-minute poll. The sweep found the same
+  for a `pushed` or `error` answer out of shape: its request waited for its timeout.
+- **Missed because.** The live tests send through `say`, which checks the message against the
+  schema first, so no test could send one out of shape; only `events` had a path for it.
+- **Rule.** Every message the protocol itself depends on (the hello, each answer by id) has an
+  explicit path for "this type, out of shape": the hello counts as one naming nothing, an answer
+  fails its request at once. Only notices fall through to the lenient reader.
+- **Sweep and guard.** `onLiveMessage` handles hello, events, pushed and error out of shape.
+  `live.test.ts` sends raw frames: three broken hellos (a pull, v2 on), a broken `pushed` and
+  `error` (the request fails at once, no notice).
+
+### 374. A once-only guard kept in React state, read at the press
+- **Bug.** Wave review, item 5: Skip tracked its in-flight keys in a `useState` set. Two presses
+  before the hide rendered both saw the key absent: two requests, two `dismiss` writes, and a
+  flicker or a wrong toast when the two answers differed. The sweep found the same in four more
+  controls guarded only by a busy state: History's Undo confirm (two revocations, the second
+  refused), Export (two downloads), Wipe/Delete's Telegram ask (two confirmations) and the dev
+  sign-in (Enter and the button together).
+- **Missed because.** Every test pressed once and awaited; state is current by the next press
+  only when a render ran in between, and a test that awaits always lets one run.
+- **Rule.** A guard that must hold from the press on lives in a ref read at the press
+  (`useBusyLatch`, or a map of the promise in flight that a second press joins); state only
+  draws the spinner. Test each such control with two presses in one `act`.
+- **Sweep and guard.** `useBusyLatch` moved to `src/shared` and now guards Undo, Export and the
+  dev sign-in; Skip joins the promise in flight per key, the account ask joins its promise. The
+  ref-guarded ones (`add-computer`, the assistant's approve, the server sheets) were already right.
+  Tests: `use-phone-answers.test.ts`, `history-screen.test.tsx`, `export-row.web.test.tsx`,
+  `login-screen.test.tsx`, `settings.test.tsx` (each "… (class 374)": two presses, one request).
+
+### 375. A fallback the doc promises and the code leaves out, behind a wait of fixed frames
+- **Bug.** Wave review, item 6: `focusRowPlace` said focus goes to "the list's heading's neighbour
+  when none is left", but with no row left it did nothing and focus fell to the page; and it
+  waited exactly two frames for the checked row to leave, so a row slower to go was still there
+  (or focus was still on it) and the wait ended with nothing done.
+- **Missed because.** No test ran the web helper at all: the list tests run as the phone, where
+  it is a no-op, and the QA round checked a list with rows left below.
+- **Rule.** Each branch a focus helper's doc names has a test on a real DOM (`@jest-environment
+  jsdom`), the empty case first. A wait for something to leave polls a bounded number of frames
+  for that thing (`isConnected`), never a fixed count.
+- **Sweep and guard.** `focusPlaceById` already polls; `focusPlace` and `useFocusBack` run from
+  the unmount, after the field is gone, so one frame is enough; the sheet, claim and toast helpers
+  poll. `focus-place.web.test.ts`: the next row, the heading's neighbour (list emptied or gone), a
+  row that takes six frames, and focus the person moved meanwhile.
+
+### 376. A legacy heuristic wider than the writes it stands in for
+- **Bug.** Wave review, item 7: History took an account's first zone-only `settings.updated` for
+  the app's own zone write (`isInitialZone`, for logs from before it was written as `system`) from
+  any source. A zone the person set first through the bot or MCP lost its Undo, though the app
+  never wrote a zone from there.
+- **Missed because.** The legacy test wrote the old shape from the web only; nothing asked which
+  sources the old write could have come from.
+- **Rule.** A heuristic that recognises an old write matches every field the old writer fixed
+  (here the source: the device's own, `app` or `web`), and what it still cannot tell apart is
+  written down beside it, with why the remaining overlap is acceptable.
+- **Sweep and guard.** The other reader of `source === "system"` (`close-reasons.ts`) reads the
+  field itself, with no legacy shape. `history.test.ts` "offers Undo for a first zone the person
+  set through the bot / mcp"; the trade-off for a first zone-question answer is written in
+  `history.ts`.

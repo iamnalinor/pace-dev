@@ -1,8 +1,9 @@
 import { and, eq, gt, sql } from "drizzle-orm";
 import { ulid } from "ulidx";
 
+import type { Db } from "./db/d1.ts";
+
 import { fcmRefusedTokens, pushSubscriptions, sessions } from "./db/d1-schema.ts";
-import { d1 } from "./db/d1.ts";
 
 /** A device's way to be pushed to: its session, the transport and where that transport sends. */
 export type PushSubscription = {
@@ -18,12 +19,12 @@ export type PushSubscription = {
 
 /** The subscriptions of a user's live sessions (expired sessions push nowhere). */
 export const subscriptionsOf = async (
-  binding: D1Database,
+  binding: Db,
   userId: string,
   now: number,
 ): Promise<readonly PushSubscription[]> => {
   const liveSession = gt(sessions.expiresAt, new Date(now));
-  return await d1(binding)
+  return await binding
     .select({
       device: sessions.name,
       endpoint: pushSubscriptions.endpoint,
@@ -39,7 +40,7 @@ export const subscriptionsOf = async (
 
 /** A still-live session's hash, even if it registered another push method since a send. */
 export const sessionHashFor = async (
-  binding: D1Database,
+  binding: Db,
   {
     userId,
     sessionId,
@@ -47,7 +48,7 @@ export const sessionHashFor = async (
   }: { readonly userId: string; readonly sessionId: string; readonly now: number },
 ): Promise<null | string> => {
   const live = gt(sessions.expiresAt, new Date(now));
-  const rows = await d1(binding)
+  const rows = await binding
     .select({ hash: sessions.tokenHash })
     .from(sessions)
     .where(and(eq(sessions.id, sessionId), eq(sessions.userId, userId), live))
@@ -62,7 +63,7 @@ whoever's it was: the phone signed in again, or signed in to another account, an
 the notifications of the account it is signed in to only. One device is never pushed to twice.
 */
 export const subscribe = async (
-  binding: D1Database,
+  binding: Db,
   input: {
     readonly sessionId: string;
     readonly userId: string;
@@ -71,7 +72,7 @@ export const subscribe = async (
     readonly now: number;
   },
 ): Promise<void> => {
-  const db = d1(binding);
+  const db = binding;
   const sameEndpoint = and(
     eq(pushSubscriptions.transport, input.transport),
     eq(pushSubscriptions.endpoint, input.endpoint),
@@ -92,22 +93,22 @@ export const subscribe = async (
 };
 
 /** Stops pushing to a session's device (it gets the live socket only, while open). */
-export const unsubscribe = async (binding: D1Database, sessionId: string): Promise<void> => {
-  await d1(binding).delete(pushSubscriptions).where(eq(pushSubscriptions.sessionId, sessionId));
+export const unsubscribe = async (binding: Db, sessionId: string): Promise<void> => {
+  await binding.delete(pushSubscriptions).where(eq(pushSubscriptions.sessionId, sessionId));
 };
 
 /** Forgets a subscription its transport called gone for good (an uninstalled app, a dead token). */
-export const dropSubscription = async (binding: D1Database, id: string): Promise<void> => {
-  await d1(binding).delete(pushSubscriptions).where(eq(pushSubscriptions.id, id));
+export const dropSubscription = async (binding: Db, id: string): Promise<void> => {
+  await binding.delete(pushSubscriptions).where(eq(pushSubscriptions.id, id));
 };
 
 /** Notes a send through a subscription: the last time it worked, or one more failure. */
 export const noteSend = async (
-  binding: D1Database,
+  binding: Db,
   id: string,
   { isOk, now }: { readonly isOk: boolean; readonly now: number },
 ): Promise<void> => {
-  await d1(binding)
+  await binding
     .update(pushSubscriptions)
     .set(
       isOk
@@ -122,7 +123,7 @@ Notes an FCM token refused as another Firebase project's (the server sends with 
 is not taken for FCM again while the server sends with that project.
 */
 const refuseFcmToken = async (
-  binding: D1Database,
+  binding: Db,
   {
     now,
     projectId,
@@ -130,7 +131,7 @@ const refuseFcmToken = async (
   }: { readonly token: string; readonly projectId: string; readonly now: number },
 ): Promise<void> => {
   const row = { projectId, refusedAt: new Date(now), token };
-  await d1(binding)
+  await binding
     .insert(fcmRefusedTokens)
     .values(row)
     .onConflictDoUpdate({ set: row, target: fcmRefusedTokens.token });
@@ -141,7 +142,7 @@ A device whose FCM token is another Firebase project's than the one the server s
 token is noted as refused (not taken for FCM again) and it polls from now on. Its new subscription.
 */
 export const moveToPolling = async (
-  binding: D1Database,
+  binding: Db,
   {
     now,
     projectId,
@@ -162,10 +163,10 @@ export const moveToPolling = async (
 
 /** Whether FCM refused this token as another project's while the server sent with `projectId`. */
 export const isFcmTokenRefused = async (
-  binding: D1Database,
+  binding: Db,
   { projectId, token }: { readonly token: string; readonly projectId: string },
 ): Promise<boolean> => {
-  const found = await d1(binding)
+  const found = await binding
     .select({ token: fcmRefusedTokens.token })
     .from(fcmRefusedTokens)
     .where(and(eq(fcmRefusedTokens.token, token), eq(fcmRefusedTokens.projectId, projectId)));

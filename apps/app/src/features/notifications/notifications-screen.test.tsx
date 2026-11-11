@@ -3,7 +3,7 @@ import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-
 import { isControl } from "#app/test/focus-target.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
-import { createTestRuntime } from "#app/test/runtime.ts";
+import { createTestRuntime, pulledInto } from "#app/test/runtime.ts";
 import { formatRelativeDay, type PoolNotification } from "@pace/core";
 import { MOSCOW, NOW } from "@pace/core/testing";
 
@@ -110,7 +110,7 @@ const feedRuntime = async (
     },
     world: "empty",
   });
-  await runtime.state.ingest([digestOnApp]);
+  await pulledInto(runtime, [digestOnApp]);
   return { read, runtime };
 };
 
@@ -145,7 +145,7 @@ describe("NotificationsScreen", () => {
     // 01:30 in Moscow (the device) is today; in New York (the account) it is still yesterday.
     const lateLogin = { ...login, createdAt: "2026-10-05T22:30:00.000Z", id: "n-late" };
     const { runtime } = await feedRuntime([lateLogin]);
-    await runtime.state.ingest([
+    await pulledInto(runtime, [
       {
         ...digestOnApp,
         id: "01ARZ3NDEKTSV4RRFFQ69G5FZY",

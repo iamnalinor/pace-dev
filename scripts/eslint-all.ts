@@ -61,6 +61,7 @@ const PARTS: readonly (readonly [string, readonly string[], readonly Ratchet[]])
   ["packages", ["packages"], []],
   ["api", ["apps/api"], []],
   ["app", ["apps/app"], APP_RATCHETS],
+  ["updates", ["apps/updates"], []],
   ["root", [".", "--ignore-pattern", "apps/**", "--ignore-pattern", "packages/**"], []],
 ];
 

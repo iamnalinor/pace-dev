@@ -1,6 +1,11 @@
 import { fallbackPaceNative, PaceNative, resolvePaceNative } from "./pace-native.ts";
 
 describe("PaceNative", () => {
+  it("does not authorize OTA downloads without a native network snapshot", () => {
+    expect(PaceNative.otaNetwork()).toBeNull();
+    expect(PaceNative.apkVersion()).toBeNull();
+  });
+
   it("falls back to a module that grants nothing when the native side is missing", async () => {
     expect(PaceNative).toBe(fallbackPaceNative);
     expect(PaceNative.hasUsageAccess()).toBe(false);
@@ -30,5 +35,18 @@ describe("PaceNative", () => {
     const linked = { ...fallbackPaceNative, hasUsageAccess: () => true };
     expect(resolvePaceNative(linked)).toBe(linked);
     expect(resolvePaceNative(null)).toBe(fallbackPaceNative);
+  });
+});
+
+describe("Firebase without the native module", () => {
+  it("reports unsupported without claiming a project or accepting persisted configuration", () => {
+    const unsupported = { status: "unsupported", projectId: null, reason: null };
+    expect(PaceNative.firebaseStatus()).toEqual(unsupported);
+    expect(PaceNative.packageName()).toBeNull();
+    expect(PaceNative.stageFirebaseConfig("https://pace.test", null)).toEqual(unsupported);
+    expect(PaceNative.commitFirebaseConfig("https://pace.test")).toEqual(unsupported);
+    expect(PaceNative.reconcileFirebaseOrigin("https://pace.test")).toEqual(unsupported);
+    expect(PaceNative.ensureFirebase("https://pace.test", null)).toEqual(unsupported);
+    expect(PaceNative.restartApp()).toBe(false);
   });
 });

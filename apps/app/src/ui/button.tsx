@@ -1,5 +1,13 @@
-import { createContext, type Ref, use, useCallback, useLayoutEffect, useRef } from "react";
-import { ActivityIndicator, Text as NativeText, type View } from "react-native";
+import {
+  createContext,
+  type ReactNode,
+  type Ref,
+  use,
+  useCallback,
+  useLayoutEffect,
+  useRef,
+} from "react";
+import { ActivityIndicator, Text as NativeText, View } from "react-native";
 
 import type { ColorRole } from "@pace/core";
 
@@ -8,7 +16,7 @@ import type { TextTone } from "./text-props.ts";
 
 import { isFocusLost, moveFocus } from "../platform/move-focus.ts";
 import { cx } from "./cx.ts";
-import { ariaHotkey, formatHotkey, type Hotkey } from "./hotkeys.ts";
+import { ariaHotkey, formatHotkey, type Hotkey, type KeyboardOs } from "./hotkeys.ts";
 import { Icon, type IconName, type IconTone } from "./icon.tsx";
 import { useIsWide } from "./layout.ts";
 import { DISABLED } from "./pressable-props.ts";
@@ -71,8 +79,24 @@ const SHAPE = { regular: "md", small: "sm" } as const satisfies Record<ButtonSiz
 const VISUAL = "flex-row items-center justify-center gap-2 self-stretch py-2";
 
 const HEIGHT: Readonly<Record<ButtonSize, string>> = {
-  regular: "min-h-12 px-5 lg:min-h-10 lg:px-4",
-  small: "min-h-8 px-3",
+  regular: "min-h-12 lg:min-h-10",
+  small: "min-h-8",
+};
+
+/** The visual's side padding per size, at each width. */
+const SIDE_PAD: Readonly<Record<ButtonSize, string>> = {
+  regular: "px-5 lg:px-4",
+  small: "px-3",
+};
+
+/**
+A flush button's pull, the negative of `SIDE_PAD` at each width (they change together): a text
+button under a line of text or at the start of a form row starts its word where the column does,
+not indented by its own padding (R28-13 «В архив», R27-11 «Изменить в Дне», bug-lessons 345).
+*/
+const FLUSH: Readonly<Record<ButtonSize, string>> = {
+  regular: "-ml-5 lg:-ml-4",
+  small: "-ml-3",
 };
 
 /** The shortcut's colour: the label's on primary, a step quieter on the others. */
@@ -116,6 +140,17 @@ const useWidthStyle = (width: ButtonWidth | undefined): typeof AT_TEXT_WIDTH | u
 };
 
 /**
+The keyboard whose keys the layout names, or `null`: none on a touch screen, and none at a phone's
+width whatever the device (a key hint squeezed a label into a letter a line, class 139; a list of
+Alt+N keys on a 390 Settings described a keyboard the layout does not offer, PR55-1-17,
+bug-lessons 349). Every hint and every list of keys asks this one question.
+*/
+export const useKeysShown = (): KeyboardOs | null => {
+  const isWide = useIsWide();
+  return isWide ? KEYBOARD : null;
+};
+
+/**
 The shortcut after the label, the way this computer names it; nothing without a keyboard, and
 nothing on a phone-width window, where it squeezed the label into a letter a line (bug-lessons
 class 139). The shortcut itself still works (`useShortcut`).
@@ -127,14 +162,14 @@ export const KeyHint = ({
   readonly hotkey: Hotkey | undefined;
   readonly variant: ButtonVariant;
 }) => {
-  const isWide = useIsWide();
+  const os = useKeysShown();
   const hasRoom = use(KeyHintRoomContext);
-  return hotkey === undefined || KEYBOARD === null || !isWide || !hasRoom ? null : (
+  return hotkey === undefined || os === null || !hasRoom ? null : (
     <NativeText
       aria-hidden
       className={cx("font-sans text-footnote font-normal tabular-nums", HINT[variant])}
     >
-      {formatHotkey(hotkey, KEYBOARD)}
+      {formatHotkey(hotkey, os)}
     </NativeText>
   );
 };
@@ -205,6 +240,27 @@ const Lead = ({
 };
 
 /**
+A flush button's pull goes on a box around it, which a column stretches back by as much: on the
+button itself its `max-w-full` took the pulled width and wrapped «В архив» into «В архи / в».
+*/
+const FlushBox = ({
+  children,
+  isFlush,
+  size,
+}: {
+  readonly children: ReactNode;
+  readonly isFlush: boolean | undefined;
+  readonly size: ButtonSize;
+}) =>
+  isFlush === true ? (
+    <View className={FLUSH[size]} testID="button-flush">
+      {children}
+    </View>
+  ) : (
+    children
+  );
+
+/**
 The kit's button (spec §4.2.3) on the kit's Pressable: [icon] · the label (`callout` 600; it wraps
 in Russian, never cut) · [the shortcut on a computer with a keyboard]. One geometry per size,
 `radius.md`, drawn inside the 48 dp / 44 px target (the small-visual pattern: a 40 desktop or a 32
@@ -220,6 +276,7 @@ export const Button = ({
   haptic,
   hint,
   icon,
+  isFlush,
   isIconFilled,
   label = children,
   onLongPress,
@@ -239,6 +296,8 @@ export const Button = ({
   /** What a press does beyond the label (a long press, say), for screen readers. */
   readonly hint?: string;
   readonly icon?: IconName;
+  /** A text button whose word lines up with the text above it: pulled back by its padding (`FLUSH`). */
+  readonly isFlush?: boolean;
   /** The icon drawn solid (Stop's square, never an outline that reads as a checkbox; F-CMP-04). */
   readonly isIconFilled?: boolean;
   /** The name said for it when the visible text is a short form of it (it must start with it). */
@@ -260,7 +319,7 @@ export const Button = ({
   const keyshortcuts = useShortcut(shortcut, shortcutMode === "global" && !isBlocked, onPress);
   const focus = useFocusThroughBusy(busy);
   const look = disabled ? DISABLED_LOOK : LOOK[variant];
-  return (
+  const button = (
     <Pressable
       {...keyshortcuts}
       accessibilityHint={hint}
@@ -278,7 +337,7 @@ export const Button = ({
       role="button"
       shape={SHAPE[size]}
       style={widthStyle}
-      visual={cx(VISUAL, HEIGHT[size], look.fill)}
+      visual={cx(VISUAL, HEIGHT[size], SIDE_PAD[size], look.fill)}
     >
       <Lead busy={busy} icon={icon} isIconFilled={isIconFilled} look={look} />
       <Text className="text-center font-semibold" role="callout" tone={look.text}>
@@ -286,5 +345,10 @@ export const Button = ({
       </Text>
       <KeyHint hotkey={shortcut} variant={variant} />
     </Pressable>
+  );
+  return (
+    <FlushBox isFlush={isFlush} size={size}>
+      {button}
+    </FlushBox>
   );
 };

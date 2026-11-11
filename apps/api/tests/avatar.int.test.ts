@@ -1,8 +1,8 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
-import { createApp } from "../src/app.ts";
 import { hmacSha256Hex } from "../src/shared/crypto.ts";
+import { createApp } from "./host.ts";
 
 const nowSeconds = (): number => Math.floor(Date.now() / 1000);
 

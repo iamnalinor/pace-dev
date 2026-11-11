@@ -5,8 +5,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { layout, space } from "@pace/core";
 
-/** A part of the bottom chrome or of the stack over it that tells the layer its height. */
-type Publish = (key: string, height: null | number) => void;
+/** A part of the chrome, the stack over it or the column that tells the layer its size. */
+type Publish = (key: string, size: null | number) => void;
 
 /** Where the content region is across the window (the sidebar or the rail beside it). */
 type Region = { readonly x: number; readonly width: number };
@@ -17,9 +17,12 @@ export type Publishers = {
   readonly setTabBar: Publish;
   readonly setStatus: Publish;
   readonly setRegion: (region: null | Region) => void;
+  /** The width of the column the screen in front keeps to on a wide window (720 or 960). */
+  readonly setColumn: Publish;
 };
 
 const NOBODY: Publishers = {
+  setColumn: () => undefined,
   setFooter: () => undefined,
   setRegion: () => undefined,
   setStatus: () => undefined,
@@ -31,7 +34,9 @@ export const PublishersContext = createContext<Publishers>(NOBODY);
 /**
 Where the bottom stack (the offline pill, then the toast above it) floats: `bottom` clears the
 measured bottom chrome (tab bar, screen footer, the safe area) by `space.3`; `left` and `right`
-keep it inside the content region, never across the sidebar or the rail (R23-13a). `inset` is
+keep it inside the content region, never across the sidebar or the rail (R23-13a), and on a wide
+window inside the screen's own column, which hugs the region's leading edge: centred on the whole
+region it floated beside the column, unattached (QA PR55-1-14, bug-lessons 342). `inset` is
 how much of the content's foot the stack covers right now: a list scrolls that far further.
 */
 export type FloatPlace = {
@@ -55,15 +60,18 @@ export const PlaceContext = createContext<FloatPlace>({
   right: SIDE_GAP,
 });
 
-/** Heights by who published them; a part that goes away takes its height with it. */
-const useHeights = () => {
-  const [heights, setHeights] = useState<Readonly<Record<string, number>>>({});
-  const publish = useCallback<Publish>((key, height) => {
-    setHeights(({ [key]: _gone, ...others }) =>
-      height === null ? others : { ...others, [key]: height },
+/**
+Sizes by who published them (a height, or the column's width), and the largest; a part that goes
+away takes its size with it.
+*/
+const usePublishedSizes = () => {
+  const [sizes, setSizes] = useState<Readonly<Record<string, number>>>({});
+  const publish = useCallback<Publish>((key, size) => {
+    setSizes(({ [key]: _gone, ...others }) =>
+      size === null ? others : { ...others, [key]: size },
     );
   }, []);
-  return { publish, tallest: Math.max(0, ...Object.values(heights)) };
+  return { largest: Math.max(0, ...Object.values(sizes)), publish };
 };
 
 /** Publishes `height` under a key of its own while `isActive`; takes it back when it stops. */
@@ -108,6 +116,15 @@ export const usePublishStatus = (height: number): void => {
 };
 
 /**
+The screen in front tells the layer how wide its column is on a wide window (`layout.contentMax` or
+`contentMaxWide`), so what floats is centred over the column the person reads, not over the empty
+room to its right. Nothing while it is not in front, or on a window where the column is the region.
+*/
+export const usePublishColumn = (width: number, isActive: boolean): void => {
+  usePublish((publishers) => publishers.setColumn, width, isActive && width > 0);
+};
+
+/**
 The shell's content region tells the layer where it is across the window: what floats is centred
 in it, clear of the sidebar and the rail. Answers the region's `onLayout`; a shell that does not
 publish (a nested one) leaves the root's word standing.
@@ -148,21 +165,26 @@ export const useFloatLayer = ({
   readonly toast: null | number;
 }) => {
   const insets = useSafeAreaInsets();
-  const footers = useHeights();
-  const tabBars = useHeights();
-  const statuses = useHeights();
+  const footers = usePublishedSizes();
+  const tabBars = usePublishedSizes();
+  const statuses = usePublishedSizes();
+  const columns = usePublishedSizes();
   const [region, setRegion] = useState<null | Region>(null);
   const publishers = useMemo<Publishers>(
     () => ({
+      setColumn: columns.publish,
       setFooter: footers.publish,
       setRegion,
       setStatus: statuses.publish,
       setTabBar: tabBars.publish,
     }),
-    [footers.publish, statuses.publish, tabBars.publish],
+    [columns.publish, footers.publish, statuses.publish, tabBars.publish],
   );
-  const chromeBottom = Math.max(tabBars.tallest, insets.bottom) + footers.tallest + CHROME_GAP;
-  const statusLift = statuses.tallest > 0 ? statuses.tallest + STACK_GAP : 0;
+  // The column's trailing edge: the region's, or the column's where it is narrower.
+  const column = columns.largest > 0 ? columns.largest : Infinity;
+  const columnRight = region === null ? null : region.x + Math.min(region.width, column);
+  const chromeBottom = Math.max(tabBars.largest, insets.bottom) + footers.largest + CHROME_GAP;
+  const statusLift = statuses.largest > 0 ? statuses.largest + STACK_GAP : 0;
   // What the stack covers of the content's foot: the gap under it, the stack, air above it.
   const stack = statusLift + (toast ?? 0);
   const place = useMemo<FloatPlace>(
@@ -170,9 +192,9 @@ export const useFloatLayer = ({
       bottom: chromeBottom,
       inset: stack > 0 ? stack + 2 * CHROME_GAP : 0,
       left: (region?.x ?? 0) + SIDE_GAP,
-      right: region === null ? SIDE_GAP : areaWidth - region.x - region.width + SIDE_GAP,
+      right: columnRight === null ? SIDE_GAP : areaWidth - columnRight + SIDE_GAP,
     }),
-    [areaWidth, chromeBottom, region, stack],
+    [areaWidth, chromeBottom, columnRight, region, stack],
   );
   return { place, publishers, toastBottom: chromeBottom + statusLift };
 };

@@ -11,9 +11,12 @@ import { createFakeFetch } from "@pace/client/testing";
 import type { readSessionValue as actualReadSessionValue } from "./session-value.ts";
 
 import * as firebaseProject from "./firebase-project.ts";
+import * as firebaseRuntime from "./firebase-runtime.ts";
 import { clearPresentedPoolNotifications } from "./notification-cleanup.ts";
 import {
   isBackgroundStepNeeded,
+  loadOfferedMethods,
+  loadPushState,
   pollNow,
   pushMethodOf,
   pushStore,
@@ -22,6 +25,58 @@ import {
   setupNotificationCategories,
 } from "./notifications.ts";
 import { handlePushTask } from "./push-task.ts";
+import { serverStore } from "./server-store.ts";
+
+jest.mock("expo-notifications", () => {
+  const fakeModule = jest
+    .requireActual<{ readonly createFakeNotifications: typeof createFakeNotifications }>(
+      "#app/testing/notifications.fake.ts",
+    )
+    .createFakeNotifications();
+  return { ...fakeModule, getDevicePushTokenAsync: jest.fn(fakeModule.getDevicePushTokenAsync) };
+});
+
+const mockChoiceRead = {
+  gate: null as null | Promise<unknown>,
+  started: null as (() => void) | null,
+};
+const mockChoicePersistence = {
+  gate: null as null | Promise<unknown>,
+  started: null as (() => void) | null,
+};
+const mockMethodPersistence = {
+  gate: null as null | Promise<void>,
+  started: null as (() => void) | null,
+};
+jest.mock("expo-secure-store", () => {
+  const secure = jest
+    .requireActual<{ readonly createFakeSecureStore: () => FakeSecureStore }>(
+      "#app/testing/secure-store.fake.ts",
+    )
+    .createFakeSecureStore();
+  return {
+    ...secure,
+    getItemAsync: async (key: string) => {
+      const value = await secure.getItemAsync(key);
+      if (key === "pace.push.choice" && mockChoiceRead.gate !== null) {
+        mockChoiceRead.started?.();
+        await mockChoiceRead.gate;
+      }
+      return value;
+    },
+    setItemAsync: async (key: string, value: string) => {
+      if (key === "pace.push.choice" && value === "fcm") {
+        mockChoicePersistence.started?.();
+        await mockChoicePersistence.gate;
+      }
+      if (key === "pace.push.method") {
+        mockMethodPersistence.started?.();
+        await mockMethodPersistence.gate;
+      }
+      await secure.setItemAsync(key, value);
+    },
+  };
+});
 
 const fake = Notifications as unknown as ReturnType<typeof createFakeNotifications>;
 const SESSION_TOKEN = "session-a";
@@ -101,6 +156,12 @@ const registering = (
 beforeEach(async () => {
   const secure = (SecureStore as unknown as FakeSecureStore).values;
   secure.clear();
+  mockChoiceRead.gate = null;
+  mockChoiceRead.started = null;
+  mockChoicePersistence.gate = null;
+  mockChoicePersistence.started = null;
+  mockMethodPersistence.gate = null;
+  mockMethodPersistence.started = null;
   secure.set("pace.session", SESSION_TOKEN);
   mockCursorRead.gate = null;
   mockCursorRead.started = null;
@@ -224,7 +285,7 @@ describe("registerPush and the Firebase project", () => {
       projectId: "pace-app",
     });
     expect(pushStore.getState()).toMatchObject({
-      isFcmOtherProject: false,
+      fcmIneligibilityReason: null,
       offered: ["fcm", "poll"],
     });
   });
@@ -235,7 +296,10 @@ describe("registerPush and the Firebase project", () => {
     const { api, fetcher } = registering(["fcm", "poll"], [], "pace-selfhosted");
     expect(await registerPush(api)).toBe("poll");
     expect(fetcher.calls.map((call) => call.body)).toEqual([undefined, { method: "poll" }]);
-    expect(pushStore.getState()).toMatchObject({ isFcmOtherProject: true, offered: ["poll"] });
+    expect(pushStore.getState()).toMatchObject({
+      fcmIneligibilityReason: "other-project",
+      offered: ["poll"],
+    });
   });
 
   it("stays on polling start after start once the server refuses its token as another project's", async () => {
@@ -734,4 +798,390 @@ describe("the push task", () => {
     );
     expect(fetcher.calls).toEqual([]);
   });
+});
+
+describe("runtime Firebase registration", () => {
+  beforeEach(() => {
+    jest.spyOn(firebaseRuntime, "isRuntimeFirebase").mockReturnValue(true);
+    jest.spyOn(firebaseProject, "appFirebaseProject").mockReturnValue("baked-project");
+    fake.state.pushToken = "native-token";
+    jest
+      .mocked(jest.requireMock<typeof Notifications>("expo-notifications").getDevicePushTokenAsync)
+      .mockImplementation(async () => {
+        if (fake.state.pushToken === null) {
+          throw new Error("services-unavailable");
+        }
+        return { type: "android", data: fake.state.pushToken };
+      });
+    serverStore.setState({ origin: "https://api.test" });
+    firebaseRuntime.firebaseRuntimeStore.setState({
+      origin: "https://api.test",
+      status: "ready",
+      projectId: "native-project",
+      reason: null,
+      blockReason: null,
+    });
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("uses the actual initialized native project instead of the baked extra", async () => {
+    const { api, fetcher } = registering(["fcm", "poll"], [], "native-project");
+    expect(await registerPush(api, "https://api.test")).toBe("fcm");
+    expect(fetcher.calls.at(-1)?.body).toEqual({
+      method: "fcm",
+      endpoint: "native-token",
+      projectId: "native-project",
+    });
+  });
+
+  it.each([
+    "server-disabled",
+    "package-missing",
+    "restart-needed",
+    "initialization-failed",
+    "storage-failed",
+    "unsupported",
+    "invalid-config",
+  ] as const)("never requests a token for %s", async (blockReason) => {
+    firebaseRuntime.firebaseRuntimeStore.setState({ blockReason });
+    const token = jest.spyOn(
+      jest.requireMock<typeof Notifications>("expo-notifications"),
+      "getDevicePushTokenAsync",
+    );
+    token.mockClear();
+    const { api } = registering(["fcm", "poll"], [], "native-project");
+    expect(await registerPush(api, "https://api.test")).toBe("poll");
+    expect(token).not.toHaveBeenCalled();
+    expect(pushStore.getState().fcmIneligibilityReason).toBe(blockReason);
+  });
+
+  it("settles after repeated registrations without a retry loop", async () => {
+    const { api, fetcher } = registering(["fcm", "poll"], [], "native-project");
+    await registerPush(api, "https://api.test");
+    await registerPush(api, "https://api.test");
+    await Promise.resolve();
+    expect(fetcher.calls).toHaveLength(4);
+    expect(pushStore.getState().method).toBe("fcm");
+  });
+
+  it("polls while native configuration is still unknown", async () => {
+    firebaseRuntime.firebaseRuntimeStore.setState({ status: "unknown", projectId: null });
+    const token = jest.spyOn(
+      jest.requireMock<typeof Notifications>("expo-notifications"),
+      "getDevicePushTokenAsync",
+    );
+    token.mockClear();
+    const { api } = registering(["fcm", "poll"], [], "native-project");
+    expect(await registerPush(api, "https://api.test")).toBe("poll");
+    expect(token).not.toHaveBeenCalled();
+    expect(pushStore.getState().fcmIneligibilityReason).toBe("configuration-pending");
+  });
+
+  it("falls back with a visible services reason when token retrieval fails", async () => {
+    fake.state.pushToken = null;
+    const { api } = registering(["fcm", "poll"], [], "native-project");
+    expect(await registerPush(api, "https://api.test")).toBe("poll");
+    expect(pushStore.getState().offered).toEqual(["poll"]);
+    await setPushChoice("poll");
+    expect(await registerPush(api, "https://api.test")).toBe("poll");
+    await loadOfferedMethods(api, "https://api.test");
+    expect(pushStore.getState().offered).toEqual(["poll"]);
+    expect(pushStore.getState().fcmIneligibilityReason).toBe("services-unavailable");
+    await setPushChoice(null);
+    fake.state.pushToken = "recovered-token";
+    expect(await registerPush(api, "https://api.test")).toBe("fcm");
+    expect(pushStore.getState().offered).toEqual(["fcm", "poll"]);
+  });
+
+  it.each([undefined, "https://old.test"])(
+    "never requests FCM without the current origin: %s",
+    async (origin) => {
+      const token = jest.spyOn(
+        jest.requireMock<typeof Notifications>("expo-notifications"),
+        "getDevicePushTokenAsync",
+      );
+      token.mockClear();
+      const { api } = registering(["fcm", "poll"], [], "native-project");
+      await registerPush(api, origin);
+      expect(token).not.toHaveBeenCalled();
+    },
+  );
+
+  it("never requests FCM for an unknown or different server project", async () => {
+    const token = jest.spyOn(
+      jest.requireMock<typeof Notifications>("expo-notifications"),
+      "getDevicePushTokenAsync",
+    );
+    token.mockClear();
+    for (const project of [null, "other-project"]) {
+      const { api } = registering(["fcm", "poll"], [], project);
+      expect(await registerPush(api, "https://api.test")).toBe("poll");
+    }
+    expect(token).not.toHaveBeenCalled();
+  });
+
+  it("never sends an old subscription with a replacement session after a held client check", async () => {
+    const { promise: checking, resolve: checked } = Promise.withResolvers<undefined>();
+    const session = { current: SESSION_TOKEN };
+    const fetcher = createFakeFetch({
+      "GET /api/push/methods": () => ({
+        pushMethods: ["fcm", "poll"],
+        fcmProject: "native-project",
+      }),
+      "PUT /api/push/subscription": ({ body }) => ({
+        method: (body as { readonly method: string }).method,
+      }),
+    });
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      fetch: fetcher.fetch,
+      token: () => session.current,
+      sessionCheck: (endpoint) =>
+        endpoint.path === "/api/push/subscription" ? checking : undefined,
+    });
+    const registration = registerPush(api, "https://api.test");
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      await Promise.resolve();
+    }
+    session.current = "session-b";
+    checked(undefined);
+    await registration;
+    const subscriptions = fetcher.calls.filter((call) => call.method === "PUT");
+    expect(
+      subscriptions.every((call) => call.headers["authorization"] === `Bearer ${SESSION_TOKEN}`),
+    ).toBe(true);
+    await setPushChoice("poll");
+    await registerPush(api, "https://api.test");
+    expect(fetcher.calls.at(-1)?.headers["authorization"]).toBe("Bearer session-b");
+    expect(pushStore.getState().method).toBe("poll");
+  });
+
+  it("keeps a newer pick when Settings finishes loading an older stored choice", async () => {
+    await setPushChoice("fcm");
+    const { promise: gate, resolve: finish } = Promise.withResolvers<undefined>();
+    const { promise: reading, resolve: started } = Promise.withResolvers<undefined>();
+    mockChoiceRead.gate = gate;
+    mockChoiceRead.started = () => {
+      started(undefined);
+    };
+    const loading = loadPushState();
+    await reading;
+    mockChoiceRead.gate = null;
+    await setPushChoice("poll");
+    finish(undefined);
+    await loading;
+    expect(pushStore.getState().choice).toBe("poll");
+  });
+
+  it("keeps the latest tap when an older choice write finishes late", async () => {
+    const { promise: gate, resolve: finish } = Promise.withResolvers<undefined>();
+    const { promise: writing, resolve: started } = Promise.withResolvers<undefined>();
+    mockChoicePersistence.gate = gate;
+    mockChoicePersistence.started = () => {
+      started(undefined);
+    };
+    const { api, fetcher } = registering(["fcm", "poll"], [], "native-project");
+    const pick = async (choice: "fcm" | "poll") => {
+      const { isLatest } = await setPushChoice(choice);
+      if (isLatest) {
+        await registerPush(api, "https://api.test");
+      }
+    };
+    const oldPick = pick("fcm");
+    await writing;
+    const newPick = pick("poll");
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      await Promise.resolve();
+    }
+    finish(undefined);
+    await Promise.all([oldPick, newPick]);
+    expect((SecureStore as unknown as FakeSecureStore).values.get("pace.push.choice")).toBe("poll");
+    expect(pushStore.getState()).toMatchObject({ choice: "poll", method: "poll" });
+    expect(
+      fetcher.calls
+        .filter((call) => call.method === "PUT")
+        .map((call) => (call.body as { readonly method: string }).method),
+    ).toEqual(["poll"]);
+  });
+
+  it("lets the latest saved choice win when an older token arrives late", async () => {
+    const { promise: pending, resolve: finish } = Promise.withResolvers<{
+      type: "android";
+      data: string;
+    }>();
+    const { promise: requesting, resolve: started } = Promise.withResolvers<undefined>();
+    const token = jest.spyOn(
+      jest.requireMock<typeof Notifications>("expo-notifications"),
+      "getDevicePushTokenAsync",
+    );
+    token.mockImplementation(async () => {
+      started(undefined);
+      return await pending;
+    });
+    const { api, fetcher } = registering(["fcm", "poll"], [], "native-project");
+    const oldRegistration = registerPush(api, "https://api.test");
+    await requesting;
+    await setPushChoice("poll");
+    await registerPush(api, "https://api.test");
+    finish({ type: "android", data: "old-token" });
+    await oldRegistration;
+    expect(fetcher.calls.filter((call) => call.method === "PUT").map((call) => call.body)).toEqual([
+      { method: "poll" },
+    ]);
+    expect(await pushMethodOf()).toBe("poll");
+    expect(pushStore.getState()).toMatchObject({ choice: "poll", method: "poll" });
+  });
+
+  it("orders an in-flight subscription before the newer saved choice", async () => {
+    const { promise: gate, resolve: finish } = Promise.withResolvers<undefined>();
+    const { promise: posting, resolve: started } = Promise.withResolvers<undefined>();
+    const { promise: discovering, resolve: discovered } = Promise.withResolvers<undefined>();
+    const calls = { discoveries: 0, subscriptions: 0 };
+    const { api, fetcher } = apiWith({
+      "GET /api/push/methods": () => {
+        calls.discoveries += 1;
+        if (calls.discoveries === 2) {
+          discovered(undefined);
+        }
+        return { pushMethods: ["fcm", "poll"], fcmProject: "native-project" };
+      },
+      "PUT /api/push/subscription": async ({ body }) => {
+        calls.subscriptions += 1;
+        if (calls.subscriptions === 1) {
+          started(undefined);
+          await gate;
+        }
+        return { method: (body as { readonly method: string }).method };
+      },
+    });
+    const oldRegistration = registerPush(api, "https://api.test");
+    await posting;
+    await setPushChoice("poll");
+    const newRegistration = registerPush(api, "https://api.test");
+    await discovering;
+    finish(undefined);
+    await Promise.all([oldRegistration, newRegistration]);
+    expect(
+      fetcher.calls
+        .filter((call) => call.method === "PUT")
+        .map((call) => (call.body as { readonly method: string }).method),
+    ).toEqual(["fcm", "poll"]);
+    expect(await pushMethodOf()).toBe("poll");
+    expect(pushStore.getState()).toMatchObject({ choice: "poll", method: "poll" });
+  });
+
+  it("recovers the persistence queue after a failed native write", async () => {
+    const secure = SecureStore as unknown as FakeSecureStore;
+    const { api } = registering(["fcm", "poll"], [], "native-project");
+    secure.writes.isRefused = true;
+    try {
+      await expect(registerPush(api, "https://api.test")).rejects.toThrow(
+        "keystore refused the write",
+      );
+    } finally {
+      secure.writes.isRefused = false;
+    }
+    expect(await registerPush(api, "https://api.test")).toBe("fcm");
+    expect(await pushMethodOf()).toBe("fcm");
+  });
+
+  it("ignores an old subscription response after an origin change", async () => {
+    const { promise: gate, resolve: finish } = Promise.withResolvers<undefined>();
+    const { promise: posting, resolve: started } = Promise.withResolvers<undefined>();
+    const { api, fetcher } = apiWith({
+      "GET /api/push/methods": () => ({
+        pushMethods: ["fcm", "poll"],
+        fcmProject: "native-project",
+      }),
+      "PUT /api/push/subscription": async () => {
+        started(undefined);
+        await gate;
+        return { method: "fcm" };
+      },
+    });
+    const registration = registerPush(api, "https://api.test");
+    await posting;
+    serverStore.setState({ origin: "https://new.test" });
+    pushStore.setState({ method: "none" });
+    finish(undefined);
+    await registration;
+    expect(fetcher.calls).toHaveLength(2);
+    expect(pushStore.getState().method).toBe("none");
+    expect((SecureStore as unknown as FakeSecureStore).values.has("pace.push.method")).toBe(false);
+  });
+
+  it("does not publish a persisted old method after native configuration changes", async () => {
+    const { promise: gate, resolve: finish } = Promise.withResolvers<undefined>();
+    mockMethodPersistence.gate = gate;
+    const { promise: writing, resolve: started } = Promise.withResolvers<undefined>();
+    mockMethodPersistence.started = () => {
+      started(undefined);
+    };
+    const { api } = registering(["fcm", "poll"], [], "native-project");
+    const registration = registerPush(api, "https://api.test");
+    await writing;
+    firebaseRuntime.firebaseRuntimeStore.setState({ blockReason: "restart-needed" });
+    pushStore.setState({ method: "poll" });
+    finish(undefined);
+    await registration;
+    expect(pushStore.getState().method).toBe("poll");
+  });
+
+  it("keeps the new method durable when an older persistence call finishes late", async () => {
+    const { promise: gate, resolve: finish } = Promise.withResolvers<undefined>();
+    mockMethodPersistence.gate = gate;
+    const { promise: writing, resolve: started } = Promise.withResolvers<undefined>();
+    mockMethodPersistence.started = () => {
+      started(undefined);
+    };
+    const { api } = registering(["fcm", "poll"], [], "native-project");
+    const oldRegistration = registerPush(api, "https://api.test");
+    await writing;
+    firebaseRuntime.firebaseRuntimeStore.setState({ blockReason: "restart-needed" });
+    mockMethodPersistence.gate = null;
+    mockMethodPersistence.started = null;
+    const newRegistration = registerPush(api, "https://api.test");
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      await Promise.resolve();
+    }
+    finish(undefined);
+    await Promise.all([oldRegistration, newRegistration]);
+    expect(pushStore.getState().method).toBe("poll");
+    expect(await pushMethodOf()).toBe("poll");
+  });
+
+  it.each(["origin", "configuration"])(
+    "does not publish or register after %s changes while the token is pending",
+    async (change) => {
+      const { promise: pending, resolve: finish } = Promise.withResolvers<{
+        type: "android";
+        data: string;
+      }>();
+      const token = jest
+        .spyOn(
+          jest.requireMock<typeof Notifications>("expo-notifications"),
+          "getDevicePushTokenAsync",
+        )
+        .mockReturnValue(pending);
+      token.mockClear();
+      const { api, fetcher } = registering(["fcm", "poll"], [], "native-project");
+      const registration = registerPush(api, "https://api.test");
+      for (let attempt = 0; attempt < 30 && token.mock.calls.length === 0; attempt += 1) {
+        await Promise.resolve();
+      }
+      expect(token).toHaveBeenCalledTimes(1);
+      if (change === "origin") {
+        serverStore.setState({ origin: "https://new.test" });
+      } else {
+        firebaseRuntime.firebaseRuntimeStore.setState({ blockReason: "restart-needed" });
+      }
+      pushStore.setState({ method: "none" });
+      finish({ type: "android", data: "late" });
+      await registration;
+      expect(fetcher.calls).toHaveLength(1);
+      expect(pushStore.getState().method).toBe("none");
+    },
+  );
 });

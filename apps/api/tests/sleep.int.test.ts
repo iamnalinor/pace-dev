@@ -1,4 +1,4 @@
-import { runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
+import { runDurableObjectAlarm } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -13,6 +13,7 @@ import {
 
 import { SLEEP_NEXT_AT_KEY } from "../src/user-store/sleep-pass.ts";
 import { answerOf, call, json, loginAsDev, nonceLogin, pushEvents } from "./helpers.ts";
+import { runInUserStore as runInDurableObject } from "./host.ts";
 
 const MOSCOW = "Europe/Moscow";
 /** The night the fixtures use (Moscow: its evening and the next day), and 15:00 that next day. */

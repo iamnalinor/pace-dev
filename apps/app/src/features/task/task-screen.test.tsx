@@ -7,7 +7,7 @@ import type { PopoverProps } from "#app/ui/popover.tsx";
 
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
-import { createTestRuntime } from "#app/test/runtime.ts";
+import { createTestRuntime, pulledInto } from "#app/test/runtime.ts";
 import { withWindowWidth } from "#app/test/window.ts";
 import { HW_ID, HW_VIEW_NOW, RENT_ID, rentSeriesEvents, TRK_ID, TRK_NOW } from "@pace/core/testing";
 
@@ -192,7 +192,7 @@ const rentScreen = async ({
   readonly until?: string;
 } = {}) => {
   const runtime = await createTestRuntime(now === undefined ? {} : { now });
-  await runtime.state.ingest(rentSeriesEvents(until));
+  await pulledInto(runtime, rentSeriesEvents(until));
   await renderScreen(<TaskScreen id={RENT_ID} />, runtime);
   return runtime;
 };

@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { memo, useCallback, useRef, useState } from "react";
 import { View } from "react-native";
 import Animated from "react-native-reanimated";
 
 import type { NowRow } from "@pace/client";
 
 import { useT } from "#app/app-state.tsx";
+import { focusedRowPlace, focusRowPlace, type RowPlace } from "#app/platform/focus-place.ts";
 import { Button } from "#app/ui/button.tsx";
 import { Disclosure } from "#app/ui/disclosure.tsx";
 import { Group } from "#app/ui/group.tsx";
@@ -47,18 +48,82 @@ const useSettling = (rows: readonly NowRow[]) => {
     setDissolving((current) => keeping(current, (id) => ids.has(id)));
     setGone((current) => keeping(current, (id) => ids.has(id)));
   }
-  const settle = async (row: NowRow): Promise<void> => {
-    setGone((current) => new Set([...current, row.id]));
-    const checking = await check(row);
-    if (checking.ok) {
-      return;
-    }
+  // Where each checked row's focus stood: it goes to the row that takes its place (PR55-1-10).
+  const placesRef = useRef(new Map<string, RowPlace>());
+  const settle = useCallback(
+    async (row: NowRow): Promise<void> => {
+      setGone((current) => new Set([...current, row.id]));
+      focusRowPlace(placesRef.current.get(row.id) ?? null);
+      placesRef.current.delete(row.id);
+      const checking = await check(row);
+      if (checking.ok) {
+        return;
+      }
 
-    setGone((current) => keeping(current, (id) => id !== row.id));
-    setDissolving((current) => keeping(current, (id) => id !== row.id));
-  };
-  return { dissolving, gone, setDissolving, settle };
+      setGone((current) => keeping(current, (id) => id !== row.id));
+      setDissolving((current) => keeping(current, (id) => id !== row.id));
+    },
+    [check],
+  );
+  const dissolve = useCallback((row: NowRow): void => {
+    placesRef.current.set(row.id, focusedRowPlace());
+    setDissolving((current) => new Set([...current, row.id]));
+  }, []);
+  return { dissolve, dissolving, gone, settle };
 };
+
+/**
+One row of the list, rendered again only for a change of its own: its task, its dust, the list's
+look. The handlers take the row, so the list hands every row the same ones and a check on one row
+(or a store change about another task) renders that row alone (bug-lessons 310).
+*/
+const Row = memo(
+  ({
+    checked,
+    isAnimated,
+    isDissolving,
+    onCheck,
+    onDissolved,
+    onOpen,
+    row,
+    withTag,
+  }: {
+    readonly checked: boolean;
+    readonly isAnimated: boolean;
+    readonly isDissolving: boolean;
+    readonly onCheck: (row: NowRow) => void;
+    readonly onDissolved: (row: NowRow) => void;
+    readonly onOpen: (taskId: string) => void;
+    readonly row: NowRow;
+    readonly withTag: boolean;
+  }) => (
+    <Animated.View
+      entering={ROW_ENTER}
+      // The dust is the exit of a checked row; the fade would only bring it back for a moment.
+      {...(!isDissolving && { exiting: ROW_EXIT })}
+      {...(isAnimated && { layout: ROW_LAYOUT })}
+      role="listitem"
+    >
+      <TaskRow
+        checked={checked}
+        isDissolving={isDissolving}
+        onDissolved={() => {
+          onDissolved(row);
+        }}
+        onOpen={() => {
+          onOpen(row.id);
+        }}
+        row={row}
+        withTag={withTag}
+        {...(!checked && {
+          onCheck: () => {
+            onCheck(row);
+          },
+        })}
+      />
+    </Animated.View>
+  ),
+);
 
 /** The key of the first row of the second kind, with the boundary's name; none when only one kind is shown. */
 const boundaryOf = (
@@ -93,7 +158,13 @@ export const TaskRows = ({
   const t = useT();
   const openTask = useOpenTask();
   const [shownCount, setShownCount] = useState(PAGE_SIZE);
-  const { dissolving, gone, setDissolving, settle } = useSettling(rows);
+  const { dissolve, dissolving, gone, settle } = useSettling(rows);
+  const onDissolved = useCallback(
+    (row: NowRow): void => {
+      void settle(row);
+    },
+    [settle],
+  );
   const open = rows.filter((row) => !gone.has(row.id));
   const hidden = Math.max(0, open.length - shownCount);
   // A long list turns the layout animation off: sliding a page of rows is not worth the frames.
@@ -107,32 +178,17 @@ export const TaskRows = ({
         separatorInset="check"
       >
         {open.slice(0, shownCount).map((row) => (
-          <Animated.View
-            entering={ROW_ENTER}
+          <Row
+            checked={checked}
+            isAnimated={isAnimated}
+            isDissolving={dissolving.has(row.id)}
             key={row.id}
-            // The dust is the exit of a checked row; the fade would only bring it back for a moment.
-            {...(!dissolving.has(row.id) && { exiting: ROW_EXIT })}
-            {...(isAnimated && { layout: ROW_LAYOUT })}
-            role="listitem"
-          >
-            <TaskRow
-              checked={checked}
-              isDissolving={dissolving.has(row.id)}
-              onDissolved={() => {
-                void settle(row);
-              }}
-              onOpen={() => {
-                openTask(row.id);
-              }}
-              row={row}
-              withTag={withTag}
-              {...(!checked && {
-                onCheck: () => {
-                  setDissolving((current) => new Set([...current, row.id]));
-                },
-              })}
-            />
-          </Animated.View>
+            onCheck={dissolve}
+            onDissolved={onDissolved}
+            onOpen={openTask}
+            row={row}
+            withTag={withTag}
+          />
         ))}
       </Group>
       {hidden === 0 ? null : (

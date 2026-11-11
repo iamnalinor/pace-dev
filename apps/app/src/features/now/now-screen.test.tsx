@@ -11,7 +11,7 @@ import { heldRoute } from "#app/test/held-route.ts";
 import { controlsInsideControls } from "#app/test/nested-controls.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { paramsSet, router, searchParams, setSearchParams } from "#app/test/router.ts";
-import { createTestRuntime } from "#app/test/runtime.ts";
+import { createTestRuntime, pulledInto } from "#app/test/runtime.ts";
 import { rowsInFlattenableBoxes } from "#app/test/sliding-rows.ts";
 import { DISSOLVE_MS } from "#app/ui/dissolve.tsx";
 import { createMemoryEventStore } from "@pace/client";
@@ -187,8 +187,8 @@ describe("NowBoard", () => {
       "Mark RFC: dedicated runner pool done",
       "Mark Return library books done",
     ]);
-    // On a phone the date goes last: the line's cut takes it, not the countdown (design review 2 N10).
-    expect(screen.getByText("1d 8h left · 4/7 done · Due tomorrow 23:59")).toBeOnTheScreen();
+    // The date first at every width; a long line wraps between pieces (QA PR55-1-04).
+    expect(screen.getByText("Due tomorrow 23:59 · 1d 8h left · 4/7 done")).toBeOnTheScreen();
     // The project (else the category) is a tag and a non-Normal importance a word; Normal says nothing.
     expect(screen.getAllByText("ASAP").length).toBeGreaterThan(0);
     expect(screen.queryByText("Normal")).not.toBeOnTheScreen();
@@ -203,7 +203,7 @@ describe("NowBoard", () => {
   it("marks the rows of repeating tasks, and the final deadline once the main one passed", async () => {
     const late = "2026-11-02T12:00:00.000Z";
     const runtime = await createTestRuntime({ now: late });
-    await runtime.state.ingest(rentSeriesEvents());
+    await pulledInto(runtime, rentSeriesEvents());
     await renderScreen(<Board />, runtime);
     const repeats = en("meta.repeats");
     const rent = screen.getByRole("link", { name: /^Rent/u });
@@ -215,7 +215,7 @@ describe("NowBoard", () => {
 
   it("says on a row past both deadlines that the final one went by too (QA 13 L10)", async () => {
     const runtime = await createTestRuntime({ now: "2026-11-10T12:00:00.000Z" });
-    await runtime.state.ingest(rentSeriesEvents());
+    await pulledInto(runtime, rentSeriesEvents());
     await renderScreen(<Board />, runtime);
     const rent = screen.getByRole("link", { name: /^Rent/u });
     expect(within(rent).getByText("9d late")).toBeOnTheScreen();
@@ -337,7 +337,7 @@ describe("NowBoard", () => {
             writes.push(events.length);
             throw new Error("QuotaExceededError");
           }
-          await memory.append(events);
+          await memory.append(events, await memory.readMeta());
         },
       };
       const runtime = await createTestRuntime({ eventStore });
@@ -707,7 +707,7 @@ describe("NowBoard", () => {
     expect(await screen.findByLabelText("From your calendar")).toBeOnTheScreen();
   });
 
-  it("skips a calendar event on every channel, and hides it once that went through", async () => {
+  it("skips a calendar event on every channel: its card goes at the press, before the server answers (bug-lessons 311)", async () => {
     seminarSoon();
     const skip = heldRoute();
     const runtime = await createTestRuntime({ routes: { "POST /api/calendar/skip": skip.route } });
@@ -719,14 +719,17 @@ describe("NowBoard", () => {
     });
     const eventKey = calendarEventKey({ startAt: addMinutesIso(NOW, 5), title: "Seminar" });
     expect(skip.calls).toEqual([{ eventKey, from: "app" }]);
-    expect(screen.getByLabelText("From your calendar")).toBeOnTheScreen();
+    // The server has not answered: the card is gone already.
+    expect(screen.queryByLabelText("From your calendar")).toBeNull();
     await act(async () => {
       skip.answer({ ok: true });
       await Promise.resolve();
     });
-    await waitFor(() => {
-      expect(screen.queryByLabelText("From your calendar")).toBeNull();
+    await act(async () => {
+      await Promise.resolve();
     });
+    expect(screen.queryByLabelText("From your calendar")).toBeNull();
+    expect(skip.calls).toHaveLength(1);
     expect(Object.values(runtime.state.store.getState().time.activities)).toEqual([]);
   });
 
@@ -754,7 +757,7 @@ describe("NowBoard", () => {
     });
   });
 
-  it("keeps the calendar card when its skip did not go through, and says so", async () => {
+  it("brings the calendar card back when its skip did not go through, and says so", async () => {
     seminarSoon();
     const skip = heldRoute();
     await renderScreen(
@@ -766,12 +769,13 @@ describe("NowBoard", () => {
     await waitFor(() => {
       expect(skip.waiting()).toBe(1);
     });
+    expect(screen.queryByLabelText("From your calendar")).toBeNull();
     await act(async () => {
       skip.refuse();
       await Promise.resolve();
     });
     expect(await screen.findByText(en("notifications.failedAction"))).toBeOnTheScreen();
-    expect(screen.getByLabelText("From your calendar")).toBeOnTheScreen();
+    expect(await screen.findByLabelText("From your calendar")).toBeOnTheScreen();
   });
 
   describe("the time bar on Now", () => {
@@ -834,10 +838,12 @@ describe("NowBoard", () => {
     });
   });
 
-  it("shows the empty state on a fresh account: what will appear, and a way to add a task (spec §5.1, M6)", async () => {
+  it("shows the empty state on a fresh account: what will appear, and the composer above it is the one way to add (spec §5.1, M6; QA PR55-1-19)", async () => {
     await renderScreen(<Board />, await createTestRuntime({ world: "empty" }));
     expect(screen.getByText(en("now.empty"))).toBeOnTheScreen();
     expect(screen.getByText(en("now.emptyBody"))).toBeOnTheScreen();
-    expect(screen.getByRole("button", { name: en("now.emptyAdd") })).toBeOnTheScreen();
+    // The composer's line is right above: a second «Add a task» was one job twice.
+    expect(screen.getByPlaceholderText(en("composer.placeholder"))).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: /^Add a task$/u })).toBeNull();
   });
 });

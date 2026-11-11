@@ -5,14 +5,17 @@ import { OAUTH_SCOPES } from "@pace/core";
 import { createApp } from "./app.ts";
 import { MCP_RESOURCE_METADATA_PATH, mcpHandler } from "./mcp/server.ts";
 import { mountOAuthRoutes } from "./oauth/oauth-routes.ts";
+import { cloudflareBindings } from "./platform/cloudflare/bindings.ts";
+import { cloudflareRequestPlaceReader } from "./platform/cloudflare/request-place.ts";
+import { sweepAccountCleanups } from "./shared/account-cleanup-reconciliation.ts";
 import { oauthOrigin } from "./shared/config.ts";
 import { createLogger } from "./shared/logger.ts";
 
-export { LlmHealth } from "./shared/llm/health-object.ts";
-export { UserStore } from "./user-store/user-store.ts";
+export { LlmHealth } from "./platform/cloudflare/health-object.ts";
+export { UserStore } from "./platform/cloudflare/user-store.ts";
 
 /** The HTTP app plus the consent routes, which only make sense behind the provider. */
-const app = mountOAuthRoutes(createApp());
+const app = mountOAuthRoutes(createApp(undefined, cloudflareRequestPlaceReader));
 const log = createLogger("info");
 
 /** A day: MCP clients refresh silently, and a revoked grant is dead within one request anyway. */
@@ -27,13 +30,16 @@ valid for the origin that issued it.
 */
 export const providerOptions = (apiOrigin: string): OAuthProviderOptions => ({
   accessTokenTTL: ACCESS_TOKEN_TTL_SECONDS,
-  apiHandler: { fetch: mcpHandler },
+  apiHandler: {
+    fetch: async (request, env, ctx) => await mcpHandler(request, cloudflareBindings(env), ctx),
+  },
   apiRoute: "/mcp",
   authorizeEndpoint: "/authorize",
   clientIdMetadataDocumentEnabled: true,
   clientRegistrationEndpoint: "/oauth/register",
   defaultHandler: {
-    fetch: async (request, env, ctx): Promise<Response> => await app.fetch(request, env, ctx),
+    fetch: async (request, env, ctx): Promise<Response> =>
+      await app.fetch(request, cloudflareBindings(env), ctx),
   },
   resourceMetadata: {
     authorization_servers: [apiOrigin],
@@ -105,6 +111,18 @@ const noOAuth = (): Response =>
 const noOAuthLog = { isDone: false };
 
 export default {
+  scheduled: async (
+    _controller: ScheduledController,
+    env: Cloudflare.Env,
+    _ctx: ExecutionContext,
+  ): Promise<void> => {
+    const result = await sweepAccountCleanups(cloudflareBindings(env));
+    if (!result.ok) {
+      log.error("Account cleanup maintenance failed", { code: result.error });
+    } else if (result.value.failed > 0) {
+      log.error("Account cleanup remains pending", { failed: result.value.failed });
+    }
+  },
   fetch: async (
     request: Request,
     env: Cloudflare.Env,
@@ -115,7 +133,7 @@ export default {
     const origin = oauthOrigin(env.API_ORIGIN, request.url);
     if (origin === null) {
       if (!isOAuthPath(new URL(request.url).pathname)) {
-        return await app.fetch(request, env, ctx);
+        return await app.fetch(request, cloudflareBindings(env), ctx);
       }
       if (!noOAuthLog.isDone) {
         noOAuthLog.isDone = true;

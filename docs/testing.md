@@ -11,11 +11,31 @@ action-level tests check that every enabled draft is accepted from each entry pa
 | Client unit | Vitest | API client, auth, app state and sync on memory adapters and the fake `fetch` from `@pace/client/testing` | `packages/client/src/**/*.test.ts` | `bun test:unit` |
 | API | Vitest + `@cloudflare/vitest-plugin` | the Worker inside workerd with real D1, KV and Durable Object bindings | `apps/api/src/**/*.test.ts`, `apps/api/tests/*.int.test.ts` | `bun test:api` |
 | App | jest-expo (Jest 29), React Native Testing Library 14 | React Native components and platform adapters | `apps/app/**/*.test.{ts,tsx}` | `bun test:app` |
+| Updates | Vitest + `@cloudflare/vitest-plugin` | the OTA update Worker (`apps/updates`: signed manifest and assets from R2) inside workerd | `apps/updates/tests/*.test.ts` | `bun test:updates` |
+| Native Firebase controller | Kotlin + JUnit 4 on the JVM | the Android module's `FirebaseController` without an SDK or emulator | `apps/app/modules/pace-native/android/src/test/` | `bun test:native-firebase` |
 | End-to-end | Playwright + axe | the production web build against `wrangler dev` in Chromium | `e2e/*.e2e.ts` | `bun test:e2e` |
+| Android end-to-end | Maestro | a release build on an Android emulator, against a fresh local Worker | `e2e/android/` | **Android E2E** workflow or the commands below |
 | Mutation | Stryker | the core tests themselves | `packages/core` | `bun test:mutation` (on demand in CI) |
 | LLM regression | own runner | the parsing prompt against real providers | planned for stage 2 | `bun test:llm` (script exists, runner does not yet) |
 
-`bun run test` runs unit → api → app → e2e. CI (`ci.yml`) runs lint, unit, app and api in one job (each job pays its own install, and minutes are rationed), then e2e once that passes.
+`bun run test` runs unit → api → app → updates → e2e. CI (`ci.yml`) runs lint, unit, app, api and updates in one job (each job pays its own install, and minutes are rationed), then e2e once that passes. The release gate (`release.yml`) runs the same plus the native Firebase controller.
+
+## Updates Worker (`apps/updates`)
+
+`apps/updates` is a workspace of its own: the Worker that serves over-the-air updates (`GET
+/manifest` and `GET /assets/...` from an R2 bucket; nothing else). `bun test:updates` (`vitest
+run` in `apps/updates`) runs its tests in workerd with a real R2 binding, the same way as the API
+tests. OTA stays off in default app builds (see [self-hosting](self-hosting.md)).
+
+## Native Firebase controller (JVM)
+
+`bun test:native-firebase` (`scripts/native/test-firebase.sh`) compiles the Android module's
+`FirebaseController.kt` with its JUnit test on a plain JVM and runs it: no Android SDK, emulator or
+Firebase service. It needs Java 17 and, on the first run, the network: it downloads the Kotlin
+compiler and the JUnit and Hamcrest jars into `.cache/native-jvm` (each checked against a pinned
+SHA-256) and reuses them afterwards. That is why it is not part of `bun run test`. CI caches the
+folder by the script's hash and runs the step on a pull request only when
+`apps/app/modules/pace-native/` or the script changed; main and the release gate always run it.
 
 ## Unit tests (core, client)
 
@@ -103,6 +123,12 @@ role and state the way a screen reader sees it: chips and segments are `radio`s
 2. the web: `bun run --cwd apps/app build:web` (Expo web export + service worker, with
    `EXPO_PUBLIC_API_URL=http://localhost:8787` and `EXPO_PUBLIC_DEV_LOGIN=1`), served as a
    single-page app by `scripts/serve-web.ts` (port 4173).
+
+`e2e/checkpoint-history.e2e.ts` is opt-in: it runs only with `PACE_E2E_CHECKPOINTS=1`, which also
+starts the API with `PACE_VERSION:e2e-checkpoint` and `PACE_HISTORY_CHECKPOINT_MODE:active` (the
+checkpoint rollout is off everywhere else). CI runs it as a step of its own after the chromium
+project, on a fresh server with the same web build:
+`E2E_REUSE_WEB_BUILD=1 PACE_E2E_CHECKPOINTS=1 bunx playwright test e2e/checkpoint-history.e2e.ts --project chromium --workers 1`.
 
 Every test starts on an account of its own: `loginViaApi` (`e2e/support/login.ts`) takes the
 next id of the worker's whitelisted block and deletes that account first (`DELETE /api/test/account`),
@@ -200,3 +226,40 @@ proposals expected (kinds in order, fields of the first, the domain and how sure
 `cases.test.ts` keeps them well-formed in `bun test:unit`. The runner (`run.ts`) is still to
 come: `bun test:llm` will run them against the configured OpenAI-compatible endpoint and write
 `docs/llm.md`. `llm-regression.yml` is on demand and reads the same endpoint variables.
+
+## Android end-to-end
+
+Run **Android E2E** in GitHub Actions on the commit to check. For a pull request, apply the
+`android-e2e` label: that label event checks out the exact PR head SHA. Remove and reapply the
+label after a new push to request another run; ordinary pushes do not spend emulator minutes.
+Manual dispatch and reusable workflow calls remain available. It builds a test-only x86_64
+release APK (bundled JavaScript and R8), boots a Google APIs emulator on API 34, applies D1
+migrations to fresh local state, and waits for the Worker on the host at `127.0.0.1:8787`.
+The APK reaches it at `http://10.0.2.2:8787`. The workflow can be called by other workflows;
+it is not a release gate until it has passed on the actual emulator runner.
+
+To run locally, use JDK 17, Node 24, the repository's Bun version, Android SDK platform 36,
+build-tools 36.0.0, NDK 27.1.12297006, CMake 3.22.1, and
+[Maestro CLI 2.11.0](https://github.com/mobile-dev-inc/maestro/releases/tag/cli-2.11.0).
+Set `ANDROID_HOME` to the SDK and put `adb`, `apkanalyzer`, `maestro`, and `curl` on `PATH`.
+Boot one English x86_64 Android emulator (API 34 Google APIs) and leave port 8787 free.
+Hardware acceleration is recommended. From the repository root:
+
+```sh
+bun install --frozen-lockfile
+EXPO_PUBLIC_API_URL=http://10.0.2.2:8787 EXPO_PUBLIC_DEV_LOGIN=1 bash scripts/android/smoke.sh build
+bash scripts/android/smoke.sh run
+```
+
+The build command replaces the generated `apps/app/android/` project. The test app uses a
+separate application id (`dev.nalinor.pace.e2e`) and the debug signing key; the release workflow still builds
+`dev.nalinor.pace` for arm64. Only the emulator host is allowed to use HTTP in the test APK.
+The run uses one fake whitelisted account, no real credentials, and clears app data before
+launch. It exercises native dev sign-in, skips the first-run permission prompts using **Not
+now**, and waits for the empty **Now** screen. It does not test real Telegram, FCM, background
+work, or usage access. Vendor battery savers and overnight Doze still need a physical device.
+
+The run prints its diagnostics directory under `.cache/android-e2e/`. It keeps migration and
+Worker logs, Maestro output and JUnit, and a screenshot of Now on success. On a failed run it
+also attempts a screenshot and logcat while the emulator is still available. CI uploads the
+directory as `android-smoke`.

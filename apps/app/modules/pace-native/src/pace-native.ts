@@ -17,8 +17,31 @@ export type UsageStats = {
   readonly totalTimeInForeground: number;
 };
 
+/** Firebase status always identifies the actual initialized default app, never the desired config. */
+export type FirebaseStatus = {
+  readonly status: "disabled" | "error" | "ready" | "restart-needed" | "unsupported";
+  readonly projectId: null | string;
+  readonly reason: "initialization-failed" | "invalid-config" | "storage-failed" | null;
+};
+
 /** The Kotlin module's surface (`modules/pace-native/android`). */
 export type PaceNative = {
+  readonly packageName: () => null | string;
+  /** Installed APK version, unaffected by downloaded JavaScript manifests. */
+  readonly apkVersion: () => null | string;
+  /** One active-network snapshot; null never authorizes an OTA asset download. */
+  readonly otaNetwork: () => null | { readonly isWifi: boolean; readonly isMetered: boolean };
+  readonly firebaseStatus: () => FirebaseStatus;
+  /** Stage before writing SecureStore's server origin. Null config deliberately disables push. */
+  readonly stageFirebaseConfig: (origin: string, json: null | string) => FirebaseStatus;
+  /** Call only after the selected origin has been durably written to SecureStore. */
+  readonly commitFirebaseConfig: (origin: string) => FirebaseStatus;
+  /** Read the persisted server origin first: this promotes only a matching staged choice. */
+  readonly reconcileFirebaseOrigin: (origin: string) => FirebaseStatus;
+  /** Requires a successful reconciliation; stale-origin responses cannot change native state. */
+  readonly ensureFirebase: (origin: string, json: null | string) => FirebaseStatus;
+  /** True only if a cold launch was scheduled; the old process then exits. */
+  readonly restartApp: () => boolean;
   readonly hasUsageAccess: () => boolean;
   /** Android 13+: an app installed from an APK meets "restricted settings" for usage access. */
   readonly restrictsSettings: () => boolean;
@@ -45,6 +68,12 @@ export type PaceNative = {
   readonly setCrashContext: (text: string) => void;
 };
 
+const unsupportedFirebase = (): FirebaseStatus => ({
+  status: "unsupported",
+  projectId: null,
+  reason: null,
+});
+
 const noop = (): void => undefined;
 
 /**
@@ -52,6 +81,15 @@ What the app sees without the native module (Jest, Expo Go, the web): nothing gr
 do. The battery is no obstacle there, so the battery step is never asked for.
 */
 export const fallbackPaceNative: PaceNative = {
+  packageName: () => null,
+  apkVersion: () => null,
+  otaNetwork: () => null,
+  firebaseStatus: unsupportedFirebase,
+  stageFirebaseConfig: unsupportedFirebase,
+  commitFirebaseConfig: unsupportedFirebase,
+  reconcileFirebaseOrigin: unsupportedFirebase,
+  ensureFirebase: unsupportedFirebase,
+  restartApp: () => false,
   appLabels: async (packages) => Object.fromEntries(packages.map((name) => [name, name])),
   hasUsageAccess: () => false,
   isDndAccessGranted: () => false,

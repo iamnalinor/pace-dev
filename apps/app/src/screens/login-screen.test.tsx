@@ -9,13 +9,19 @@ import type { Auth, BotLogin } from "@pace/client";
 import type * as CoreActual from "@pace/core";
 
 import { fakeUser } from "@pace/client/testing";
-import { ok, t } from "@pace/core";
+import { err, ok, t } from "@pace/core";
 
 import type * as DeviceIdActual from "../platform/device-id.ts";
 
+import { isNativeDevLoginEnabled } from "../platform/api-base.ts";
 import * as mockSecureStoreModule from "../testing/secure-store.fake.ts";
 import { ThemeProvider } from "../ui/theme-provider.tsx";
 import { LoginScreen } from "./login-screen.tsx";
+
+jest.mock("../platform/api-base.ts", () => ({
+  ...jest.requireActual<object>("../platform/api-base.ts"),
+  isNativeDevLoginEnabled: jest.fn(() => true),
+}));
 
 jest.mock("expo-secure-store", () => mockSecureStoreModule.createFakeSecureStore());
 jest.mock("expo-constants", () => {
@@ -89,6 +95,7 @@ const auth = mockAuth as unknown as jest.Mocked<Auth> & typeof mockAuth;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  jest.mocked(isNativeDevLoginEnabled).mockReturnValue(true);
   mockStatus.current = "signed-out";
   mockStatus.endedElsewhere = false;
   mockStatus.endedInAnotherTab = false;
@@ -121,6 +128,13 @@ describe("LoginScreen", () => {
     expect(screen.queryByText(t("en", "login.endedElsewhere"))).toBeNull();
   });
 
+  it("hides dev login when the Android build has not enabled it", async () => {
+    jest.mocked(isNativeDevLoginEnabled).mockReturnValue(false);
+    await renderScreen();
+    expect(screen.queryByLabelText("Telegram id")).toBeNull();
+    expect(screen.queryByText("Sign in as dev")).toBeNull();
+  });
+
   it("signs in through the dev route with the typed Telegram id", async () => {
     auth.loginWithDev.mockResolvedValue(ok(fakeUser));
     await renderScreen();
@@ -128,6 +142,50 @@ describe("LoginScreen", () => {
     await fireEvent.press(screen.getByText("Sign in as dev"));
     expect(auth.loginWithDev).toHaveBeenCalledWith("1919");
   });
+
+  it("signs in once for a press and Enter in the same frame (class 374)", async () => {
+    auth.loginWithDev.mockResolvedValue(ok(fakeUser));
+    await renderScreen();
+    await fireEvent.changeText(screen.getByLabelText("Telegram id"), "1919");
+    await act(async () => {
+      void fireEvent.press(screen.getByText("Sign in as dev"));
+      void fireEvent(screen.getByLabelText("Telegram id"), "submitEditing");
+    });
+    expect(auth.loginWithDev).toHaveBeenCalledTimes(1);
+  });
+
+  it("signs in with Enter in the Telegram id field (QA PR55-1-06)", async () => {
+    auth.loginWithDev.mockResolvedValue(ok(fakeUser));
+    await renderScreen();
+    await fireEvent.changeText(screen.getByLabelText("Telegram id"), "1919");
+    await fireEvent(screen.getByLabelText("Telegram id"), "submitEditing");
+    expect(auth.loginWithDev).toHaveBeenCalledWith("1919");
+  });
+
+  it("says a Telegram id is digits without asking the server (QA PR55-1-07)", async () => {
+    await renderScreen();
+    await fireEvent.changeText(screen.getByLabelText("Telegram id"), "abc");
+    await fireEvent.press(screen.getByText("Sign in as dev"));
+    expect(auth.loginWithDev).not.toHaveBeenCalled();
+    expect(screen.getByText(t("en", "login.devIdInvalid"))).toBeOnTheScreen();
+  });
+
+  it.each([
+    ["network", "login.offline"],
+    ["auth/not-allowed", "login.notAllowed"],
+    ["internal", "login.failed"],
+  ] as const)(
+    "tells a dev sign-in that failed with %s by its cause (QA PR55-1-07)",
+    async (code, key) => {
+      auth.loginWithDev.mockResolvedValue(err(code));
+      await renderScreen();
+      await fireEvent.changeText(screen.getByLabelText("Telegram id"), "1919");
+      await fireEvent.press(screen.getByText("Sign in as dev"));
+      await waitFor(() => {
+        expect(screen.getByText(t("en", key))).toBeOnTheScreen();
+      });
+    },
+  );
 
   it("opens the bot deep link and polls until the token arrives", async () => {
     const poll = Promise.withResolvers<Awaited<ReturnType<BotLogin["waitForToken"]>>>();
@@ -270,6 +328,17 @@ describe("LoginScreen", () => {
       });
       await unmount();
     }
+  });
+
+  it("says there is no connection when the browser login's token could not reach the server (QA PR55-1-07)", async () => {
+    jest.mocked(openAuthSessionAsync).mockResolvedValueOnce({
+      type: "success",
+      url: "pace://auth?token=tok_web",
+    });
+    auth.adoptToken.mockResolvedValueOnce(err("network"));
+    await renderScreen();
+    await fireEvent.press(screen.getByText("Sign in on the web instead"));
+    expect(await screen.findByText(t("en", "login.offline"))).toBeOnTheScreen();
   });
 
   it("leaves the screen once signed in", async () => {

@@ -11,7 +11,14 @@ import {
   validatePresetInput,
 } from "@pace/core";
 
-import { type ActionDeps, type ActionResult, emit, fromStoreAll, stamp } from "./deps.ts";
+import {
+  type ActionDeps,
+  type ActionResult,
+  emit,
+  fromStoreAll,
+  stamp,
+  withCompleteHistory,
+} from "./deps.ts";
 
 export type PresetActions = {
   readonly createPreset: (input: PresetInput) => ActionResult;
@@ -92,9 +99,12 @@ const archivePreset =
         );
   };
 
-const restorePreset =
-  (deps: ActionDeps): PresetActions["restorePreset"] =>
-  async (presetId) => {
+/*
+The archives to revoke may sit in a checkpoint's base, which `state.events` does not hold: the
+source is loaded first and the log read after that wait (class 118).
+*/
+const restorePreset = (deps: ActionDeps): PresetActions["restorePreset"] =>
+  withCompleteHistory(deps, async (presetId: string) => {
     const { events, presets } = deps.state.store.getState();
     const preset = presetById(presets, presetId);
     if (preset === undefined) {
@@ -110,7 +120,7 @@ const restorePreset =
     return archives.length === 0
       ? err("action/nothing-to-do")
       : fromStoreAll(await deps.state.revokeAll(archives.map((event) => event.id)));
-  };
+  });
 
 /**
 The pickers' order as positions 1…n: new presets share order 100 until one is moved, so

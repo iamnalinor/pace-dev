@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 
 import type { MessageKey } from "@pace/core";
 
+import { useBusyLatch } from "#app/shared/use-busy-latch.ts";
 import { TextField } from "#app/ui/text-field.tsx";
 
-import type { BotLoginPhase } from "./use-bot-login.ts";
+import type { BotLoginPhase, useBotLogin } from "./use-bot-login.ts";
 
 import { useAuth, useT } from "../app-state.tsx";
 import { Button } from "../ui/button.tsx";
@@ -52,18 +53,47 @@ export const SignedOutLine = () => {
   );
 };
 
-export const DevLoginForm = ({ onFailure }: { readonly onFailure: () => void }) => {
+/**
+Why a sign-in failed, in words: not on the list, no connection to the server (a request that never
+got an answer, QA PR55-1-07), or anything else.
+*/
+export const signInErrorKey = (code: string): MessageKey => {
+  if (code === "auth/not-allowed") {
+    return "login.notAllowed";
+  }
+  return code === "network" ? "login.offline" : "login.failed";
+};
+
+/** A Telegram id is a positive number: anything else is refused here, without a round trip. */
+const isTelegramId = (value: string): boolean => /^\d+$/u.test(value);
+
+/**
+The dev form (local and e2e builds): Enter in the field signs in as the button does (QA PR55-1-06),
+and a failure says why under the field.
+*/
+export const DevLoginForm = () => {
   const t = useT();
   const { auth } = useAuth();
   const [telegramId, setTelegramId] = useState("");
-  const [isBusy, setIsBusy] = useState(false);
+  // Enter and the button in one frame both saw it idle and signed in twice (class 374).
+  const latch = useBusyLatch();
+  const [error, setError] = useState<MessageKey | null>(null);
+  const id = telegramId.trim();
   const submit = async (): Promise<void> => {
-    setIsBusy(true);
-    const result = await auth.loginWithDev(telegramId.trim());
-    setIsBusy(false);
-    if (!result.ok) {
-      onFailure();
+    if (id === "") {
+      return;
     }
+    if (!isTelegramId(id)) {
+      setError("login.devIdInvalid");
+      return;
+    }
+    await latch.run(async () => {
+      setError(null);
+      const result = await auth.loginWithDev(id);
+      if (!result.ok) {
+        setError(signInErrorKey(result.error));
+      }
+    });
   };
   return (
     <View className="gap-2 rounded-xl border border-separator bg-cell p-4">
@@ -71,17 +101,19 @@ export const DevLoginForm = ({ onFailure }: { readonly onFailure: () => void }) 
         {t("login.dev")}
       </Text>
       <TextField
+        error={error === null ? null : t(error)}
         isLabelHidden
         keyboardType="number-pad"
         label={t("login.devId")}
         onChangeText={setTelegramId}
+        onSubmitEditing={() => void submit()}
         placeholder={t("login.devId")}
         purpose="token"
         value={telegramId}
       />
       <Button
-        busy={isBusy}
-        disabled={telegramId.trim() === ""}
+        busy={latch.isBusy}
+        disabled={id === ""}
         onPress={() => void submit()}
         variant="secondary"
         width="fill"
@@ -92,7 +124,7 @@ export const DevLoginForm = ({ onFailure }: { readonly onFailure: () => void }) 
   );
 };
 
-export const Waiting = ({
+const Waiting = ({
   onCancel,
   onReopen,
 }: {
@@ -121,3 +153,13 @@ export const Waiting = ({
     </View>
   );
 };
+
+/** Both platforms replace their sign-in choices while the same bot flow is pending. */
+export const LoginChoices = ({
+  bot,
+  children,
+}: {
+  readonly bot: ReturnType<typeof useBotLogin>;
+  readonly children: ReactNode;
+}) =>
+  bot.phase.kind === "waiting" ? <Waiting onCancel={bot.reset} onReopen={bot.reopen} /> : children;

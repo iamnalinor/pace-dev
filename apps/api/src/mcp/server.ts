@@ -1,11 +1,14 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 
+import type { Db } from "../shared/db/d1.ts";
+import type { AppBindings } from "../shared/ports/bindings.ts";
+
 import { loadConfig, ownOrigin } from "../shared/config.ts";
 import { createLogger } from "../shared/logger.ts";
 import { isAllowed } from "../shared/telegram-identity.ts";
 import { telegramIdOf } from "../shared/user-lookup.ts";
-import { type McpGrant, readGrant } from "./grant.ts";
+import { type McpContext, type McpGrant, readGrant } from "./grant.ts";
 import { registerTools, type Tool, type ToolContext } from "./registry.ts";
 import { describeSchema, exportAll, querySql, simulateTool } from "./tools/analytics-tools.ts";
 import { calendarTool, usageTool, weekTool } from "./tools/cloud-tools.ts";
@@ -125,7 +128,7 @@ store would belong to nobody, so the client is sent to connect again instead.
 */
 const refusal = async (access: {
   readonly allowed: readonly string[];
-  readonly db: D1Database;
+  readonly db: Db;
   readonly grant: McpGrant;
   readonly origin: string;
 }): Promise<null | Response> => {
@@ -144,8 +147,8 @@ token's scopes). Stateless streamable HTTP: every POST is a complete JSON-RPC ex
 */
 export const mcpHandler = async (
   request: Request,
-  env: Cloudflare.Env,
-  ctx: ExecutionContext,
+  env: AppBindings,
+  ctx: McpContext,
 ): Promise<Response> => {
   const grant = readGrant(ctx);
   if (!grant.ok) {
@@ -169,7 +172,7 @@ export const mcpHandler = async (
     return refused;
   }
   // The same Durable Object the sync routes use: one per user, named by the user id.
-  const store = env.USER_STORE.get(env.USER_STORE.idFromName(grant.value.userId));
+  const store = env.USER_STORE.of(grant.value.userId);
   const server = createMcpServer({
     grant: grant.value,
     now: new Date().toISOString(),

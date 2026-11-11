@@ -7,6 +7,8 @@ import {
   type Page,
 } from "@playwright/test";
 
+import { waitForTransitions } from "./animation-wait.ts";
+
 /** Whether an axe finding is about colour alone (a fade may be what it measured). */
 const isColourFault = (violation: { readonly id: string }): boolean =>
   violation.id === "color-contrast";
@@ -15,13 +17,7 @@ const isColourFault = (violation: { readonly id: string }): boolean =>
 export const expectNoA11yViolations = async (page: Page): Promise<void> => {
   // Check what the person sees once things settle, not a toast halfway through fading in. A loop
   // (a skeleton's breathing) never ends: only the animations that do are waited for.
-  await page.waitForFunction(() =>
-    document
-      .getAnimations()
-      .every(
-        (a) => a.playState !== "running" || a.effect?.getComputedTiming().iterations === Infinity,
-      ),
-  );
+  await waitForTransitions(page);
   // A fade the app drives itself (a reanimated opacity) is no web animation: a scan that finds only
   // colour faults is repeated until the page holds still, and fails on what stays.
   const scan = async () => {

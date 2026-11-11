@@ -1,0 +1,26 @@
+{
+  "name": "@pace/updates",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "test": "vitest run",
+    "types": "wrangler types"
+  },
+  "dependencies": {
+    "@pace/core": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.4.11",
+    "@cloudflare/workers-types": "catalog:",
+    "@types/node": "22.20.5",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
+  },
+  "exports": {
+    "./*": "./src/shared/*.ts"
+  }
+}

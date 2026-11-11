@@ -1,11 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createApiClient } from "./api-client.ts";
+import { createSession, type Session } from "./auth-session.ts";
 import { type Auth, createAuth } from "./auth.ts";
+import { createEndedSessions, endingLogout } from "./ended-sessions.ts";
 import { createFakeFetch, fakeMe, type FakeRoute, fakeUser, problem } from "./fake-fetch.fake.ts";
 import {
   createMemoryEndedSessionStore,
   createMemorySessionStore,
+  createMemorySignOutNotes,
   type EndedSessionStore,
   type SessionStore,
 } from "./session.ts";
@@ -232,5 +235,46 @@ describe("createAuth: a Log out the server did not hear is kept until it does (R
     await auth.retryEndedSessions();
     expect(auth.endedSessions.getState()).toEqual({ pending: false });
     expect(logoutsOf(calls)).toHaveLength(2);
+  });
+});
+
+/** A signed-in session whose sign-out note takes a while: `duringNote` runs in that wait. */
+const loggingOut = async (duringNote: (session: Session) => void) => {
+  const stored = createMemorySessionStore();
+  await stored.set("stored");
+  const fake = createFakeFetch({ "POST /api/auth/logout": () => ({ ok: true }) });
+  const session: Session = createSession(stored, {
+    ...createMemorySignOutNotes(),
+    leave: async () => {
+      duringNote(session);
+    },
+  });
+  await session.ready;
+  const api = createApiClient({
+    baseUrl: "https://api.test",
+    fetch: fake.fetch,
+    token: () => session.token(),
+  });
+  const ended = createEndedSessions(api, createMemoryEndedSessionStore());
+  await ended.ready;
+  await endingLogout(session, ended)();
+  return { calls: fake.calls, ended, session };
+};
+
+describe("endingLogout: a sign-in that began while the log-out was on its way", () => {
+  it("does not have the server end a session the device still holds: it stays to end later", async () => {
+    // The sign-out is the older owner's and does nothing; ending the session on the server all
+    // the same left a token the device kept, read later as "ended elsewhere".
+    const { calls, ended, session } = await loggingOut((session) => session.beginSignIn());
+    expect(session.token()).toBe("stored");
+    expect(logoutsOf(calls)).toEqual([]);
+    expect(ended.store.getState()).toEqual({ pending: true });
+  });
+
+  it("has the server end the session this log-out forgot", async () => {
+    const { calls, ended, session } = await loggingOut(() => undefined);
+    expect(session.token()).toBeUndefined();
+    expect(logoutsOf(calls)).toEqual(["Bearer stored"]);
+    expect(ended.store.getState()).toEqual({ pending: false });
   });
 });

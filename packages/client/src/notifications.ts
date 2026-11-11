@@ -34,8 +34,19 @@ export type FeedAnswer = "read" | Answer;
 
 export type NotificationFeed = {
   readonly store: StoreApi<FeedState>;
-  /** Fetches the newest page again (on open, on a live notice, on reconnect). */
+  /** Fetches the newest page again (a live notice, the screen's own Retry). */
   readonly refresh: () => Promise<void>;
+  /**
+  The page as of now, for a start, a screen opening, a reconnect or a return: a fetch already out
+  is joined, and one that came less than `FEED_FRESH_MS` ago is it (QA PR55-1-12: the start and
+  the Notifications screen fetched the same page 300 ms apart).
+  */
+  readonly refreshUnlessFresh: () => Promise<void>;
+  /**
+  Forgets the page and its freshness, and drops a fetch still out: the session it belonged to has
+  ended, so the next account signed in here never sees it (class 372).
+  */
+  readonly reset: () => void;
   readonly markRead: (ids: readonly string[]) => Promise<void>;
   /** Answers a notification; `false` when the server could not be reached or refused. */
   readonly resolve: (id: string, answer: FeedAnswer) => Promise<boolean>;
@@ -47,6 +58,11 @@ export type NotificationFeed = {
 
 const PAGE = 50;
 
+const EMPTY_FEED: FeedState = { deliveries: {}, items: [], status: "idle" };
+
+/** How long a fetched page counts as current for `refreshUnlessFresh`. */
+export const FEED_FRESH_MS = 5000;
+
 const replaced = (
   items: readonly PoolNotification[],
   next: PoolNotification,
@@ -57,26 +73,63 @@ const replaced = (
 
 type FeedDeps = {
   readonly api: ApiClient;
+  readonly now: () => number;
   readonly source: "app" | "web";
   readonly store: StoreApi<FeedState>;
 };
 
-const refreshOf =
-  ({ api, store }: FeedDeps) =>
-  async (): Promise<void> => {
+/** Every fetch of the page, and the one `refreshUnlessFresh` may join or skip. */
+const refreshesOf = ({ api, now, store }: FeedDeps) => {
+  let inFlight: Promise<void> | undefined;
+  let fetchedAt = -Infinity;
+  /** Bumped by `reset`: a fetch made before it lands on nothing. */
+  let epoch = 0;
+  const refresh = async (): Promise<void> => {
+    const startedIn = epoch;
     if (store.getState().status === "idle") {
       store.setState({ status: "loading" });
     }
     try {
       const page = await api.call(endpoints.notifications.list, { query: { limit: PAGE } });
+      if (startedIn !== epoch) {
+        return;
+      }
       store.setState({ deliveries: page.deliveries, items: page.items, status: "ready" });
+      fetchedAt = now();
     } catch {
       // Offline: what was shown stays; a first load says it failed.
-      if (store.getState().status !== "ready") {
+      if (startedIn === epoch && store.getState().status !== "ready") {
         store.setState({ status: "failed" });
       }
     }
   };
+  const tracked = async (): Promise<void> => {
+    const run = refresh();
+    inFlight = run;
+    try {
+      await run;
+    } finally {
+      if (inFlight === run) {
+        inFlight = undefined;
+      }
+    }
+  };
+  return {
+    refresh: tracked,
+    refreshUnlessFresh: async (): Promise<void> => {
+      if (now() - fetchedAt < FEED_FRESH_MS) {
+        return;
+      }
+      await (inFlight ?? tracked());
+    },
+    reset: (): void => {
+      epoch += 1;
+      inFlight = undefined;
+      fetchedAt = -Infinity;
+      store.setState(EMPTY_FEED);
+    },
+  };
+};
 
 /**
 Marks notifications read here at once (every call) and tells the server, each id once: a server
@@ -166,18 +219,22 @@ live socket, answered through the same endpoint every channel uses.
 */
 export const createNotificationFeed = ({
   api,
+  now = () => Date.now(),
   source,
 }: {
   readonly api: ApiClient;
+  readonly now?: () => number;
   readonly source: "app" | "web";
 }): NotificationFeed => {
-  const store = createStore<FeedState>(() => ({ deliveries: {}, items: [], status: "idle" }));
-  const deps: FeedDeps = { api, source, store };
-  const refresh = refreshOf(deps);
+  const store = createStore<FeedState>(() => EMPTY_FEED);
+  const deps: FeedDeps = { api, now, source, store };
+  const { refresh, refreshUnlessFresh, reset } = refreshesOf(deps);
   return {
     markRead: markReadOf(deps),
     receive: receiveOf(deps, refresh),
     refresh,
+    refreshUnlessFresh,
+    reset,
     resolve: resolveOf(deps),
     skipEvent: skipEventOf(deps, refresh),
     store,

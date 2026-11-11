@@ -1,3 +1,4 @@
+import { enAccount } from "./en/account.ts";
 import { enBoard } from "./en/board.ts";
 import { enDecisions } from "./en/decisions.ts";
 import { enDev } from "./en/dev.ts";
@@ -5,6 +6,7 @@ import { enDevices } from "./en/devices.ts";
 import { enInput } from "./en/input.ts";
 import { enLibrary } from "./en/library.ts";
 import { enNotify } from "./en/notify.ts";
+import { enOta } from "./en/ota.ts";
 import { enServer } from "./en/server.ts";
 import { enSessions } from "./en/sessions.ts";
 import { enSettings } from "./en/settings.ts";
@@ -14,12 +16,14 @@ import { enTime } from "./en/time.ts";
 /** Source catalog: the keys here define `MessageKey`; every other language mirrors them. */
 export const en = {
   ...enShell,
+  ...enAccount,
   ...enDevices,
   ...enBoard,
   ...enInput,
   ...enLibrary,
   ...enTime,
   ...enNotify,
+  ...enOta,
   ...enDecisions,
   ...enServer,
   ...enSettings,

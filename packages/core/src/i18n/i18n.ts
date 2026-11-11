@@ -44,6 +44,71 @@ export const countryName = (code: string, language: Language): string => {
 };
 
 /**
+What a zone's long generic name carries that a sentence does not need: Russian data names a zone
+without summer time «Москва, стандартное время», and its short name is English in browsers
+(«Moscow»), so the long one is cut to «Москва».
+*/
+const ZONE_TAIL: Readonly<Record<Language, null | RegExp>> = {
+  en: null,
+  ru: /, стандартное время$/u,
+};
+
+/** The city an IANA id ends in («America/New_York» → «New York»); `UTC` for the UTC ids. */
+const zoneCity = (tz: string): string => {
+  const city = (tz.split("/").at(-1) ?? tz).replaceAll("_", " ");
+  return /^(?:UTC|UCT|GMT|Zulu|Universal)$/u.test(city) ? "UTC" : city;
+};
+
+/**
+A time zone the way people name it, at `atIso` («Eastern Time», «Москва»), never its IANA id
+(«Время читается в поясе Europe/Moscow», QA R28-08). Where the platform cannot name it (Hermes'
+`Intl`, an unknown id) or only gives an offset («GMT+00:00»), the id's city stands in.
+*/
+export const zoneName = (tz: string, language: Language, atIso: string): string => {
+  try {
+    const name = new Intl.DateTimeFormat(language, {
+      timeZone: tz,
+      timeZoneName: "longGeneric",
+    })
+      .formatToParts(new Date(atIso))
+      .find((part) => part.type === "timeZoneName")?.value;
+    if (name === undefined || name.startsWith("GMT")) {
+      return zoneCity(tz);
+    }
+    const tail = ZONE_TAIL[language];
+    return tail === null ? name : name.replace(tail, "");
+  } catch {
+    return zoneCity(tz);
+  }
+};
+
+/**
+Where something came from, as people write a place: the city, then the country in the reader's
+language («Columbus, Соединённые Штаты»); a part not reported is left out. The city is Cloudflare's
+own spelling (it reports English names only, and no gazetteer is shipped to translate them).
+Settings' session rows, the feed's sign-in and the Telegram notice all name a place through this
+(QA PR55-1-17: two copies wrote «Соединённые Штаты, Columbus»).
+*/
+export const placeName = (
+  {
+    city,
+    country,
+  }: {
+    readonly city?: null | string | undefined;
+    readonly country?: null | string | undefined;
+  },
+  language: Language,
+): string =>
+  [
+    city ?? "",
+    country === null || country === undefined || country === ""
+      ? ""
+      : countryName(country, language),
+  ]
+    .filter((part) => part !== "")
+    .join(", ");
+
+/**
 `{count}` is the one parameter name for a number of things shown to the person: a numeric one is
 written the way `formatCount` writes it (`1 284`), so no caller formats it by hand.
 */

@@ -1,16 +1,22 @@
-import type { HistoryEntry, NowRow } from "@pace/client";
+import type { HistoryEntry, HistoryError, HistoryViewModel, NowRow } from "@pace/client";
+import type { HistoryResource } from "@pace/client/react";
 
-import { usePace, useT } from "#app/app-state.tsx";
+import { useIsAccountUnknown, usePace, useT } from "#app/app-state.tsx";
+import { errorText } from "#app/format/action-error.ts";
 import { zonedText } from "#app/format/time.ts";
 import { PeriodStepper } from "#app/shared/period-stepper.tsx";
 import { useOpenTask } from "#app/shared/task-opener.tsx";
 import { useBack } from "#app/shared/use-back.ts";
+import { useBlockRetry } from "#app/shared/use-block-retry.ts";
 import { instantParam, useSearchParam } from "#app/shared/use-search-param.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
+import { Button } from "#app/ui/button.tsx";
 import { EmptyState } from "#app/ui/empty-state.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
 import { type ListSection, SectionedList } from "#app/ui/sectioned-list.tsx";
+import { Skeleton } from "#app/ui/skeleton.tsx";
+import { useSyncRetryReason } from "#app/ui/sync-frame.tsx";
 import { addMinutesIso } from "@pace/core";
 
 import { EventRow } from "./event-row.tsx";
@@ -40,6 +46,84 @@ const withLatest = (events: readonly HistoryEntry[]): readonly Row[] => {
   });
 };
 
+type Pending =
+  | { readonly status: "failed"; readonly error: HistoryError; readonly retry: () => void }
+  | { readonly status: "loading" };
+
+/**
+The complete source is still loading, or its load failed: never an empty board in its place, since
+a partial copy (a checkpoint and its tail) cannot say what the board was. A failure says so at once;
+its Retry is the sync line's while that offers one (QA PR55-1-09), and the load runs again when
+the line goes.
+*/
+const HistoryPending = ({ resource }: { readonly resource: Pending }) => {
+  const t = useT();
+  const retry = useBlockRetry({
+    isFailed: resource.status === "failed",
+    retry: resource.status === "failed" ? resource.retry : NOTHING,
+  });
+  return resource.status === "loading" ? (
+    <Skeleton label={t("history.loading")} rows={6} />
+  ) : (
+    <EmptyState
+      action={
+        retry === null ? null : (
+          <Button onPress={retry} size="small" variant="secondary">
+            {t("common.retry")}
+          </Button>
+        )
+      }
+      isKnown
+      title={errorText(t, resource.error)}
+    />
+  );
+};
+
+const NOTHING = (): void => undefined;
+
+/**
+What the page shows of the history: a copy whose first sync ended without success holds none of the
+account, so its empty history is no answer; the page says the history did not load, not grey rows
+for good (QA PR55-1-02). The sync line's Retry loads it; once a pull succeeds, the history shows.
+*/
+const usePageHistory = (history: HistoryResource): HistoryResource | Pending => {
+  const isUnknown = useIsAccountUnknown();
+  const reason = useSyncRetryReason();
+  if (!isUnknown || reason === null || history.status !== "ready") {
+    return history;
+  }
+  return {
+    error: reason === "offline" ? "history/offline" : "history/unavailable",
+    retry: NOTHING,
+    status: "failed",
+  };
+};
+
+/** The snapshot of the board at the moment, then the events up to `at` (all of them at "now"). */
+const historySections = (
+  history: HistoryViewModel,
+  { at, when }: { readonly at: null | string; readonly when: string },
+  t: ReturnType<typeof useT>,
+): readonly ListSection<Row>[] => {
+  // At "now" every event shows (the clock ticks by the minute; a fresh undo is not later).
+  const events =
+    at === null
+      ? history.events
+      : history.events.filter((entry) => Date.parse(entry.occurredAt) <= Date.parse(at));
+  return [
+    {
+      key: "tasks",
+      rows: history.board.rows.map((row): Row => ({ kind: "task", row })),
+      title: t("history.snapshot", { when }),
+    },
+    {
+      key: "events",
+      rows: withLatest(events),
+      title: at === null ? t("history.events") : t("history.eventsUntil", { when }),
+    },
+  ];
+};
+
 /** The moment the address asks for; a malformed one, or one not yet come, is now (`null`). */
 const momentOf = (param: null | string, now: string): null | string => {
   const asked = instantParam(param);
@@ -67,7 +151,7 @@ const MomentStepper = ({
     <PeriodStepper
       isAway={at !== null}
       label={when}
-      nextLabel={t("history.dayForward")}
+      nextLabel={t("day.next")}
       onNext={
         at === null
           ? null
@@ -81,7 +165,7 @@ const MomentStepper = ({
       onToday={() => {
         onAt(null);
       }}
-      previousLabel={t("history.dayBack")}
+      previousLabel={t("day.previous")}
       shortLabel={shortWhen}
       todayLabel={t("period.today")}
     />
@@ -103,7 +187,7 @@ export const HistoryScreen = () => {
   const [atParam, setAt] = useSearchParam("at");
   const at = momentOf(atParam, now);
   const instant = at ?? now;
-  const history = hooks.useHistory(instant);
+  const history = usePageHistory(hooks.useHistory(instant));
   const when = zonedText({ at: instant, mode: "datetime", tz: viewer.deviceTz }, viewer);
   const shortWhen = new Intl.DateTimeFormat(viewer.language, {
     day: "numeric",
@@ -112,23 +196,8 @@ export const HistoryScreen = () => {
     month: "numeric",
     timeZone: viewer.deviceTz,
   }).format(new Date(instant));
-  // At "now" every event shows (the clock ticks by the minute; a fresh undo is not later).
-  const events =
-    at === null
-      ? history.events
-      : history.events.filter((entry) => Date.parse(entry.occurredAt) <= Date.parse(at));
-  const sections: readonly ListSection<Row>[] = [
-    {
-      key: "tasks",
-      rows: history.board.rows.map((row): Row => ({ kind: "task", row })),
-      title: t("history.snapshot", { when }),
-    },
-    {
-      key: "events",
-      rows: withLatest(events),
-      title: at === null ? t("history.events") : t("history.eventsUntil", { when }),
-    },
-  ];
+  const sections =
+    history.status === "ready" ? historySections(history.value, { at, when }, t) : [];
   return (
     <Screen
       header={
@@ -143,7 +212,13 @@ export const HistoryScreen = () => {
       }
       scroller={(scroll) => (
         <SectionedList
-          empty={<EmptyState title={t(at === null ? "history.emptyAccount" : "history.emptyAt")} />}
+          empty={
+            history.status === "ready" ? (
+              <EmptyState title={t(at === null ? "history.emptyAccount" : "history.emptyAt")} />
+            ) : (
+              <HistoryPending resource={history} />
+            )
+          }
           renderRow={(row) =>
             row.kind === "event" ? (
               <EventRow entry={row.entry} isLatest={row.isLatest} />

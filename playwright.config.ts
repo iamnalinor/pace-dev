@@ -14,6 +14,10 @@ const WEB_PORT = 4173;
 // Set E2E_BASE_URL to test an already running stack instead of starting the API and web here.
 const externalBaseUrl = process.env["E2E_BASE_URL"];
 const WEB_URL = externalBaseUrl ?? `http://localhost:${String(WEB_PORT)}`;
+const checkpointTestVars =
+  process.env["PACE_E2E_CHECKPOINTS"] === "1"
+    ? " --var PACE_VERSION:e2e-checkpoint --var PACE_HISTORY_CHECKPOINT_MODE:active"
+    : "";
 const isCi = process.env["CI"] !== undefined;
 // Wrangler's local state for the e2e Worker lives outside apps/api so a run never reuses
 // yesterday's events. Absolute: the commands below run from the root and from apps/api.
@@ -86,7 +90,7 @@ export default defineConfig({
             command: [
               `rm -rf ${E2E_STATE_DIR}`,
               `bunx wrangler d1 migrations apply DB --local --env dev --config apps/api/wrangler.jsonc --persist-to ${E2E_STATE_DIR}`,
-              `bun run --cwd apps/api dev -- --env dev --persist-to ${E2E_STATE_DIR} --var ENVIRONMENT:test --var WEB_ORIGIN:${WEB_URL} --var ALLOWED_TELEGRAM_IDS:${E2E_TELEGRAM_IDS} --var LLM_PROVIDER:fake`,
+              `bun run --cwd apps/api dev -- --env dev --persist-to ${E2E_STATE_DIR} --var ENVIRONMENT:test --var WEB_ORIGIN:${WEB_URL} --var ALLOWED_TELEGRAM_IDS:${E2E_TELEGRAM_IDS} --var LLM_PROVIDER:fake${checkpointTestVars}`,
             ].join(" && "),
             reuseExistingServer: !isCi,
             url: `http://localhost:${String(API_PORT)}/api/health`,

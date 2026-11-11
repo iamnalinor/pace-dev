@@ -74,14 +74,14 @@ const readHead = async (response: Response): Promise<string> => {
   return new TextDecoder().decode(Buffer.concat(chunks).subarray(0, MAX_BYTES));
 };
 
-export type Fetcher = (input: string, init: RequestInit) => Promise<Response>;
+export type PreviewFetch = (input: string, init: RequestInit) => Promise<Response>;
 
 /**
 Reads a page's head to name its link. Never throws: an unreachable page or a non-HTML
 answer yields a preview with only the host. Private addresses are refused by the
 Worker runtime (`global_fetch_strictly_public`).
 */
-export const fetchPreview = async (url: string, fetcher: Fetcher): Promise<LinkPreview> => {
+export const fetchPreview = async (url: string, fetcher: PreviewFetch): Promise<LinkPreview> => {
   const base = { host: linkHost(url), icon: null, title: null, url };
   try {
     const response = await fetcher(url, {

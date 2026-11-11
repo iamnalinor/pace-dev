@@ -262,6 +262,18 @@ describe("Pressable (the kit's state layer, spec §3.7)", () => {
     expect(screen.getByText("Chip")).toBeOnTheScreen();
   });
 
+  it("centres what it draws inside a visual: a tonal Stop's square sat at its disc's top-left (QA PR55-1-03, bug-lessons 340)", async () => {
+    await renderLight(
+      <Pressable label="Stop" onPress={jest.fn()} role="button" shape="pill" visual="size-8">
+        <Text>■</Text>
+      </Pressable>,
+    );
+    const visual = screen.getByTestId("pressable-visual");
+    expect(String(visual.props["className"]).split(" ")).toEqual(
+      expect.arrayContaining(["items-center", "justify-center"]),
+    );
+  });
+
   it("gives its corners from shape (a radius token), so ripple, overlay and ring share them", async () => {
     await renderLight(
       <Pressable onPress={jest.fn()} role="button" shape="md">

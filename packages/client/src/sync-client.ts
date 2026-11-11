@@ -1,6 +1,6 @@
 import { createStore, type StoreApi } from "zustand/vanilla";
 
-import { err, type Result } from "@pace/core";
+import { err, type LogHead, type Result } from "@pace/core";
 
 import type { PullPage } from "./sync-transport.ts";
 
@@ -44,6 +44,14 @@ export type SyncClient = {
   page the log already holds (one that waited for a run to finish) changes nothing.
   */
   readonly ingestLive: (page: PullPage) => Promise<void>;
+  /**
+  A socket connected and its server said where its log stands: a run (`soon`) only when the copy
+  is not there yet (another store, a lower cursor), holds writes to send, or the last run failed
+  (its success clears the offline line); a copy the start's pull just brought there asks nothing
+  (QA PR55-1-12: the same pull twice at every load). A run in flight is waited for and judged
+  after: its failure asks a run, its success that reached the head asks none (class 370).
+  */
+  readonly catchUpTo: (head: LogHead) => Promise<void>;
   /**
   Lets the run in flight finish (waited for at most `HOLD_WAIT_MS`), then starts none (every call
   gets `stopped`, the loop waits without ticking) until the returned `release`, or `HOLD_MAX_MS`
@@ -152,11 +160,8 @@ const createRunner = (deps: SyncDeps, status: StoreApi<SyncStatus>) => {
   After the run in flight has settled (each settles to a result: `runSync` catches), unless the
   sync was stopped meanwhile (signed out: it would go out with no token, fix round 5 V3).
   */
-  const after = async (
-    current: Promise<unknown>,
-    queuedIn: number,
-  ): Promise<Result<SyncSummary, string>> => {
-    await current;
+  const after = async (previous: Promise<unknown>, queuedIn: number) => {
+    await previous;
     if (queuedIn !== epoch || holds.isHeld()) {
       return err(SYNC_STOPPED);
     }
@@ -168,6 +173,7 @@ const createRunner = (deps: SyncDeps, status: StoreApi<SyncStatus>) => {
     epoch += 1;
     next = undefined;
   };
+  const current = () => ({ run: inFlight });
   return {
     dropWaiting,
     failures: record.failures,
@@ -178,11 +184,11 @@ const createRunner = (deps: SyncDeps, status: StoreApi<SyncStatus>) => {
     hold: async (): Promise<() => void> => {
       const release = holds.add();
       dropWaiting();
-      const drained = drain(() => ({ run: inFlight }));
-      await settledWithin(drained, HOLD_WAIT_MS);
+      await settledWithin(drain(current), HOLD_WAIT_MS);
       return release;
     },
     isHeld: holds.isHeld,
+    current, // The run in flight, if any (see `drain`).
     /** Applies a live page that fits; true when a pull is needed instead. */
     ingestLive: async (page: PullPage): Promise<boolean> =>
       await serial(async () => await shouldPullFor(deps, page)),
@@ -321,6 +327,26 @@ export const createSyncClient = (deps: SyncDeps): SyncClient => {
     },
     setInterval: loop.setInterval,
     soon: loop.soon,
+    catchUpTo: async (head) => {
+      // A run in flight (a direct `syncNow` of the return to the app) decides first: one that
+      // fails schedules no backoff of its own, and one that succeeds may move the cursor to the
+      // head, so judging before it settles either kept the offline line up until the poll or
+      // pulled the same nothing twice (class 370).
+      await drain(runner.current);
+      // A last run that failed still runs: its success is what clears the offline line.
+      if (status.getState().lastError === null) {
+        try {
+          const meta = await deps.store.readMeta();
+          const pending = await deps.store.listPending();
+          if (meta.storeId === head.storeId && meta.cursor >= head.seq && pending.length === 0) {
+            return;
+          }
+        } catch {
+          // The copy could not be read: a run finds out what is wrong.
+        }
+      }
+      loop.soon();
+    },
     start: (options) => {
       loop.start(options.intervalMs);
     },

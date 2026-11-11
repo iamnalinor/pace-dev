@@ -1,23 +1,15 @@
 import { z } from "zod";
 
+import { type FirebaseServiceAccount, parseFirebaseServiceAccount } from "@pace/core";
+
+import { type FirebaseBindings, firebasePolicyVerdict } from "./firebase-config.ts";
 import { createLogger } from "./logger.ts";
-
-/** The parts of a Firebase service account key (the JSON file) that sending needs. */
-const ServiceAccountSchema = z.object({
-  project_id: z.string().min(1),
-  client_email: z.string().min(1),
-  private_key: z.string().min(1),
-  private_key_id: z.string().optional(),
-  token_uri: z.url().default("https://oauth2.googleapis.com/token"),
-});
-
-export type ServiceAccount = z.output<typeof ServiceAccountSchema>;
 
 type Fetch = (input: string, init: RequestInit) => Promise<Response>;
 
 /** Where push messages go: the account that signs for them and the transport. */
 export type FcmTarget = {
-  readonly account: ServiceAccount;
+  readonly account: FirebaseServiceAccount;
   readonly fetch: Fetch;
   /** Which credentials these are (the account and its key's id): new ones are tried afresh. */
   readonly fingerprint: string;
@@ -55,30 +47,26 @@ The push target the Worker's secret describes, or `null` when `FIREBASE_SERVICE_
 missing or unreadable (push is off; said once per isolate).
 */
 export const fcmTargetOf = (
-  env: { readonly FIREBASE_SERVICE_ACCOUNT?: string | undefined },
+  env: FirebaseBindings,
   fetcher: Fetch = async (input, init) => await fetch(input, init),
 ): FcmTarget | null => {
+  if (!firebasePolicyVerdict(env).ok) {
+    return null;
+  }
   const raw = env.FIREBASE_SERVICE_ACCOUNT;
-  const parsed = (() => {
-    try {
-      return raw === undefined || raw === ""
-        ? null
-        : ServiceAccountSchema.safeParse(JSON.parse(raw));
-    } catch {
-      return null;
-    }
-  })();
-  if (parsed?.success !== true) {
+  const parsed = raw === undefined || raw === "" ? null : parseFirebaseServiceAccount(raw);
+  if (parsed?.ok !== true) {
     if (!warned.missing) {
       warned.missing = true;
       createLogger("info").info("Push is off: FIREBASE_SERVICE_ACCOUNT is not set or not readable");
     }
     return null;
   }
+  const account = parsed.value;
   return {
-    account: parsed.data,
+    account,
     fetch: fetcher,
-    fingerprint: `${parsed.data.client_email}#${parsed.data.private_key_id ?? ""}`,
+    fingerprint: `${account.client_email}#${account.private_key_id ?? ""}`,
   };
 };
 
@@ -98,7 +86,7 @@ const pemBytes = (pem: string): Uint8Array =>
   );
 
 /** A JWT signed RS256 with the service account's key: the OAuth2 grant assertion. */
-const assertion = async (account: ServiceAccount, nowS: number): Promise<string> => {
+const assertion = async (account: FirebaseServiceAccount, nowS: number): Promise<string> => {
   const header = textUrl(JSON.stringify({ alg: "RS256", typ: "JWT" }));
   const claims = textUrl(
     JSON.stringify({
@@ -124,7 +112,7 @@ const assertion = async (account: ServiceAccount, nowS: number): Promise<string>
   return `${header}.${claims}.${base64Url(new Uint8Array(signature))}`;
 };
 
-const signed = async (account: ServiceAccount, nowMs: number): Promise<null | string> => {
+const signed = async (account: FirebaseServiceAccount, nowMs: number): Promise<null | string> => {
   try {
     return await assertion(account, Math.floor(nowMs / 1000));
   } catch {

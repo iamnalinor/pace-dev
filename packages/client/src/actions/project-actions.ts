@@ -12,9 +12,9 @@ import {
   type ActionDeps,
   type ActionResult,
   emit,
-  fromStoreAll,
   type ProjectNameError,
   stamp,
+  withCompleteHistory,
 } from "./deps.ts";
 
 export type ProjectDraft = { readonly name: string; readonly color: ProjectColorName };
@@ -80,16 +80,20 @@ const patchPayload = (projectId: string, patch: ProjectPatch) => {
 };
 
 export const projectActions = (deps: ActionDeps): ProjectActions => ({
-  undoArchive: async (projectId, archiveId) => {
-    const staged = await deps.state.stage(
-      [{ occurredAt: deps.clock.now(), payload: { targetId: archiveId }, type: "event.revoked" }],
-      () =>
-        archiveInEffect(deps.state.store.getState().events, projectId) === archiveId
-          ? null
-          : "action/nothing-to-do",
-    );
-    return fromStoreAll(staged.ok ? await staged.value.persisted : staged);
-  },
+  // A revocation needs the source: the archive may sit in a checkpoint's base. The archive in
+  // effect is read after that wait, in the write queue (classes 118, 222).
+  undoArchive: withCompleteHistory(
+    deps,
+    async (projectId: string, archiveId: string) =>
+      await emit(
+        deps,
+        [stamp(deps, { payload: { targetId: archiveId }, type: "event.revoked" })],
+        () =>
+          archiveInEffect(deps.state.store.getState().events, projectId) === archiveId
+            ? null
+            : "action/nothing-to-do",
+      ),
+  ),
   createProject: async ({ color, name }) => {
     const problem = projectNameError(deps.state.store.getState().projects, name);
     if (problem !== null) {

@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it, vi } from "vitest";
 
-import type { LlmHealth } from "./health-object.ts";
+import type { LlmHealth } from "../../../tests/host.ts";
 import type { Health, Verdict } from "./health.ts";
 
 import {
@@ -55,13 +55,20 @@ const broken = async (): Promise<never> => {
 
 describe("objectHealth", () => {
   it("keeps both penalties when two isolates record at once", async () => {
-    const first = objectHealth(env.LLM_HEALTH, { cache: {} });
-    const second = objectHealth(env.LLM_HEALTH, { cache: {} });
+    const first = objectHealth(() => env.LLM_HEALTH.get(env.LLM_HEALTH.idFromName("global")), {
+      cache: {},
+    });
+    const second = objectHealth(() => env.LLM_HEALTH.get(env.LLM_HEALTH.idFromName("global")), {
+      cache: {},
+    });
     await Promise.all([
       first.record([unwell("both-one")], NOW),
       second.record([unwell("both-two")], NOW),
     ]);
-    const health = await objectHealth(env.LLM_HEALTH, { cache: {} }).read();
+    const health = await objectHealth(
+      () => env.LLM_HEALTH.get(env.LLM_HEALTH.idFromName("global")),
+      { cache: {} },
+    ).read();
     expect(health).toHaveProperty("both-one");
     expect(health).toHaveProperty("both-two");
   });
@@ -73,7 +80,10 @@ describe("objectHealth", () => {
         await env.LLM_HEALTH.get(env.LLM_HEALTH.idFromName("global")).record(verdicts, now),
     });
     let clock = 0;
-    const health = objectHealth(namespace, { cache: {}, clock: () => clock });
+    const health = objectHealth(() => namespace.get(namespace.idFromName("global")), {
+      cache: {},
+      clock: () => clock,
+    });
     await health.read();
     clock = HEALTH_CACHE_MS - 1;
     await health.read();
@@ -97,7 +107,7 @@ describe("objectHealth", () => {
         return {};
       },
     });
-    const health = objectHealth(namespace, { cache: {} });
+    const health = objectHealth(() => namespace.get(namespace.idFromName("global")), { cache: {} });
     await health.record([answered("quiet-good")], NOW);
     await health.record([answered("quiet-good"), answered("quiet-other")], NOW);
     expect(calls.record).toBe(0);
@@ -107,7 +117,9 @@ describe("objectHealth", () => {
     const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
     try {
       const { namespace } = fakeNamespace({ read: broken, record: broken });
-      const health = objectHealth(namespace, { cache: {} });
+      const health = objectHealth(() => namespace.get(namespace.idFromName("global")), {
+        cache: {},
+      });
       expect(await health.read()).toEqual({});
       await expect(health.record([unwell("lost")], NOW)).resolves.toBeUndefined();
       const lines = errors.mock.calls.map(
@@ -133,7 +145,11 @@ describe("objectHealth", () => {
         record: broken,
       });
       let clock = 0;
-      const health = objectHealth(namespace, { cache: {}, clock: () => clock, readTimeoutMs: 20 });
+      const health = objectHealth(() => namespace.get(namespace.idFromName("global")), {
+        cache: {},
+        clock: () => clock,
+        readTimeoutMs: 20,
+      });
       expect(await health.read()).toEqual({});
       expect(await health.read()).toEqual({});
       expect(calls.read).toBe(1);
@@ -183,7 +199,7 @@ describe("objectHealth", () => {
     });
     const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
     try {
-      const health = objectHealth(namespace, { cache });
+      const health = objectHealth(() => namespace.get(namespace.idFromName("global")), { cache });
       await health.record([unwell("unsaved")], NOW);
       expect(await health.read()).toEqual({});
     } finally {

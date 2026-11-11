@@ -50,6 +50,11 @@ describe("Icon (spec §3.6)", () => {
     },
   );
 
+  it("keeps its size beside a text that wraps (an SVG shrinks in a web row by default)", async () => {
+    await renderLight(<Icon name="triangle-alert" size="inline" />);
+    expect(mockSeen.at(-1)).toMatchObject({ style: { flexShrink: 0 } });
+  });
+
   it("is a control icon in label.secondary unless told, and takes its tone's colour", async () => {
     await renderLight(
       <>

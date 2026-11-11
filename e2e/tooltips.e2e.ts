@@ -110,9 +110,9 @@ test("Done tells of its other times on hover, and a button under it opens them",
     page.getByRole("tooltip").filter({ hasText: "Закрывает задачу сейчас." }),
   ).toBeVisible();
   await page.mouse.move(0, 0);
-  const other = page.getByRole("button", { name: "Другое время или итог…" });
+  const other = page.getByRole("button", { name: "Другое время или итог" });
   // It says what it is in words, under Focus and Done (design review B1).
-  await expect(other).toHaveText("Другое время или итог…");
+  await expect(other).toHaveText("Другое время или итог");
   await other.click();
   await expect(page.locator('[data-pace-surface="sheet"]')).toBeVisible();
   // The outcome is one choice in sight (QA 20 L6).

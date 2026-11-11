@@ -1,15 +1,13 @@
-import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { endpoints, newId, type PoolNotification } from "@pace/core";
 
-import type { UserStore } from "../src/user-store/user-store.ts";
-
 import { findUserIdByTelegramId } from "../src/auth/users.ts";
+import { d1 } from "../src/platform/cloudflare/sqlite.ts";
 import { hmacSha256Hex } from "../src/shared/crypto.ts";
-import { d1 } from "../src/shared/db/d1.ts";
 import { answerOf, call, json, loginAsDev, pushEvents, readJson } from "./helpers.ts";
+import { runInUserStore as runInDurableObject, type UserStore } from "./host.ts";
 import { obtainToken } from "./oauth-flow.ts";
 
 /* eslint-disable sonarjs/no-hardcoded-ip -- the addresses Cloudflare and Telegram report are these tests' fixture */
@@ -263,7 +261,7 @@ describe("a sign-in notice in Telegram", () => {
     const messages = sent.filter((entry) => entry.method === "sendMessage");
     expect(messages).toHaveLength(1);
     expect(messages[0]?.body["text"]).toBe(
-      "🔐 You signed in from IP 1.2.3.4 · Germany, Berlin · Chrome on macOS",
+      "🔐 You signed in from IP 1.2.3.4 · Berlin, Germany · Chrome on macOS",
     );
     // Plain text: nothing the client named is read as markup.
     expect(messages[0]?.body).not.toHaveProperty("parse_mode");
@@ -276,7 +274,7 @@ describe("a sign-in notice in Telegram", () => {
     await adminOf("1002", "ru");
     await widgetLogin(1002, fromBerlin(CHROME_MAC));
     const message = sent.find((entry) => entry.method === "sendMessage");
-    expect(message?.body["text"]).toBe("🔐 Вход с IP 1.2.3.4 · Германия, Berlin · Chrome on macOS");
+    expect(message?.body["text"]).toBe("🔐 Вход с IP 1.2.3.4 · Berlin, Германия · Chrome on macOS");
     expect(keyboardOf(message)?.[0]?.[0]?.["text"]).toBe("Это не я — завершить сеанс");
     await setLanguage(await loginAsDev("1002"), "en");
   });
@@ -322,7 +320,7 @@ describe("a deep-link sign-in", () => {
     expect(sent[0]?.body).toMatchObject({
       chat_id: String(ADA),
       message_id: reply?.messageId,
-      text: "🔐 You signed in from IP 1.2.3.4 · Germany, Berlin · Pixel 9a",
+      text: "🔐 You signed in from IP 1.2.3.4 · Berlin, Germany · Pixel 9a",
     });
     expect(keyboardOf(sent[0])).toEqual([
       [returnButton, { callback_data: `nr:${notice.id}`, text: NOT_ME }],
@@ -341,7 +339,7 @@ describe("a deep-link sign-in", () => {
     await json(`/api/auth/nonce/${nonce}`);
     const edit = sent.find((entry) => entry.method === "editMessageText");
     expect(edit?.body["text"]).toBe(
-      "🔐 You signed in from IP 1.2.3.4 · Germany, Berlin · <b>Your</b> *phone* _x_ [ok](https://evil.test)",
+      "🔐 You signed in from IP 1.2.3.4 · Berlin, Germany · <b>Your</b> *phone* _x_ [ok](https://evil.test)",
     );
     expect(edit?.body).not.toHaveProperty("parse_mode");
   });

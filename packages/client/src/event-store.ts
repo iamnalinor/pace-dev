@@ -1,32 +1,27 @@
 import type { Event } from "@pace/core";
 
+import type { CheckpointStore, CopyGuard } from "./checkpoint-store-types.ts";
+
 /**
 Persistence port for the local event log. Platforms implement it (IndexedDB on the
 web, SQLite in the app); `createMemoryEventStore` is the reference implementation.
 
-"Pending" events are local ones the server has not acknowledged yet (the outbox).
-`append` always adds to the outbox; the caller marks remote events synced right after.
-Next to the cursor the store keeps the server store's id, so the sync can tell when the
-server's data was reset and this copy must go, and the sync version the log was pulled under.
+"Pending" events are local ones the server has not acknowledged yet (the outbox). Next to the
+events the store keeps the copy's meta (`readMeta`): the cursor, the server store's id, the sync
+version the log was pulled under, its owner and its coverage. Every write names the copy it was
+made for (a `CopyGuard`), checked inside the write's own transaction: nothing reaches a copy that
+was dropped or changed hands meanwhile. The meta moves only with what it describes, through the
+guarded operations of `CheckpointStore`; the port has no way to set a cursor on its own.
 */
-export type EventStore = {
-  readonly listAll: () => Promise<readonly Event[]>;
-  /** Idempotent by `id`: an event already stored is left untouched. */
-  readonly append: (events: readonly Event[]) => Promise<void>;
-  readonly listPending: () => Promise<readonly Event[]>;
-  readonly markSynced: (ids: readonly string[]) => Promise<void>;
-  /** The server sequence number of the last pulled event (0 = never pulled). */
-  readonly getCursor: () => Promise<number>;
-  readonly setCursor: (seq: number) => Promise<void>;
-  /** The id of the server store the log came from (`null` = none confirmed yet). */
-  readonly getStoreId: () => Promise<null | string>;
-  readonly setStoreId: (storeId: string) => Promise<void>;
+export type EventStore = CheckpointStore & {
   /**
-  Which `SYNC_SCHEMA_VERSION` the log was pulled under (0 = before versions existed): a lower
-  one makes the sync pull the whole log again once (see `sync-client.ts`).
+  Adds local events to the log and the outbox. Idempotent by `id`: an event already stored is
+  left untouched. Throws `SyncError(COPY_CHANGED)` for a copy that is not `guard`'s any more.
   */
-  readonly getSyncVersion: () => Promise<number>;
-  readonly setSyncVersion: (version: number) => Promise<void>;
+  readonly append: (events: readonly Event[], guard: CopyGuard) => Promise<void>;
+  readonly listPending: () => Promise<readonly Event[]>;
+  /** Takes the ids out of the outbox (the server holds them); guarded as `append` is. */
+  readonly markSynced: (ids: readonly string[], guard: CopyGuard) => Promise<void>;
   /**
   Marks the copy as one session's (a mark of its token, never the token): written at sign-in,
   before the sync writes anything into it.

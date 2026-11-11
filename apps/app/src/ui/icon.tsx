@@ -166,6 +166,9 @@ on screen at every size, so a 16 and a 24 draw the same line. That is what lucid
 the viewBox stroke is worked out here instead. Hidden from assistive technology unless it carries
 a `label` (F-A11Y-19).
 */
+/** An icon keeps its size in a row: a web SVG shrinks beside a wrapping text by default. */
+const KEEP_SIZE = { flexShrink: 0 } as const;
+
 export const Icon = ({
   filled = false,
   hue,
@@ -184,6 +187,7 @@ export const Icon = ({
       color={color}
       size={pixels}
       strokeWidth={(SIZE.stroke * VIEW_BOX) / pixels}
+      style={KEEP_SIZE}
       {...(filled && { fill: color })}
       // lucide hides an icon unless it carries an `aria-*` or `role` prop.
       {...(label === undefined

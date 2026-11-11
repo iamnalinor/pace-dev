@@ -5,6 +5,7 @@ import { useStore } from "zustand";
 import { usePace, useT } from "#app/app-state.tsx";
 import { isBuildServer, serverStore } from "#app/platform/server-store.ts";
 import { switchServer } from "#app/platform/server.ts";
+import { useBusyLatch } from "#app/shared/use-busy-latch.ts";
 import { Button } from "#app/ui/button.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
@@ -16,9 +17,11 @@ import {
   type ServerUrlError,
 } from "@pace/core";
 
+import { configurationErrorKey } from "./configuration-error.ts";
+
 type Problem = InstanceError | ServerUrlError;
 
-const PROBLEM_KEY: Readonly<Record<Problem, MessageKey>> = {
+const PROBLEM_KEY: Readonly<Record<Extract<Problem, string>, MessageKey>> = {
   "client-outdated": "server.clientOutdated",
   insecure: "server.insecure",
   "invalid-url": "server.invalidUrl",
@@ -26,6 +29,9 @@ const PROBLEM_KEY: Readonly<Record<Problem, MessageKey>> = {
   "server-outdated": "server.serverOutdated",
   unreachable: "server.unreachable",
 };
+
+const problemKey = (problem: Problem): MessageKey =>
+  typeof problem === "object" ? configurationErrorKey(problem.reason) : PROBLEM_KEY[problem];
 
 /** One fact about the checked server: a quiet label and the server's own value, read as one. */
 const Fact = ({ label, value }: { readonly label: string; readonly value: string }) => (
@@ -92,6 +98,27 @@ const useServerCheck = () => {
   return { check, edit, phase, text };
 };
 
+const useServerMove = (onClose: () => void) => {
+  const runtime = usePace();
+  const [moveFailed, setMoveFailed] = useState(false);
+  // One move per press: a second tap while the log is cleared would switch twice.
+  const { isBusy: isMoving, run } = useBusyLatch();
+
+  const move = async (choice: Parameters<typeof switchServer>[1]): Promise<void> => {
+    setMoveFailed(false);
+    await run(async () => {
+      try {
+        await switchServer(runtime, choice);
+        onClose();
+      } catch {
+        setMoveFailed(true);
+      }
+    });
+  };
+
+  return { isMoving, move, moveFailed };
+};
+
 /**
 "Change server" (signed out, from the login screen): the address of another Pace server, checked
 against `/api/instance` (it must be a Pace this app fits) before the app moves to it; or back to
@@ -99,23 +126,11 @@ the build's own server. Moving drops this phone's local log and any stored token
 */
 export const ChangeServerSheet = ({ onClose }: { readonly onClose: () => void }) => {
   const t = useT();
-  const runtime = usePace();
   const origin = useStore(serverStore, (state) => state.origin);
   const { check, edit, phase, text } = useServerCheck();
-  const [isMoving, setIsMoving] = useState(false);
-  // A latch read synchronously: two taps in one frame both see the state still false.
-  const movingRef = useRef(false);
-
-  const move = async (choice: Parameters<typeof switchServer>[1]): Promise<void> => {
-    // One move per press: a second tap while the log is cleared would switch twice.
-    if (movingRef.current) {
-      return;
-    }
-    movingRef.current = true;
-    setIsMoving(true);
-    await switchServer(runtime, choice);
-    onClose();
-  };
+  const { isMoving, move, moveFailed } = useServerMove(onClose);
+  const checkError = phase.kind === "refused" ? t(problemKey(phase.problem)) : null;
+  const error = moveFailed ? t("server.moveFailed") : checkError;
 
   return (
     <Sheet
@@ -132,7 +147,7 @@ export const ChangeServerSheet = ({ onClose }: { readonly onClose: () => void })
           autoCapitalize="none"
           autoComplete="url"
           autoCorrect={false}
-          error={phase.kind === "refused" ? t(PROBLEM_KEY[phase.problem]) : null}
+          error={error}
           inputMode="url"
           keyboardType="url"
           label={t("server.address")}

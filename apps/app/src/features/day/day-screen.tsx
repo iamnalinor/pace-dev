@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { View } from "react-native";
 import Animated from "react-native-reanimated";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { IS_PHONE } from "#app/platform/device.ts";
+import { focusPlaceById } from "#app/platform/focus-place.ts";
 import { ScreenTimeSection } from "#app/shared/activity-usage.tsx";
+import { useBlockRetry } from "#app/shared/use-block-retry.ts";
 import { useSearchParam, useZonedDateParam } from "#app/shared/use-search-param.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { useWhereSat } from "#app/shared/use-where-sat.ts";
@@ -18,13 +20,13 @@ import { Screen } from "#app/ui/screen.tsx";
 import { Shell } from "#app/ui/shell.tsx";
 import { type DayEntry, type DayModel, dayRail } from "@pace/client";
 import { useUsageRead } from "@pace/client/react";
-import { addDaysIn, formatEyebrow } from "@pace/core";
+import { formatEyebrow, nextDayStartIn } from "@pace/core";
 
 import { ActivityPane } from "./activity-pane.tsx";
 import { ActivitySheet, type SheetTarget } from "./activity-sheet.tsx";
 import { DayNav } from "./day-nav.tsx";
 import { DayRail, NowMargin, type RowFrame, type RowFrames } from "./day-rail.tsx";
-import { EntryRow, LogPastRow, type SatOf } from "./day-rows.tsx";
+import { EntryRow, isTarget, LogPastRow, type SatOf } from "./day-rows.tsx";
 import { Totals } from "./day-totals.tsx";
 import * as Phone from "./phone-section.tsx";
 import { type DayPhone, useDayPhone } from "./use-day-phone.ts";
@@ -58,6 +60,9 @@ type RowsProps = {
   readonly onFrame: (key: string, frame: RowFrame) => void;
 };
 
+/** The id of a day's row on the page (the web's `id`): where focus goes back to (`closeSheet`). */
+const dayEntryId = (key: string): string => `day-entry-${key}`;
+
 /** One keyed row per entry, for the `Group` to put its one divider rule between. */
 const entryRows = ({
   entries,
@@ -77,9 +82,13 @@ const entryRows = ({
         exiting: ROW_EXIT,
         layout: ROW_LAYOUT,
       })}
+      nativeID={dayEntryId(entry.key)}
       onLayout={(event) => {
         const { height, y } = event.nativeEvent.layout;
-        onFrame(entry.key, { height, top: y });
+        // A hidden row (Day left behind on the web) measures nothing: its bar keeps its frame.
+        if (height > 0) {
+          onFrame(entry.key, { height, top: y });
+        }
       }}
       testID="day-entry"
     >
@@ -175,7 +184,8 @@ const DayPage = ({
   const phone = useDayPhone(day, now);
   const openingKeys = useOpeningKeys(day.date, day.entries);
   // One read of the day's usage for every part that shows it (QA round 21 L5).
-  const usageRead = useUsageRead(api, day.date, addDaysIn(day.date, 1, day.zone));
+  const usageRead = useUsageRead(api, day.date, nextDayStartIn(day.date, day.zone));
+  const usageRetry = useBlockRetry(usageRead);
   const sat = useWhereSat(usageRead.rows);
   return (
     <FirstSyncBody>
@@ -202,13 +212,20 @@ const DayPage = ({
       {IS_PHONE ? (
         <Phone.CalendarSection entries={day.entries} phone={phone} zone={day.zone} />
       ) : null}
-      <ScreenTimeSection
-        date={day.date}
-        key={day.date}
-        onRetry={usageRead.isFailed ? usageRead.retry : null}
-        usage={usageRead.rows}
-        zone={day.zone}
-      />
+      {/* The web records no screen time: the section shows there only for what a phone or a
+          computer sent (QA PR55-1-08: «0 мин · Нет данных» on every day), or for a read that
+          failed, since a computer may have sent some (R23-08, class 371): its Retry stays the
+          sync line's while the line offers one (`useBlockRetry`). */}
+      {IS_PHONE || usageRead.rows.length > 0 || usageRead.isFailed ? (
+        <ScreenTimeSection
+          date={day.date}
+          isFailed={usageRead.isFailed}
+          key={day.date}
+          onRetry={usageRetry}
+          usage={usageRead.rows}
+          zone={day.zone}
+        />
+      ) : null}
     </FirstSyncBody>
   );
 };
@@ -248,7 +265,7 @@ const useOpenedBlock = (
 One day of the time ledger: totals per category, the timeline on its notebook page with its gaps,
 edits. On a computer the editor opens in the inspector beside the day; on a phone, in a sheet.
 */
-export const DayScreen = () => {
+export const DayScreen = memo(function DayScreen() {
   const t = useT();
   const { hooks } = usePace();
   const isWide = useIsWide();
@@ -268,7 +285,13 @@ export const DayScreen = () => {
   };
   useOpenedBlock(day, setSheet);
   const closeSheet = (): void => {
+    // Opened from the address (Week's «Edit in Day»), the editor had no control to give focus back
+    // to: the row it edited takes it, where nothing else did (R27-09).
+    const edited = day.entries.find((entry) => isTarget(entry, sheet));
     setSheet(null);
+    if (edited !== undefined) {
+      focusPlaceById(dayEntryId(edited.key));
+    }
   };
   const screen = (
     <Screen
@@ -316,4 +339,4 @@ export const DayScreen = () => {
       onInspectorClose={closeSheet}
     />
   );
-};
+});

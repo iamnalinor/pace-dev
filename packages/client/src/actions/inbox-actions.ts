@@ -47,6 +47,10 @@ const sortingEvents = (deps: ActionDeps, task: Task, sorted: Suggestion): readon
 const discardInbox =
   (deps: ActionDeps): InboxActions["discardInbox"] =>
   async (taskId) => {
+    const complete = await deps.state.ensureHistory();
+    if (!complete.ok) {
+      return complete;
+    }
     const task = taskOf(deps, taskId);
     if (!task.ok) {
       return task;

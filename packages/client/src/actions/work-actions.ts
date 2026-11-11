@@ -17,6 +17,7 @@ import {
   stamp,
   taskOf,
   type When,
+  withCompleteHistory,
 } from "./deps.ts";
 import { type SubtaskForm, subtaskInputs } from "./task-actions.ts";
 
@@ -87,9 +88,10 @@ A closed task's marks stay as they are, like ticking one is refused there: an ol
 `task.submitted` often closed the task (`closes: true`), and revoking it would silently reopen it.
 Reopen the task first.
 */
-const unmarkDone =
-  (deps: ActionDeps): WorkActions["unmarkDone"] =>
-  async (taskId, subtaskId) => {
+const unmarkDone = (deps: ActionDeps): WorkActions["unmarkDone"] =>
+  // The marks to take back may sit in the part of the log a checkpoint left out. It is loaded
+  // first: the task is looked at after that wait, not before it (class 118).
+  withCompleteHistory(deps, async (taskId, subtaskId) => {
     const task = taskOf(deps, taskId);
     if (!task.ok) {
       return task;
@@ -99,7 +101,7 @@ const unmarkDone =
     }
     const corrections = undoneBy(deps, taskId, subtaskId);
     return corrections.length === 0 ? err("action/nothing-to-do") : await emit(deps, corrections);
-  };
+  });
 
 const closeTask =
   (deps: ActionDeps): WorkActions["closeTask"] =>

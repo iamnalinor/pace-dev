@@ -1,6 +1,5 @@
-import type { ReactNode } from "react";
-
 import { Redirect, useRouter } from "expo-router";
+import { memo, type ReactNode } from "react";
 
 import type { SharedIn } from "#app/platform/shared-line.ts";
 
@@ -121,7 +120,7 @@ Now on a phone; on a wide window the list with the picked task (or the task form
 `compose` is a share arriving on /add (or handed on to "/"); the composer is keyed by its arrival,
 so each share fills the line, the same text again included.
 */
-export const NowScreen = ({
+export const NowScreen = memo(function NowScreen({
   compose,
   lineDraftKey = "now.line",
   notesLineDraft = false,
@@ -134,7 +133,7 @@ export const NowScreen = ({
   readonly notesLineDraft?: boolean;
   /** New task arriving on /add: the empty form opens at once. */
   readonly opensForm?: boolean;
-}) => {
+}) {
   const router = useRouter();
   const isWide = useIsWide();
   const [picked, setPicked, forgetPicked] = usePickedTask();
@@ -172,4 +171,4 @@ export const NowScreen = ({
       )}
     </ComposerProvider>
   );
-};
+});

@@ -1,13 +1,13 @@
 import { useT } from "#app/app-state.tsx";
 import { PresetsList } from "#app/features/presets/presets-list.tsx";
-import { PushedScreen } from "#app/screens/pushed-screen.tsx";
+import { ListScreen } from "#app/screens/pushed-screen.tsx";
 import { FirstSyncBody } from "#app/ui/empty-state.tsx";
 import { Text } from "#app/ui/text.tsx";
 
 export const PresetsScreen = () => {
   const t = useT();
   return (
-    <PushedScreen title={t("presets.title")}>
+    <ListScreen title={t("presets.title")}>
       <Text className="mx-gutter mb-2 px-row-x" role="callout" tone="secondary">
         {t("settings.presets.hint")}
       </Text>
@@ -16,6 +16,6 @@ export const PresetsScreen = () => {
       <FirstSyncBody>
         <PresetsList />
       </FirstSyncBody>
-    </PushedScreen>
+    </ListScreen>
   );
 };

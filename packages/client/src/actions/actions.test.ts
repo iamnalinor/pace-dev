@@ -26,6 +26,7 @@ import {
 } from "@pace/core/testing";
 
 import { createMemoryEventStore } from "../adapters/memory-event-store.ts";
+import { seedSynced } from "../local-store.fake.ts";
 import { createAppState } from "../state.ts";
 import { repeatChangeProblem } from "../view-models/repeat-change.ts";
 import { ESTIMATE_BUCKET_MINUTES } from "./estimate-hints.ts";
@@ -508,6 +509,23 @@ describe("subtasks", () => {
     expect(taskOf(world, HW_ID)?.subtasks.find((item) => item.id === "s5")?.doneAt).not.toBeNull();
   });
 
+  it("refuses to take a mark back on a task closed while the history was loading (class 118)", async () => {
+    const world = await setupActions();
+    unwrap(await world.actions.markDone(HW_ID, "s5"));
+    world.state.setHistoryLoader(async () => {
+      // The seconds a hydration takes: the task is closed meanwhile (another tab, the sync).
+      unwrap(await world.actions.closeTask({ outcome: "done", taskId: HW_ID }));
+      return { ok: true, value: undefined };
+    });
+    const before = world.state.store.getState().log.length;
+    await expect(world.actions.unmarkDone(HW_ID, "s5")).resolves.toEqual({
+      error: "retro/task-closed",
+      ok: false,
+    });
+    expect(world.state.store.getState().log).toHaveLength(before + 1);
+    expect(taskOf(world, HW_ID)?.subtasks.find((item) => item.id === "s5")?.doneAt).not.toBeNull();
+  });
+
   it("adds subtasks with fresh ids", async () => {
     const world = await setupActions();
     const [added] = unwrap(
@@ -701,13 +719,15 @@ describe("presets", () => {
   });
 
   it("restores a preset two devices archived offline in one press, one batch (review M1)", async () => {
-    const world = await setupActions();
+    const store = createMemoryEventStore();
+    const world = await setupActions(undefined, store);
     const [archive] = unwrap(await world.actions.archivePreset("hw.algebra"));
     if (archive === undefined) {
       throw new Error("archived");
     }
     // The other device's archive of the same preset, synced in.
-    await world.state.ingest([{ ...archive, deviceId: "phone", id: "01KOTHERDEVICEARCHIVE00000" }]);
+    await seedSynced(store, [{ ...archive, deviceId: "phone", id: "01KOTHERDEVICEARCHIVE00000" }]);
+    await world.state.rematerialize();
     const restored = unwrap(await world.actions.restorePreset("hw.algebra"));
     expect(restored.map((event) => event.type)).toEqual(["event.revoked", "event.revoked"]);
     // One action: the revocations share their instants.
@@ -1076,6 +1096,12 @@ describe("settings", () => {
     expect(unwrap(await world.actions.ensureTimezone())).toHaveLength(1);
     expect(world.state.store.getState().settings.timezone).toBe(MOSCOW);
     expect(unwrap(await world.actions.ensureTimezone())).toHaveLength(0);
+  });
+
+  it("writes the device zone as the system's own setting, not the person's (QA PR55-1-11)", async () => {
+    const world = await setupActions([]);
+    const [zone] = unwrap(await world.actions.ensureTimezone());
+    expect(zone?.source).toBe("system");
   });
 
   it("updates the account settings", async () => {

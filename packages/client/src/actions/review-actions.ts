@@ -44,12 +44,21 @@ export const reviewActions = (deps: ActionDeps): ReviewActions => ({
     if (closed.value.confirmed) {
       return err("action/nothing-to-do");
     }
-    return await emit(deps, [
-      stamp(deps, {
-        type: "event.amended",
-        payload: { targetId: closed.value.eventId, patch: { confirmed: true } },
-      }),
-    ]);
+    // Asked again in the write queue, after the history's wait: two presses write one (118, 222).
+    const isConfirmed = (): boolean => {
+      const now = autoOutcomeOf(deps, taskId);
+      return !now.ok || now.value.eventId !== closed.value.eventId || now.value.confirmed;
+    };
+    return await emit(
+      deps,
+      [
+        stamp(deps, {
+          type: "event.amended",
+          payload: { targetId: closed.value.eventId, patch: { confirmed: true } },
+        }),
+      ],
+      () => (isConfirmed() ? "action/nothing-to-do" : null),
+    );
   },
   runReviewAction: async (item, key) => {
     const action = item.actions.find((candidate) => candidate.key === key);

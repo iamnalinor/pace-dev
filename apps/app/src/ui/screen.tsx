@@ -2,10 +2,10 @@ import { type ReactNode, useState } from "react";
 import { type NativeScrollEvent, type NativeSyntheticEvent, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { space } from "@pace/core";
+import { layout, space } from "@pace/core";
 
 import { cx } from "./cx.ts";
-import { useFloatPlace, useLiftToastAbove } from "./float-layer.ts";
+import { useFloatPlace, useLiftToastAbove, usePublishColumn } from "./float-layer.ts";
 import { useIsWide } from "./layout.ts";
 import { useIsScreenActive } from "./screen-active.ts";
 
@@ -22,6 +22,12 @@ const ANCHORED = {
   content: "w-full max-w-content self-start",
   wide: "w-full max-w-content-wide self-start",
 } as const;
+
+/** Each anchored column's width, the token its class reads (`max-w-content`, `max-w-content-wide`). */
+const COLUMN_WIDTH: Readonly<Record<keyof typeof ANCHORED, number>> = {
+  content: layout.contentMax,
+  wide: layout.contentMaxWide,
+};
 
 /**
 What a screen with a virtualised body (`SectionedList`) hands its list: the column, the foot room,
@@ -118,7 +124,10 @@ export const Screen = ({
   const insets = useSafeAreaInsets();
   // A toast floats above the footer (the time bar) instead of covering its buttons.
   const [footerHeight, setFooterHeight] = useState(0);
-  useLiftToastAbove(footer === undefined ? 0 : footerHeight, useIsScreenActive());
+  const isActive = useIsScreenActive();
+  useLiftToastAbove(footer === undefined ? 0 : footerHeight, isActive);
+  // The toast and the sync strip float over this column, not over the room beside it (PR55-1-14).
+  usePublishColumn(isWide ? COLUMN_WIDTH[anchor] : 0, isActive);
   // While a toast or the offline pill floats over the list's foot, the list scrolls that much further.
   const { inset } = useFloatPlace();
   const [isScrolled, setIsScrolled] = useState(false);

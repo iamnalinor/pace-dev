@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import {
   accountTz,
-  addDaysIn,
+  nextDayStartIn,
   ok,
   startOfDayIn,
   t,
@@ -62,7 +62,7 @@ export const dayTool = defineTool({
       const zone = accountTz(state, qctx);
       const anchor = args.date === undefined ? qctx.now : `${args.date}T12:00:00.000Z`;
       const from = startOfDayIn(anchor, zone);
-      const day = timeline(state.time, { from, now: qctx.now, to: addDaysIn(from, 1, zone) });
+      const day = timeline(state.time, { from, now: qctx.now, to: nextDayStartIn(from, zone) });
       return ok({
         structured: {
           alongside: [...day.alongside],
