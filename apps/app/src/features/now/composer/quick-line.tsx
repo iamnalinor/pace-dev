@@ -272,11 +272,11 @@ export const QuickLine = ({
         // The + slot is kept while + is away, so the field does not jump 42 px sideways when text
         // comes (design review 2 N5). Its width is the web target's (a tablet's 48 dp target is 4
         // wider, a shift too small to read).
-        <View aria-hidden className="-ml-4 w-hit-web" testID="line-plus-slot" />
+        <View aria-hidden className="w-hit-web" testID="line-plus-slot" />
       ) : (
-        // The glyph on the gutter, as the list's checks below are: the field gains the 12 px
-        // the target's padding took («Задача или…» at 320, QA PR55-1-15).
-        <View className="-ml-4" testID="line-edge-start">
+        // The glyph on the gutter, as the list's checks below are: the composer's frame steps out
+        // by the target's padding (composer.tsx), so the field gains it at 320 (QA PR55-1-15).
+        <View testID="line-edge-start">
           <LineButton
             disabled={isLocked}
             hotkey={HOTKEYS.newTask}
@@ -287,8 +287,8 @@ export const QuickLine = ({
         </View>
       )}
       <LineInput flow={flow} isFocused={isFocused} isLocked={isLocked} isReading={isReading} />
-      {/* Send's 40 circle ends on the gutter. */}
-      <View className="-mr-1 flex-row" testID="line-edge-end">
+      {/* Send's 40 circle ends on the gutter (the frame steps out by its 4 px, composer.tsx). */}
+      <View className="flex-row" testID="line-edge-end">
         <LineButton
           disabled={isIdle}
           hotkey={HOTKEYS.toInbox}

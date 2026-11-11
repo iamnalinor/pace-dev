@@ -107,6 +107,17 @@ describe("TaskRow's meta line on a phone (QA PR55-1-04, bug-lessons 341)", () =>
     expect(screen.getAllByText(/m\u{A0}left/u, asIs).length).toBeGreaterThan(0);
     expect(line).toHaveTextContent(/ · /u);
   });
+
+  it("moves the pieces under the tag when the tag and the importance leave them no room", async () => {
+    // At 320 «Здоровье · Приоритет» left the line 12 px: «осталось 6 ч 30 мин» stood one letter a
+    // line, clipped to «о с.» (worst-case sweep, bug-lessons 355). The row wraps, and the pieces
+    // keep their own width as the basis, so they start a line of their own rather than shrink.
+    const line = await renderDueSoon();
+    const holder = line.parent;
+    const row = holder?.parent;
+    expect(String(row?.props["className"]).split(" ")).toContain("flex-wrap");
+    expect(String(holder?.props["className"])).not.toMatch(/basis-0|grow/u);
+  });
 });
 
 describe("TaskRow's meta line on a computer", () => {

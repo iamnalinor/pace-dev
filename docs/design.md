@@ -89,6 +89,9 @@ not to whatever an older screen still shows.
 - [ ] New colour pairs (text, cues, layered tints) in `pairs.ts`, both themes, every ground
 - [ ] Every state the spec names exists and is tested; keyboard, focus ring, Space, targets
 - [ ] RU and EN, phone and desktop, light and dark shot and looked at; worst-case gallery entry
+- [ ] Every layout commit (a margin, a wrap, a width, an offset), in a fix wave too, runs
+      `e2e/worst-case.e2e.ts` and `e2e/overlays.e2e.ts` before it is committed: a jest test that
+      pins class names does not see a box leave its frame (bug-lessons 354, 355)
 - [ ] Taps instant (no await on the visual path), refusals answered with a sentence
 - [ ] `bun lint`, unit, app and the full e2e suite green; QA round; code review; bug-lessons entry
       for every bug found on the way, with its sweep and guard

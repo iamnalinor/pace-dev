@@ -3629,6 +3629,45 @@ New bugs go here with their class; a new class gets its own section above.
   of the 44 target around a 20 glyph and a 40 circle), the tiles lost `px-1`;
   `composer.test.tsx` pins the offsets.
 
+### 354. A control pulled out of the frame that owns it by a negative margin
+- **Bug.** Class 353's fix lined the composer's + and Send up with the gutter by pulling the buttons
+  out of the line (`-ml-4`, `-mr-1`). The composer's frame (`composer-card`) had no padding to give,
+  so the + target sat 16 px outside its card in every frame; during the unfold's grow the card
+  clips (`overflow: hidden`), so the frame cut its own control. CI's overlays e2e caught it
+  («New task · Alt+N» 16 px outside, `overlays.e2e.ts` :159 and :175).
+- **Missed because.** The wave's guard was a jest test that pinned the class names (`-ml-4`), the
+  implementation rather than the outcome, and the e2e containment sweep was not run before the
+  commit.
+- **Rule.** To move a control's visual edge onto the gutter, move the frame that owns the control
+  (its margin or padding), never the control out of its frame. A negative margin on a child is
+  right only where its parent's padding takes it back (a flush text button inside a padded row).
+- **Sweep and guard.** The composer's line frame now steps out of the gutter itself (`ml-0 mr-3`
+  in line shape, `mx-gutter` as the form's card); its buttons carry no offset and their
+  positions are unchanged (+ at 0–44, Send ending at 308 / 378). The other negative margins
+  (`Button` `FLUSH`, the header's Back `-ml-3`, the overlays' close `-mr-2`, the sheet's grabber
+  `-mt-3`, the screen-time Retry `-ml-4`, the count badge) each pull into a padding their surface
+  has (gutter, `sheet-pad`, `row-x`). `composer.test.tsx` asserts that the frame, not the buttons,
+  carries the offset; `overlays.e2e.ts` measures every box in the card in every frame.
+
+### 355. A shrinking text beside fixed siblings with no line of its own to go to
+- **Bug.** Class 341's fix let the meta line wrap between pieces inside its text, but the text still
+  shared one flex row with the tag (up to half the row) and the importance word (`shrink-0`). In
+  the gallery's narrow rows at 320 the text got 12 px: «осталось 6 ч 30 мин» stood one letter a
+  line and the two-line clamp showed «о с.»; at 390 «осталось 6 ч / 30 мин» broke inside a piece
+  (worst-case sweep 18>12, 19>7 in CI).
+- **Missed because.** The jest tests render the row without a width; the worst-case sweep at 320
+  that would have flagged it was not run before the commit.
+- **Rule.** A text that wraps inside itself still needs a line wide enough for its widest piece.
+  In a row with fixed siblings, the row wraps (`flex-wrap`) and the text keeps its own width as
+  its basis, so it starts a line of its own instead of shrinking to a sliver; only alone on its
+  line does it shrink and wrap.
+- **Sweep and guard.** `MetaLine` wraps (`flex-row flex-wrap gap-y-1`): the pieces stay beside the
+  tag when they fit and go under it when they do not. The other `min-w-0 shrink` texts in rows
+  (period stepper, task header, the gallery's tag rows) pass the worst-case sweep at 320 in all
+  four sets. `task-row.test.tsx` pins the wrap and the natural basis; the sweep at 320 is the
+  outcome guard, and `docs/design.md`'s pre-PR checklist now has every layout commit run
+  `worst-case.e2e.ts` and `overlays.e2e.ts` before it is committed.
+
 ### 360. A caller that reaches below the shared path and skips the step it adds
 - **Bug.** PR 55 follow-up review, item 1: the archive toast's Undo (`undoArchive`) staged its
   revocation with `state.stage(…)` to get an in-queue check, below `stageEmit`, which is where the

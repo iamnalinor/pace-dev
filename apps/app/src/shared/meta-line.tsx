@@ -86,7 +86,10 @@ export const MetaLine = ({
   const tagLabel = tag === null ? null : rowTagLabel(tag.tag, viewer.language);
   return (
     // Leading-aligned: a second line of pieces starts under the first, the tag stays on the first.
-    <View className="flex-row items-start gap-x-2">
+    // The row wraps: when the tag and the importance leave the pieces less than their own width,
+    // the pieces start a line of their own under the tag instead of shrinking to a sliver («о с.»
+    // in 12 px at 320, bug-lessons 355).
+    <View className="flex-row flex-wrap items-start gap-x-2 gap-y-1">
       {tag === null || tagLabel === null ? null : (
         <View className="max-w-1/2 shrink-0">
           <Tag hue={tag.color}>{tagLabel}</Tag>
@@ -109,7 +112,9 @@ export const MetaLine = ({
         </View>
       ) : null}
       {texts.length === 0 ? null : (
-        // The first line sits on the tag's centre line (a tag is 20, a footnote line 18).
+        // The first line sits on the tag's centre line (a tag is 20, a footnote line 18). Its basis
+        // is its own width (the row's wrap decides on it); alone on a line it shrinks and wraps
+        // between pieces.
         <View className="min-h-5 min-w-0 shrink justify-center">
           <Text
             full={texts.map((piece) => piece.text).join(" · ")}
