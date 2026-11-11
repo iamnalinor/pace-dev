@@ -16,12 +16,12 @@ test.skip(
   "needs the checkpoint Worker run (PACE_E2E_CHECKPOINTS=1)",
 );
 
-test("boots year-old projections, preserves same-generation outbox and loads complete History/export once", async ({
+test("boots year-old projections, keeps the offline outbox of a copy that never pulled, and loads complete History/export once", async ({
   page,
 }, testInfo) => {
   const { token } = await loginViaApi(page);
   const seed = await seedCheckpointYear(token);
-  await preparePendingCopy(page, { storeId: seed.storeId, pending: seed.pending });
+  await preparePendingCopy(page, { pending: seed.pending });
   const traffic = recordSyncTraffic(page);
   await page.goto("/");
   await expect(nowTasks(page).getByText(seed.title, { exact: true })).toBeVisible();

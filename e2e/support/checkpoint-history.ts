@@ -4,7 +4,6 @@ import { inflateRawSync } from "node:zlib";
 
 import type { Event } from "@pace/core";
 
-import { API_URL } from "./login.ts";
 import { pushAsClient, ulid } from "./seed.ts";
 
 /** A year of immutable source, including correction chains and a target arriving after its amendment. */
@@ -15,7 +14,6 @@ export const seedCheckpointYear = async (
   readonly title: string;
   /** When the task was created: History at a minute later shows its creation first. */
   readonly createdAt: string;
-  readonly storeId: string;
   readonly pending: Event;
 }> => {
   const now = Date.now();
@@ -51,6 +49,9 @@ export const seedCheckpointYear = async (
       const at = new Date(start);
       at.setUTCMonth(start.getUTCMonth() + month);
       at.setUTCDate(day + 2);
+      // An hour after the task's creation: one device's events at one instant are one write, and
+      // History shows a write as one row (owner R27-05), so the creation would be folded in.
+      at.setUTCHours(10);
       events.push(envelope("settings.updated", at.getTime(), { language: "en", timezone: "UTC" }));
     }
   }
@@ -87,29 +88,28 @@ export const seedCheckpointYear = async (
   if (answer.accepted.length !== events.length || answer.rejected.length > 0) {
     throw new Error("year seed lost source events");
   }
-  const pulled = await fetch(`${API_URL}/api/sync/pull?limit=1`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  const { storeId } = (await pulled.json()) as { readonly storeId: string };
   return {
     events,
     title,
     createdAt: created.occurredAt,
-    storeId,
     pending: envelope("settings.updated", now - 1000, { language: "en" }),
   };
 };
 
-/** Install an offline outbox on the same confirmed generation before any application script runs. */
+/**
+Install an offline outbox before any application script runs: a copy that has never pulled (no
+store id, cursor 0), so its first run bootstraps from the checkpoint and keeps the outbox. A copy
+that knows a store id has pulled once, even at cursor 0, and is a full one (bug-lessons 363).
+*/
 export const preparePendingCopy = async (
   page: Page,
-  input: { readonly storeId: string; readonly pending: Event },
+  input: { readonly pending: Event },
 ): Promise<void> => {
   await page.route("**/checkpoint-local-setup", async (route) => {
     await route.fulfill({ contentType: "text/html", body: "<html><body></body></html>" });
   });
   await page.goto("/checkpoint-local-setup");
-  await page.evaluate(async ({ storeId, pending }) => {
+  await page.evaluate(async ({ pending }) => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = globalThis.indexedDB.open("pace", 2);
       request.addEventListener("upgradeneeded", () => {
@@ -130,7 +130,6 @@ export const preparePendingCopy = async (
     tx.objectStore("events").put(pending);
     tx.objectStore("pending").put({ id: pending.id });
     const metadata = Object.entries({
-      storeId,
       cursor: "0",
       syncVersion: "1",
       coverage: "full",
