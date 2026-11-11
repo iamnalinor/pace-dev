@@ -1924,6 +1924,7 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-10 | Two fixes met: the shared instance reader (one `/api/instance` read at load) handed the checkpoint renegotiation the cached answer that had just failed the contract, so a long-lived tab never learned of the rollback | 362 | yes: `latest()` has one caller, the negotiation; every check that must be current uses `read()` | `checkpoint-sync-modes.test.ts` "asks the server what it offers again…" over a client with the shared reader |
 | 2026-11-10 | The city-first place order (`placeName`) was swept through the app and `notify-text`, but the login notice's integration tests still pinned "Germany, Berlin": four `bun test:api` failures, found when the waves were merged | 348 | yes: `grep` for the old order across `apps/api/tests` and `e2e` | the full `bun test:api` runs before a wave that changes shared copy is handed over |
 | 2026-11-11 | The opt-in checkpoint e2e seeded "a copy that never pulled" with the server's store id at cursor 0, which since class 363 is a copy that has pulled (a full one), so no bootstrap ran; once seeded right, its year of settings rows shared the creation's device and instant and History folded the creation into one write (owner R27-05) | 363, 137 | yes: the other e2e seeds that write a local copy (`preparePendingCopy` is the only one) | the seed writes no store id, and the settings rows sit an hour after the creation; the opt-in step runs in CI on every push |
+| 2026-11-11 | Wave review, item 1: a connect's hello judged the copy while a direct `syncNow()` hung; the run then failed with no backoff and the offline line stayed up beside a live socket until the 5-min poll (or an empty second pull went out) | 370 (new) | yes: `firstTickIn` waits through `isFresh`; no other reader decides on the run's state before it settles | `sync-client.test.ts`: a hello during a run that fails leads to a run; one during a run that reaches the head asks no second pull |
 
 ### 125. A live region around a ticking value
 - **Bug.** PR B 4.2 (F-A11Y-10): the running row sat in `accessibilityLiveRegion="polite"` around the
@@ -3752,3 +3753,19 @@ New bugs go here with their class; a new class gets its own section above.
   and says in its header that it reads zod's JSON Schema output. Swept every test that writes a
   file: the only other one (`apps/app/ota-build-config.test.ts`) writes into a `mkdtemp` folder;
   the presets' previous-release test (`old-reader-compat.test.ts`) only reads.
+
+### 370. A decision taken while the run that settles it is still in flight
+- **Bug.** Wave review, item 1: `catchUpTo` (a connect's hello) judged the copy at once. On a
+  return to the app a direct `syncNow()` was still hanging over HTTP: `lastError` was still null and
+  the cursor at the head, so it asked nothing; the run then failed, and a direct run schedules no
+  backoff, so the app showed offline next to a connected socket until the 5-minute poll. The same
+  early judgement asked an empty second pull when the hello came before the run moved the cursor.
+- **Missed because.** The hello tests called `catchUpTo` on a loop at rest; none held a run open
+  across the hello and settled it after.
+- **Rule.** A decision that reads what a run in flight is about to write (its error, the cursor,
+  the outbox) waits for that run and reads after it. Test it with the run held by a deferred
+  answer, settled both ways after the decision was asked.
+- **Sweep and guard.** The other readers of the run's state either wait already (`firstTickIn`
+  reads `isFresh`, false while a run is in flight) or follow the status store (`followSyncedLanguage`
+  acts on the transition). `sync-client.test.ts` "runs after a direct run in flight at the hello
+  fails…" and "asks no second pull when the run in flight at the hello brings the copy to the head".

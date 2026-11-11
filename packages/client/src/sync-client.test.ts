@@ -134,6 +134,70 @@ describe("createSyncClient catching up to a connect's hello (QA PR55-1-12)", () 
     sync.stop();
   });
 
+  /** Like `caughtUp`, but the next pull hangs until `gate.answer` settles it (class 370). */
+  const caughtUpWithHungPull = async () => {
+    const gate = { answer: (_page: unknown): void => undefined, isClosed: false };
+    const { calls, state, store, sync } = await setup({
+      "GET /api/sync/pull": async ({ url }) => {
+        if (url.searchParams.get("since") === "0") {
+          return { events: localEvents(2), more: false, seq: 2, storeId: STORE_ID };
+        }
+        if (!gate.isClosed) {
+          return { events: [], more: false, seq: 3, storeId: STORE_ID };
+        }
+        gate.isClosed = false;
+        return await new Promise((resolve, reject) => {
+          gate.answer = (page) => {
+            if (page instanceof Error) {
+              reject(page);
+            } else {
+              resolve(page);
+            }
+          };
+        });
+      },
+      "POST /api/sync/push": acceptAll,
+    });
+    await sync.syncNow();
+    vi.useFakeTimers();
+    sync.start({ intervalMs: 60_000 });
+    await vi.advanceTimersByTimeAsync(0);
+    const before = calls.length;
+    gate.isClosed = true;
+    const pulls = () => calls.slice(before).filter((call) => call.path === "/api/sync/pull");
+    return { gate, pulls, state, store, sync };
+  };
+
+  it("runs after a direct run in flight at the hello fails: the offline line does not wait for the poll", async () => {
+    const { gate, pulls, sync } = await caughtUpWithHungPull();
+    const direct = sync.syncNow();
+    await vi.advanceTimersByTimeAsync(0);
+    const catching = sync.catchUpTo({ seq: 2, storeId: STORE_ID });
+    await vi.advanceTimersByTimeAsync(0);
+    gate.answer(new TypeError("Failed to fetch"));
+    await direct;
+    await catching;
+    expect(sync.status.getState().online).toBe(false);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(pulls().length).toBeGreaterThanOrEqual(2);
+    expect(sync.status.getState().online).toBe(true);
+    sync.stop();
+  });
+
+  it("asks no second pull when the run in flight at the hello brings the copy to the head", async () => {
+    const { gate, pulls, sync } = await caughtUpWithHungPull();
+    const direct = sync.syncNow();
+    await vi.advanceTimersByTimeAsync(0);
+    const catching = sync.catchUpTo({ seq: 3, storeId: STORE_ID });
+    await vi.advanceTimersByTimeAsync(0);
+    gate.answer({ events: localEvents(1), more: false, seq: 3, storeId: STORE_ID });
+    await direct;
+    await catching;
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(pulls()).toHaveLength(1);
+    sync.stop();
+  });
+
   it("runs when the copy holds writes the server has not got", async () => {
     const { calls, state, sync } = await caughtUp();
     await state.dispatch({
