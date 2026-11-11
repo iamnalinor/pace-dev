@@ -187,7 +187,7 @@ export class UserStore extends HistoryStore {
   }
 
   /** Where the log stands: the seq and store a pull that reached its end answers with. */
-  async logHead(): Promise<{ readonly seq: number; readonly storeId: string }> {
+  async logHead(): ReturnType<HistoryStore["logHead"]> {
     return { seq: await log.latestSeq(this.db), storeId: await storeIdOf(this.ctx.storage) };
   }
 

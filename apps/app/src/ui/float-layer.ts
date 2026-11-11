@@ -5,8 +5,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { layout, space } from "@pace/core";
 
-/** A part of the bottom chrome or of the stack over it that tells the layer its height. */
-type Publish = (key: string, height: null | number) => void;
+/** A part of the chrome, the stack over it or the column that tells the layer its size. */
+type Publish = (key: string, size: null | number) => void;
 
 /** Where the content region is across the window (the sidebar or the rail beside it). */
 type Region = { readonly x: number; readonly width: number };
@@ -60,15 +60,18 @@ export const PlaceContext = createContext<FloatPlace>({
   right: SIDE_GAP,
 });
 
-/** Heights by who published them; a part that goes away takes its height with it. */
-const useHeights = () => {
-  const [heights, setHeights] = useState<Readonly<Record<string, number>>>({});
-  const publish = useCallback<Publish>((key, height) => {
-    setHeights(({ [key]: _gone, ...others }) =>
-      height === null ? others : { ...others, [key]: height },
+/**
+Sizes by who published them (a height, or the column's width), and the largest; a part that goes
+away takes its size with it.
+*/
+const usePublishedSizes = () => {
+  const [sizes, setSizes] = useState<Readonly<Record<string, number>>>({});
+  const publish = useCallback<Publish>((key, size) => {
+    setSizes(({ [key]: _gone, ...others }) =>
+      size === null ? others : { ...others, [key]: size },
     );
   }, []);
-  return { publish, tallest: Math.max(0, ...Object.values(heights)) };
+  return { largest: Math.max(0, ...Object.values(sizes)), publish };
 };
 
 /** Publishes `height` under a key of its own while `isActive`; takes it back when it stops. */
@@ -162,10 +165,10 @@ export const useFloatLayer = ({
   readonly toast: null | number;
 }) => {
   const insets = useSafeAreaInsets();
-  const footers = useHeights();
-  const tabBars = useHeights();
-  const statuses = useHeights();
-  const columns = useHeights();
+  const footers = usePublishedSizes();
+  const tabBars = usePublishedSizes();
+  const statuses = usePublishedSizes();
+  const columns = usePublishedSizes();
   const [region, setRegion] = useState<null | Region>(null);
   const publishers = useMemo<Publishers>(
     () => ({
@@ -178,10 +181,10 @@ export const useFloatLayer = ({
     [columns.publish, footers.publish, statuses.publish, tabBars.publish],
   );
   // The column's trailing edge: the region's, or the column's where it is narrower.
-  const column = columns.tallest > 0 ? columns.tallest : Infinity;
+  const column = columns.largest > 0 ? columns.largest : Infinity;
   const columnRight = region === null ? null : region.x + Math.min(region.width, column);
-  const chromeBottom = Math.max(tabBars.tallest, insets.bottom) + footers.tallest + CHROME_GAP;
-  const statusLift = statuses.tallest > 0 ? statuses.tallest + STACK_GAP : 0;
+  const chromeBottom = Math.max(tabBars.largest, insets.bottom) + footers.largest + CHROME_GAP;
+  const statusLift = statuses.largest > 0 ? statuses.largest + STACK_GAP : 0;
   // What the stack covers of the content's foot: the gap under it, the stack, air above it.
   const stack = statusLift + (toast ?? 0);
   const place = useMemo<FloatPlace>(

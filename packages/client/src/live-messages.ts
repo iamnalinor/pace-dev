@@ -1,9 +1,6 @@
-import { type LiveServerMessage, LiveServerMessageSchema } from "@pace/core";
+import { type LiveServerMessage, LiveServerMessageSchema, type LogHead } from "@pace/core";
 
 import type { LiveEventsPage } from "./live-types.ts";
-
-/** Where the server's log stood as the socket opened (a v2 hello from this build on). */
-export type LogHead = { readonly seq: number; readonly storeId: string };
 
 export type LiveHandlers = {
   readonly open: () => void;

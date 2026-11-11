@@ -1,4 +1,11 @@
-import { type Event, type KnownLiveServerMessage, LIVE_PAGE, LIVE_V1, LIVE_V2 } from "@pace/core";
+import {
+  type Event,
+  type KnownLiveServerMessage,
+  LIVE_PAGE,
+  LIVE_V1,
+  LIVE_V2,
+  type LogHead,
+} from "@pace/core";
 
 import type { AppBindings } from "../shared/ports/bindings.ts";
 import type { ActorContext, LiveSocket } from "../shared/ports/live-channel.ts";
@@ -31,9 +38,6 @@ const sendTo = (socket: LiveSocket, message: KnownLiveServerMessage): void => {
     // A socket closing meanwhile: its client reconnects and pulls anyway.
   }
 };
-
-/** Where the log stands: the seq and store a pull from it would answer with. */
-export type LogHead = { readonly seq: number; readonly storeId: string };
 
 /**
 Accepts a live client as a hibernating WebSocket (no duration billed while it is quiet), tagged

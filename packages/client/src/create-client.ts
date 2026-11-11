@@ -1,8 +1,7 @@
-import { endpoints, type EndpointShape, type LiveNotice } from "@pace/core";
+import { endpoints, type EndpointShape, type LiveNotice, type LogHead } from "@pace/core";
 
 import type { PaceClientOptions } from "./create-client-types.ts";
 import type { HistoryCoordinator } from "./history-types.ts";
-import type { LogHead } from "./live-messages.ts";
 import type { AppStateHandle } from "./state.ts";
 import type { SyncClient } from "./sync-client.ts";
 

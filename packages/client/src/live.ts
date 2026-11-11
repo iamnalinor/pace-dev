@@ -5,12 +5,13 @@ import {
   LIVE_V2,
   type LiveClientMessage,
   type LiveServerMessage,
+  type LogHead,
   PROTOCOL,
 } from "@pace/core";
 
 import type { LiveEventsPage } from "./live-types.ts";
 
-import { type LiveHandlers as Handlers, type LogHead, onLiveMessage } from "./live-messages.ts";
+import { type LiveHandlers as Handlers, onLiveMessage } from "./live-messages.ts";
 import { createRequests, LiveUnavailable } from "./live-requests.ts";
 import { createRun, type Run } from "./live-run.ts";
 import { createTimers, type LiveTimers, retryDelay } from "./live-timers.ts";

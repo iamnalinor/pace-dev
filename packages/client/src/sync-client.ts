@@ -1,8 +1,7 @@
 import { createStore, type StoreApi } from "zustand/vanilla";
 
-import { err, type Result } from "@pace/core";
+import { err, type LogHead, type Result } from "@pace/core";
 
-import type { LogHead } from "./live-messages.ts";
 import type { PullPage } from "./sync-transport.ts";
 
 import {

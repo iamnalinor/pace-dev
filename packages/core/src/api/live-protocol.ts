@@ -90,6 +90,13 @@ export const parseLiveClientMessage = (
   return parsed.success ? ok(parsed.data) : err(LIVE_BAD_REQUEST);
 };
 
+/**
+Where the server's log stands: the seq and store a pull from it would answer with. The v2 hello
+carries it (both fields, from this build on); the Durable Object reads it, the client compares
+its copy with it (`catchUpTo`).
+*/
+export type LogHead = { readonly seq: number; readonly storeId: string };
+
 const SyncMessages = [
   /**
   The first message on a v2 socket: the server speaks it, and (from this build on) where its log
