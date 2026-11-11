@@ -1925,6 +1925,7 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-10 | The city-first place order (`placeName`) was swept through the app and `notify-text`, but the login notice's integration tests still pinned "Germany, Berlin": four `bun test:api` failures, found when the waves were merged | 348 | yes: `grep` for the old order across `apps/api/tests` and `e2e` | the full `bun test:api` runs before a wave that changes shared copy is handed over |
 | 2026-11-11 | The opt-in checkpoint e2e seeded "a copy that never pulled" with the server's store id at cursor 0, which since class 363 is a copy that has pulled (a full one), so no bootstrap ran; once seeded right, its year of settings rows shared the creation's device and instant and History folded the creation into one write (owner R27-05) | 363, 137 | yes: the other e2e seeds that write a local copy (`preparePendingCopy` is the only one) | the seed writes no store id, and the settings rows sit an hour after the creation; the opt-in step runs in CI on every push |
 | 2026-11-11 | Wave review, item 1: a connect's hello judged the copy while a direct `syncNow()` hung; the run then failed with no backoff and the offline line stayed up beside a live socket until the 5-min poll (or an empty second pull went out) | 370 (new) | yes: `firstTickIn` waits through `isFresh`; no other reader decides on the run's state before it settles | `sync-client.test.ts`: a hello during a run that fails leads to a run; one during a run that reaches the head asks no second pull |
+| 2026-11-11 | Wave review, item 2: on the web Day showed screen time only for rows, and a failed read has none, so a 503 was silent (R23-08 again) | 371 (new), 62 | yes: Week's calendar shows its failure whatever its rows; the usage marks on blocks show no total | `day-web.test.tsx`: the failed read says so with Try again; one Retry beside the offline sync line; an empty answer stays silent |
 
 ### 125. A live region around a ticking value
 - **Bug.** PR B 4.2 (F-A11Y-10): the running row sat in `accessibilityLiveRegion="polite"` around the
@@ -3769,3 +3770,19 @@ New bugs go here with their class; a new class gets its own section above.
   reads `isFresh`, false while a run is in flight) or follow the status store (`followSyncedLanguage`
   acts on the transition). `sync-client.test.ts` "runs after a direct run in flight at the hello
   fails…" and "asks no second pull when the run in flight at the hello brings the copy to the head".
+
+### 371. A section shown for its rows only, so its failure has nowhere to appear
+- **Bug.** Wave review, item 2: the web's Day showed screen time only when the day had rows (class
+  323). `useRangeRead` reports a failure only with no rows, so on the web the failure sentence could
+  never show: a read that failed looked the same as a day nothing was sent for, class 62 / R23-08
+  again (a computer's screen time is real on the web).
+- **Missed because.** The fix for 323 was tested with an empty answer and with a 503, and the 503
+  test asserted the silence as the wanted behaviour; no test said what a failed read owes the
+  person on the web.
+- **Rule.** A condition that hides a section for "no data" lets its failure through: the guard
+  is "rows, or the read failed", never "rows" alone. One Retry per offline state still holds
+  (`useBlockRetry`).
+- **Sweep and guard.** The other reads behind a section: Week's calendar shows `CalendarFailed`
+  whatever its rows; Week's and the activity sheet's usage draw marks on blocks with no total or
+  "none". `day-web.test.tsx`: a 503 shows the sentence and its Try again reads again; offline
+  beside the sync line there is one Retry; an empty answer shows nothing.

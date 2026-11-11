@@ -213,9 +213,10 @@ const DayPage = ({
         <Phone.CalendarSection entries={day.entries} phone={phone} zone={day.zone} />
       ) : null}
       {/* The web records no screen time: the section shows there only for what a phone or a
-          computer sent (QA PR55-1-08: «0 мин · Нет данных» on every day, and a failure to load
-          what was never there). */}
-      {IS_PHONE || usageRead.rows.length > 0 ? (
+          computer sent (QA PR55-1-08: «0 мин · Нет данных» on every day), or for a read that
+          failed, since a computer may have sent some (R23-08, class 371): its Retry stays the
+          sync line's while the line offers one (`useBlockRetry`). */}
+      {IS_PHONE || usageRead.rows.length > 0 || usageRead.isFailed ? (
         <ScreenTimeSection
           date={day.date}
           isFailed={usageRead.isFailed}
