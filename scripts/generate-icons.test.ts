@@ -5,6 +5,10 @@ import { color } from "@pace/core";
 
 import { ICONS, LOGO_FILES, pngDimensions, renderPng } from "./generate-icons.ts";
 
+// Rendering every icon (up to 1024 px) takes about 6 s on a loaded CI runner, past Bun's default
+// 5 s per test, so the timeout is explicit.
+const RENDER_ALL_MS = 60_000;
+
 describe("generate-icons", () => {
   it("declares every committed icon with its target size", () => {
     const byPath = new Map(ICONS.map((icon) => [icon.path, icon.size]));
@@ -27,12 +31,16 @@ describe("generate-icons", () => {
     expect(svgOf.get("assets/logo/bot-avatar.png")).toBe(app);
   });
 
-  it("renders every icon as a square PNG of the declared size", () => {
-    for (const icon of ICONS) {
-      const png = renderPng(icon.svg, icon.size);
-      expect(pngDimensions(png), icon.path).toEqual({ height: icon.size, width: icon.size });
-    }
-  });
+  it(
+    "renders every icon as a square PNG of the declared size",
+    () => {
+      for (const icon of ICONS) {
+        const png = renderPng(icon.svg, icon.size);
+        expect(pngDimensions(png), icon.path).toEqual({ height: icon.size, width: icon.size });
+      }
+    },
+    RENDER_ALL_MS,
+  );
 
   it("renders deterministically", () => {
     const [first] = ICONS;
